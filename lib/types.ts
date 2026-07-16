@@ -455,8 +455,29 @@ export interface AICallRecord {
   source: "ai" | "rule" | "fallback";
   /** 关联资源 ID（如 planId / questionId / conversationId，用于反馈归因） */
   refId?: string;
+  /** Token 使用量（可选，仅当 API 返回时填充，用于成本追踪） */
+  tokenUsage?: TokenUsage;
+  /** 估算成本 USD（可选，由客户端 estimateCost 计算） */
+  estimatedCost?: number;
+  /** 模型 ID（可选，用于成本归因，如 glm-4-flash / deepseek-chat） */
+  modelId?: string;
   /** 时间 */
   createdAt: string;
+}
+
+/**
+ * AI 调用的 token 使用量（用于成本追踪）
+ * 数据来源：
+ *   - 流式：Vercel AI SDK data stream protocol 的 "d:" finish 消息中的 usage 字段
+ *   - 非流式：generateObject 返回的 result.usage
+ */
+export interface TokenUsage {
+  /** 输入 token 数（prompt tokens） */
+  prompt: number;
+  /** 输出 token 数（completion tokens） */
+  completion: number;
+  /** 总 token 数（一般 = prompt + completion） */
+  total: number;
 }
 
 /** AI 输出反馈动作（显式 + 隐式） */

@@ -68,6 +68,21 @@ function fmtRating(v: number | null): string {
   return v.toFixed(1);
 }
 
+// 格式化 token 数（带 K/M 简写）
+function fmtTokens(n: number): string {
+  if (n === 0) return "—";
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
+  return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
+// 格式化 USD 成本
+function fmtCost(v: number): string {
+  if (v === 0) return "—";
+  if (v < 0.01) return `$${v.toFixed(6)}`;
+  return `$${v.toFixed(4)}`;
+}
+
 export default function AIQualityPage() {
   const [report, setReport] = useState<QualityReport | null>(null);
   const [range, setRange] = useState<Range>("30d");
@@ -156,21 +171,27 @@ export default function AIQualityPage() {
             <StatCard label="AI 调用" value={String(report.totalCalls)} icon="sparkles" />
             <StatCard label="用户反馈" value={String(report.totalFeedback)} icon="message-circle" />
             <StatCard
-              label="时间范围"
-              value={
-                report.period.from
-                  ? `${report.period.from.slice(0, 10)} ~ ${report.period.to?.slice(0, 10) ?? ""}`
-                  : "—"
-              }
-              icon="calendar"
-              small
+              label="Token 总量"
+              value={fmtTokens(report.totalTokens)}
+              icon="zap"
             />
             <StatCard
-              label="场景数"
-              value={String(report.scenes.length)}
-              icon="target"
+              label="估算成本"
+              value={fmtCost(report.totalCost)}
+              icon="trending-up"
             />
           </div>
+
+          {/* 时间范围副信息 */}
+          <p className="text-xs text-gray-400 -mt-3">
+            时间范围：
+            {report.period.from
+              ? `${report.period.from.slice(0, 10)} ~ ${report.period.to?.slice(0, 10) ?? ""}`
+              : "—"}
+            {" · "}
+            场景数 {report.scenes.length}
+            {report.totalTokens > 0 && " · 成本基于模型定价表估算（USD）"}
+          </p>
 
           {pruned !== null && pruned > 0 && (
             <p className="text-xs text-gray-400">
@@ -191,6 +212,8 @@ export default function AIQualityPage() {
                     <th className="text-right px-3 py-2 font-medium">采纳率</th>
                     <th className="text-right px-3 py-2 font-medium">再生成率</th>
                     <th className="text-right px-3 py-2 font-medium">平均耗时</th>
+                    <th className="text-right px-3 py-2 font-medium">Token 数</th>
+                    <th className="text-right px-3 py-2 font-medium">成本</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -214,13 +237,19 @@ export default function AIQualityPage() {
                         <td className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">
                           {fmtDuration(s.avgDurationMs)}
                         </td>
+                        <td className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">
+                          {fmtTokens(s.totalTokens)}
+                        </td>
+                        <td className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">
+                          {fmtCost(s.totalCost)}
+                        </td>
                       </tr>
                     ))}
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              采纳率 = adopted / (adopted + discarded) · 再生成率 = regenerated / calls · 评分仅来自显式反馈
+              采纳率 = adopted / (adopted + discarded) · 再生成率 = regenerated / calls · 评分仅来自显式反馈 · Token/成本仅统计有 usage 记录的调用
             </p>
           </section>
 

@@ -12,6 +12,7 @@ import { streamText } from "ai";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireAuth } from "@/lib/auth";
 import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
+import { getProviderInfo } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
 import { createKVStore } from "@/lib/storage/kv";
@@ -138,14 +139,35 @@ export async function POST(req: NextRequest) {
     const hasTools = toolContext && Array.isArray(toolContext.plans);
     const tools = hasTools ? createChatTools(toolContext!) : undefined;
 
+    // 解析当前使用的模型 ID（用于客户端成本估算）
+    // - 用户自定义模型：从 modelConfig.model 取
+    // - 服务端默认模型：从 getProviderInfo().model 取
+    const currentModelId = useServerModel
+      ? getProviderInfo().model
+      : modelConfig?.model ?? "unknown";
+
     const result = await streamText({
       model,
       messages,
       system: systemPrompt,
       ...(tools ? { tools, maxSteps: 5 } : {}),
+      // onFinish 回调：流式完成后服务端观测 usage（用于服务端日志/未来扩展）
+      // 客户端通过解析 data stream protocol 的 "d:" finish 消息直接拿到 usage
+      onFinish: ({ usage, finishReason }) => {
+        console.info("[chat] usage", {
+          modelId: currentModelId,
+          promptTokens: usage?.promptTokens,
+          completionTokens: usage?.completionTokens,
+          totalTokens: usage?.totalTokens,
+          finishReason,
+        });
+      },
     });
 
-    return result.toDataStreamResponse();
+    const response = result.toDataStreamResponse();
+    // 通过响应头传递 modelId，客户端用于成本估算（与 "d:" 消息中的 usage 配合）
+    response.headers.set("X-AI-Model-Id", currentModelId);
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
     return NextResponse.json({ error: message }, { status: 500 });

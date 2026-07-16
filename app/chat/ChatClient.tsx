@@ -43,6 +43,7 @@ import {
   makeInputDigest,
   makeOutputDigest,
   generateCallId,
+  parseUsageFromFinishMessage,
 } from "@/lib/ai/quality-tracker";
 
 // 内置提示词库
@@ -505,6 +506,9 @@ export default function ChatClient() {
         return { error: "响应没有流式内容" };
       }
 
+      // 从响应头读取模型 ID（用于成本估算）
+      const responseModelId = res.headers.get("X-AI-Model-Id") ?? undefined;
+
       setStreaming(true);
       setStreamContent("");
 
@@ -513,6 +517,8 @@ export default function ChatClient() {
       let buffer = "";
       let acc = "";
       const pendingActions: ClientAction[] = [];
+      // 从 data stream protocol 的 "d:" finish 消息中提取的 token usage
+      let tokenUsage: import("@/lib/types").TokenUsage | undefined;
 
       const parseDataLine = (line: string): string => {
         const idx = line.indexOf(":");
@@ -538,6 +544,11 @@ export default function ChatClient() {
           } catch {
             /* ignore */
           }
+        }
+        // data stream protocol v3+: "d:" 是 finish 消息，包含 usage 信息
+        if (type === "d") {
+          const usage = parseUsageFromFinishMessage(payload);
+          if (usage) tokenUsage = usage;
         }
         return "";
       };
@@ -603,7 +614,7 @@ export default function ChatClient() {
         }
       }
 
-      // AI 质量追踪
+      // AI 质量追踪（含 token 使用量 + 成本估算）
       const durationMs = stopTimer();
       aiCallIdMap.current.set(aiMsg.id, callId);
       void recordAICall({
@@ -619,6 +630,8 @@ export default function ChatClient() {
         durationMs,
         source: "ai",
         refId: params.convId,
+        tokenUsage,
+        modelId: responseModelId,
       }).catch(() => {});
 
       return { content: finalContent, callId };

@@ -21,7 +21,7 @@
 //   - 数据格式损坏：读取时 try/catch 跳过
 
 import { getItem, setItem, listItems, listKeys, delItem } from "@/lib/storage/db";
-import { KEY_PREFIXES, type AICallRecord, type AIFeedback, type AIScene, type AIFeedbackRating, type AIFeedbackAction, type AIImplicitAction } from "@/lib/types";
+import { KEY_PREFIXES, type AICallRecord, type AIFeedback, type AIScene, type AIFeedbackRating, type AIFeedbackAction, type AIImplicitAction, type TokenUsage } from "@/lib/types";
 import { PROMPTS, type PromptId, promptFingerprint } from "./prompts";
 
 // ============ 环境检测 ============
@@ -115,6 +115,101 @@ export function startTimer(): () => number {
   return () => Math.round(performance.now() - start);
 }
 
+// ============ 成本估算 ============
+
+/**
+ * 主流模型定价表（USD / 1M tokens，2024-2025 公开价格）
+ * 来源：各 provider 官网定价页
+ *
+ * 维护规则：
+ *   - 添加新模型时同步更新此表
+ *   - 未在表中的模型走 DEFAULT_PRICING（保守估值）
+ *   - 价格变动时更新并 bump 版本注释
+ */
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // GLM（智谱）— https://open.bigmodel.cn/pricing
+  "glm-4-flash": { input: 0.1, output: 0.1 }, // 免费额度后价格
+  "glm-4-air": { input: 0.5, output: 0.5 },
+  "glm-4-airx": { input: 1.0, output: 1.0 },
+  "glm-4": { input: 3.5, output: 3.5 },
+  "glm-4-plus": { input: 5.0, output: 5.0 },
+  // DeepSeek — https://api-docs.deepseek.com/quick_start/pricing
+  "deepseek-chat": { input: 0.14, output: 0.28 },
+  "deepseek-reasoner": { input: 0.55, output: 2.19 },
+  // MiMo（小米）— 估算
+  "mimo-v2-pro": { input: 0.5, output: 0.5 },
+  // OpenAI（用户自定义 key 时可能使用）
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "gpt-4-turbo": { input: 10, output: 30 },
+};
+
+/** 未知模型的保守默认定价（USD / 1M tokens） */
+const DEFAULT_PRICING = { input: 0.5, output: 0.5 };
+
+/**
+ * 规范化模型 ID：去掉 provider 前缀（如 "openai/gpt-4o" → "gpt-4o"），小写
+ * 用于匹配 MODEL_PRICING 表
+ */
+export function normalizeModelId(modelId: string): string {
+  if (!modelId) return "";
+  // 去掉 provider 前缀
+  const parts = modelId.split("/");
+  const name = parts[parts.length - 1];
+  // 去掉可能的版本后缀日期（如 gpt-4-0314 → gpt-4）— 简化处理
+  return name.toLowerCase().trim();
+}
+
+/**
+ * 根据模型 ID 和 token 使用量估算成本（USD）
+ *
+ * @param modelId 模型 ID（如 "glm-4-flash" / "deepseek-chat"）
+ * @param usage token 使用量
+ * @returns 估算成本 USD（保留 6 位小数）
+ *
+ * 用法：
+ *   const cost = estimateCost("glm-4-flash", { prompt: 1000, completion: 500, total: 1500 });
+ *   // → 0.00015
+ */
+export function estimateCost(modelId: string, usage: TokenUsage): number {
+  if (!usage || usage.total === 0) return 0;
+  const normalized = normalizeModelId(modelId);
+  const pricing = MODEL_PRICING[normalized] ?? DEFAULT_PRICING;
+  const cost =
+    (usage.prompt / 1_000_000) * pricing.input +
+    (usage.completion / 1_000_000) * pricing.output;
+  return Number(cost.toFixed(6));
+}
+
+/**
+ * 从 Vercel AI SDK data stream protocol 的 "d:" finish 消息中解析 usage
+ *
+ * data stream protocol 格式（v3+）：
+ *   d:{"finishReason":"stop","usage":{"promptTokens":5,"completionTokens":10},...}
+ *
+ * @param payload "d:" 后的 JSON 字符串
+ * @returns TokenUsage 或 null（无法解析时）
+ */
+export function parseUsageFromFinishMessage(payload: string): TokenUsage | null {
+  try {
+    const parsed = JSON.parse(payload) as {
+      usage?: {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      };
+    };
+    if (!parsed.usage) return null;
+    const prompt = parsed.usage.promptTokens ?? 0;
+    const completion = parsed.usage.completionTokens ?? 0;
+    const total = parsed.usage.totalTokens ?? prompt + completion;
+    if (prompt === 0 && completion === 0) return null;
+    return { prompt, completion, total };
+  } catch {
+    return null;
+  }
+}
+
 // ============ 写入：AICallRecord ============
 
 export interface RecordAICallInput {
@@ -136,6 +231,12 @@ export interface RecordAICallInput {
   refId?: string;
   /** 显式指定 callId（不传则自动生成） */
   callId?: string;
+  /** Token 使用量（可选，从流式 d: 消息或 generateObject.usage 提取） */
+  tokenUsage?: TokenUsage;
+  /** 估算成本 USD（可选，不传时由 recordAICall 根据 modelId + tokenUsage 自动计算） */
+  estimatedCost?: number;
+  /** 模型 ID（可选，如 glm-4-flash / deepseek-chat，用于成本归因） */
+  modelId?: string;
 }
 
 /**
@@ -166,6 +267,12 @@ export async function recordAICall(input: RecordAICallInput): Promise<string> {
   const def = PROMPTS[input.promptId];
   const promptVersion = def ? promptFingerprint(input.promptId, def.version) : `${input.promptId}:unknown`;
 
+  // 成本估算：若未显式提供，且同时有 tokenUsage + modelId，则自动计算
+  let estimatedCost = input.estimatedCost;
+  if (estimatedCost === undefined && input.tokenUsage && input.modelId) {
+    estimatedCost = estimateCost(input.modelId, input.tokenUsage);
+  }
+
   const record: AICallRecord = {
     id,
     scene: input.scene,
@@ -176,6 +283,9 @@ export async function recordAICall(input: RecordAICallInput): Promise<string> {
     durationMs: input.durationMs,
     source: input.source,
     refId: input.refId,
+    tokenUsage: input.tokenUsage,
+    estimatedCost,
+    modelId: input.modelId,
     createdAt: new Date().toISOString(),
   };
 
@@ -281,6 +391,12 @@ export interface SceneQualityStats {
   regenerationRate: number | null;
   /** 平均耗时 ms */
   avgDurationMs: number;
+  /** 总 token 数（仅有 usage 记录的调用累加） */
+  totalTokens: number;
+  /** 总估算成本 USD */
+  totalCost: number;
+  /** 平均单次调用成本 USD（无成本数据时为 0） */
+  avgCostPerCall: number;
 }
 
 export interface PromptVersionStats {
@@ -310,6 +426,10 @@ export interface QualityReport {
   totalCalls: number;
   /** 总反馈数 */
   totalFeedback: number;
+  /** 总 token 数（仅有 usage 记录的调用累加） */
+  totalTokens: number;
+  /** 总估算成本 USD */
+  totalCost: number;
   /** 数据时间范围 */
   period: { from: string | null; to: string | null };
 }
@@ -350,6 +470,9 @@ export async function getQualityReport(since?: string): Promise<QualityReport> {
     let adopted = 0;
     let discarded = 0;
     let regenerated = 0;
+    let totalTokens = 0;
+    let totalCost = 0;
+    let callsWithCost = 0;
     for (const c of sceneCalls) {
       const fs = feedbacksByCall.get(c.id) ?? [];
       for (const f of fs) {
@@ -357,6 +480,14 @@ export async function getQualityReport(since?: string): Promise<QualityReport> {
         if (f.action === "adopted") adopted++;
         if (f.action === "discarded") discarded++;
         if (f.action === "regenerated") regenerated++;
+      }
+      // token + 成本聚合（仅有 usage 记录的调用累加）
+      if (c.tokenUsage) {
+        totalTokens += c.tokenUsage.total ?? 0;
+      }
+      if (typeof c.estimatedCost === "number") {
+        totalCost += c.estimatedCost;
+        callsWithCost++;
       }
     }
     return {
@@ -368,6 +499,9 @@ export async function getQualityReport(since?: string): Promise<QualityReport> {
       avgDurationMs: sceneCalls.length > 0
         ? Math.round(sceneCalls.reduce((s, c) => s + c.durationMs, 0) / sceneCalls.length)
         : 0,
+      totalTokens,
+      totalCost: Number(totalCost.toFixed(6)),
+      avgCostPerCall: callsWithCost > 0 ? Number((totalCost / callsWithCost).toFixed(6)) : 0,
     };
   });
 
@@ -434,12 +568,25 @@ export async function getQualityReport(since?: string): Promise<QualityReport> {
     to: timestamps.length > 0 ? timestamps[timestamps.length - 1] : null,
   };
 
+  // 全局 token + 成本聚合
+  const totalTokens = filteredCalls.reduce(
+    (s, c) => s + (c.tokenUsage?.total ?? 0),
+    0,
+  );
+  const totalCost = Number(
+    filteredCalls
+      .reduce((s, c) => s + (typeof c.estimatedCost === "number" ? c.estimatedCost : 0), 0)
+      .toFixed(6),
+  );
+
   return {
     scenes,
     promptVersions,
     failureClusters,
     totalCalls: filteredCalls.length,
     totalFeedback: filteredFeedbacks.length,
+    totalTokens,
+    totalCost,
     period,
   };
 }

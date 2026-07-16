@@ -266,7 +266,7 @@ buildProfileContext(profile) → ≤500 字符文本
 | **反馈闭环** | 采纳率/再生成率/评分追踪 + prompt 版本对比 | ★★★★☆ |
 | **降级策略** | 限流 → 429 + 提示；画像缺失 → 跳过；模型不可用 → 规则兜底 | ★★★★☆ |
 | **用户建模** | 6 维画像（技能/时段/时长/薄弱/风格/目标），24h TTL | ★★★☆☆ |
-| **成本控制** | 场景化配额 + 用户自带 Key 跳过 + 节奏引擎不消耗 AI | ★★★★☆ |
+| **成本控制** | 场景化配额 + 用户自带 Key 跳过 + 节奏引擎不消耗 AI + token 用量追踪 + USD 成本估算 + 仪表盘可视化 | ★★★★★ |
 | **可观测性** | AI 质量看板 + 失败模式聚类 + prompt 版本归因 | ★★★★☆ |
 | **个性化** | Persona + 画像驱动计划生成 + 跳过已掌握节点 | ★★★★☆ |
 | **增量学习** | 能量回归模型在线训练，但画像是批量重建 | ★★☆☆☆ |
@@ -275,15 +275,16 @@ buildProfileContext(profile) → ≤500 字符文本
 
 ### 优化方向
 
-1. **AI 调用成本追踪**（P0）：记录每次调用的 token 用量 + 估算成本，加入 AI 质量看板
+1. **~~AI 调用成本追踪~~（P0 ✅ 已完成 2025-11）**：从 Vercel AI SDK data stream 协议解析 token usage，按模型定价表（`MODEL_PRICING`）估算 USD 成本，仪表盘展示 Token 总量 + 估算成本 + 场景级聚合。详见 `lib/ai/quality-tracker.ts` 的 `estimateCost()` / `parseUsageFromFinishMessage()`
 2. **模型 fallback 链**（P1）：主模型超时/失败时自动降级到备选模型（如 GLM → DeepSeek）
 3. **画像增量更新**（P1）：高频维度（averageSessionMinutes / weakAreas）事件驱动更新，低频维度（skillLevel）保持 24h 批量
 4. **Prompt A/B 测试**（P2）：同一场景同时跑两个 prompt 版本，对比采纳率自动选优
 5. **语义搜索**（P2）：对知识节点 summary 做向量化，支持「我想学 X」的模糊匹配
+6. **成本追踪扩展到非流式路由**（P1）：目前仅 `/api/chat` 接入成本追踪，扩展到 `/api/daily-nudge` / `/api/learn` / `/api/weekly-report` 等非流式路由
 
 ## 测试策略
 
-- **Vitest 单测**（379+）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit 等核心模块
+- **Vitest 单测**（403+）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking 等核心模块
 - **Playwright E2E**：主流程（首页 → 学习 → 复习 → 统计）+ 番茄时钟完整流程 + Demo 注入/清除
 - **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint
 

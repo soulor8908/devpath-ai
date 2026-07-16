@@ -20,6 +20,10 @@ import {
   startTimer,
   generateCallId,
   pruneOldRecords,
+  estimateCost,
+  normalizeModelId,
+  parseUsageFromFinishMessage,
+  MODEL_PRICING,
 } from "../lib/ai/quality-tracker";
 
 // 清理 IndexedDB
@@ -461,5 +465,239 @@ describe("pruneOldRecords", () => {
     expect(deleted).toBe(0);
     const after = await listAICalls();
     expect(after.length).toBe(before.length);
+  });
+});
+
+// ============ 成本估算 ============
+
+describe("normalizeModelId", () => {
+  it("去掉 provider 前缀", () => {
+    expect(normalizeModelId("openai/gpt-4o")).toBe("gpt-4o");
+    expect(normalizeModelId("custom/glm-4-flash")).toBe("glm-4-flash");
+  });
+
+  it("小写化", () => {
+    expect(normalizeModelId("GLM-4-Flash")).toBe("glm-4-flash");
+    expect(normalizeModelId("DeepSeek-Chat")).toBe("deepseek-chat");
+  });
+
+  it("空字符串返回空", () => {
+    expect(normalizeModelId("")).toBe("");
+  });
+
+  it("无前缀的模型名保持不变（仅小写）", () => {
+    expect(normalizeModelId("glm-4-flash")).toBe("glm-4-flash");
+  });
+});
+
+describe("estimateCost", () => {
+  it("GLM-4-Flash 已知价格", () => {
+    // glm-4-flash: $0.1/1M input + $0.1/1M output
+    const cost = estimateCost("glm-4-flash", { prompt: 1000, completion: 500, total: 1500 });
+    // 1000/1M * 0.1 + 500/1M * 0.1 = 0.0001 + 0.00005 = 0.00015
+    expect(cost).toBe(0.00015);
+  });
+
+  it("DeepSeek-Chat 输入输出差异定价", () => {
+    // deepseek-chat: $0.14/1M input + $0.28/1M output
+    const cost = estimateCost("deepseek-chat", { prompt: 1_000_000, completion: 0, total: 1_000_000 });
+    expect(cost).toBe(0.14);
+    const cost2 = estimateCost("deepseek-chat", { prompt: 0, completion: 1_000_000, total: 1_000_000 });
+    expect(cost2).toBe(0.28);
+  });
+
+  it("未知模型走 DEFAULT_PRICING", () => {
+    // DEFAULT_PRICING = { input: 0.5, output: 0.5 }
+    const cost = estimateCost("unknown-model-xyz", { prompt: 1_000_000, completion: 0, total: 1_000_000 });
+    expect(cost).toBe(0.5);
+  });
+
+  it("大小写不敏感（通过 normalizeModelId）", () => {
+    const c1 = estimateCost("GLM-4-FLASH", { prompt: 1000, completion: 0, total: 1000 });
+    const c2 = estimateCost("glm-4-flash", { prompt: 1000, completion: 0, total: 1000 });
+    expect(c1).toBe(c2);
+  });
+
+  it("去掉 provider 前缀后匹配", () => {
+    const c1 = estimateCost("openai/gpt-4o-mini", { prompt: 1_000_000, completion: 0, total: 1_000_000 });
+    // gpt-4o-mini: $0.15/1M input
+    expect(c1).toBe(0.15);
+  });
+
+  it("0 token 返回 0 成本", () => {
+    expect(estimateCost("glm-4-flash", { prompt: 0, completion: 0, total: 0 })).toBe(0);
+  });
+
+  it("保留 6 位小数精度", () => {
+    // 100 tokens * $0.1/1M = 0.00001
+    const cost = estimateCost("glm-4-flash", { prompt: 50, completion: 50, total: 100 });
+    expect(cost).toBe(0.00001);
+  });
+
+  it("MODEL_PRICING 包含主流模型", () => {
+    expect(MODEL_PRICING["glm-4-flash"]).toBeDefined();
+    expect(MODEL_PRICING["deepseek-chat"]).toBeDefined();
+    expect(MODEL_PRICING["deepseek-reasoner"]).toBeDefined();
+    // input/output 价格不同
+    expect(MODEL_PRICING["deepseek-chat"].output).toBeGreaterThan(MODEL_PRICING["deepseek-chat"].input);
+  });
+});
+
+describe("parseUsageFromFinishMessage", () => {
+  it("解析标准 finish 消息", () => {
+    const payload = JSON.stringify({
+      finishReason: "stop",
+      usage: { promptTokens: 50, completionTokens: 100, totalTokens: 150 },
+    });
+    const usage = parseUsageFromFinishMessage(payload);
+    expect(usage).toEqual({ prompt: 50, completion: 100, total: 150 });
+  });
+
+  it("无 usage 字段返回 null", () => {
+    const payload = JSON.stringify({ finishReason: "stop" });
+    expect(parseUsageFromFinishMessage(payload)).toBeNull();
+  });
+
+  it("缺 totalTokens 时自动求和", () => {
+    const payload = JSON.stringify({
+      finishReason: "stop",
+      usage: { promptTokens: 30, completionTokens: 70 },
+    });
+    const usage = parseUsageFromFinishMessage(payload);
+    expect(usage).toEqual({ prompt: 30, completion: 70, total: 100 });
+  });
+
+  it("0 tokens 返回 null（避免噪声）", () => {
+    const payload = JSON.stringify({
+      finishReason: "stop",
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    });
+    expect(parseUsageFromFinishMessage(payload)).toBeNull();
+  });
+
+  it("非法 JSON 返回 null", () => {
+    expect(parseUsageFromFinishMessage("not json{")).toBeNull();
+  });
+
+  it("空字符串返回 null", () => {
+    expect(parseUsageFromFinishMessage("")).toBeNull();
+  });
+});
+
+describe("recordAICall with tokenUsage + modelId", () => {
+  it("持久化 tokenUsage + modelId + estimatedCost", async () => {
+    const id = await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "test", outputDigest: "fields:0|test",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 1000, completion: 500, total: 1500 },
+      modelId: "glm-4-flash",
+    });
+
+    const calls = await listAICalls();
+    const record = calls.find((c) => c.id === id);
+    expect(record).toBeDefined();
+    expect(record?.tokenUsage).toEqual({ prompt: 1000, completion: 500, total: 1500 });
+    expect(record?.modelId).toBe("glm-4-flash");
+    // 自动计算 estimatedCost
+    expect(record?.estimatedCost).toBe(0.00015);
+  });
+
+  it("无 tokenUsage 时不设置 estimatedCost", async () => {
+    const id = await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "no-usage", outputDigest: "fields:0|no-usage",
+      schemaValid: true, durationMs: 500, source: "ai",
+    });
+
+    const calls = await listAICalls();
+    const record = calls.find((c) => c.id === id);
+    expect(record?.tokenUsage).toBeUndefined();
+    expect(record?.estimatedCost).toBeUndefined();
+    expect(record?.modelId).toBeUndefined();
+  });
+
+  it("显式 estimatedCost 覆盖自动计算", async () => {
+    const id = await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "explicit", outputDigest: "fields:0|explicit",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 1000, completion: 500, total: 1500 },
+      modelId: "glm-4-flash",
+      estimatedCost: 0.999, // 显式覆盖
+    });
+
+    const calls = await listAICalls();
+    const record = calls.find((c) => c.id === id);
+    expect(record?.estimatedCost).toBe(0.999);
+  });
+});
+
+describe("getQualityReport with cost aggregation", () => {
+  it("场景级别聚合 token + 成本", async () => {
+    // chat 场景 2 次调用，都有 usage
+    await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "c1", outputDigest: "fields:0|c1",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 1000, completion: 500, total: 1500 },
+      modelId: "glm-4-flash",
+    });
+    await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "c2", outputDigest: "fields:0|c2",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 2000, completion: 1000, total: 3000 },
+      modelId: "glm-4-flash",
+    });
+
+    const report = await getQualityReport();
+    const chatScene = report.scenes.find((s) => s.scene === "chat");
+    expect(chatScene).toBeDefined();
+    expect(chatScene?.totalTokens).toBe(4500); // 1500 + 3000
+    expect(chatScene?.totalCost).toBe(0.00045); // 0.00015 + 0.0003
+    expect(chatScene?.avgCostPerCall).toBeCloseTo(0.000225, 6);
+  });
+
+  it("全局聚合 token + 成本", async () => {
+    await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "g1", outputDigest: "fields:0|g1",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 1000, completion: 0, total: 1000 },
+      modelId: "glm-4-flash", // 0.0001
+    });
+    await recordAICall({
+      scene: "question_generate", promptId: "question_generate",
+      inputDigest: "g2", outputDigest: "fields:0|g2",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 2000, completion: 0, total: 2000 },
+      modelId: "glm-4-flash", // 0.0002
+    });
+
+    const report = await getQualityReport();
+    expect(report.totalTokens).toBe(3000);
+    expect(report.totalCost).toBe(0.0003);
+  });
+
+  it("无 usage 的调用不影响 token/cost 聚合", async () => {
+    await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "no-usage", outputDigest: "fields:0|no-usage",
+      schemaValid: true, durationMs: 500, source: "ai",
+      // 不传 tokenUsage / modelId
+    });
+    await recordAICall({
+      scene: "chat", promptId: "chat",
+      inputDigest: "with-usage", outputDigest: "fields:0|with-usage",
+      schemaValid: true, durationMs: 500, source: "ai",
+      tokenUsage: { prompt: 1000, completion: 0, total: 1000 },
+      modelId: "glm-4-flash",
+    });
+
+    const report = await getQualityReport();
+    expect(report.totalCalls).toBe(2);
+    expect(report.totalTokens).toBe(1000); // 只算有 usage 的
+    expect(report.totalCost).toBe(0.0001);
   });
 });

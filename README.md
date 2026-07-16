@@ -32,6 +32,7 @@
 - **Demo 站**：首次访问自动注入示例数据（前端工程师计划 + 3 张复习卡片 + 2 天学习日志），创建真实计划后可一键清除
 - **AI 调用限流**：按场景配额（聊天 20/日 / 计划生成 5/日 / 周报 1/日 / 提醒 4/日），用户自带 API Key 不受限
 - **AI 质量观测**：按场景统计调用数 / 采纳率 / 再生成率 / 平均耗时，Prompt 版本对比，失败模式聚类
+- **AI 成本追踪**：从 Vercel AI SDK data stream 协议的 finish 消息解析 token 使用量，按模型定价表（GLM / DeepSeek / GPT 等）估算 USD 成本，仪表盘展示 Token 总量 + 估算成本 + 场景级成本聚合
 
 ## 🏗️ 技术架构
 
@@ -46,7 +47,7 @@
 | 复习算法 | ts-fsrs（FSRS-4.5）|
 | 能量模型 | 线性回归（3 特征 → actualMinutes，正则方程闭式解）|
 | PWA | Service Worker + Web Push + Manifest |
-| 测试 | Vitest（379+ 单测）+ Playwright（E2E）|
+| 测试 | Vitest（403+ 单测）+ Playwright（E2E）|
 | 代码质量 | ESLint（next/core-web-vitals + typescript）|
 
 ## 📁 仓库结构
@@ -118,7 +119,7 @@ lib/
   └── types.ts          全局类型
 functions/api/public/   Cloudflare Pages Functions（公开主页 API + 成就墙）
 public/                 PWA 配置（manifest / sw / icons）
-__tests__/              Vitest 单测（37 个文件 / 379+ 用例）
+__tests__/              Vitest 单测（37 个文件 / 403+ 用例）
 e2e/                    Playwright E2E（番茄时钟 + Demo 流程 + 主流程）
 docs/                   项目文档（架构 / 开发指南）
 .github/workflows/      CI：自动部署到 Cloudflare Pages
@@ -155,7 +156,7 @@ npm run dev
 ### 4. 测试
 
 ```bash
-npm test           # Vitest 单测（379+ 用例）
+npm test           # Vitest 单测（403+ 用例）
 npm run test:e2e   # Playwright E2E（需先 npx playwright install chromium）
 npx tsc --noEmit   # 类型检查
 npx next lint      # ESLint

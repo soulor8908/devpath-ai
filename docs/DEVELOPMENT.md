@@ -17,7 +17,7 @@ npm run dev
 ## 测试
 
 ```bash
-# 全部单测（379+ 用例）
+# 全部单测（403+ 用例）
 npm test
 
 # 监听模式
@@ -322,3 +322,66 @@ lib/ai/rhythm-engine.ts
 - 中文注释（与现有代码库一致）
 - 文件头注释说明文件职责
 - AI 相关函数优先用 `observeCall(tag, fn)` 包装（计时 + 记录指标）
+
+## AI 成本追踪开发
+
+### 数据流
+
+```
+服务端 streamText() / generateObject()
+    │
+    ├─ result.usage { promptTokens, completionTokens, totalTokens }
+    │
+    ├─ 流式：data stream protocol "d:" finish 消息包含 usage
+    │       客户端 parseUsageFromFinishMessage(payload) 解析
+    │
+    └─ 非流式：在 JSON response body 中返回 usage
+    ↓
+客户端 recordAICall({ tokenUsage, modelId })
+    │
+    ├─ 自动计算 estimatedCost = estimateCost(modelId, tokenUsage)
+    │   - MODEL_PRICING 表查模型定价（USD / 1M tokens）
+    │   - 未知模型走 DEFAULT_PRICING（保守估值）
+    │
+    └─ 持久化到 IndexedDB（ai_call:<id>）
+    ↓
+仪表盘 getQualityReport()
+    ├─ 场景级聚合：totalTokens / totalCost / avgCostPerCall
+    └─ 全局聚合：totalTokens / totalCost
+```
+
+### 关键文件
+
+- `lib/ai/quality-tracker.ts` — `MODEL_PRICING` + `estimateCost()` + `normalizeModelId()` + `parseUsageFromFinishMessage()`
+- `lib/types.ts` — `TokenUsage` 接口 + `AICallRecord.tokenUsage/estimatedCost/modelId` 字段
+- `app/api/chat/route.ts` — `onFinish` 回调日志 + `X-AI-Model-Id` 响应头
+- `app/chat/ChatClient.tsx` — 解析流式 "d:" 消息 + 读取响应头 + 传给 `recordAICall()`
+- `app/stats/ai-quality/page.tsx` — Token / 成本统计卡片 + 场景表新列
+
+### 添加新模型定价
+
+1. 在 `lib/ai/quality-tracker.ts` 的 `MODEL_PRICING` 添加条目：
+
+```ts
+"new-model-name": { input: 0.5, output: 1.0 }, // USD / 1M tokens
+```
+
+2. 模型 ID 自动通过 `normalizeModelId()` 规范化（去前缀 + 小写）后查表
+3. 未知模型走 `DEFAULT_PRICING`（保守估值，不会报错）
+4. 添加单测到 `__tests__/quality-tracker.test.ts` 的 `estimateCost` describe 块
+
+### 扩展到其他 AI 路由
+
+目前 chat 路由已实现成本追踪。要扩展到非流式路由（如 `/api/daily-nudge` / `/api/learn`）：
+
+1. 在 `generateObject()` 返回的 `result.usage` 提取 token 使用量
+2. 在 JSON response body 中加 `usage` 字段：
+
+```ts
+return NextResponse.json({
+  // ...existing fields
+  _meta: { usage: result.usage, modelId: currentModelId },
+});
+```
+
+3. 客户端从 response body 读取 `_meta`，传给 `recordAICall({ tokenUsage, modelId })`
