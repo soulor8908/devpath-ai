@@ -27,6 +27,7 @@ import { getDueCards } from "@/lib/fsrs";
 import { getUnresolvedMistakes } from "@/lib/mistake-book";
 import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
 import { maybeRetrain } from "@/lib/energy-regression";
+import { maybeBuildProfile } from "@/lib/ai/memory/user-profile";
 
 // ============ 打卡可视化元数据 ============
 
@@ -268,9 +269,11 @@ export function useHomeData(): HomeData & {
     // - autoFillTodayActualMinutes: 自动回填今日 actualMinutes
     //   修复"模型永远无法训练"的冷启动问题（Issue 4）
     // - maybeRetrain: 检查是否需要重训练能量回归模型
+    // - maybeBuildProfile: 懒构建/刷新用户画像（24h TTL）
     void Promise.allSettled([
       autoFillTodayActualMinutes(),
       maybeRetrain(),
+      maybeBuildProfile(),
     ]).catch(() => {
       // 维护任务失败不影响首页加载
     });
