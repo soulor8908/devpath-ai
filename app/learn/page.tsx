@@ -435,7 +435,7 @@ export default function LearnPage() {
             <div className="mt-2 border-t pt-2 space-y-1">
               <p className="text-xs text-gray-500 mb-1">选择常用提示词：</p>
               {promptLibrary.length === 0 ? (
-                <p className="text-xs text-gray-400">暂无，可输入后点击"存为常用"</p>
+                <p className="text-xs text-gray-400">暂无，可输入后点击&quot;存为常用&quot;</p>
               ) : (
                 promptLibrary.map((p) => (
                   <div

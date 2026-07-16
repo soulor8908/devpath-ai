@@ -11,7 +11,7 @@ describe("api-public (via KV mock)", () => {
       displayName: "Alice",
       avatar: undefined,
       bio: "learning FE",
-      visibility: { radar: true, heatmap: true, currentTopic: true, notes: false },
+      visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
       followerCount: 0,
       followingCount: 0,
       updatedAt: new Date().toISOString(),

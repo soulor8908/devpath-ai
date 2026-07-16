@@ -310,6 +310,8 @@ export interface PublicProfile {
     heatmap: boolean;
     currentTopic: boolean;
     notes: boolean;
+    /** 成就墙是否公开（默认 false，用户需显式开启） */
+    achievements: boolean;
   };
   followerCount: number;
   followingCount: number;

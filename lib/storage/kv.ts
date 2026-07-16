@@ -3,7 +3,7 @@
 // 运行时：Cloudflare Pages Functions 通过 env.KV binding 注入
 // 本地开发/测试：无 env.KV 时降级为内存 Map（mock）
 
-import type { PublicProfile, UserBackup } from "../types";
+import type { PublicProfile, UserBackup, Achievement } from "../types";
 
 export interface PublicStats {
   username: string;
@@ -20,6 +20,10 @@ export interface KVStore {
   setProfile(profile: PublicProfile): Promise<void>;
   getStats(username: string): Promise<PublicStats | null>;
   updateStats(username: string, stats: Partial<PublicStats>): Promise<void>;
+  /** 读取公开成就列表（用户开启 visibility.achievements 后由客户端上传） */
+  getPublicAchievements(username: string): Promise<Achievement[]>;
+  /** 覆盖写入公开成就列表（整体替换，非增量） */
+  setPublicAchievements(username: string, achievements: Achievement[]): Promise<void>;
   getUserBackup(userId: string): Promise<UserBackup | null>;
   setUserBackup(userId: string, data: UserBackup): Promise<void>;
   /**
@@ -100,6 +104,19 @@ export function createKVStore(envKV?: KVLike): KVStore {
         updatedAt: new Date().toISOString(),
       };
       await kv.put(`stats:${username}`, JSON.stringify(merged));
+    },
+    async getPublicAchievements(username: string) {
+      const raw = await kv.get(`achievements:${username}`);
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw) as Achievement[];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    },
+    async setPublicAchievements(username: string, achievements: Achievement[]) {
+      await kv.put(`achievements:${username}`, JSON.stringify(achievements));
     },
     async getUserBackup(userId: string) {
       const raw = await kv.get(`user:${userId}:backup`);

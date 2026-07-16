@@ -16,7 +16,7 @@ const profile: PublicProfile = {
   displayName: "Alice",
   avatar: undefined,
   bio: "",
-  visibility: { radar: true, heatmap: true, currentTopic: true, notes: false },
+  visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
   followerCount: 10,
   followingCount: 5,
   updatedAt: new Date().toISOString(),

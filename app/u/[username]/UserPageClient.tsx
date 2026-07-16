@@ -116,10 +116,8 @@ export default function UserPageClient() {
 
   const { profile, stats } = data;
 
-  // 成就墙默认关闭（TODO: 后续从 profile.visibility.achievements 读取）
-  // 当前 PublicProfile.visibility 未含 achievements 字段，且 /api/public 未返回成就列表，
-  // 暴露成就需用户显式授权，硬编码关闭避免在未授权时泄露数据。
-  const showAchievementWall = false;
+  // 成就墙：仅当用户在隐私设置中显式开启 visibility.achievements 时展示
+  const showAchievementWall = profile.visibility.achievements === true;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
@@ -201,13 +199,7 @@ export default function UserPageClient() {
         </section>
       )}
 
-      {/* 成就墙模块（可选展示，默认关闭）
-          TODO: PublicProfile.visibility 当前只有 radar/heatmap/currentTopic/notes，
-          缺少 achievements 字段。需要：
-          1) 在 lib/types.ts 的 PublicProfile.visibility 增加 `achievements: boolean`
-          2) 在 /api/public 路由返回该用户已解锁的成就列表（仅公开的）
-          3) 将下面的 showAchievementWall 改为读取 profile.visibility.achievements
-          目前硬编码关闭，避免在用户未授权时泄露成就数据。 */}
+      {/* 成就墙模块：用户在隐私设置中开启 visibility.achievements 后展示 */}
       {showAchievementWall && data.achievements && data.achievements.length > 0 && (
         <section className="rounded-lg border p-4">
           <h2 className="mb-2 font-semibold flex items-center gap-1.5">

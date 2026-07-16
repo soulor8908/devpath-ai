@@ -8,7 +8,7 @@ function makeProfile(username: string): PublicProfile {
     displayName: username,
     avatar: undefined,
     bio: "",
-    visibility: { radar: true, heatmap: true, currentTopic: true, notes: false },
+    visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
     followerCount: 0,
     followingCount: 0,
     updatedAt: new Date().toISOString(),

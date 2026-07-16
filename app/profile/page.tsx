@@ -7,11 +7,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { PublicProfile, LearnLog, UserProfile, PersonaId } from "@/lib/types";
+import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } from "@/lib/types";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { apiFetch, getApiToken, setApiToken } from "@/lib/api-client";
+import { listAchievements } from "@/lib/achievements/store";
 import { ShareCardButton } from "@/components/ShareCardButton";
 import { SyncStatus } from "@/components/SyncStatus";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -53,7 +54,7 @@ const defaultProfile: PublicProfile = {
   displayName: "",
   avatar: undefined,
   bio: "",
-  visibility: { radar: true, heatmap: true, currentTopic: true, notes: false },
+  visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
   followerCount: 0,
   followingCount: 0,
   updatedAt: new Date().toISOString(),
@@ -226,10 +227,19 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       await dbSet(STORAGE_KEY, profile);
+      // 成就墙开启时，上传已解锁成就到云端（供公开主页展示）
+      let achievementsPayload: Achievement[] | undefined = undefined;
+      if (profile.visibility.achievements) {
+        try {
+          achievementsPayload = await listAchievements();
+        } catch {
+          achievementsPayload = [];
+        }
+      }
       const res = await apiFetch(`/api/public/${encodeURIComponent(profile.username)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile }),
+        body: JSON.stringify({ profile, achievements: achievementsPayload }),
       });
       if (!res.ok && res.status !== 404) {
         // 解析服务端返回的错误消息，向用户展示（而不是仅 console.warn）
@@ -645,7 +655,7 @@ export default function ProfilePage() {
             <p className="font-medium"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 公开主页未同步</p>
             <p>{syncError}</p>
             <p className="text-amber-700 dark:text-amber-300">
-              提示：未同步时 /u/{profile.username || "username"} 会显示"用户不存在"。
+              提示：未同步时 /u/{profile.username || "username"} 会显示&quot;用户不存在&quot;。
             </p>
           </div>
         )}
@@ -999,7 +1009,7 @@ export default function ProfilePage() {
         <div className="space-y-3 border-b pb-4">
           <h3 className="font-medium">每日时间表</h3>
           <p className="text-xs text-gray-500">
-            配置后首页会显示"现在该做什么"+ 剩余分钟 + 下一项，并联动 FSRS 复习 / 休息工具
+            配置后首页会显示&quot;现在该做什么&quot;+ 剩余分钟 + 下一项，并联动 FSRS 复习 / 休息工具
           </p>
           <textarea
             value={routine}
@@ -1042,7 +1052,7 @@ export default function ProfilePage() {
         <div className="space-y-3 border-b py-4">
           <h3 className="font-medium">AI 人格（Persona）</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            选择 AI 对话的语气风格。"自动" 会根据你当下的能量、心情、提问内容智能切换。
+            选择 AI 对话的语气风格。&quot;自动&quot; 会根据你当下的能量、心情、提问内容智能切换。
           </p>
           <div className="space-y-1.5">
             {/* 自动 */}
@@ -1115,6 +1125,7 @@ export default function ProfilePage() {
               { key: "heatmap" as const, label: "学习热力图" },
               { key: "currentTopic" as const, label: "当前学习主题" },
               { key: "notes" as const, label: "笔记内容" },
+              { key: "achievements" as const, label: "成就墙" },
             ]
           ).map((item) => (
             <label

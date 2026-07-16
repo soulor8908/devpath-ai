@@ -107,7 +107,7 @@
 - [x] `npm run typecheck` 通过（仅预存 observability.test.ts vitest mock 类型问题）
 - [x] `npm test` 所有单测通过（37 个测试文件，379 个测试用例）
 - [ ] `npm run test:e2e` 主流程 E2E 通过（沙箱无 Playwright 浏览器，已在测试顶部注释说明）
-- [ ] 无 lint 警告（项目未配置 eslint，`npm run lint` 触发交互式配置提示）
+- [x] 无 lint 警告 — ESLint 已配置（.eslintrc.json），0 error / 16 warning（预存）
 - [x] 新增 prompt 修改已 bump version（prompts.test.ts 快照更新）
 - [x] chat-context 总体积 ≤ 2.3KB（学习状态 1.5KB + 画像 500B + persona 200B）
 - [x] PomodoroSession 完成路径不阻塞 UI（所有 IO 异步）

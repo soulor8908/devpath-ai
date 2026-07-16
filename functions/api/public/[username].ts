@@ -9,7 +9,7 @@
 //   - GET 始终无需鉴权（公开数据）
 
 import { createKVStore } from "../../../lib/storage/kv";
-import type { PublicProfile } from "../../../lib/types";
+import type { PublicProfile, Achievement } from "../../../lib/types";
 import type { PublicStats } from "../../../lib/storage/kv";
 
 // 最小类型定义（无 @cloudflare/workers-types 时使用）
@@ -45,7 +45,12 @@ export const onRequestGet: PagesFunction<PagesEnv> = async (context) => {
   }
 
   const stats = await kv.getStats(username);
-  return new Response(JSON.stringify({ profile, stats }), {
+  // 仅当用户显式开启 visibility.achievements 时返回公开成就
+  const achievements =
+    profile.visibility?.achievements === true
+      ? await kv.getPublicAchievements(username)
+      : [];
+  return new Response(JSON.stringify({ profile, stats, achievements }), {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "public, max-age=300", // 5 分钟边缘缓存
@@ -87,7 +92,11 @@ export const onRequestPut: PagesFunction<PagesEnv> = async (context) => {
 
   const kv = createKVStore(context.env.KV as unknown as { get: (k: string) => Promise<string | null>; put: (k: string, v: string) => Promise<void> });
 
-  const body = (await context.request.json()) as { profile?: Partial<PublicProfile>; stats?: Partial<PublicStats> };
+  const body = (await context.request.json()) as {
+    profile?: Partial<PublicProfile>;
+    stats?: Partial<PublicStats>;
+    achievements?: Achievement[];
+  };
 
   if (body.profile) {
     const existing = (await kv.getProfile(username)) ?? {
@@ -95,7 +104,7 @@ export const onRequestPut: PagesFunction<PagesEnv> = async (context) => {
       displayName: username,
       avatar: undefined,
       bio: "",
-      visibility: { radar: true, heatmap: true, currentTopic: true, notes: false },
+      visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
       followerCount: 0,
       followingCount: 0,
       updatedAt: new Date().toISOString(),
@@ -107,6 +116,16 @@ export const onRequestPut: PagesFunction<PagesEnv> = async (context) => {
       updatedAt: new Date().toISOString(),
     };
     await kv.setProfile(merged);
+
+    // 成就墙关闭时，清空云端成就（避免残留公开数据）
+    if (merged.visibility.achievements === false) {
+      await kv.setPublicAchievements(username, []);
+    }
+  }
+
+  // 成就列表整体覆盖写入（仅当客户端显式上传时）
+  if (body.achievements !== undefined) {
+    await kv.setPublicAchievements(username, body.achievements);
   }
 
   if (body.stats) {

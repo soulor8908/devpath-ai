@@ -231,7 +231,7 @@ export function UserProfileCard({ profile }: Props) {
       {/* 无有效数据提示 */}
       {topSkills.length === 0 && slots.length === 0 && avgMinutes === 0 && (
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          画像数据为空，点击"手动重建画像"生成
+          画像数据为空，点击&quot;手动重建画像&quot;生成
         </p>
       )}
 
