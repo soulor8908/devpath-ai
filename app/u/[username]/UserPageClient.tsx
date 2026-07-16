@@ -92,8 +92,7 @@ export default function UserPageClient() {
             可能原因：
           </p>
           <ul className="text-xs list-disc list-inside space-y-1">
-            <li>该用户尚未在「我的 → 个人信息编辑」中保存公开资料</li>
-            <li>该用户保存资料时公开主页同步失败（如未配置 API Token）</li>
+            <li>该用户尚未在「我的」中保存公开资料</li>
             <li>用户名拼写错误</li>
           </ul>
           <p className="text-xs pt-2 border-t border-amber-200 dark:border-amber-800">

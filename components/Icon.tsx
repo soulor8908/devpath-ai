@@ -70,7 +70,8 @@ export type IconName =
   | "check-circle"
   | "party"
   | "calendar-check"
-  | "tag";
+  | "tag"
+  | "snowflake";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: (
@@ -431,6 +432,11 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
       <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+    </>
+  ),
+  snowflake: (
+    <>
+      <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07L19.07 4.93" />
     </>
   ),
 };

@@ -15,6 +15,7 @@ import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
 import { getProviderInfo } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
+import { buildToolSystemSuffix } from "@/lib/ai/tool-registry";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 import { PERSONAS, selectPersona, type PersonaContext, type Persona } from "@/lib/ai/persona";
@@ -30,35 +31,8 @@ interface ChatMessage {
 // 从 Prompt Registry 读取基础 system（运行时拼接 contextSnapshot）
 const PROMPT_DEF = getPrompt("chat");
 
-// 工具能力说明（追加到 system prompt）
-const TOOL_SYSTEM_SUFFIX = `
-# AI 工具能力
-你拥有以下工具，可以根据用户意图主动调用：
-- get_daily_schedule：查看今日时间表（作息+学习计划）
-- get_next_task：推荐接下来该做什么
-- set_reminder：设置提醒（如"30分钟后提醒我学习"）
-- review_today：获取今日学习数据用于复盘
-- get_upcoming_plan：查看未来几天的学习安排
-- adjust_plan：调整学习计划（如"周日有事，延后那天的计划"）
-- toggle_plan_freeze：冻结/解冻学习计划
-- set_plan_priority：调整计划优先级（1-5）
-- start_focus_session：启动番茄钟专注学习 session（如"开始专注 25 分钟"）
-- generate_learning_plan：根据用户画像生成精准学习计划（如"帮我制定 4 周 React 计划"）
-- optimize_schedule：智能优化今日学习安排的优先级（如"优化今天的日程顺序"）
-
-调用工具时遵循：
-1. 用户问"今天有什么安排"→ 调 get_daily_schedule
-2. 用户问"接下来学什么"→ 调 get_next_task
-3. 用户说"X分钟后提醒我..."→ 调 set_reminder
-4. 用户说"复盘今天"→ 调 review_today，然后基于数据给出分析
-5. 用户说"未来几天有什么计划"→ 调 get_upcoming_plan
-6. 用户说"某天有事调整计划"→ 先调 get_upcoming_plan 确认，再调 adjust_plan
-7. 用户说"冻结/暂停某计划"→ 调 toggle_plan_freeze
-8. 用户说"调整优先级"→ 调 set_plan_priority
-9. 用户说"开始专注/开始学习/启动番茄钟"→ 调 start_focus_session
-10. 用户说"制定学习计划/生成计划"→ 调 generate_learning_plan
-11. 用户说"优化今日日程/安排今天的顺序"→ 调 optimize_schedule
-调用工具后，用自然语言总结结果并给出建议。`;
+// 工具能力说明（从 tool-registry 动态生成，追加到 system prompt）
+const TOOL_SYSTEM_SUFFIX = buildToolSystemSuffix();
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();

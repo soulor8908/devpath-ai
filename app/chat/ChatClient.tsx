@@ -33,8 +33,9 @@ import { AnswerContent } from "@/components/CodeBlock";
 import { Icon } from "@/components/Icon";
 import { buildChatContext, buildToolContext } from "@/lib/ai/chat-context";
 import type { ClientAction } from "@/lib/ai/chat-tools";
+import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
 import { createReminder, startReminderPolling } from "@/lib/reminder";
-import { getItem as dbGet, setItem as dbSet } from "@/lib/storage/db";
+import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { scheduleAutoSync, getUserId } from "@/lib/sync";
 import {
   recordAICall,
@@ -53,15 +54,6 @@ const BUILTIN_PROMPTS = [
   "对比优缺点",
   "面试中怎么回答",
   "常见误区有哪些",
-];
-
-// AI 工具快捷指令
-const TOOL_PROMPTS = [
-  "今天有什么安排？",
-  "接下来该学什么？",
-  "30分钟后提醒我学习",
-  "复盘一下今天的表现",
-  "未来几天有什么计划？",
 ];
 
 // 格式化为相对时间（如"3 分钟前"、"昨天"）
@@ -321,6 +313,84 @@ export default function ChatClient() {
               schedule: newSchedule,
               updatedAt: new Date().toISOString(),
             });
+            scheduleAutoSync();
+            success = true;
+            break;
+          }
+          case "start_focus_session": {
+            const params = action.params as {
+              task_description: string;
+              duration_minutes: number;
+              plan_id?: string;
+              node_id?: string;
+            };
+            // 写入一个 session 记录到 IndexedDB，供专注页读取启动
+            const session = {
+              id: crypto.randomUUID(),
+              taskDescription: params.task_description,
+              durationMinutes: params.duration_minutes,
+              planId: params.plan_id,
+              nodeId: params.node_id,
+              status: "pending" as const,
+              createdAt: new Date().toISOString(),
+            };
+            await dbSet("focus:pending_session", session);
+            // 跳转到专注页，由专注页接管
+            window.location.href = `/focus?session=${session.id}`;
+            success = true;
+            break;
+          }
+          case "generate_plan": {
+            const params = action.params as {
+              goal: string;
+              duration_weeks: number;
+              constraints: {
+                hours_per_week: number;
+                preferred_times?: string[];
+              };
+            };
+            // 构造一个学习计划并跳转到创建页预填
+            const planData = {
+              topic: params.goal,
+              dailyMinutes: Math.max(
+                15,
+                Math.floor(
+                  (params.constraints.hours_per_week * 60) /
+                    (params.duration_weeks * 7),
+                ),
+              ),
+              maxNewPerDay: 2,
+              prompt: `基于用户画像生成：目标 ${params.goal}，${params.duration_weeks} 周，每周 ${params.constraints.hours_per_week} 小时`,
+            };
+            sessionStorage.setItem(
+              "learn:pending_plan",
+              JSON.stringify(planData),
+            );
+            window.location.href = "/learn/new";
+            success = true;
+            break;
+          }
+          case "reorder_schedule": {
+            const params = action.params as {
+              date: string;
+              mode?: "balanced" | "catch_up" | "light";
+            };
+            // 遍历所有未冻结计划，按 mode 调整今日任务优先级
+            const allPlans = await listItems<LearningPlan>(
+              KEY_PREFIXES.PLAN,
+            );
+            const modePriority: Record<string, number> = {
+              catch_up: 5,
+              balanced: 3,
+              light: 1,
+            };
+            const maxNew = modePriority[params.mode ?? "balanced"] ?? 3;
+            for (const plan of allPlans) {
+              if (plan.frozen) continue;
+              plan.maxNewPerDay = maxNew;
+              plan.updatedAt = new Date().toISOString();
+              await dbSet(KEY_PREFIXES.PLAN + plan.id, plan);
+            }
             scheduleAutoSync();
             success = true;
             break;
@@ -896,18 +966,36 @@ export default function ChatClient() {
                 </button>
               ))}
             </div>
-            <p className="mb-2 text-xs text-gray-400">AI 工具能力</p>
-            <div className="flex flex-wrap gap-2 justify-center max-w-md">
-              {TOOL_PROMPTS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => applyPrompt(p)}
-                  className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-full transition-colors"
-                >
-                  {p}
-                </button>
-              ))}
+            <div className="w-full max-w-lg space-y-3">
+              <p className="text-xs text-gray-400 font-medium">AI 工具能力</p>
+              {TOOL_CATEGORIES.map((cat) => {
+                const tools = getToolsByCategory(cat.id);
+                if (tools.length === 0) return null;
+                return (
+                  <div key={cat.id} className="text-left">
+                    <p className="mb-1 text-xs text-gray-500 flex items-center gap-1">
+                      <Icon name={cat.icon} className="w-3.5 h-3.5 inline-block" />
+                      {cat.label}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tools.map((t) => (
+                        <button
+                          key={t.name}
+                          type="button"
+                          onClick={() => applyPrompt(t.quickPrompts[0])}
+                          className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-lg transition-colors flex items-center gap-1"
+                          title={t.description}
+                        >
+                          <Icon name={t.icon} className="w-3 h-3 inline-block" />
+                          {t.quickPrompts[0].length > 12
+                            ? t.quickPrompts[0].slice(0, 12) + "…"
+                            : t.quickPrompts[0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
