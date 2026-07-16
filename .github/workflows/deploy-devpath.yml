@@ -61,4 +61,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy .vercel/output/static --project-name=devpath-ai
+          command: pages deploy .vercel/output/static --project-name=devpath-ai --commit-dirty=true
+
+      - name: Output Deployment URL
+        run: |
+          echo "✅ Deployment completed!"
+          echo "🔗 Project: https://dash.cloudflare.com/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/view/devpath-ai"
+          echo "🌐 Production URL: https://devpath-ai.pages.dev"
+
