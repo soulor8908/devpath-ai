@@ -1,0 +1,18 @@
+{
+  "name": "devpath-ai",
+  "buildCommand": "npm run build",
+  "buildOutputDirectory": "out",
+  "environmentVariables": {
+    "AI_PROVIDER": "glm",
+    "NEXT_PUBLIC_PUBLIC_AUTH_TOKEN": "dev-token-change-in-prod"
+  },
+  "kvNamespaces": [
+    {
+      "binding": "KV",
+      "name": "devpath-ai-kv"
+    }
+  ],
+  "routes": [
+    { "pattern": "/u/*", "handle": "static-routing" }
+  ]
+}

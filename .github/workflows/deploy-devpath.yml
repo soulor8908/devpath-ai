@@ -1,0 +1,64 @@
+name: 🚀 Deploy DevPath to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "functions/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.js"
+      - ".github/workflows/deploy-devpath.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Build for Cloudflare Pages
+        run: npx @cloudflare/next-on-pages
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Verify Cloudflare Secrets
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "API Token set: $([[ -n "$CF_API_TOKEN" ]] && echo 'YES' || echo 'NO - MISSING!')"
+          echo "Account ID set: $([[ -n "$CF_ACCOUNT_ID" ]] && echo 'YES' || echo 'NO - MISSING!')"
+          echo "Account ID value: ${CF_ACCOUNT_ID:0:4}****${CF_ACCOUNT_ID: -4}"
+          if [[ -z "$CF_API_TOKEN" || -z "$CF_ACCOUNT_ID" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret is missing! Please add them in GitHub Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .vercel/output/static --project-name=devpath-ai
