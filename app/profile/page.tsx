@@ -244,7 +244,8 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile, achievements: achievementsPayload }),
       });
-      if (!res.ok && res.status !== 404) {
+      // 任何非 2xx 都视为同步失败：401（未授权）/ 404（路由异常）/ 500（服务端错误）都不应继续走"已保存"
+      if (!res.ok) {
         // 解析服务端返回的错误消息，向用户展示（而不是仅 console.warn）
         let serverMsg = "";
         try {
@@ -262,12 +263,15 @@ export default function ProfilePage() {
         } else {
           setSyncError(`公开主页同步失败：${serverMsg}`);
         }
+        // 关键修复：同步失败时不显示"已保存"，避免用户误以为已成功（实际 KV 未写入 → /u/x 404）
+        setSaved(false);
       } else {
+        // 同步成功：清空错误、显示已保存、触发后续自动同步
         setSyncError(null);
+        setSaved(true);
+        // 触发自动云端同步（含 profile）
+        scheduleAutoSync();
       }
-      setSaved(true);
-      // 触发自动云端同步（含 profile）
-      scheduleAutoSync();
     } finally {
       setSaving(false);
     }
@@ -898,9 +902,12 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <div>
-          <ShareCardButton profile={profile} />
-        </div>
+        {/* 仅当设置了 username 时才显示分享按钮（没有 username 无法生成公开主页链接） */}
+        {profile.username && (
+          <div>
+            <ShareCardButton profile={profile} />
+          </div>
+        )}
 
         {/* 编辑表单：复用原 editOpen 状态 */}
         <button

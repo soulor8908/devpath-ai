@@ -110,6 +110,12 @@ export interface ReviewCard {
   lapses: number;
   state: 0 | 1 | 2 | 3 | 4;
   lastReview: string;
+  /**
+   * 关联的收藏试题集 ID（如有）。
+   * 用于「开始复习」时查重：deckId + questionId 唯一标识一张卡。
+   * 历史 / 演示数据可能缺失，按 undefined 处理。
+   */
+  deckId?: string;
 }
 
 // 每日状态

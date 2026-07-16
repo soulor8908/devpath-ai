@@ -1,21 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { listFavoriteDecks, deleteFavoriteDeck, listFavoritedQuestions, unfavorQuestion } from "@/lib/favorite";
-import { createCard } from "@/lib/fsrs";
+import { createCard, findExistingCard } from "@/lib/fsrs";
 import { getItem, setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type { FavoriteDeck } from "@/lib/types";
 import type { FavoritedQuestionWithPlan } from "@/lib/favorite";
 
 export default function FavoritesPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<"decks" | "questions">("decks");
   const [decks, setDecks] = useState<FavoriteDeck[]>([]);
   const [questions, setQuestions] = useState<FavoritedQuestionWithPlan[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "info" | "error">("success");
   const [loading, setLoading] = useState(true);
   const [expandedDeck, setExpandedDeck] = useState<string | null>(null);
+  const [reviewStarting, setReviewStarting] = useState<string | null>(null);
 
   async function loadData() {
     const [d, q] = await Promise.all([listFavoriteDecks(), listFavoritedQuestions()]);
@@ -41,17 +45,55 @@ export default function FavoritesPage() {
   }
 
   async function handleStartReview(deck: FavoriteDeck) {
-    // 用 deck 的题创建 FSRS 卡片
-    const cardKeys: string[] = [];
-    for (const q of deck.questions) {
-      const card = createCard(deck.id, q.nodeId, q.id, q.question, q.answer, "standard");
-      await setItem(KEY_PREFIXES.CARD + card.id, card);
-      cardKeys.push(KEY_PREFIXES.CARD + card.id);
+    setReviewStarting(deck.id);
+    try {
+      // 查重 + 创建 FSRS 卡片
+      let created = 0;
+      let skipped = 0;
+      const newCardKeys: string[] = [];
+      for (const q of deck.questions) {
+        // 查重：deckId + questionId 唯一标识一张卡，已存在则跳过
+        const existingCard = await findExistingCard(deck.id, q.id);
+        if (existingCard) {
+          skipped++;
+          continue;
+        }
+        // 创建新卡片（携带 deckId 便于后续查重）
+        const card = createCard(deck.planId, q.nodeId, q.id, q.question, q.answer, "standard", deck.id);
+        await setItem(KEY_PREFIXES.CARD + card.id, card);
+        newCardKeys.push(KEY_PREFIXES.CARD + card.id);
+        created++;
+      }
+
+      // 累加 key 列表（去重，避免重复 push）
+      if (newCardKeys.length > 0) {
+        const allKeys = (await getItem<string[]>("all_card_keys")) ?? [];
+        const merged = Array.from(new Set([...allKeys, ...newCardKeys]));
+        await setItem("all_card_keys", merged);
+      }
+
+      // 反馈 + 自动跳转到 /review
+      if (created === 0 && skipped > 0) {
+        setMessage(`该题集 ${skipped} 道题已在复习库中，正在跳转到复习...`);
+        setMessageType("info");
+      } else if (created > 0 && skipped > 0) {
+        setMessage(`新增 ${created} 张卡片，${skipped} 张已存在跳过，正在跳转到复习...`);
+        setMessageType("success");
+      } else {
+        setMessage(`已创建 ${created} 张复习卡片，正在跳转到复习...`);
+        setMessageType("success");
+      }
+
+      // 1.2s 后跳转（让用户看到反馈信息）
+      setTimeout(() => {
+        router.push("/review");
+      }, 1200);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "启动复习失败");
+      setMessageType("error");
+    } finally {
+      setReviewStarting(null);
     }
-    // 存 key 列表供 /review 读取
-    const existing = await getItem<string[]>("all_card_keys").then((k) => k || []);
-    await setItem("all_card_keys", [...existing, ...cardKeys]);
-    setMessage(`已创建 ${deck.questions.length} 张复习卡片，去 /review 开始复习`);
   }
 
   if (loading) {
@@ -67,7 +109,15 @@ export default function FavoritesPage() {
       <h1 className="text-xl font-bold mb-4">收藏夹</h1>
 
       {message && (
-        <div className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+        <div
+          className={`mb-4 rounded-lg px-3 py-2 text-sm ${
+            messageType === "success"
+              ? "bg-green-50 text-green-700"
+              : messageType === "info"
+                ? "bg-blue-50 text-blue-700"
+                : "bg-red-50 text-red-700"
+          }`}
+        >
           {message}
         </div>
       )}
@@ -111,9 +161,10 @@ export default function FavoritesPage() {
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => handleStartReview(deck)}
-                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
+                    disabled={reviewStarting === deck.id}
+                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50 inline-flex items-center gap-1"
                   >
-                    开始复习
+                    {reviewStarting === deck.id ? "准备中..." : "开始复习"}
                   </button>
                   <button
                     onClick={() => setExpandedDeck(expandedDeck === deck.id ? null : deck.id)}

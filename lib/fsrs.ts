@@ -13,6 +13,8 @@ import {
 } from "ts-fsrs";
 import { nanoid } from "nanoid";
 import type { ReviewCard, Rating as AppRating } from "./types";
+import { listItems } from "./storage/db";
+import { KEY_PREFIXES } from "./types";
 
 export type FSRSMode = "conservative" | "standard" | "aggressive";
 
@@ -69,7 +71,9 @@ export function createCard(
   questionId: string,
   front: string,
   back: string,
-  mode: FSRSMode = "standard"
+  mode: FSRSMode = "standard",
+  /** 可选 deckId：收藏试题集生成的卡片会带上，便于查重 */
+  deckId?: string
 ): ReviewCard {
   const f = getFsrs(mode);
   const empty = createEmptyCard(new Date());
@@ -89,7 +93,27 @@ export function createCard(
     lapses: empty.lapses,
     state: empty.state as 0,
     lastReview: "",
+    deckId,
   };
+}
+
+/**
+ * 查重：根据 deckId + questionId 找已存在的卡片
+ *
+ * 用途：「开始复习」时避免重复创建卡片（用户多次点击同一试题集的「开始复习」按钮）
+ * - deckId 未提供 → 返回 undefined（无法查重，按"无重复"处理）
+ * - 找到匹配 → 返回已存在的 ReviewCard，调用方应跳过创建
+ * - 未找到 → 返回 undefined，调用方按需创建
+ *
+ * 性能：一次性 listItems 读全部 card，仅在点击时调用，OK
+ */
+export async function findExistingCard(
+  deckId: string | undefined,
+  questionId: string
+): Promise<ReviewCard | undefined> {
+  if (!deckId) return undefined;
+  const all = await listItems<ReviewCard>(KEY_PREFIXES.CARD);
+  return all.find((c) => c.deckId === deckId && c.questionId === questionId);
 }
 
 // app Rating (1|2|3|4) → ts-fsrs Grade (排除 Rating.Manual) 映射

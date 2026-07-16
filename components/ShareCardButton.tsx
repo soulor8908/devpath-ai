@@ -53,6 +53,8 @@ export function ShareCardButton({ profile }: Props) {
         totalMinutes,
         heatmapData: profile.visibility.heatmap ? heatmapData : undefined,
         radarData,
+        // 公开主页 URL（用于生成二维码，扫码即可访问）
+        shareUrl: `${window.location.origin}/u/${encodeURIComponent(profile.username)}`,
       });
 
       // 触发下载
