@@ -21,6 +21,8 @@ import {
   makeOutputDigest,
   generateCallId,
 } from "@/lib/ai/quality-tracker";
+import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
+import { FullscreenPrompt } from "@/components/FullscreenPrompt";
 
 export default function PlanDetailClient() {
   const params = useParams<{ planId: string }>();
@@ -48,6 +50,8 @@ export default function PlanDetailClient() {
   const [filterDifficulty, setFilterDifficulty] = useState<number | "all">("all");
   const [filterNodeId, setFilterNodeId] = useState<string | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const fullscreen = useAutoFullscreen();
 
   useEffect(() => {
     (async () => {
@@ -305,6 +309,12 @@ export default function PlanDetailClient() {
 
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto pb-20">
+      {fullscreen.supported && fullscreen.needsPrompt && (
+        <FullscreenPrompt
+          onEnter={fullscreen.enterFullscreen}
+          onDismiss={fullscreen.dismissPrompt}
+        />
+      )}
       <div className="mb-6">
         <button
           onClick={() => router.push("/learn")}
