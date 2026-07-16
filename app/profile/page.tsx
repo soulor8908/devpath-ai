@@ -147,6 +147,9 @@ export default function ProfilePage() {
   const [personaSaving, setPersonaSaving] = useState(false);
   const [personaSaved, setPersonaSaved] = useState(false);
 
+  // 是否已配置含 API Key 的模型 → 决定 API Token 输入框是否显示
+  const hasModelConfig = modelConfigs.some((c) => c.apiKey.trim().length > 0);
+
   useEffect(() => {
     (async () => {
       const stored = await dbGet<PublicProfile>(STORAGE_KEY);
@@ -1347,6 +1350,46 @@ function Section({
         <span className="text-right text-xs text-gray-400">{desc}</span>
       </header>
       <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+/** 可折叠分区：点击标题切换展开/收起。用于个人信息与「更多」。 */
+function CollapsibleSection({
+  icon,
+  title,
+  desc,
+  defaultOpen = false,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  desc?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        aria-expanded={open}
+      >
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Icon name={icon} className="w-5 h-5 shrink-0" />
+          {title}
+        </h2>
+        <span className="flex items-center gap-2">
+          {desc && <span className="text-right text-xs text-gray-400">{desc}</span>}
+          <Icon
+            name="chevron-down"
+            className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+      {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
     </section>
   );
 }
