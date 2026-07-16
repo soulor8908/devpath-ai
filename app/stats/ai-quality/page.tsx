@@ -30,6 +30,9 @@ const SCENE_LABELS: Record<AIScene, string> = {
   adjust_plan: "计划调整",
   chat_tool_action: "工具动作执行",
   emotion_coping: "情绪应对建议",
+  plan_generate: "精准计划生成",
+  schedule_optimize: "日程优化",
+  focus_session_start: "番茄启动",
 };
 
 // 时间范围选项

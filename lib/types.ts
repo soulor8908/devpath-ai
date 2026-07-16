@@ -17,6 +17,10 @@ export interface LearningPlan {
   frozen?: boolean;
   /** 优先级 1-5（1=最高），多计划并存时排序用，默认 3 */
   priority?: number;
+  /** 截止日期 ISO（可选，用于优先级引擎 deadline_urgency 计算） */
+  deadline?: string;
+  /** 是否为 Demo 预置数据（首次访问自动注入，用户创建真实计划后可清除） */
+  isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -287,9 +291,12 @@ export interface LearnLog {
   date: string;
   /** 精确时间戳 ISO（可选，旧数据可能没有） */
   timestamp?: string;
-  /** 学习时长（分钟，旧字段，兼容） */
+  /** 学习时长（分钟）。
+   * 旧字段原本仅作兼容用；新增 type=focus_session 后，
+   * 此字段明确表示"实际专注分钟数（扣除打断）"。
+   * 旧的 learn/review 类型不写此字段，保持兼容。 */
   duration?: number;
-  type: "learn" | "review" | "learn_complete" | "review_complete" | "question_view" | "question_favorite" | "question_regenerate";
+  type: "learn" | "review" | "learn_complete" | "review_complete" | "question_view" | "question_favorite" | "question_regenerate" | "focus_session";
 }
 
 // 公开主页
@@ -378,6 +385,16 @@ export const KEY_PREFIXES = {
   ENERGY_SAMPLE: "energy_sample:",
   /** 已训练的能量回归模型：energy_model:current（单例） */
   ENERGY_MODEL: "energy_model:",
+  /** 番茄钟 session：pomodoro:<id> */
+  POMODORO_SESSION: "pomodoro:",
+  /** 用户画像（单例）：user:profile:current */
+  USER_PROFILE: "user:profile:",
+  /** 成就记录：achievement:<id> */
+  ACHIEVEMENT: "achievement:",
+  /** 优先级引擎缓存：priority_cache:<YYYY-MM-DD>（当日有效） */
+  PRIORITY_CACHE: "priority_cache:",
+  /** 限流客户端估算：rate_limit:<YYYY-MM-DD>:<scene>（仅 UI 提示） */
+  RATE_LIMIT: "rate_limit:",
 } as const;
 
 // AI 模型配置（用户可在 profile 配置多个）
@@ -412,7 +429,10 @@ export type AIScene =
   | "weekly_report"
   | "adjust_plan"
   | "chat_tool_action"
-  | "emotion_coping";
+  | "emotion_coping"
+  | "plan_generate"
+  | "schedule_optimize"
+  | "focus_session_start";
 
 /** AI 调用记录（一次 AI 调用 = 一条记录） */
 export interface AICallRecord {
@@ -613,4 +633,209 @@ export interface Reminder {
   triggered: boolean;
   /** 关联学习计划 ID（可选） */
   planId?: string;
+}
+
+// ============ 番茄时钟 ============
+
+/** 番茄 session 类型 */
+export type PomodoroSessionType = "focus" | "short_break" | "long_break";
+
+/** 番茄 session 状态 */
+export type PomodoroSessionStatus = "running" | "paused" | "completed" | "abandoned";
+
+/** 番茄时钟 session（一次专注/休息的完整记录） */
+export interface PomodoroSession {
+  id: string;
+  /** 关联学习计划 ID（休息 session 可空） */
+  planId?: string;
+  /** 关联知识点 ID（休息 session 可空） */
+  nodeId?: string;
+  /** 任务描述（用户输入或 AI 生成） */
+  taskDescription: string;
+  type: PomodoroSessionType;
+  /** 时长（分钟） */
+  durationMinutes: number;
+  /** 开始时间 ISO */
+  startedAt: string;
+  status: PomodoroSessionStatus;
+  /** 完成时间 ISO（status=completed/abandoned 时填写） */
+  completedAt?: string;
+  /** 今日第几个番茄（从 1 开始，用于长休息判定） */
+  sessionIndex: number;
+  /** 被打断次数（visibilitychange 切走标签页累计） */
+  interruptions: number;
+  /** 开始时的能量等级（1-5，供能量回归模型使用） */
+  energyBefore?: number;
+  /** 结束时的能量等级（1-5，供能量回归模型使用） */
+  energyAfter?: number;
+  /** 暂停累计时长（分钟，用于精确计算实际专注时长） */
+  pausedMinutes?: number;
+}
+
+// ============ 用户画像 ============
+
+/** 技能等级 */
+export type SkillLevel = "beginner" | "intermediate" | "advanced";
+
+/** 学习风格（P2，可从 LearnLog type 分布推断） */
+export type LearningStyle = "visual" | "hands-on" | "reading" | "mixed";
+
+/** AI 人格 ID */
+export type PersonaId = "strict_coach" | "gentle_companion" | "socratic_tutor" | "peer_dev";
+
+/** 用户目标（短/中/长期） */
+export interface UserGoal {
+  text: string;
+  /** 完成进度 0-1 */
+  progress?: number;
+  /** 目标日期 ISO（可选） */
+  targetDate?: string;
+}
+
+/** 用户画像（单例，存 IndexedDB + 增量同步到 KV） */
+export interface UserProfile {
+  /** 固定为 "ai:profile"（单例标识） */
+  id: "ai:profile";
+  /** 技能等级：key 为 nodeId，value 为 beginner/intermediate/advanced */
+  skillLevel: Record<string, SkillLevel>;
+  /** 各节点准确率（从 ReviewLog 聚合，用于 skillLevel 判定的第二维度） */
+  accuracyByNode: Record<string, { correct: number; total: number }>;
+  /** 偏好学习时段（如 ["06:00-07:00", "12:00-12:30"]） */
+  preferredTimeSlots: string[];
+  /** 平均专注时长（分钟，从 EnergySample.actualMinutes 聚合） */
+  averageSessionMinutes: number;
+  /** 学习风格（P2，可选） */
+  learningStyle?: LearningStyle;
+  /** 用户偏好的 AI 人格（覆盖自动选择，undefined=自动） */
+  preferredPersona?: PersonaId;
+  /** 短期目标（1-2 周） */
+  goals: {
+    short: UserGoal[];
+    mid: UserGoal[];
+    long: UserGoal[];
+  };
+  /** 严格专注模式（true=3 次打断自动放弃，false=只记录） */
+  strictFocusMode?: boolean;
+  /** 最近更新时间 ISO */
+  updatedAt: string;
+}
+
+// ============ 计划可行性评分 ============
+
+/** 计划降级建议（confidence < 0.5 时给出） */
+export interface DowngradePlan {
+  /** 建议减少的每周学习小时数 */
+  reduceHoursPerWeek?: number;
+  /** 建议减少的每日新学节点数 */
+  reduceNewPerDay?: number;
+}
+
+/** 可行性评分结果 */
+export interface FeasibilityScore {
+  /** 是否可行 */
+  feasible: boolean;
+  /** 置信度 0-1（< 0.5 标记不可行） */
+  confidence: number;
+  /** 风险列表（如"每日要求 60 分钟但历史平均仅 30 分钟"） */
+  risks: string[];
+  /** 建议（如"建议减少每日新学量到 1 个"） */
+  suggestions: string[];
+  /** 降级方案（confidence < 0.5 时给出具体参数） */
+  downgradePlan?: DowngradePlan;
+}
+
+// ============ 优先级引擎 ============
+
+/** 健康检查告警 */
+export interface HealthAlert {
+  id: string;
+  /** 告警类型 */
+  type: "overdue_tasks" | "low_completion_rate" | "energy_declining" | "fsrs_backlog";
+  /** 严重程度 */
+  severity: "info" | "warning" | "critical";
+  /** 告警标题 */
+  title: string;
+  /** 详细描述 */
+  description: string;
+  /** 建议动作（如"重新排优先级"） */
+  suggestedAction?: string;
+  /** 关联计划 ID（可选） */
+  planId?: string;
+  /** 创建时间 ISO */
+  createdAt: string;
+}
+
+/** 优化日程模式 */
+export type OptimizeMode = "balanced" | "catch_up" | "light";
+
+/** 优化结果 */
+export interface OptimizeResult {
+  /** 重排后的任务 ID 顺序 */
+  reorderedTaskIds: string[];
+  /** 决策理由（给用户看） */
+  reasoning: string;
+  /** 关联的告警列表 */
+  alerts: HealthAlert[];
+}
+
+// ============ 节奏引擎 ============
+
+/** 节奏引擎决策上下文（聚合所有信号） */
+export interface RhythmContext {
+  /** 当前进行中的番茄 session（如有） */
+  runningSession: PomodoroSession | null;
+  /** 今日能量（1-5，可能未记录） */
+  todayEnergy: number | null;
+  /** 今日心情 */
+  todayMood?: string;
+  /** 到期 FSRS 卡片 */
+  dueCards: ReviewCard[];
+  /** 最近 1 小时是否有复习记录 */
+  reviewedRecently: boolean;
+  /** 活跃学习计划（未冻结） */
+  activePlans: LearningPlan[];
+  /** 用户作息 */
+  routine?: Routine;
+  /** 用户画像 */
+  profile?: UserProfile;
+  /** 当前时间 ISO */
+  now: string;
+  /** 今日已完成番茄数 */
+  todayFocusCount: number;
+}
+
+/** 节奏引擎输出的下一步行动（联合类型） */
+export type NextAction =
+  | { type: "start_focus"; task?: ScheduleItem; duration: number; reason: string; planId?: string }
+  | { type: "review"; cards: ReviewCard[]; reason: string }
+  | { type: "break"; minutes: number; reason: string }
+  | { type: "rest"; reason: string }
+  | { type: "plan_next_day"; reason: string }
+  | { type: "continue_focus"; session: PomodoroSession; reason: string };
+
+// ============ 成就系统 ============
+
+/** 成就类型 */
+export type AchievementType =
+  | "streak"
+  | "topic_mastery"
+  | "focus_hours"
+  | "review_streak"
+  | "recovery"
+  | "first_time";
+
+/** 成就记录 */
+export interface Achievement {
+  id: string;
+  type: AchievementType;
+  /** 成就标题 */
+  title: string;
+  /** 成就描述 */
+  description: string;
+  /** 图标名称（对应 components/Icon.tsx 的 IconName） */
+  icon: string;
+  /** 解锁时间 ISO */
+  unlockedAt: string;
+  /** 进度 0-1（未解锁时显示进度，已解锁时为 1） */
+  progress?: number;
 }

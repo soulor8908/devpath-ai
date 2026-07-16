@@ -93,7 +93,10 @@ export interface ClientAction {
     | "create_reminder"
     | "adjust_plan"
     | "toggle_plan_freeze"
-    | "set_plan_priority";
+    | "set_plan_priority"
+    | "start_focus_session"
+    | "reorder_schedule"
+    | "generate_plan";
   params: Record<string, unknown>;
   /**
    * 幂等键：基于 action.type + params 内容自动计算
