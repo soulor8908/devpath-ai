@@ -1,546 +1,191 @@
-"use client";
+# 「我的」页面布局重构 Implementation Plan
 
-// app/profile/page.tsx
-// 「我的」中心：关键信息前置 + 个人信息折叠 + 低频功能收纳到「更多」
-// 布局：学习统计 / 收藏 / AI 模型（置顶·始终展开）→ 个人信息（折叠）→ 更多（折叠）
-// API Token：已配置自己的 AI 模型时隐藏输入框，避免用户困惑
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } from "@/lib/types";
-import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
-import { KEY_PREFIXES } from "@/lib/types";
-import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { apiFetch, getApiToken, setApiToken } from "@/lib/api-client";
-import { listAchievements } from "@/lib/achievements/store";
-import { ShareCardButton } from "@/components/ShareCardButton";
-import { SyncStatus } from "@/components/SyncStatus";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { scheduleAutoSync } from "@/lib/sync";
-import {
-  loadRoutineMarkdown,
-  saveRoutineMarkdown,
-  defaultRoutineMarkdown,
-  parseRoutine,
-} from "@/lib/routine";
-import { listFavoriteDecks, listFavoritedQuestions } from "@/lib/favorite";
-import {
-  listModelConfigs,
-  createModelConfig,
-  updateModelConfig,
-  deleteModelConfig,
-  setDefaultModel,
-  MODEL_PRESETS,
-} from "@/lib/model-config";
-import type { ModelConfig } from "@/lib/types";
-import { Icon, type IconName } from "@/components/Icon";
-import { maybeRetrain } from "@/lib/energy-regression";
-import { getUserProfile, saveUserProfile } from "@/lib/ai/memory/user-profile";
-import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
-import { PERSONA_LIST } from "@/lib/ai/persona";
+**Goal:** 重构「我的」页面布局——关键信息（学习统计/收藏/AI 模型）前置，个人信息折叠，低频功能收纳到「更多」，API Token 智能显隐（已配置模型时隐藏，消除分享场景下的困惑）。
 
-const STORAGE_KEY = "my:profile";
+**Architecture:** 单文件重组（`app/profile/page.tsx`），不拆分文件（所有 state 紧密耦合）。新增 `CollapsibleSection` 辅助组件用于折叠分区。API Token 显隐基于 `modelConfigs` 派生状态 `hasModelConfig`。
 
-/** VAPID 公钥转 Uint8Array（push 订阅需要） */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from(rawData, (c) => c.charCodeAt(0));
-}
+**Tech Stack:** Next.js App Router、React 19、Tailwind、IndexedDB（只读）。
 
-const defaultProfile: PublicProfile = {
-  username: "",
-  displayName: "",
-  avatar: undefined,
-  bio: "",
-  visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
-  followerCount: 0,
-  followingCount: 0,
-  updatedAt: new Date().toISOString(),
-};
+---
 
-// 常见问题列表（FAQ）
-const FAQS: Array<{ q: string; a: string }> = [
-  {
-    q: "如何开始学习？",
-    a: "在首页输入想学的主题，或点击预设知识库一键导入",
-  },
-  {
-    q: "数据存储在哪里？",
-    a: "本地 IndexedDB 优先，可在设置中开启云端同步到 Cloudflare KV",
-  },
-  {
-    q: "如何跨设备同步？",
-    a: "在「我的个人信息 → 用户 ID」处：旧设备点击「上传到云端」并复制 ID；新设备点击「导入已有 ID」粘贴后，再点「从云端恢复」即可",
-  },
-  {
-    q: "什么是 FSRS？",
-    a: "Free Spaced Repetition Scheduler，科学的间隔重复算法，根据你的遗忘曲线安排复习时间",
-  },
-  {
-    q: "API Token 和 API Key 有什么区别？",
-    a: "API Key 是你从模型服务商（智谱/DeepSeek/OpenAI）获取的密钥，在「AI 模型配置」里填写，用于调用你自己的 AI 额度。API Token 是部署管理员设置的服务端鉴权密钥，仅在未配置自己的模型而使用「服务端默认模型」时才需要。大多数用户只需配置 API Key 即可。",
-  },
-  {
-    q: "AI 接口失败/报错怎么办？",
-    a: "1) 确保在「AI 模型配置」添加了自己的模型（含 API Key），这是最常见的原因；2) 在聊天页底部确认模型选择器已选中你配置的模型；3) 预设知识库无需 AI 也可使用",
-  },
-  {
-    q: "支持哪些语言？",
-    a: "中文界面，代码示例支持 JS/TS/Python/Java/Go/SQL/Bash 等主流语言高亮",
-  },
-];
+## 设计分析（乔布斯视角）
 
-export default function ProfilePage() {
-  const [profile, setProfile] = useState<PublicProfile>(defaultProfile);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  // 公开主页同步错误（401/500 等向用户展示）
-  const [syncError, setSyncError] = useState<string | null>(null);
+**问题 1：布局平铺，焦点散乱**
+当前 7 大分区平铺：学习统计 / 收藏 / 个人信息 / AI 模型 / 个人信息编辑 / 设置 / 应用信息 / 帮助。用户每次打开都要滚动找自己关心的东西。这违背焦点原则——没有告诉用户"先看什么"。
 
-  // 编辑表单是否展开（默认折叠）
-  const [editOpen, setEditOpen] = useState(false);
+**问题 2：API Token 困惑**
+经代码核查，`ShareCardButton`（分享图）**根本不使用 API Token**，它纯本地生成图片。API Token 仅在 `apiFetch`/`aiFetch` 调用服务端 API 时附加到 Authorization 头，且仅当用户**未配置自己的 AI 模型**时才需要。把它放在"个人信息"分区下方是 UX 错误——用户在分享场景看到它完全无意义，且大多数用户配置了自己的模型后根本不需要它。
 
-  // 每日时间表
-  const [routine, setRoutine] = useState<string>("");
-  const [routineSaving, setRoutineSaving] = useState(false);
-  const [routineSaved, setRoutineSaved] = useState(false);
-  const [routineHint, setRoutineHint] = useState<string>("");
+**解法**：
+1. **关键信息前置**：学习统计、收藏、AI 模型配置三个核心使用功能置顶，始终展开。
+2. **个人信息折叠**：默认显示头像+用户名概要，点击展开编辑表单。同步状态、分享图按钮随分区一起折叠（用户需要时才点开）。
+3. **「更多」分区**：收纳低频功能——主题、每日时间表、AI 人格、隐私、通知、API Token、应用信息、帮助。默认折叠。
+4. **API Token 智能显隐**：
+   - 已配置 AI 模型（`modelConfigs` 中有含 `apiKey` 的配置）→ 显示"✓ 已配置自己的 AI 模型，无需填写 API Token"，隐藏输入框。
+   - 未配置模型 → 显示引导文字 + 输入框，引导文字优先推荐"配置自己的 AI 模型"。
 
-  // PWA 通知
-  const [notifSupported, setNotifSupported] = useState(false);
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+**为何不删除 API Token**：自部署用户若使用服务端默认模型仍需要它。删除会破坏这部分用户体验。智能显隐是最优解——既消除普通用户的困惑，又保留功能。
 
-  // API Token
-  const [apiToken, setApiTokenState] = useState("");
-  const [tokenSaved, setTokenSaved] = useState(false);
+## 文件结构
 
-  // 收藏统计
-  const [deckCount, setDeckCount] = useState(0);
-  const [questionCount, setQuestionCount] = useState(0);
+| 文件 | 责任 | 类型 |
+|------|------|------|
+| `app/profile/page.tsx` | 重构布局：置顶分区 + 折叠个人信息 + 「更多」分区 + API Token 显隐 | 改写 |
 
-  // P2.5 学习统计概览（dashboard Tab 移除后补全闭环）
-  const [streak, setStreak] = useState(0);
-  const [totalMinutes, setTotalMinutes] = useState(0);
-  const [weekMinutes, setWeekMinutes] = useState(0);
+**不新建文件**：`CollapsibleSection` 作为 `page.tsx` 内联辅助组件，与现有 `Section` 共存。所有 state 已在组件内，拆分反而增加 prop 传递复杂度（YAGNI）。
 
-  // AI 模型配置
-  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
-  const [showModelForm, setShowModelForm] = useState(false);
-  const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
-  const [modelName, setModelName] = useState("");
-  const [modelProvider, setModelProvider] = useState<ModelConfig["provider"]>("custom");
-  const [modelBaseURL, setModelBaseURL] = useState("");
-  const [modelApiKey, setModelApiKey] = useState("");
-  const [modelModel, setModelModel] = useState("");
-  const [modelIsDefault, setModelIsDefault] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [modelSaving, setModelSaving] = useState(false);
-  const [modelError, setModelError] = useState("");
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
+**新布局结构**：
+```
+我的
+├── [置顶·始终展开] 学习统计概览
+├── [置顶·始终展开] 我的收藏
+├── [置顶·始终展开] AI 模型配置
+├── [折叠] 个人信息（概要 + 编辑表单 + 同步 + 分享图）
+└── [折叠] 更多
+    ├── 外观主题
+    ├── 每日时间表
+    ├── AI 人格（Persona）
+    ├── 隐私设置
+    ├── 学习提醒（PWA）
+    ├── 高级 ▼
+    │   └── API 鉴权 Token（已配置模型时隐藏输入框）
+    ├── 应用信息
+    └── 帮助 / FAQ
+```
 
-  // AI 人格（Persona）设置
-  // preferredPersona: undefined = 自动（按用户状态选）；否则为 4 种 PersonaId 之一
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [personaSaving, setPersonaSaving] = useState(false);
-  const [personaSaved, setPersonaSaved] = useState(false);
+---
 
-  // 是否已配置含 API Key 的模型 → 决定 API Token 输入框是否显示
-  const hasModelConfig = modelConfigs.some((c) => c.apiKey.trim().length > 0);
+### Task 1: 添加 CollapsibleSection 辅助组件 + hasModelConfig 派生状态
 
+**Files:**
+- Modify: `app/profile/page.tsx`（在文件末尾 `Section` 组件定义后追加 `CollapsibleSection`；在组件内加 `hasModelConfig` 派生）
+
+- [ ] **Step 1: 在 `ProfilePage` 组件内，`useEffect` 之后、`update` 函数之前，添加 `hasModelConfig` 派生状态**
+
+在 `app/profile/page.tsx` 中找到：
+```tsx
   useEffect(() => {
     (async () => {
       const stored = await dbGet<PublicProfile>(STORAGE_KEY);
-      if (stored) setProfile(stored);
+```
 
-      const r = await loadRoutineMarkdown();
-      setRoutine(r);
+在 `useEffect` 块**之前**插入一行派生状态声明：
+```tsx
+  // 是否已配置含 API Key 的模型 → 决定 API Token 输入框是否显示
+  const hasModelConfig = modelConfigs.some((c) => c.apiKey.trim().length > 0);
+```
 
-      // 加载已存的 API Token
-      const token = await getApiToken();
-      if (token) setApiTokenState(token);
+注意：`modelConfigs` 已在组件 state 中（第 129 行），`hasModelConfig` 是纯派生值，无需 useState。
 
-      // 检查 PWA 通知支持
-      if (typeof window !== "undefined" && "Notification" in window) {
-        setNotifSupported(true);
-        setNotifPermission(Notification.permission);
-      }
+- [ ] **Step 2: 在文件末尾 `Section` 函数之后，追加 `CollapsibleSection` 辅助组件**
 
-      // 加载收藏统计
-      const [decks, questions] = await Promise.all([
-        listFavoriteDecks(),
-        listFavoritedQuestions(),
-      ]);
-      setDeckCount(decks.length);
-      setQuestionCount(questions.length);
+找到文件末尾：
+```tsx
+function Section({
+  icon,
+  title,
+  desc,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  desc: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+      <header className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Icon name={icon} className="w-5 h-5 shrink-0" />
+          {title}
+        </h2>
+        <span className="text-right text-xs text-gray-400">{desc}</span>
+      </header>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+```
 
-      // P2.5 加载学习统计概览：连续打卡 + 总时长 + 本周时长
-      const logs = await listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG);
-      const total = logs.reduce((sum, l) => sum + (l.duration ?? 0), 0);
-      setTotalMinutes(total);
-      // 本周（最近 7 天）时长
-      let week = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = chinaDateShift(chinaDateNow(), -i);
-        week += logs
-          .filter((l) => l.date === d)
-          .reduce((s, l) => s + (l.duration ?? 0), 0);
-      }
-      setWeekMinutes(week);
-      // 连续打卡
-      const logDates = new Set(logs.map((l) => l.date));
-      let streakCount = 0;
-      let checkDate = chinaDateNow();
-      while (logDates.has(checkDate)) {
-        streakCount++;
-        checkDate = chinaDateShift(checkDate, -1);
-      }
-      setStreak(streakCount);
+在其后追加：
+```tsx
+/** 可折叠分区：点击标题切换展开/收起。用于个人信息与「更多」。 */
+function CollapsibleSection({
+  icon,
+  title,
+  desc,
+  defaultOpen = false,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  desc?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        aria-expanded={open}
+      >
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Icon name={icon} className="w-5 h-5 shrink-0" />
+          {title}
+        </h2>
+        <span className="flex items-center gap-2">
+          {desc && <span className="text-right text-xs text-gray-400">{desc}</span>}
+          <Icon
+            name="chevron-down"
+            className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+      {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
+    </section>
+  );
+}
+```
 
-      // 加载 AI 模型配置
-      const configs = await listModelConfigs();
-      setModelConfigs(configs);
+- [ ] **Step 3: 验证类型**
 
-      // 加载用户画像（用于 persona 设置）
-      const profile = await getUserProfile();
-      setUserProfile(profile);
+Run: `npx tsc --noEmit 2>&1 | grep "app/profile" || echo "profile clean"`
+Expected: `profile clean`（无新增类型错误；预先存在的 observability.test.ts 错误与本改动无关）
 
-      // P3.4：页面加载时静默检查能量模型是否需要重训练（不阻塞 UI，失败仅 console.warn）
-      void maybeRetrain();
-    })();
-  }, []);
+- [ ] **Step 4: 提交**
 
-  function update<K extends keyof PublicProfile>(key: K, value: PublicProfile[K]) {
-    setProfile((p) => ({ ...p, [key]: value }));
-    setSaved(false);
-  }
+```bash
+git add app/profile/page.tsx
+git commit -m "feat(profile): add CollapsibleSection helper + hasModelConfig derived state"
+```
 
-  function toggleVisibility(key: keyof PublicProfile["visibility"]) {
-    setProfile((p) => ({
-      ...p,
-      visibility: { ...p.visibility, [key]: !p.visibility[key] },
-    }));
-    setSaved(false);
-  }
+---
 
-  // 保存个人信息：写入 IndexedDB + 调用 /api/public/[username] PUT
-  async function save() {
-    setSaving(true);
-    try {
-      await dbSet(STORAGE_KEY, profile);
-      // 成就墙开启时，上传已解锁成就到云端（供公开主页展示）
-      let achievementsPayload: Achievement[] | undefined = undefined;
-      if (profile.visibility.achievements) {
-        try {
-          achievementsPayload = await listAchievements();
-        } catch {
-          achievementsPayload = [];
-        }
-      }
-      const res = await apiFetch(`/api/public/${encodeURIComponent(profile.username)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, achievements: achievementsPayload }),
-      });
-      if (!res.ok && res.status !== 404) {
-        // 解析服务端返回的错误消息，向用户展示（而不是仅 console.warn）
-        let serverMsg = "";
-        try {
-          const errBody = (await res.json()) as { message?: string; error?: string };
-          serverMsg = errBody.message ?? errBody.error ?? "";
-        } catch {
-          serverMsg = `HTTP ${res.status}`;
-        }
-        console.warn("公开主页同步失败:", res.status, serverMsg);
-        // 401 时给用户明确提示：要么配置 API Token，要么联系部署方
-        if (res.status === 401) {
-          setSyncError(
-            `公开主页同步未授权（${serverMsg}）。请在「更多 → 高级 · API 鉴权 Token」中填入与部署方一致的 Token 后再保存。`,
-          );
-        } else {
-          setSyncError(`公开主页同步失败：${serverMsg}`);
-        }
-      } else {
-        setSyncError(null);
-      }
-      setSaved(true);
-      // 触发自动云端同步（含 profile）
-      scheduleAutoSync();
-    } finally {
-      setSaving(false);
-    }
-  }
+### Task 2: 重组布局——置顶分区 + 折叠个人信息 + 「更多」分区
 
-  async function saveToken() {
-    await setApiToken(apiToken);
-    setTokenSaved(true);
-    setTimeout(() => setTokenSaved(false), 2000);
-  }
+**Files:**
+- Modify: `app/profile/page.tsx`（重组 return 语句的 JSX 结构）
 
-  async function saveRoutine() {
-    setRoutineSaving(true);
-    try {
-      await saveRoutineMarkdown(routine);
-      // 简单校验：解析后能否得到时段
-      const slots = parseRoutine(routine);
-      setRoutineHint(
-        slots.length > 0
-          ? `已识别 ${slots.length} 个时段`
-          : "已保存（未识别到任何时段，请检查格式）",
-      );
-      setRoutineSaved(true);
-    } finally {
-      setRoutineSaving(false);
-    }
-  }
+- [ ] **Step 1: 重组 `return` 语句**
 
-  async function requestNotifPermission() {
-    if (!notifSupported) return;
-    const perm = await Notification.requestPermission();
-    setNotifPermission(perm);
-    if (perm === "granted") {
-      // 尝试订阅 Push（需要配置 NEXT_PUBLIC_VAPID_PUBLIC_KEY）
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-          if (vapidKey) {
-            sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
-            });
-          }
-        }
-        if (sub) {
-          await dbSet("push:subscription", sub);
-        }
-      } catch (e) {
-        console.warn("Push 订阅失败:", e);
-      }
-      // 注册 Periodic Background Sync（后台定期检查，让 AI "在呼吸"）
-      if ("serviceWorker" in navigator && "PeriodicSyncManager" in window) {
-        try {
-          const reg = await navigator.serviceWorker.ready;
-          const periodicSync = (
-            reg as ServiceWorkerRegistration & {
-              periodicSync?: {
-                register: (
-                  tag: string,
-                  options?: { minInterval?: number },
-                ) => Promise<void>;
-              };
-            }
-          ).periodicSync;
-          await periodicSync?.register("devpath-background-check", {
-            minInterval: 30 * 60 * 1000, // 30 分钟
-          });
-        } catch (e) {
-          console.warn("Periodic Sync 注册失败:", e);
-        }
-      }
-      // 测试通知
-      new Notification("devpath 打卡提醒已开启", {
-        body: "我们会在每日学习时段提醒你 📚",
-        icon: "/icons/icon-192.png",
-      });
-    }
-  }
+找到 `return` 语句起始（约 541 行）：
+```tsx
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 p-4 pb-20">
+      <h1 className="text-2xl font-bold">我的</h1>
 
-  // ============ AI 人格（Persona）设置 ============
+      {/* 0. 学习统计概览（P2.5: dashboard Tab 移除后补全闭环） */}
+      <Section
+```
 
-  /**
-   * 保存 persona 偏好到 UserProfile
-   * - value = undefined 表示"自动选择"
-   * - 若 userProfile 不存在（首次使用），先 buildUserProfile 构造一份再保存
-   */
-  async function savePersonaPreference(value: PersonaId | undefined) {
-    setPersonaSaving(true);
-    try {
-      let profile = userProfile;
-      if (!profile) {
-        // 首次使用：构建画像兜底
-        try {
-          profile = await buildUserProfile();
-        } catch {
-          // 构建失败：用最小默认画像兜底（保证用户能选 persona）
-          profile = {
-            id: "ai:profile",
-            skillLevel: {},
-            accuracyByNode: {},
-            preferredTimeSlots: [],
-            averageSessionMinutes: 0,
-            goals: { short: [], mid: [], long: [] },
-            updatedAt: new Date().toISOString(),
-          };
-        }
-      }
-      const next: UserProfile = { ...profile, preferredPersona: value };
-      await saveUserProfile(next);
-      setUserProfile(next);
-      setPersonaSaved(true);
-      setTimeout(() => setPersonaSaved(false), 2000);
-      // 触发云端同步（确保跨设备生效）
-      scheduleAutoSync();
-    } finally {
-      setPersonaSaving(false);
-    }
-  }
+将其下方到文件末尾 `</div>` 闭合（约 1324 行）的**整段 JSX** 替换为以下新结构。保留所有内部逻辑（统计、收藏、AI 模型、编辑表单、主题、时间表、AI 人格、隐私、通知、Token、应用信息、帮助的 JSX 内容不变），仅调整分区容器与顺序：
 
-  // ============ AI 模型配置 ============
-
-  /** 刷新模型配置列表 */
-  async function refreshModelConfigs() {
-    const configs = await listModelConfigs();
-    setModelConfigs(configs);
-  }
-
-  /** 重置表单（清空字段，退出编辑模式） */
-  function resetModelForm() {
-    setEditingModel(null);
-    setModelName("");
-    setModelProvider("custom");
-    setModelBaseURL("");
-    setModelApiKey("");
-    setModelModel("");
-    setModelIsDefault(false);
-    setModelError("");
-  }
-
-  /** 点击预设模板，填充表单（baseURL + model + name） */
-  function applyPreset(preset: (typeof MODEL_PRESETS)[number]) {
-    setModelName(preset.name);
-    setModelProvider(preset.provider);
-    setModelBaseURL(preset.baseURL);
-    setModelModel(preset.model);
-    setModelError("");
-  }
-
-  /** 打开新建表单 */
-  function openNewModelForm() {
-    resetModelForm();
-    setShowModelForm(true);
-  }
-
-  /** 点击编辑：用已有配置填充表单并展开 */
-  function openEditModelForm(config: ModelConfig) {
-    setEditingModel(config);
-    setModelName(config.name);
-    setModelProvider(config.provider);
-    setModelBaseURL(config.baseURL);
-    setModelApiKey(config.apiKey);
-    setModelModel(config.model);
-    setModelIsDefault(config.isDefault);
-    setModelError("");
-    setShowModelForm(true);
-  }
-
-  /** Provider 改变时，若为 glm/deepseek/mimo/kimi 自动回填 baseURL+model */
-  function handleProviderChange(provider: ModelConfig["provider"]) {
-    setModelProvider(provider);
-    const preset = MODEL_PRESETS.find((p) => p.provider === provider);
-    if (preset && (provider === "glm" || provider === "deepseek" || provider === "mimo" || provider === "kimi")) {
-      setModelBaseURL(preset.baseURL);
-      setModelModel(preset.model);
-    }
-  }
-
-  /** 保存（新建 / 更新） */
-  async function saveModelConfig() {
-    setModelError("");
-    if (!modelName.trim() || !modelBaseURL.trim() || !modelApiKey.trim() || !modelModel.trim()) {
-      setModelError("请填写名称、baseURL、API Key、模型名称");
-      return;
-    }
-    setModelSaving(true);
-    try {
-      const payload = {
-        name: modelName.trim(),
-        provider: modelProvider,
-        baseURL: modelBaseURL.trim(),
-        apiKey: modelApiKey.trim(),
-        model: modelModel.trim(),
-        isDefault: modelIsDefault,
-      };
-      if (editingModel) {
-        await updateModelConfig(editingModel.id, payload);
-      } else {
-        await createModelConfig(payload);
-      }
-      await refreshModelConfigs();
-      resetModelForm();
-      setShowModelForm(false);
-      // 触发云端同步，确保跨设备可用（否则换设备后会报 503）
-      scheduleAutoSync();
-    } finally {
-      setModelSaving(false);
-    }
-  }
-
-  /** 删除模型配置 */
-  async function handleDeleteModel(id: string) {
-    if (!confirm("确定删除该模型配置？")) return;
-    await deleteModelConfig(id);
-    await refreshModelConfigs();
-    if (editingModel?.id === id) {
-      resetModelForm();
-      setShowModelForm(false);
-    }
-    scheduleAutoSync();
-  }
-
-  /** 设为默认 */
-  async function handleSetDefault(id: string) {
-    await setDefaultModel(id);
-    await refreshModelConfigs();
-    scheduleAutoSync();
-  }
-
-  /** 测试模型连接 */
-  async function handleTestModel(config: ModelConfig) {
-    setTestingId(config.id);
-    setTestResult((prev) => ({ ...prev, [config.id]: { ok: false, msg: "测试中..." } }));
-    try {
-      const res = await fetch("/api/ai-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelConfig: {
-            baseURL: config.baseURL,
-            apiKey: config.apiKey,
-            model: config.model,
-            name: config.name,
-            provider: config.provider,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setTestResult((prev) => ({
-          ...prev,
-          [config.id]: {
-            ok: true,
-            msg: `连接成功 (${data.elapsedMs}ms): ${data.reply?.slice(0, 50) || "OK"}`,
-          },
-        }));
-      } else {
-        setTestResult((prev) => ({
-          ...prev,
-          [config.id]: { ok: false, msg: data.error || `HTTP ${res.status}` },
-        }));
-      }
-    } catch (e) {
-      setTestResult((prev) => ({
-        ...prev,
-        [config.id]: { ok: false, msg: e instanceof Error ? e.message : "网络错误" },
-      }));
-    } finally {
-      setTestingId(null);
-    }
-  }
-
+```tsx
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 pb-20">
       <h1 className="text-2xl font-bold">我的</h1>
@@ -553,6 +198,7 @@ export default function ProfilePage() {
         title="学习统计"
         desc="连续打卡 · 累计时长 · 本周表现"
       >
+        {/* [原 0. 学习统计的 JSX 内容原样搬入] */}
         <div className="grid grid-cols-3 gap-3 mb-3">
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-600 flex items-center justify-center gap-1">
@@ -600,6 +246,7 @@ export default function ProfilePage() {
 
       {/* 2. 我的收藏 */}
       <Section icon="star" title="我的收藏" desc="收藏的试题集与单题">
+        {/* [原 1. 我的收藏的 JSX 内容原样搬入] */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-6">
             <div>
@@ -622,7 +269,8 @@ export default function ProfilePage() {
 
       {/* 3. AI 模型配置（核心使用功能） */}
       <Section icon="sparkles" title="AI 模型配置" desc="管理 OpenAI 兼容模型">
-        {/* 配置列表 */}
+        {/* [原 2. AI 模型配置的整段 JSX 原样搬入——含配置列表、新建按钮、表单] */}
+        {/* 从 "配置列表" 注释开始，到表单结束的 </Section> 之前 */}
         <div className="space-y-2">
           {modelConfigs.length === 0 ? (
             <p className="rounded-lg border border-dashed bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
@@ -697,7 +345,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* 新建 / 收起表单按钮 */}
         <div>
           {!showModelForm ? (
             <button
@@ -719,10 +366,8 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* 表单 */}
         {showModelForm && (
           <div className="space-y-3 rounded-lg border bg-gray-50/50 p-3">
-            {/* 预设模板 */}
             <div>
               <label className="block text-sm font-medium">预设模板</label>
               <p className="text-xs text-gray-500">
@@ -741,7 +386,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* 名称 */}
             <div>
               <label className="block text-sm font-medium">名称</label>
               <input
@@ -752,7 +396,6 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* Provider */}
             <div>
               <label className="block text-sm font-medium">Provider</label>
               <select
@@ -770,7 +413,6 @@ export default function ProfilePage() {
               </select>
             </div>
 
-            {/* baseURL */}
             <div>
               <label className="block text-sm font-medium">baseURL</label>
               <input
@@ -781,7 +423,6 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* API Key（密码 + 显隐） */}
             <div>
               <label className="block text-sm font-medium">API Key</label>
               <div className="mt-1 flex gap-2">
@@ -802,7 +443,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* 模型名称 */}
             <div>
               <label className="block text-sm font-medium">模型名称</label>
               <input
@@ -813,7 +453,6 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* 设为默认 */}
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -824,12 +463,10 @@ export default function ProfilePage() {
               <span className="text-sm">设为默认模型</span>
             </label>
 
-            {/* 错误提示 */}
             {modelError && (
               <p className="text-sm text-red-600">{modelError}</p>
             )}
 
-            {/* 保存按钮 */}
             <div className="flex items-center gap-2">
               <button
                 onClick={saveModelConfig}
@@ -887,7 +524,6 @@ export default function ProfilePage() {
           <SyncStatus />
         </div>
 
-        {/* 公开主页同步错误提示 */}
         {syncError && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-200 space-y-1">
             <p className="font-medium"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 公开主页未同步</p>
@@ -1337,70 +973,72 @@ export default function ProfilePage() {
       </CollapsibleSection>
     </div>
   );
-}
+```
 
-/** 分区卡片：左侧 emoji + 标题，右侧描述；圆角分组卡片样式 */
-function Section({
-  icon,
-  title,
-  desc,
-  children,
-}: {
-  icon: IconName;
-  title: string;
-  desc: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3 rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      <header className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icon name={icon} className="w-5 h-5 shrink-0" />
-          {title}
-        </h2>
-        <span className="text-right text-xs text-gray-400">{desc}</span>
-      </header>
-      <div className="space-y-3">{children}</div>
-    </section>
-  );
-}
+**关键变化总结**：
+1. 学习统计、收藏、AI 模型配置三个 `<Section>` 保留不变，始终展开。
+2. 原"我的个人信息" + "个人信息编辑"两个分区合并为一个 `<CollapsibleSection>`，`desc` 显示用户名概要。
+3. 原"设置"分区拆解：主题、时间表、AI 人格、隐私、通知、API Token、应用信息、帮助全部收纳进 `<CollapsibleSection title="更多">`。
+4. API Token 块改为基于 `hasModelConfig` 条件渲染：已配置模型时显示绿色提示卡片，未配置时显示引导 + 输入框。
+5. 原 FAQ 中"API Token 和 API Key 有什么区别？"条目保留（仍有教育价值）。
 
-/** 可折叠分区：点击标题切换展开/收起。用于个人信息与「更多」。 */
-function CollapsibleSection({
-  icon,
-  title,
-  desc,
-  defaultOpen = false,
-  children,
-}: {
-  icon: IconName;
-  title: string;
-  desc?: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className="rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-        aria-expanded={open}
-      >
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icon name={icon} className="w-5 h-5 shrink-0" />
-          {title}
-        </h2>
-        <span className="flex items-center gap-2">
-          {desc && <span className="text-right text-xs text-gray-400">{desc}</span>}
-          <Icon
-            name="chevron-down"
-            className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </span>
-      </button>
-      {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
-    </section>
-  );
-}
+- [ ] **Step 2: 验证类型**
+
+Run: `npx tsc --noEmit 2>&1 | grep "app/profile" || echo "profile clean"`
+Expected: `profile clean`
+
+- [ ] **Step 3: 跑测试确保无回归**
+
+Run: `npx vitest run __tests__/smoke.test.ts __tests__/api-status.test.ts 2>&1 | tail -10`
+Expected: PASS
+
+- [ ] **Step 4: ESLint 检查**
+
+Run: `npx next lint --file app/profile/page.tsx`
+Expected: 无 error
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add app/profile/page.tsx
+git commit -m "feat(profile): restructure layout — key info first, collapse personal, move token to more"
+```
+
+---
+
+### Task 3: 全量验证与推送
+
+**Files:** 无新增，仅验证
+
+- [ ] **Step 1: 全量测试**
+
+Run: `npx vitest run 2>&1 | tail -10`
+Expected: 所有测试通过（预先存在的 observability.test.ts 类型错误不影响 vitest 运行）
+
+- [ ] **Step 2: TypeScript 全量检查（确认无新增错误）**
+
+Run: `npx tsc --noEmit 2>&1 | grep -c "error TS"`
+Expected: 与改动前相同（仅 observability.test.ts 的 2 个预先存在错误）
+
+- [ ] **Step 3: 推送到远程**
+
+```bash
+git push origin develop
+```
+
+---
+
+## Self-Review
+
+**1. Spec coverage**：
+- "重新设计布局，不重要的放更多，关键信息往前放" → Task 2 重组：学习统计/收藏/AI 模型置顶，低频功能进「更多」✅
+- "个人信息之类的分类折叠" → Task 2 用 `CollapsibleSection` 折叠个人信息 + 「更多」✅
+- "api token 为什么要存在？分享场景为什么要 api token？" → 经核查 ShareCardButton 不使用 API Token；Task 2 将其移到「更多 → 高级」并智能显隐 ✅
+- "如果一定要，请放更多" → Task 2 API Token 放入「更多」分区，且已配置模型时隐藏输入框 ✅
+
+**2. Placeholder scan**：Task 2 Step 1 包含完整 JSX 代码，无 "TODO/TBD"；所有引用的类型/函数（`hasModelConfig`、`modelConfigs`、`apiToken`、`saveToken` 等）在 Task 1 或原文件中已定义。✅
+
+**3. Type consistency**：
+- `CollapsibleSection` props（icon/title/desc/defaultOpen/children）在 Task 1 定义，Task 2 使用一致 ✅
+- `hasModelConfig` 在 Task 1 定义为 `modelConfigs.some((c) => c.apiKey.trim().length > 0)`，Task 2 使用一致 ✅
+- `IconName` 类型中 `settings`/`chevron-down`/`check-circle`/`alert` 均已存在 ✅
