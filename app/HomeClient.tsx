@@ -17,6 +17,7 @@ import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { DailyNudge } from "@/components/DailyNudge";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
 import { AchievementCard } from "@/components/AchievementCard";
+import { HealthAlertCard } from "@/components/HealthAlertCard";
 import { Icon, type IconName } from "@/components/Icon";
 import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
 
@@ -35,6 +36,7 @@ export default function HomeClient() {
     todayEmotions,
     recentMistakes,
     newAchievements,
+    healthAlerts,
     reload,
   } = useHomeData();
 
@@ -42,6 +44,10 @@ export default function HomeClient() {
   const [showEmotionRecorder, setShowEmotionRecorder] = useState(false);
   // 成就卡片关闭状态：关闭后隐藏，直到出现新的成就
   const [achievementsDismissed, setAchievementsDismissed] = useState(false);
+  // 已关闭的 HealthAlert id 集合（仅本会话内，刷新后重新出现）
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Demo 数据注入：首次访问（IndexedDB 无任何 plan）时异步注入示例数据
   // 不阻塞 UI——注入完成后 reload 刷新首页数据
@@ -127,6 +133,19 @@ export default function HomeClient() {
           onClose={() => setAchievementsDismissed(true)}
         />
       )}
+
+      {/* 健康检查告警卡片（可关闭 + 一键采纳） */}
+      <HealthAlertCard
+        alerts={healthAlerts}
+        dismissedIds={dismissedAlertIds}
+        onClose={(alertId) =>
+          setDismissedAlertIds((prev) => {
+            const next = new Set(prev);
+            next.add(alertId);
+            return next;
+          })
+        }
+      />
 
       {/* ============ 1. AI 主动提醒 + 现在该做什么 ============ */}
       <section className="mb-4 space-y-3">

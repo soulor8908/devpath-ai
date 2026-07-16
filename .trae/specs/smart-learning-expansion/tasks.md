@@ -224,15 +224,15 @@
 
 ## 阶段 7：首页集成 + 健康检查展示
 
-- [ ] Task 7.1: 修改 `lib/home.ts` 后台任务完整集成
-  - [ ] SubTask 7.1.1: 追加 `planHealthCheck()` + `detectAchievements()` + `maybeBuildProfile()`
-  - [ ] SubTask 7.1.2: 所有后台任务用 `Promise.allSettled` 并行
-- [ ] Task 7.2: 修改 `app/HomeClient.tsx` 展示 HealthAlert
-  - [ ] SubTask 7.2.1: 顶部可关闭卡片展示 HealthAlert
-  - [ ] SubTask 7.2.2: "一键采纳"按钮调用 `optimize_schedule` 工具
-- [ ] Task 7.3: E2E 测试 `e2e/main-flow.spec.ts` 扩展
-  - [ ] SubTask 7.3.1: 番茄时钟完整流程（开始 → 倒计时 → 完成 → LearnLog 写入）
-  - [ ] SubTask 7.3.2: Demo 数据注入 + 清除流程
+- [x] Task 7.1: 修改 `lib/home.ts` 后台任务完整集成
+  - [x] SubTask 7.1.1: 追加 `planHealthCheck()` + `detectAchievements()` + `maybeBuildProfile()`
+  - [x] SubTask 7.1.2: 所有后台任务用 `Promise.allSettled` 并行
+- [x] Task 7.2: 修改 `app/HomeClient.tsx` 展示 HealthAlert
+  - [x] SubTask 7.2.1: 顶部可关闭卡片展示 HealthAlert
+  - [x] SubTask 7.2.2: "一键采纳"按钮调用 `optimize_schedule` 工具
+- [x] Task 7.3: E2E 测试 `e2e/main-flow.spec.ts` 扩展
+  - [x] SubTask 7.3.1: 番茄时钟完整流程（开始 → 倒计时 → 完成 → LearnLog 写入）
+  - [x] SubTask 7.3.2: Demo 数据注入 + 清除流程
 
 # Task Dependencies
 

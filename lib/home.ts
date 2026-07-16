@@ -22,6 +22,7 @@ import type {
   MistakeRecord,
   EmotionEntry,
   Achievement,
+  HealthAlert,
 } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { getDueCards } from "@/lib/fsrs";
@@ -30,6 +31,10 @@ import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
 import { maybeRetrain } from "@/lib/energy-regression";
 import { maybeBuildProfile } from "@/lib/ai/memory/user-profile";
 import { checkAndNotify } from "@/lib/achievements";
+import {
+  planHealthCheck,
+  shouldRunHealthCheck,
+} from "@/lib/ai/plan-health";
 
 // ============ 打卡可视化元数据 ============
 
@@ -119,6 +124,8 @@ export interface HomeData {
   recentMistakes: MistakeRecord[];
   /** 后台检测到的新解锁成就（供首页顶部展示通知卡片） */
   newAchievements: Achievement[];
+  /** 健康检查告警（首页顶部展示，可关闭 + 一键采纳） */
+  healthAlerts: HealthAlert[];
 }
 
 // ============ 纯函数：从原始数据计算派生状态 ============
@@ -226,6 +233,7 @@ export function useHomeData(): HomeData & {
     todayEmotions: [],
     recentMistakes: [],
     newAchievements: [],
+    healthAlerts: [],
   });
 
   const load = useCallback(async () => {
@@ -269,6 +277,7 @@ export function useHomeData(): HomeData & {
       todayEmotions: emotions.filter((e) => e.date === today),
       recentMistakes: mistakes.slice(0, 3),
       newAchievements: [],
+      healthAlerts: [],
     });
 
     // 后台维护任务：不阻塞 UI，失败静默
@@ -277,11 +286,13 @@ export function useHomeData(): HomeData & {
     // - maybeRetrain: 检查是否需要重训练能量回归模型
     // - maybeBuildProfile: 懒构建/刷新用户画像（24h TTL）
     // - checkAndNotify: 成就检测 + 通知（新成就存入 state 供 UI 展示）
+    // - maybeRunHealthCheck: 计划健康检查（当日只跑一次，HealthAlert 存入 state 供 UI 展示）
     void Promise.allSettled([
       autoFillTodayActualMinutes(),
       maybeRetrain(),
       maybeBuildProfile(),
       checkAndNotify(),
+      maybeRunHealthCheck(today),
     ])
       .then((results) => {
         // checkAndNotify 是第 4 个；fulfilled 时取其返回的新成就
@@ -290,6 +301,13 @@ export function useHomeData(): HomeData & {
           achievementResult.status === "fulfilled" ? achievementResult.value : [];
         if (newAchievements.length > 0) {
           setData((prev) => ({ ...prev, newAchievements }));
+        }
+        // maybeRunHealthCheck 是第 5 个；fulfilled 时取其返回的 HealthAlert[]
+        const healthResult = results[4];
+        const healthAlerts =
+          healthResult.status === "fulfilled" ? healthResult.value : [];
+        if (healthAlerts.length > 0) {
+          setData((prev) => ({ ...prev, healthAlerts }));
         }
       })
       .catch(() => {
@@ -302,4 +320,22 @@ export function useHomeData(): HomeData & {
   }, [load]);
 
   return { ...data, reload: load };
+}
+
+// ============ 内部工具：后台任务包装 ============
+
+/**
+ * 计划健康检查包装：当日只跑一次
+ * - shouldRunHealthCheck 返回 true → 调 planHealthCheck() 返回 HealthAlert[]
+ * - shouldRunHealthCheck 返回 false（当日已跑过）→ 返回空数组
+ * - 任何异常吞掉返回空数组（与 Promise.allSettled 失败静默协议一致）
+ */
+async function maybeRunHealthCheck(today: string): Promise<HealthAlert[]> {
+  try {
+    const shouldRun = await shouldRunHealthCheck(today);
+    if (!shouldRun) return [];
+    return await planHealthCheck();
+  } catch {
+    return [];
+  }
 }
