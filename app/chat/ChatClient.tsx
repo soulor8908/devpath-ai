@@ -35,7 +35,7 @@ import { buildChatContext, buildToolContext } from "@/lib/ai/chat-context";
 import type { ClientAction } from "@/lib/ai/chat-tools";
 import { createReminder, startReminderPolling } from "@/lib/reminder";
 import { getItem as dbGet, setItem as dbSet } from "@/lib/storage/db";
-import { scheduleAutoSync } from "@/lib/sync";
+import { scheduleAutoSync, getUserId } from "@/lib/sync";
 import {
   recordAICall,
   trackAIFeedback,
@@ -481,6 +481,7 @@ export default function ChatClient() {
       const stopTimer = startTimer();
 
       const token = await getApiToken();
+      const userId = await getUserId().catch(() => undefined);
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -492,6 +493,7 @@ export default function ChatClient() {
           modelConfig,
           contextSnapshot,
           toolContext,
+          userId,
         }),
       });
 

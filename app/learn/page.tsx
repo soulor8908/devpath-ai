@@ -31,6 +31,7 @@ import {
 } from "@/lib/plan-summary";
 import { nanoid } from "nanoid";
 import { Icon } from "@/components/Icon";
+import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 
 const EXAMPLES = [
   "前端性能优化",
@@ -196,6 +197,11 @@ export default function LearnPage() {
     };
     await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
     await savePlanSummary(plan);
+    // 创建真实计划后，若存在 Demo 数据则提示清除
+    const hasDemo = await hasDemoData();
+    if (hasDemo && window.confirm("检测到示例数据，是否清除示例数据？")) {
+      await clearDemoData();
+    }
     // 如果点击了具体节点，通过 query 选中该节点
     const query = node ? `?node=${encodeURIComponent(node.id)}` : "";
     router.push(`/learn/${plan.id}${query}`);
@@ -262,6 +268,11 @@ export default function LearnPage() {
           const matched = all.find((p) => p.content === promptText.trim());
           if (matched) await markPromptUsed(matched.id);
         }
+      }
+      // 创建真实计划后，若存在 Demo 数据则提示清除
+      const hasDemo = await hasDemoData();
+      if (hasDemo && window.confirm("检测到示例数据，是否清除示例数据？")) {
+        await clearDemoData();
       }
       router.push(`/learn/${planId}`);
     } catch (err) {

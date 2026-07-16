@@ -9,7 +9,7 @@
 //   - SSR 阶段：用户看到骨架屏（有视觉反馈，不再是白屏）
 //   - hydration 后：useHomeData hook 加载 IndexedDB 数据，渲染真实内容
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { StatusCard } from "@/components/StatusCard";
@@ -17,6 +17,7 @@ import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { DailyNudge } from "@/components/DailyNudge";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
 import { Icon, type IconName } from "@/components/Icon";
+import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
 
 export default function HomeClient() {
   const {
@@ -37,6 +38,18 @@ export default function HomeClient() {
 
   const [shareMsg, setShareMsg] = useState<string>("");
   const [showEmotionRecorder, setShowEmotionRecorder] = useState(false);
+
+  // Demo 数据注入：首次访问（IndexedDB 无任何 plan）时异步注入示例数据
+  // 不阻塞 UI——注入完成后 reload 刷新首页数据
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      const needInject = await shouldInjectDemo();
+      if (!needInject) return;
+      await injectDemoData();
+      await reload();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 分享主页地址
   async function handleShare() {

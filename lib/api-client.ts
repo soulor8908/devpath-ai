@@ -10,6 +10,7 @@
 
 import { getItem, setItem } from "@/lib/storage/db";
 import { getDefaultModelConfig } from "@/lib/model-config";
+import { getUserId } from "@/lib/sync";
 import type { ModelConfig } from "@/lib/types";
 
 const TOKEN_KEY = "auth:api_token";
@@ -73,6 +74,19 @@ export async function aiFetch(
     } else if (body == null) {
       body = JSON.stringify({ modelConfig: configToSend });
     }
+  }
+
+  // 注入 userId（服务端限流用，失败静默——限流仅在 useServerModel=true 时生效）
+  const userId = await getUserId().catch(() => undefined);
+  if (userId && typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body);
+      body = JSON.stringify({ ...parsed, userId });
+    } catch {
+      // body 不是 JSON，保持原样
+    }
+  } else if (userId && body == null) {
+    body = JSON.stringify({ userId });
   }
 
   return fetch(url, { ...options, headers, body });

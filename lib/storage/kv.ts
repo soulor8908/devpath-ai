@@ -37,6 +37,20 @@ export interface KVStore {
     userId: string,
     changes: Record<string, unknown>,
   ): Promise<string>;
+  /**
+   * 读取某用户某场景当日限流计数
+   * @param userId 用户 ID
+   * @param scene AI 场景（AIScene 字符串值）
+   * @param date "YYYY-MM-DD"（中国时区日期）
+   * @returns 当前已用次数（未记录返回 0）
+   */
+  getRateLimitCount(userId: string, scene: string, date: string): Promise<number>;
+  /**
+   * 限流计数 +1，返回新值
+   * 实现：读旧值 +1 写回（KV 无原生原子自增，此实现满足低并发限流场景）
+   * @returns 自增后的新计数
+   */
+  incrementRateLimitCount(userId: string, scene: string, date: string): Promise<number>;
 }
 
 interface KVLike {
@@ -135,6 +149,18 @@ export function createKVStore(envKV?: KVLike): KVStore {
       };
       await kv.put(`user:${userId}:backup`, JSON.stringify(backup));
       return updatedAt;
+    },
+    async getRateLimitCount(userId, scene, date) {
+      const raw = await kv.get(`ratelimit:${userId}:${scene}:${date}`);
+      if (!raw) return 0;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : 0;
+    },
+    async incrementRateLimitCount(userId, scene, date) {
+      const current = await this.getRateLimitCount(userId, scene, date);
+      const next = current + 1;
+      await kv.put(`ratelimit:${userId}:${scene}:${date}`, String(next));
+      return next;
     },
   };
 }

@@ -9,11 +9,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { streamText } from "ai";
-import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireAuth } from "@/lib/auth";
 import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
+import { createKVStore } from "@/lib/storage/kv";
+import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -53,11 +55,12 @@ export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   try {
     const body = await req.json();
-    const { messages, modelConfig, contextSnapshot, toolContext } = body as {
+    const { messages, modelConfig, contextSnapshot, toolContext, userId } = body as {
       messages?: ChatMessage[];
       modelConfig?: ClientModelConfig;
       contextSnapshot?: string;
       toolContext?: ToolContext;
+      userId?: string;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -70,6 +73,21 @@ export async function POST(req: NextRequest) {
     const { model, useServerModel } = resolveModel(modelConfig, "chat");
     const authError = requireAuth(req, { useServerModel });
     if (authError) return authError;
+
+    // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
+    if (useServerModel && userId) {
+      const kv = createKVStore(getCloudflareKV());
+      const { allowed, remaining, limit } = await checkRateLimit(userId, "chat", kv);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "chat", remaining: 0, limit },
+          { status: 429 },
+        );
+      }
+      // 乐观计数：流式响应前先 +1，失败不回滚（可接受，保守计数）
+      await incrementRateLimit(userId, "chat", kv);
+      void remaining; // remaining 仅用于 429 响应，此处已通过检查
+    }
 
     const safeContext =
       typeof contextSnapshot === "string" && contextSnapshot.length > 0

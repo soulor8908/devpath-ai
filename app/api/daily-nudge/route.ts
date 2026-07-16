@@ -9,11 +9,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
-import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireAuth } from "@/lib/auth";
 import { hasAIKey } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
+import { createKVStore } from "@/lib/storage/kv";
+import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -23,18 +25,30 @@ const PROMPT_DEF = getPrompt("daily_nudge");
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
 
-  let body: { contextSnapshot?: string; modelConfig?: ClientModelConfig };
+  let body: { contextSnapshot?: string; modelConfig?: ClientModelConfig; userId?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const { contextSnapshot, modelConfig } = body;
+  const { contextSnapshot, modelConfig, userId } = body;
   const { model, useServerModel } = resolveModel(modelConfig, "daily-nudge");
 
   const authError = requireAuth(req, { useServerModel });
   if (authError) return authError;
+
+  // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
+  if (useServerModel && userId) {
+    const kv = createKVStore(getCloudflareKV());
+    const { allowed } = await checkRateLimit(userId, "daily_nudge", kv);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "daily_nudge", remaining: 0 },
+        { status: 429 },
+      );
+    }
+  }
 
   try {
     // 安全截断
@@ -66,6 +80,12 @@ export async function POST(req: NextRequest) {
           source: "rule",
           generatedAt: new Date().toISOString(),
         });
+      }
+
+      // 限流计数 +1（AI 成功生成后；规则降级不计数）
+      if (useServerModel && userId) {
+        const kv = createKVStore(getCloudflareKV());
+        await incrementRateLimit(userId, "daily_nudge", kv);
       }
 
       return NextResponse.json({

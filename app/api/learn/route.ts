@@ -4,27 +4,43 @@ import { nanoid } from "nanoid";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { generateQuestions } from "@/lib/ai/question";
 import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
-import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireAuth } from "@/lib/auth";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import type { LearningPlan } from "@/lib/types";
+import { createKVStore } from "@/lib/storage/kv";
+import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   const body = await req.json();
-  const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt, modelConfig } = body as {
+  const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt, modelConfig, userId } = body as {
     topic?: string;
     dailyMinutes?: number;
     maxNewPerDay?: number;
     prompt?: string;
     modelConfig?: ClientModelConfig;
+    userId?: string;
   };
   const { model, useServerModel } = resolveModel(modelConfig, "learn");
   const authError = requireAuth(req, { useServerModel });
   if (authError) return authError;
+
+  // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
+  if (useServerModel && userId) {
+    const kv = createKVStore(getCloudflareKV());
+    const { allowed } = await checkRateLimit(userId, "plan_generate", kv);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "plan_generate", remaining: 0 },
+        { status: 429 },
+      );
+    }
+  }
+
   try {
 
     if (!topic || typeof topic !== "string" || !topic.trim()) {
@@ -78,6 +94,11 @@ export async function POST(req: NextRequest) {
     };
 
     // 返回给前端，由前端存 IndexedDB（API route 无法访问客户端 IndexedDB）
+    // 限流计数 +1（成功生成后）
+    if (useServerModel && userId) {
+      const kv = createKVStore(getCloudflareKV());
+      await incrementRateLimit(userId, "plan_generate", kv);
+    }
     return NextResponse.json({ planId: plan.id, plan });
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
