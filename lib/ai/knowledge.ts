@@ -14,7 +14,7 @@ import { getFallbackTemplate } from "./templates";
 import { getCloudflareKV } from "./cloudflare-env";
 import { observeCall } from "./observability";
 import { getPrompt } from "./prompts";
-import type { KnowledgeNode } from "../types";
+import type { KnowledgeNode, UserProfile } from "../types";
 
 // 从 Prompt Registry 读取（修改 prompt 在 lib/ai/prompts.ts 中 bump version）
 const PROMPT_DEF = getPrompt("knowledge_decompose");
@@ -57,22 +57,37 @@ function hashString(str: string): string {
   return (hash >>> 0).toString(16);
 }
 
-function buildCacheKey(topic: string, userPrompt?: string): string {
-  const raw = `${topic.trim().toLowerCase()}|${(userPrompt ?? "").trim()}`;
+function buildCacheKey(topic: string, userPrompt?: string, userProfile?: UserProfile): string {
+  const raw = `${topic.trim().toLowerCase()}|${(userPrompt ?? "").trim()}|${profileFingerprint(userProfile)}`;
   return `${CACHE_KEY_PREFIX}${hashString(raw)}`;
+}
+
+/**
+ * 用户画像指纹（用于 cache key 区分不同画像的拆解结果）
+ * - 无 userProfile 时返回空串（向后兼容旧 cache key）
+ * - 有画像时按 nodeId 排序拼接 skillLevel，保证稳定
+ */
+function profileFingerprint(userProfile?: UserProfile): string {
+  if (!userProfile) return "";
+  const entries = Object.entries(userProfile.skillLevel ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  if (entries.length === 0) return "";
+  return entries.map(([id, level]) => `${id}:${level}`).join(",");
 }
 
 export async function decomposeKnowledge(
   topic: string,
   userPrompt?: string,
   opts?: { skipCache?: boolean },
-  model?: LanguageModel
+  model?: LanguageModel,
+  userProfile?: UserProfile,
 ): Promise<KnowledgeNode[]> {
   const skipCache = opts?.skipCache ?? false;
 
   // 1. 尝试缓存命中（非跳过缓存场景）
   if (!skipCache) {
-    const cached = await tryReadCache(topic, userPrompt).catch(() => null);
+    const cached = await tryReadCache(topic, userPrompt, userProfile).catch(() => null);
     if (cached && cached.length > 0) {
       return cached;
     }
@@ -88,19 +103,24 @@ export async function decomposeKnowledge(
             model: aiModel,
             schema: treeSchema,
             system: PROMPT_DEF.system,
-            prompt: buildPrompt(topic, userPrompt),
+            prompt: buildPrompt(topic, userPrompt, userProfile),
           }),
         2
       )
     );
-    const nodes = result.object.nodes.map((n) => ({
+    let nodes: KnowledgeNode[] = result.object.nodes.map((n) => ({
       ...n,
       mastery: 0,
     }));
 
+    // 2.5 画像感知：跳过已掌握（advanced）节点（stability>21 且 accuracy>85% 已编码为 advanced）
+    if (userProfile) {
+      nodes = filterByProfile(nodes, userProfile);
+    }
+
     // 3. 写入缓存（失败静默忽略）
     if (!skipCache && nodes.length > 0) {
-      await tryWriteCache(topic, userPrompt, nodes).catch(() => {});
+      await tryWriteCache(topic, userPrompt, nodes, userProfile).catch(() => {});
     }
 
     return nodes;
@@ -110,19 +130,54 @@ export async function decomposeKnowledge(
   }
 }
 
-function buildPrompt(topic: string, userPrompt?: string): string {
+function buildPrompt(topic: string, userPrompt?: string, userProfile?: UserProfile): string {
   const promptParts = [`请拆解学习主题：${topic}`];
   if (userPrompt && userPrompt.trim()) {
     promptParts.push(`\n用户补充要求：\n${userPrompt.trim()}`);
   }
+  const profileSeg = buildProfileSegment(userProfile);
+  if (profileSeg) {
+    promptParts.push(`\n${profileSeg}`);
+  }
   return promptParts.join("\n");
 }
 
-async function tryReadCache(topic: string, userPrompt?: string): Promise<KnowledgeNode[] | null> {
+/**
+ * 构建用户画像段落（注入到 prompt）
+ * - 无 userProfile 或无 skillLevel 数据时返回空串
+ * - 有数据时按 beginner/intermediate/advanced 分组计数，指导 LLM 调整拆解粒度
+ */
+function buildProfileSegment(userProfile?: UserProfile): string {
+  if (!userProfile) return "";
+  const entries = Object.entries(userProfile.skillLevel ?? {});
+  if (entries.length === 0) return "";
+  const counts = { beginner: 0, intermediate: 0, advanced: 0 };
+  for (const [, level] of entries) {
+    counts[level]++;
+  }
+  return [
+    "用户画像（请据此调整拆解粒度）：",
+    `- 已掌握(advanced)：${counts.advanced} 个节点 → 跳过这些高级内容，避免重复学习`,
+    `- 进阶(intermediate)：${counts.intermediate} 个节点 → 可加速，减少基础铺垫`,
+    `- 入门(beginner)：${counts.beginner} 个节点 → 需夯实基础，拆得更细`,
+  ].join("\n");
+}
+
+/**
+ * 画像感知过滤：跳过 skillLevel === "advanced" 的节点
+ * （advanced 已编码 stability>21 且 accuracy>85% 的判定）
+ * - 若过滤后为空（全部已掌握），返回原集合避免空知识树
+ */
+function filterByProfile(nodes: KnowledgeNode[], userProfile: UserProfile): KnowledgeNode[] {
+  const filtered = nodes.filter((n) => userProfile.skillLevel[n.id] !== "advanced");
+  return filtered.length > 0 ? filtered : nodes;
+}
+
+async function tryReadCache(topic: string, userPrompt?: string, userProfile?: UserProfile): Promise<KnowledgeNode[] | null> {
   const kv = getCloudflareKV();
   if (!kv) return null;
 
-  const key = buildCacheKey(topic, userPrompt);
+  const key = buildCacheKey(topic, userPrompt, userProfile);
   const raw = await kv.get(key);
   if (!raw) return null;
 
@@ -139,11 +194,11 @@ async function tryReadCache(topic: string, userPrompt?: string): Promise<Knowled
   }
 }
 
-async function tryWriteCache(topic: string, userPrompt: string | undefined, nodes: KnowledgeNode[]): Promise<void> {
+async function tryWriteCache(topic: string, userPrompt: string | undefined, nodes: KnowledgeNode[], userProfile?: UserProfile): Promise<void> {
   const kv = getCloudflareKV();
   if (!kv) return;
 
-  const key = buildCacheKey(topic, userPrompt);
+  const key = buildCacheKey(topic, userPrompt, userProfile);
   const payload: CachedDecomposition = {
     topic,
     nodes,

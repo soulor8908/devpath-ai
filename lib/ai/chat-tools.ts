@@ -529,6 +529,88 @@ export function createChatTools(ctx: ToolContext) {
         } as ToolResult;
       },
     }),
+
+    // 9. 启动番茄时钟专注学习 session
+    start_focus_session: tool({
+      description:
+        '启动番茄时钟专注学习 session。当用户说"开始专注"、"开始学习"、"启动番茄钟"、"我要学 25 分钟"时调用。',
+      parameters: z.object({
+        task_description: z.string().describe("本次专注的任务描述，如「学习 React Hooks」"),
+        duration_minutes: z
+          .number()
+          .default(25)
+          .describe("专注时长（分钟），默认 25"),
+        plan_id: z.string().optional().describe("关联学习计划 ID（可选）"),
+        node_id: z.string().optional().describe("关联知识点 ID（可选）"),
+      }),
+      execute: async (args) => {
+        return {
+          success: true,
+          message: `已启动番茄钟（${args.duration_minutes} 分钟）：${args.task_description}`,
+          clientAction: {
+            type: "start_focus_session" as const,
+            params: {
+              task_description: args.task_description,
+              duration_minutes: args.duration_minutes,
+              plan_id: args.plan_id,
+              node_id: args.node_id,
+            },
+            idempotencyKey: makeIdempotencyKey("start_focus_session", args),
+          },
+        } as ToolResult;
+      },
+    }),
+
+    // 10. 根据用户画像生成个性化学习计划
+    generate_learning_plan: tool({
+      description:
+        '根据用户画像生成个性化学习计划。当用户说"帮我制定学习计划"、"生成 React 学习计划"、"我想 4 周学完算法"时调用。',
+      parameters: z.object({
+        goal: z.string().describe("学习目标，如「掌握 React 基础」"),
+        duration_weeks: z.number().describe("计划周期（周）"),
+        constraints: z
+          .object({
+            hours_per_week: z.number().describe("每周可投入小时数"),
+            preferred_times: z.array(z.string()).optional().describe("偏好学习时段，如 [\"06:00-06:59\"]"),
+          })
+          .describe("时间约束"),
+      }),
+      execute: async (args) => {
+        return {
+          success: true,
+          message: `已生成学习计划：目标「${args.goal}」，周期 ${args.duration_weeks} 周`,
+          clientAction: {
+            type: "generate_plan" as const,
+            params: args,
+            idempotencyKey: makeIdempotencyKey("generate_plan", args),
+          },
+        } as ToolResult;
+      },
+    }),
+
+    // 11. 智能优化今日学习安排的优先级
+    optimize_schedule: tool({
+      description:
+        '智能优化今日学习安排的优先级。当用户说"帮我安排今天的顺序"、"优化今日日程"、"今天该先学什么"时调用。',
+      parameters: z.object({
+        date: z.string().describe("日期 YYYY-MM-DD"),
+        mode: z
+          .enum(["balanced", "catch_up", "light"])
+          .optional()
+          .describe("优化模式：balanced=均衡, catch_up=追赶进度, light=轻量"),
+      }),
+      execute: async (args) => {
+        return {
+          success: true,
+          message: `已优化 ${args.date} 的日程优先级${args.mode ? `（模式：${args.mode}）` : ""}`,
+          clientAction: {
+            type: "reorder_schedule" as const,
+            params: args,
+            idempotencyKey: makeIdempotencyKey("reorder_schedule", args),
+          },
+        } as ToolResult;
+      },
+    }),
   };
 }
 

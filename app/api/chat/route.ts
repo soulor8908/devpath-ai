@@ -39,6 +39,9 @@ const TOOL_SYSTEM_SUFFIX = `
 - adjust_plan：调整学习计划（如"周日有事，延后那天的计划"）
 - toggle_plan_freeze：冻结/解冻学习计划
 - set_plan_priority：调整计划优先级（1-5）
+- start_focus_session：启动番茄钟专注学习 session（如"开始专注 25 分钟"）
+- generate_learning_plan：根据用户画像生成精准学习计划（如"帮我制定 4 周 React 计划"）
+- optimize_schedule：智能优化今日学习安排的优先级（如"优化今天的日程顺序"）
 
 调用工具时遵循：
 1. 用户问"今天有什么安排"→ 调 get_daily_schedule
@@ -49,6 +52,9 @@ const TOOL_SYSTEM_SUFFIX = `
 6. 用户说"某天有事调整计划"→ 先调 get_upcoming_plan 确认，再调 adjust_plan
 7. 用户说"冻结/暂停某计划"→ 调 toggle_plan_freeze
 8. 用户说"调整优先级"→ 调 set_plan_priority
+9. 用户说"开始专注/开始学习/启动番茄钟"→ 调 start_focus_session
+10. 用户说"制定学习计划/生成计划"→ 调 generate_learning_plan
+11. 用户说"优化今日日程/安排今天的顺序"→ 调 optimize_schedule
 调用工具后，用自然语言总结结果并给出建议。`;
 
 export async function POST(req: NextRequest) {
