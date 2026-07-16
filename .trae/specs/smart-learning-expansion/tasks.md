@@ -128,32 +128,32 @@
 
 ## 阶段 4：节奏引擎 + AI 人格化（编排层）
 
-- [ ] Task 4.1: 创建 `lib/ai/rhythm-engine.ts`
-  - [ ] SubTask 4.1.1: 定义 `RhythmContext` interface（聚合 session / energy / cards / plans / routine / profile）
-  - [ ] SubTask 4.1.2: `getNextAction(ctx): Promise<NextAction>` 实现决策优先级链
-  - [ ] SubTask 4.1.3: `collectRhythmContext()` 从 IndexedDB 并行抓取所有信号
-- [ ] Task 4.2: 创建 `app/api/rhythm/route.ts`（GET）
-  - [ ] SubTask 4.2.1: 调用 `getNextAction` 返回 JSON
-  - [ ] SubTask 4.2.2: 鉴权用 `requireAuth({ dataOperation: true })`（不消耗 AI 额度）
-- [ ] Task 4.3: 修改 `components/CurrentTaskCard.tsx`
-  - [ ] SubTask 4.3.1: 从 routine-based 改为 rhythm-engine-based
-  - [ ] SubTask 4.3.2: 展示 NextAction.reason + 对应按钮（"开始专注" / "去复习" / "去休息"）
-- [ ] Task 4.4: 创建 `lib/ai/persona.ts`
-  - [ ] SubTask 4.4.1: 定义 4 种 Persona + 对应 system prompt 片段
-  - [ ] SubTask 4.4.2: `selectPersona(ctx): Persona` 选择逻辑
-  - [ ] SubTask 4.4.3: 用户 `preferredPersona` 覆盖逻辑
-- [ ] Task 4.5: 修改 `lib/ai/prompts.ts` 新增 `persona_snippets`
-  - [ ] SubTask 4.5.1: 注册 4 种 persona 的 prompt 片段
-  - [ ] SubTask 4.5.2: bump chat prompt version（v2 → v3）
-- [ ] Task 4.6: 修改 `app/api/chat/route.ts` 注入 persona
-  - [ ] SubTask 4.6.1: 调用 `selectPersona` 获取片段
-  - [ ] SubTask 4.6.2: 追加到 systemPrompt
-- [ ] Task 4.7: 修改 `app/profile/page.tsx` 新增 persona 设置
-  - [ ] SubTask 4.7.1: 单选"自动" / 4 种 persona
-  - [ ] SubTask 4.7.2: 保存到 `UserProfile.preferredPersona`
-- [ ] Task 4.8: 单测 `__tests__/rhythm-engine.test.ts` + `__tests__/persona.test.ts`
-  - [ ] SubTask 4.8.1: getNextAction 6 条决策优先级分支
-  - [ ] SubTask 4.8.2: selectPersona 4 种 persona 触发条件
+- [x] Task 4.1: 创建 `lib/ai/rhythm-engine.ts`
+  - [x] SubTask 4.1.1: 定义 `RhythmContext` interface（聚合 session / energy / cards / plans / routine / profile）
+  - [x] SubTask 4.1.2: `getNextAction(ctx): Promise<NextAction>` 实现决策优先级链
+  - [x] SubTask 4.1.3: `collectRhythmContext()` 从 IndexedDB 并行抓取所有信号
+- [x] Task 4.2: 创建 `app/api/rhythm/route.ts`（GET）
+  - [x] SubTask 4.2.1: 调用 `getNextAction` 返回 JSON
+  - [x] SubTask 4.2.2: 鉴权用 `requireAuth({ dataOperation: true })`（不消耗 AI 额度）
+- [x] Task 4.3: 修改 `components/CurrentTaskCard.tsx`
+  - [x] SubTask 4.3.1: 从 routine-based 改为 rhythm-engine-based
+  - [x] SubTask 4.3.2: 展示 NextAction.reason + 对应按钮（"开始专注" / "去复习" / "去休息"）
+- [x] Task 4.4: 创建 `lib/ai/persona.ts`
+  - [x] SubTask 4.4.1: 定义 4 种 Persona + 对应 system prompt 片段
+  - [x] SubTask 4.4.2: `selectPersona(ctx): Persona` 选择逻辑
+  - [x] SubTask 4.4.3: 用户 `preferredPersona` 覆盖逻辑
+- [x] Task 4.5: 修改 `lib/ai/prompts.ts` 新增 `persona_snippets`
+  - [x] SubTask 4.5.1: 注册 4 种 persona 的 prompt 片段
+  - [x] SubTask 4.5.2: bump chat prompt version（v2 → v3）
+- [x] Task 4.6: 修改 `app/api/chat/route.ts` 注入 persona
+  - [x] SubTask 4.6.1: 调用 `selectPersona` 获取片段
+  - [x] SubTask 4.6.2: 追加到 systemPrompt
+- [x] Task 4.7: 修改 `app/profile/page.tsx` 新增 persona 设置
+  - [x] SubTask 4.7.1: 单选"自动" / 4 种 persona
+  - [x] SubTask 4.7.2: 保存到 `UserProfile.preferredPersona`
+- [x] Task 4.8: 单测 `__tests__/rhythm-engine.test.ts` + `__tests__/persona.test.ts`
+  - [x] SubTask 4.8.1: getNextAction 6 条决策优先级分支
+  - [x] SubTask 4.8.2: selectPersona 4 种 persona 触发条件
 
 ## 阶段 5：专注环境保护 + 成就系统（体验层）
 

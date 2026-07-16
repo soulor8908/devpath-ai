@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { PublicProfile, LearnLog } from "@/lib/types";
+import type { PublicProfile, LearnLog, UserProfile, PersonaId } from "@/lib/types";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
@@ -34,6 +34,9 @@ import {
 import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
 import { maybeRetrain } from "@/lib/energy-regression";
+import { getUserProfile, saveUserProfile } from "@/lib/ai/memory/user-profile";
+import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
+import { PERSONA_LIST } from "@/lib/ai/persona";
 
 const STORAGE_KEY = "my:profile";
 
@@ -137,6 +140,12 @@ export default function ProfilePage() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
 
+  // AI 人格（Persona）设置
+  // preferredPersona: undefined = 自动（按用户状态选）；否则为 4 种 PersonaId 之一
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [personaSaving, setPersonaSaving] = useState(false);
+  const [personaSaved, setPersonaSaved] = useState(false);
+
   useEffect(() => {
     (async () => {
       const stored = await dbGet<PublicProfile>(STORAGE_KEY);
@@ -189,6 +198,10 @@ export default function ProfilePage() {
       // 加载 AI 模型配置
       const configs = await listModelConfigs();
       setModelConfigs(configs);
+
+      // 加载用户画像（用于 persona 设置）
+      const profile = await getUserProfile();
+      setUserProfile(profile);
 
       // P3.4：页面加载时静默检查能量模型是否需要重训练（不阻塞 UI，失败仅 console.warn）
       void maybeRetrain();
@@ -320,6 +333,46 @@ export default function ProfilePage() {
         body: "我们会在每日学习时段提醒你 📚",
         icon: "/icons/icon-192.png",
       });
+    }
+  }
+
+  // ============ AI 人格（Persona）设置 ============
+
+  /**
+   * 保存 persona 偏好到 UserProfile
+   * - value = undefined 表示"自动选择"
+   * - 若 userProfile 不存在（首次使用），先 buildUserProfile 构造一份再保存
+   */
+  async function savePersonaPreference(value: PersonaId | undefined) {
+    setPersonaSaving(true);
+    try {
+      let profile = userProfile;
+      if (!profile) {
+        // 首次使用：构建画像兜底
+        try {
+          profile = await buildUserProfile();
+        } catch {
+          // 构建失败：用最小默认画像兜底（保证用户能选 persona）
+          profile = {
+            id: "ai:profile",
+            skillLevel: {},
+            accuracyByNode: {},
+            preferredTimeSlots: [],
+            averageSessionMinutes: 0,
+            goals: { short: [], mid: [], long: [] },
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      }
+      const next: UserProfile = { ...profile, preferredPersona: value };
+      await saveUserProfile(next);
+      setUserProfile(next);
+      setPersonaSaved(true);
+      setTimeout(() => setPersonaSaved(false), 2000);
+      // 触发云端同步（确保跨设备生效）
+      scheduleAutoSync();
+    } finally {
+      setPersonaSaving(false);
     }
   }
 
@@ -983,6 +1036,74 @@ export default function ProfilePage() {
               <span className="text-xs text-gray-500">{routineHint}</span>
             )}
           </div>
+        </div>
+
+        {/* AI 人格（Persona）设置 */}
+        <div className="space-y-3 border-b py-4">
+          <h3 className="font-medium">AI 人格（Persona）</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            选择 AI 对话的语气风格。"自动" 会根据你当下的能量、心情、提问内容智能切换。
+          </p>
+          <div className="space-y-1.5">
+            {/* 自动 */}
+            <button
+              type="button"
+              onClick={() => savePersonaPreference(undefined)}
+              disabled={personaSaving}
+              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                !userProfile?.preferredPersona
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700"
+                  : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+              }`}
+            >
+              <span>
+                <Icon name="sparkles" className="w-3.5 h-3.5 inline-block align-middle mr-1.5" />
+                <span className="font-medium">自动</span>
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  按状态智能切换（推荐）
+                </span>
+              </span>
+              {!userProfile?.preferredPersona && (
+                <Icon name="check" className="w-4 h-4 text-blue-600" />
+              )}
+            </button>
+
+            {/* 4 种 Persona */}
+            {PERSONA_LIST.map((p) => {
+              const selected = userProfile?.preferredPersona === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => savePersonaPreference(p.id)}
+                  disabled={personaSaving}
+                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    selected
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700"
+                      : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="ml-2 block text-xs text-gray-500 dark:text-gray-400">
+                      {p.description}
+                    </span>
+                  </span>
+                  {selected && (
+                    <Icon name="check" className="w-4 h-4 shrink-0 text-blue-600" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {personaSaving && (
+            <p className="text-xs text-gray-400">保存中...</p>
+          )}
+          {personaSaved && (
+            <p className="text-xs text-green-600 inline-flex items-center gap-1">
+              <Icon name="check" className="w-3.5 h-3.5 inline-block" /> 已保存
+            </p>
+          )}
         </div>
 
         {/* 隐私设置 */}

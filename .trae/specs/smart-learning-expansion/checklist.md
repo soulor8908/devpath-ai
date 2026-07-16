@@ -52,17 +52,17 @@
 - [x] `__tests__/plan-feasibility.test.ts` 覆盖 confidence < 0.5 + downgradePlan
 
 ## 阶段 4：节奏引擎 + AI 人格化
-- [ ] `lib/ai/rhythm-engine.ts` 的 getNextAction 实现 6 条决策优先级
-- [ ] 决策链：running session > energy≤2 > FSRS 到期 > routine 时段 > 接近睡眠 > 默认 learn
-- [ ] `app/api/rhythm/route.ts` GET 接口返回 NextAction JSON
-- [ ] `components/CurrentTaskCard.tsx` 改用 rhythm-engine，展示 reason + 对应按钮
-- [ ] `lib/ai/persona.ts` 定义 4 种 Persona + selectPersona 选择逻辑
-- [ ] `lib/ai/prompts.ts` 新增 persona_snippets 注册表 + bump chat version
-- [ ] `app/api/chat/route.ts` 注入 persona 片段到 systemPrompt
-- [ ] `app/profile/page.tsx` 新增 persona 设置（自动 / 4 种手动）
-- [ ] UserProfile.preferredPersona 覆盖自动选择
-- [ ] `__tests__/rhythm-engine.test.ts` 覆盖 6 条决策分支
-- [ ] `__tests__/persona.test.ts` 覆盖 4 种 persona 触发条件
+- [x] `lib/ai/rhythm-engine.ts` 的 getNextAction 实现 6 条决策优先级
+- [x] 决策链：running session > energy≤2 > FSRS 到期 > routine 时段 > 接近睡眠 > 默认 learn
+- [x] `app/api/rhythm/route.ts` GET 接口返回 NextAction JSON
+- [x] `components/CurrentTaskCard.tsx` 改用 rhythm-engine，展示 reason + 对应按钮
+- [x] `lib/ai/persona.ts` 定义 4 种 Persona + selectPersona 选择逻辑
+- [x] `lib/ai/prompts.ts` 新增 persona_snippets 注册表 + bump chat version（v2→v3）
+- [x] `app/api/chat/route.ts` 注入 persona 片段到 systemPrompt
+- [x] `app/profile/page.tsx` 新增 persona 设置（自动 / 4 种手动）
+- [x] UserProfile.preferredPersona 覆盖自动选择
+- [x] `__tests__/rhythm-engine.test.ts` 覆盖 6 条决策分支
+- [x] `__tests__/persona.test.ts` 覆盖 4 种 persona 触发条件
 
 ## 阶段 5：专注环境保护 + 成就系统
 - [x] `lib/timer/focus-guard.ts` 严格模式 3 次打断触发 abandon

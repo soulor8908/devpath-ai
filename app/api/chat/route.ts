@@ -16,6 +16,8 @@ import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
+import { PERSONAS, selectPersona, type PersonaContext, type Persona } from "@/lib/ai/persona";
+import type { PersonaId } from "@/lib/types";
 
 export const runtime = "edge";
 
@@ -61,12 +63,16 @@ export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   try {
     const body = await req.json();
-    const { messages, modelConfig, contextSnapshot, toolContext, userId } = body as {
+    const { messages, modelConfig, contextSnapshot, toolContext, userId, personaContext, preferredPersona } = body as {
       messages?: ChatMessage[];
       modelConfig?: ClientModelConfig;
       contextSnapshot?: string;
       toolContext?: ToolContext;
       userId?: string;
+      /** Persona 选择上下文（客户端聚合：energy/mood/streak/topic） */
+      personaContext?: PersonaContext;
+      /** 用户手动设置的偏好 Persona（覆盖自动选择） */
+      preferredPersona?: PersonaId;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -100,9 +106,33 @@ export async function POST(req: NextRequest) {
         ? contextSnapshot.slice(0, 4000)
         : "";
 
-    const systemPrompt = safeContext
-      ? `${PROMPT_DEF.system}\n\n${safeContext}\n${TOOL_SYSTEM_SUFFIX}`
-      : `${PROMPT_DEF.system}\n${TOOL_SYSTEM_SUFFIX}`;
+    // Persona 注入：根据用户状态选择匹配的 AI 人格片段
+    // - preferredPersona（用户手动设置）覆盖自动选择
+    // - personaContext（客户端聚合 energy/mood/streak/topic）用于自动选择
+    // - 两者都缺时跳过 persona 注入（保持向后兼容）
+    // - persona.id 可由客户端记入 AICallRecord.inputDigest 用于归因分析
+    let personaSnippet = "";
+    let personaId: PersonaId | null = null;
+    if (preferredPersona) {
+      // 用户手动设置优先级最高
+      const persona: Persona = PERSONAS[preferredPersona];
+      personaSnippet = persona.snippet;
+      personaId = persona.id;
+    } else if (personaContext) {
+      // 自动选择（服务端不读 IndexedDB，由客户端聚合 ctx）
+      const persona = selectPersona(personaContext);
+      personaSnippet = persona.snippet;
+      personaId = persona.id;
+    }
+    void personaId; // 当前仅用于调试/未来归因，不写入响应
+
+    // systemPrompt 拼接顺序：基础 prompt → contextSnapshot → persona 片段 → 工具能力说明
+    // persona 片段在 contextSnapshot 之后，让 AI 先了解用户上下文再调整语气
+    const parts: string[] = [PROMPT_DEF.system];
+    if (safeContext) parts.push(safeContext);
+    if (personaSnippet) parts.push(personaSnippet);
+    parts.push(TOOL_SYSTEM_SUFFIX);
+    const systemPrompt = parts.join("\n\n");
 
     // 如果有 toolContext，创建工具并启用多步调用
     const hasTools = toolContext && Array.isArray(toolContext.plans);

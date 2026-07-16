@@ -89,7 +89,7 @@ const PROMPT_VERSION_HASHES: Record<PromptId, string> = {
   knowledge_decompose: "v2:8bbf3f1f",
   question_generate: "v2:9fa46437",
   daily_nudge: "v2:a7f4c7ac",
-  chat: "v2:907e6216",
+  chat: "v3:1f6686bc",
   adjust_plan: "v2:3d72527b",
   energy_pattern: "v1:153156ef",
   emotion_coping: "v1:dd1d7097",

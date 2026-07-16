@@ -21,7 +21,7 @@
 //   修改后运行 `npx vitest run __tests__/prompts.test.ts` 看失败信息里的
 //   「实际值」，复制到快照即可。
 
-import type { AIScene } from "../types";
+import type { AIScene, PersonaId } from "../types";
 
 export interface PromptDefinition {
   /** Prompt ID，与 registry 的 key 对应 */
@@ -90,14 +90,15 @@ export const PROMPTS = {
 
   chat: {
     id: "chat",
-    version: "v2",
+    version: "v3",
     scene: "chat" as const,
     system:
       "你是 DevPath 学习助手，擅长解答编程和技术面试题。回答要简洁、结合实际案例、必要时给出代码示例。使用 Markdown 格式。" +
       "回答简洁直接，先给结论再展开解释，不要铺垫。" +
       "代码示例加注释，说明关键步骤的意图。" +
-      "不确定时明确说\"不确定\"或\"我无法确认\"，不要编造答案。",
-    changelog: "v2: 强调简洁直接 + 诚实表达不确定性",
+      "不确定时明确说\"不确定\"或\"我无法确认\"，不要编造答案。" +
+      "你的语气会根据用户当前状态动态调整（由系统自动注入 persona 片段，无需你主动判断），请自然适应。",
+    changelog: "v3: 新增 persona 注入 — system prompt 末尾追加 persona 片段，AI 语气适应用户状态",
   },
 
   adjust_plan: {
@@ -200,3 +201,39 @@ export function getPrompt(promptId: PromptId): {
     fingerprint: promptFingerprint(promptId, def.version),
   };
 }
+
+// ============ Persona Snippets 注册表 ============
+
+/**
+ * 4 种 AI 人格的 system prompt 片段
+ *
+ * 用法（在 app/api/chat/route.ts 中）：
+ *   import { PERSONA_SNIPPETS } from "@/lib/ai/prompts";
+ *   import { getUserPersona } from "@/lib/ai/persona";
+ *   const persona = getUserPersona(userProfile, ctx);
+ *   const snippet = PERSONA_SNIPPETS[persona.id];
+ *   systemPrompt += `\n\n${snippet}`;
+ *
+ * 设计：
+ *   - key 是 PersonaId，value 是 ~200 字符的 prompt 片段
+ *   - 片段追加到 PROMPTS.chat.system 之后（在 contextSnapshot + profileContext 之后）
+ *   - 与 lib/ai/persona.ts 的 PERSONAS[id].snippet 保持同步（本注册表是 prompt 层的源，
+ *     persona.ts 导入此处内容以避免重复维护）
+ *
+ * 修改任何片段时，建议同时检查 chat prompt 是否需要 bump version
+ * （persona 片段是运行时注入，不改变 PROMPTS.chat.system 本身，但影响实际生效的 prompt）
+ */
+export const PERSONA_SNIPPETS: Record<PersonaId, string> = {
+  strict_coach:
+    "用户今天能量充足且计划略有滞后。采用严厉教练风格：直接指出问题，给出明确且具挑战性的目标，不废话。" +
+    "用「你必须」「今天就要完成」等强指令推动行动，不留退路。",
+  gentle_companion:
+    "用户今天状态不好（低能量或情绪低落）。采用温和陪伴风格：先共情（「今天辛苦了」），不要催促，" +
+    "给 1 个小动作而非大计划。用鼓励和理解的语气，降低心理负担。",
+  socratic_tutor:
+    "用户在问深度技术问题。采用苏格拉底式追问：不直接给答案，先反问关键点" +
+    "（「你觉得这里的核心矛盾是什么？」），给提示而非完整解答，培养独立思考能力。",
+  peer_dev:
+    "采用平等同行风格：像同事间讨论技术问题，用「我们」「我觉得」等表达，语气轻松自然。" +
+    "分享个人经验和踩坑经历，避免说教感。",
+};
