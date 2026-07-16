@@ -21,6 +21,7 @@ import type {
   PublicProfile,
   MistakeRecord,
   EmotionEntry,
+  Achievement,
 } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { getDueCards } from "@/lib/fsrs";
@@ -28,6 +29,7 @@ import { getUnresolvedMistakes } from "@/lib/mistake-book";
 import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
 import { maybeRetrain } from "@/lib/energy-regression";
 import { maybeBuildProfile } from "@/lib/ai/memory/user-profile";
+import { checkAndNotify } from "@/lib/achievements";
 
 // ============ 打卡可视化元数据 ============
 
@@ -115,6 +117,8 @@ export interface HomeData {
   username: string;
   todayEmotions: EmotionEntry[];
   recentMistakes: MistakeRecord[];
+  /** 后台检测到的新解锁成就（供首页顶部展示通知卡片） */
+  newAchievements: Achievement[];
 }
 
 // ============ 纯函数：从原始数据计算派生状态 ============
@@ -221,6 +225,7 @@ export function useHomeData(): HomeData & {
     username: "",
     todayEmotions: [],
     recentMistakes: [],
+    newAchievements: [],
   });
 
   const load = useCallback(async () => {
@@ -263,6 +268,7 @@ export function useHomeData(): HomeData & {
       username: profile?.username ?? "",
       todayEmotions: emotions.filter((e) => e.date === today),
       recentMistakes: mistakes.slice(0, 3),
+      newAchievements: [],
     });
 
     // 后台维护任务：不阻塞 UI，失败静默
@@ -270,13 +276,25 @@ export function useHomeData(): HomeData & {
     //   修复"模型永远无法训练"的冷启动问题（Issue 4）
     // - maybeRetrain: 检查是否需要重训练能量回归模型
     // - maybeBuildProfile: 懒构建/刷新用户画像（24h TTL）
+    // - checkAndNotify: 成就检测 + 通知（新成就存入 state 供 UI 展示）
     void Promise.allSettled([
       autoFillTodayActualMinutes(),
       maybeRetrain(),
       maybeBuildProfile(),
-    ]).catch(() => {
-      // 维护任务失败不影响首页加载
-    });
+      checkAndNotify(),
+    ])
+      .then((results) => {
+        // checkAndNotify 是第 4 个；fulfilled 时取其返回的新成就
+        const achievementResult = results[3];
+        const newAchievements =
+          achievementResult.status === "fulfilled" ? achievementResult.value : [];
+        if (newAchievements.length > 0) {
+          setData((prev) => ({ ...prev, newAchievements }));
+        }
+      })
+      .catch(() => {
+        // 维护任务失败不影响首页加载
+      });
   }, []);
 
   useEffect(() => {

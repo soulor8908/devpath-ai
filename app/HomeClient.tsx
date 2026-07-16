@@ -16,6 +16,7 @@ import { StatusCard } from "@/components/StatusCard";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { DailyNudge } from "@/components/DailyNudge";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
+import { AchievementCard } from "@/components/AchievementCard";
 import { Icon, type IconName } from "@/components/Icon";
 import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
 
@@ -33,11 +34,14 @@ export default function HomeClient() {
     username,
     todayEmotions,
     recentMistakes,
+    newAchievements,
     reload,
   } = useHomeData();
 
   const [shareMsg, setShareMsg] = useState<string>("");
   const [showEmotionRecorder, setShowEmotionRecorder] = useState(false);
+  // 成就卡片关闭状态：关闭后隐藏，直到出现新的成就
+  const [achievementsDismissed, setAchievementsDismissed] = useState(false);
 
   // Demo 数据注入：首次访问（IndexedDB 无任何 plan）时异步注入示例数据
   // 不阻塞 UI——注入完成后 reload 刷新首页数据
@@ -50,6 +54,13 @@ export default function HomeClient() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 出现新成就时重置关闭状态（让卡片重新展示）
+  useEffect(() => {
+    if (newAchievements.length > 0) {
+      setAchievementsDismissed(false);
+    }
+  }, [newAchievements]);
 
   // 分享主页地址
   async function handleShare() {
@@ -107,6 +118,14 @@ export default function HomeClient() {
         <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-2 text-sm text-blue-700 dark:text-blue-300 break-all">
           {shareMsg}
         </div>
+      )}
+
+      {/* 新成就解锁通知卡片（可关闭） */}
+      {!achievementsDismissed && newAchievements.length > 0 && (
+        <AchievementCard
+          achievements={newAchievements}
+          onClose={() => setAchievementsDismissed(true)}
+        />
       )}
 
       {/* ============ 1. AI 主动提醒 + 现在该做什么 ============ */}

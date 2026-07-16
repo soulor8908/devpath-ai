@@ -4,8 +4,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
-import { Icon } from "@/components/Icon";
-import type { PublicProfile, KnowledgeNode } from "@/lib/types";
+import { Icon, type IconName } from "@/components/Icon";
+import type { PublicProfile, KnowledgeNode, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
 import { setItem as dbSet, getItem as dbGet } from "@/lib/storage/db";
 import { topoSort, allocateDaily } from "@/lib/schedule";
@@ -15,6 +15,8 @@ interface PublicResponse {
   profile: PublicProfile;
   stats: PublicStats | null;
   planSnapshot?: { topic: string; knowledgeTree: unknown[]; questions: unknown[] };
+  /** 公开成就列表（需后端 /api/public 扩展返回；当前未实现） */
+  achievements?: Achievement[];
 }
 
 export default function UserPageClient() {
@@ -114,6 +116,11 @@ export default function UserPageClient() {
 
   const { profile, stats } = data;
 
+  // 成就墙默认关闭（TODO: 后续从 profile.visibility.achievements 读取）
+  // 当前 PublicProfile.visibility 未含 achievements 字段，且 /api/public 未返回成就列表，
+  // 暴露成就需用户显式授权，硬编码关闭避免在未授权时泄露数据。
+  const showAchievementWall = false;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <header className="flex items-center gap-4">
@@ -191,6 +198,45 @@ export default function UserPageClient() {
           >
             {copied ? "✓ 已复制到我的计划" : (<><Icon name="copy" className="w-4 h-4 inline-block align-middle" /> 复制这个计划</>)}
           </button>
+        </section>
+      )}
+
+      {/* 成就墙模块（可选展示，默认关闭）
+          TODO: PublicProfile.visibility 当前只有 radar/heatmap/currentTopic/notes，
+          缺少 achievements 字段。需要：
+          1) 在 lib/types.ts 的 PublicProfile.visibility 增加 `achievements: boolean`
+          2) 在 /api/public 路由返回该用户已解锁的成就列表（仅公开的）
+          3) 将下面的 showAchievementWall 改为读取 profile.visibility.achievements
+          目前硬编码关闭，避免在用户未授权时泄露成就数据。 */}
+      {showAchievementWall && data.achievements && data.achievements.length > 0 && (
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-semibold flex items-center gap-1.5">
+            <Icon name="party" className="w-4 h-4" />
+            成就墙
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {data.achievements.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-2"
+              >
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                  <Icon
+                    name={(a.icon as IconName) ?? "sparkles"}
+                    className="w-4 h-4 text-amber-600 dark:text-amber-400"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
+                    {a.title}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                    {a.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </div>

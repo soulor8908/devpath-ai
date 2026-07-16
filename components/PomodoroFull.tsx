@@ -12,6 +12,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import type { PomodoroSession } from "@/lib/types";
+import { KEY_PREFIXES } from "@/lib/types";
+import { setItem as dbSetItem } from "@/lib/storage/db";
 import {
   createSession,
   completeSession,
@@ -27,10 +29,16 @@ import {
 } from "@/lib/timer/pomodoro-rule";
 import { getTodayCount } from "@/lib/timer/session-tracker";
 import {
-  startTracking,
-  stopTracking,
-} from "@/lib/timer/interruption-tracker";
+  startGuard,
+  stopGuard,
+  resolveGuardMode,
+  type FocusGuardMode,
+} from "@/lib/timer/focus-guard";
 import { notify, requestPermission, hasPermission } from "@/lib/timer/notification-permission";
+import {
+  getUserProfile,
+  saveUserProfile,
+} from "@/lib/ai/memory/user-profile";
 
 type View = "form" | "running" | "completed";
 
@@ -79,9 +87,14 @@ export function PomodoroFull() {
   // 防止重复通知
   const notifiedRef = useRef<string | null>(null);
 
-  // 初始化：检查通知权限 + 检查恢复 session
+  // 初始化：检查通知权限 + 检查恢复 session + 从画像读取严格模式
   const init = useCallback(async () => {
     setNotifPermission(hasPermission());
+    // 从 UserProfile 读取 strictFocusMode（默认 loose）
+    const profile = await getUserProfile();
+    if (profile?.strictFocusMode === true) {
+      setStrictMode(true);
+    }
     const recovered = await recoverInterruptedSession();
     if (recovered) {
       setRecoveryPrompt(recovered);
@@ -130,24 +143,23 @@ export function PomodoroFull() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session]);
 
-  // 启动打断追踪
+  // 启动专注保护（基于 focus-guard，复用 interruption-tracker）
   const startInterruptTracking = useCallback(
     (sessionId: string) => {
-      startTracking(
-        sessionId,
-        (count) => {
+      const mode: FocusGuardMode = strictMode ? "strict" : "loose";
+      startGuard(sessionId, mode, {
+        onInterrupt: (count) => {
           setInterruptions(count);
-          // 同步到 session 对象（用于持久化）
+          // 同步到 session 对象（用于完成时持久化 + UI 展示）
           setSession((prev) =>
             prev ? { ...prev, interruptions: count } : prev,
           );
         },
-        () => {
+        onAbandon: () => {
           // 严格模式：3 次打断 → 自动放弃
           void handleAbandonStrict();
         },
-        strictMode,
-      );
+      });
     },
     [strictMode],
   );
@@ -186,8 +198,16 @@ export function PomodoroFull() {
   // 完成当前 session
   async function handleComplete() {
     if (!session) return;
-    stopTracking();
+    stopGuard();
     try {
+      // 持久化打断次数，确保 completeSession 读取到正确的 interruptions
+      // （completeSession 内部按 durationMinutes - interruptions 计算 actualMinutes）
+      if (interruptions > 0) {
+        await dbSetItem(KEY_PREFIXES.POMODORO_SESSION + session.id, {
+          ...session,
+          interruptions,
+        });
+      }
       await completeSession(session.id);
       setTodayCount(await getTodayCount());
       setView("completed");
@@ -205,7 +225,7 @@ export function PomodoroFull() {
       if (session.status === "running") {
         await pauseSession(session.id);
         setSession({ ...session, status: "paused" });
-        stopTracking();
+        stopGuard();
       } else if (session.status === "paused") {
         await resumeSession(session.id);
         setSession({ ...session, status: "running" });
@@ -220,7 +240,7 @@ export function PomodoroFull() {
   async function handleAbandon() {
     if (!session) return;
     if (!window.confirm("确定放弃这个番茄吗？本次专注将不计入统计")) return;
-    stopTracking();
+    stopGuard();
     try {
       await abandonSession(session.id, "user_abandon");
       setSession(null);
@@ -234,7 +254,7 @@ export function PomodoroFull() {
   // 严格模式自动放弃
   async function handleAbandonStrict() {
     if (!session) return;
-    stopTracking();
+    stopGuard();
     try {
       await abandonSession(session.id, "strict_mode_3_interruptions");
       // 提示用户
@@ -291,7 +311,7 @@ export function PomodoroFull() {
       notifiedRef.current = null;
       completingRef.current = false;
       // 休息 session 不启动打断追踪
-      stopTracking();
+      stopGuard();
     } catch (e) {
       setError(e instanceof Error ? e.message : "启动休息失败");
     }
@@ -387,7 +407,19 @@ export function PomodoroFull() {
             <input
               type="checkbox"
               checked={strictMode}
-              onChange={(e) => setStrictMode(e.target.checked)}
+              onChange={async (e) => {
+                const next = e.target.checked;
+                setStrictMode(next);
+                // 持久化到 UserProfile.strictFocusMode（下次进入时读取）
+                try {
+                  const profile = await getUserProfile();
+                  if (profile) {
+                    await saveUserProfile({ ...profile, strictFocusMode: next });
+                  }
+                } catch {
+                  // 持久化失败不影响当前会话的 toggle
+                }
+              }}
               className="w-4 h-4"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">
