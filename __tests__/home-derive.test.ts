@@ -16,6 +16,7 @@ describe("deriveUserProfileSummary", () => {
 
   it("正确统计三档节点数", () => {
     const profile: UserProfile = {
+      id: "ai:profile",
       skillLevel: {
         n1: "beginner",
         n2: "intermediate",
@@ -26,7 +27,7 @@ describe("deriveUserProfileSummary", () => {
       preferredTimeSlots: ["evening"],
       averageSessionMinutes: 25,
       learningStyle: "mixed",
-      preferredPersona: "mentor",
+      preferredPersona: "strict_coach",
       goals: { short: [], mid: [], long: [] },
       updatedAt: new Date().toISOString(),
     };
@@ -41,12 +42,13 @@ describe("deriveUserProfileSummary", () => {
 
   it("preferredSlot 中文转换", () => {
     const profile: UserProfile = {
+      id: "ai:profile",
       skillLevel: {},
       accuracyByNode: {},
       preferredTimeSlots: ["evening"],
       averageSessionMinutes: 25,
       learningStyle: "mixed",
-      preferredPersona: "mentor",
+      preferredPersona: "strict_coach",
       goals: { short: [], mid: [], long: [] },
       updatedAt: new Date().toISOString(),
     };
@@ -55,12 +57,13 @@ describe("deriveUserProfileSummary", () => {
 
   it("无 preferredTimeSlots 时 preferredSlot 为 null", () => {
     const profile: UserProfile = {
+      id: "ai:profile",
       skillLevel: {},
       accuracyByNode: {},
       preferredTimeSlots: [],
       averageSessionMinutes: 25,
       learningStyle: "mixed",
-      preferredPersona: "mentor",
+      preferredPersona: "strict_coach",
       goals: { short: [], mid: [], long: [] },
       updatedAt: new Date().toISOString(),
     };
@@ -83,8 +86,7 @@ describe("deriveEnergyTrend", () => {
       availableMinutes: 60,
       aiAdjustedLoad: 2,
       actualMinutes: 30,
-      dopamineTrigger: "none",
-      updatedAt: new Date().toISOString(),
+      dopamineTrigger: "无",
     };
     const trend = deriveEnergyTrend(status);
     // 应该有一个位置是 4，其余是 null

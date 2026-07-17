@@ -366,7 +366,7 @@ export function LearnWizard({
           {/* 提示词输入（可调整后重新生成） */}
           <details className="border rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20">
             <summary className="text-sm cursor-pointer text-gray-700 dark:text-gray-300">
-              <Icon name="target" className="w-4 h-4 inline-block align-middle" /> 自定义提示词（调整后点"重新生成"生效）
+              <Icon name="target" className="w-4 h-4 inline-block align-middle" /> 自定义提示词（调整后点&ldquo;重新生成&rdquo;生效）
             </summary>
             <textarea
               value={promptText}
@@ -388,7 +388,7 @@ export function LearnWizard({
             </div>
           ) : nodes.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-500">
-              <p>点击"重新生成"开始拆解知识点</p>
+              <p>点击&ldquo;重新生成&rdquo;开始拆解知识点</p>
             </div>
           ) : (
             <ul className="space-y-2">

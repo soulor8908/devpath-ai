@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type MockInstance } from "vitest";
 import type { LanguageModel } from "ai";
 import {
   wrapModelWithObservability,
@@ -7,8 +7,8 @@ import {
 } from "../lib/ai/observability";
 
 // 控制台日志 spy，用于断言 observability 输出
-let logSpy: ReturnType<typeof vi.spyOn>;
-let warnSpy: ReturnType<typeof vi.spyOn>;
+let logSpy: MockInstance;
+let warnSpy: MockInstance;
 
 beforeEach(() => {
   logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
