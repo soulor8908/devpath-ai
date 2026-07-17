@@ -385,3 +385,45 @@ return NextResponse.json({
 ```
 
 3. 客户端从 response body 读取 `_meta`，传给 `recordAICall({ tokenUsage, modelId })`
+
+## 质量门禁
+
+为了在 CI 部署之前拦截 ESLint / 类型错误 / 单测失败，项目引入了「质量门禁」机制，覆盖本地与 CI 两条路径。
+
+### 本地一键校验
+
+```bash
+# 依次执行 lint → typecheck → 单元测试，任一失败即中止
+npm run quality-gate
+```
+
+- `npm run lint` —— ESLint（next/core-web-vitals + typescript）
+- `npm run typecheck` —— `tsc --noEmit` 全量类型检查
+- `npm test` —— vitest 单元测试套件
+
+> 提交前建议本地跑一次 `npm run quality-gate`，避免把明显的错误推到远程。
+
+### Git pre-push 钩子（可选但推荐）
+
+安装一个本地 pre-push 钩子，在 `git push` 之前自动跑 lint + typecheck（为速度考虑跳过测试，完整测试交给 CI）：
+
+```bash
+bash scripts/install-git-hooks.sh
+```
+
+- 脚本幂等，可重复执行（每次覆盖旧钩子）。
+- 钩子安装在 `.git/hooks/pre-push`，仅作用于当前本地仓库，不会提交到远程。
+- 临时绕过：`git push --no-verify`。
+
+### CI 自动门禁
+
+`.github/workflows/deploy-devpath.yml` 中新增了 `quality-gate` job，在 `push` 到 `main` / `develop` 分支（且命中 paths 过滤器）时触发：
+
+1. `actions/checkout@v4`
+2. `actions/setup-node@v4`（Node 22 + npm 缓存）
+3. `npm ci`
+4. `npm run lint` —— ESLint
+5. `npm run typecheck` —— 类型检查
+6. `npm test` —— 单元测试
+
+`deploy` job 通过 `needs: quality-gate` 依赖门禁 job，**只有质量门禁全部通过后才会执行构建与部署**。CI 的 quality-gate job 是质量保障的「唯一事实来源」，本地钩子仅为加速反馈的可选项。
