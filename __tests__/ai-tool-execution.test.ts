@@ -234,7 +234,12 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
 
 describe("AI start_focus_session 集成 — createSession → getRunningSession", () => {
   beforeEach(async () => {
-    await clearAll();
+    // 清理 pomodoro:* + learn_log:* 前缀的 key（与 pomodoro.test.ts 一致）
+    const pomodoroKeys = await listKeys(KEY_PREFIXES.POMODORO_SESSION);
+    const learnLogKeys = await listKeys(KEY_PREFIXES.LEARN_LOG);
+    for (const k of [...pomodoroKeys, ...learnLogKeys]) {
+      await delItem(k);
+    }
   });
 
   it("createSession 写入的 session 应被 getRunningSession 扫描到", async () => {
