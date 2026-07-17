@@ -810,7 +810,7 @@ export default function ChatClient() {
       // 没有活动对话则先创建
       if (!conv) {
         // 消费暂存的来源信息（追问场景通过 prefill 进入时写入）
-        const source = pendingSourceRef.current;
+        const source = pendingSourceRef.current ?? undefined;
         conv = await createConversation({
           title: text.slice(0, 30),
           modelConfigId: selectedModelId || undefined,
