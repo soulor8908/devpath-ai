@@ -10,6 +10,7 @@
 
 import { toPng } from "html-to-image";
 import QRCode from "qrcode";
+import { maskUsername } from "./username-mask";
 
 interface ShareCardData {
   username: string;
@@ -88,7 +89,7 @@ export async function generateShareCard(data: ShareCardData): Promise<Blob> {
         <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;backdrop-filter:blur(10px);border:2px solid rgba(255,255,255,0.4)">${escapeHtml(initial)}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:26px;font-weight:bold;line-height:1.2">${escapeHtml(data.displayName)}</div>
-          <div style="font-size:13px;opacity:0.85;margin-top:2px">@${escapeHtml(data.username)}</div>
+          <div style="font-size:13px;opacity:0.85;margin-top:2px">@${escapeHtml(maskUsername(data.username))}</div>
         </div>
         <div style="text-align:right;font-size:11px;opacity:0.7;line-height:1.4">
           devpath<br>AI 学习教练

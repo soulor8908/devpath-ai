@@ -11,12 +11,14 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
 import { Icon, type IconName } from "@/components/Icon";
 import type { PublicProfile, KnowledgeNode, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
 import { setItem as dbSet, getItem as dbGet } from "@/lib/storage/db";
+import { maskUsername } from "@/lib/username-mask";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
@@ -139,7 +141,7 @@ export default function UserPageClient() {
         <div className="max-w-md w-full rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-6 text-sm text-amber-800 dark:text-amber-200 space-y-3 shadow-lg">
           <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
             <Icon name="alert" className="w-5 h-5" />
-            <p className="font-medium text-base">用户「{username}」暂未公开主页</p>
+            <p className="font-medium text-base">用户「{maskUsername(username)}」暂未公开主页</p>
           </div>
           <p className="text-xs">可能原因：</p>
           <ul className="text-xs list-disc list-inside space-y-1 ml-1">
@@ -209,7 +211,7 @@ export default function UserPageClient() {
                 <h1 className="text-2xl sm:text-3xl font-bold leading-tight break-words">
                   {profile.displayName || "(未设置)"}
                 </h1>
-                <p className="text-sm text-white/80 mt-0.5">@{profile.username}</p>
+                <p className="text-sm text-white/80 mt-0.5">@{maskUsername(profile.username)}</p>
                 {profile.bio && (
                   <p className="mt-2 text-sm text-white/90 line-clamp-3">{profile.bio}</p>
                 )}
@@ -376,13 +378,13 @@ export default function UserPageClient() {
 
         {/* ============ Footer ============ */}
         <footer className="text-center text-xs text-gray-400 dark:text-gray-600 pt-4">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-1 hover:text-purple-500 transition-colors"
           >
             <Icon name="sparkles" className="w-3.5 h-3.5" />
             创建我自己的学习主页 →
-          </a>
+          </Link>
         </footer>
       </div>
     </div>

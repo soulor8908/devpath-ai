@@ -23,18 +23,20 @@ import type {
   EmotionEntry,
   Achievement,
   HealthAlert,
+  UserProfile,
 } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { getDueCards } from "@/lib/fsrs";
 import { getUnresolvedMistakes } from "@/lib/mistake-book";
 import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
 import { maybeRetrain } from "@/lib/energy-regression";
-import { maybeBuildProfile } from "@/lib/ai/memory/user-profile";
+import { maybeBuildProfile, getUserProfile } from "@/lib/ai/memory/user-profile";
 import { checkAndNotify } from "@/lib/achievements";
 import {
   planHealthCheck,
   shouldRunHealthCheck,
 } from "@/lib/ai/plan-health";
+import { getQualityReport } from "@/lib/ai/quality-tracker";
 
 // ============ 打卡可视化元数据 ============
 
@@ -126,6 +128,31 @@ export interface HomeData {
   newAchievements: Achievement[];
   /** 健康检查告警（首页顶部展示，可关闭 + 一键采纳） */
   healthAlerts: HealthAlert[];
+  /**
+   * 用户画像摘要（新增）：
+   * - skillLevelCount：beginner/intermediate/advanced 三档节点数
+   * - preferredSlot：偏好学习时段（如 "晚上"）
+   * - averageSessionMinutes：平均专注时长
+   * null 表示画像未构建或冷启动
+   */
+  userProfileSummary: {
+    skillLevelCount: { beginner: number; intermediate: number; advanced: number };
+    preferredSlot: string | null;
+    averageSessionMinutes: number | null;
+  } | null;
+  /**
+   * 最近 7 天能量趋势（新增）：[Monday, Tuesday, ..., Sunday] 的平均能量 1-5
+   * 全为 null 表示无数据
+   */
+  energyTrend: Array<number | null>;
+  /**
+   * AI 质量摘要（新增）：今日 AI 调用数 + 整体采纳率
+   * null 表示无 AI 调用记录
+   */
+  aiQualitySummary: {
+    todayCalls: number;
+    adoptionRate: number;
+  } | null;
 }
 
 // ============ 纯函数：从原始数据计算派生状态 ============
@@ -153,6 +180,101 @@ export function computeStreaks(
     }
   }
   return { streak, lastStreak };
+}
+
+/**
+ * 派生用户画像摘要（新增）：
+ * - skillLevelCount：beginner/intermediate/advanced 三档节点数
+ * - preferredSlot：偏好学习时段名（中文化）
+ * - averageSessionMinutes：平均专注时长
+ *
+ * null 表示画像未构建
+ */
+export function deriveUserProfileSummary(
+  profile: UserProfile | null,
+): HomeData["userProfileSummary"] {
+  if (!profile) return null;
+
+  const skillLevelCount = { beginner: 0, intermediate: 0, advanced: 0 };
+  for (const level of Object.values(profile.skillLevel ?? {})) {
+    if (level === "beginner") skillLevelCount.beginner++;
+    else if (level === "intermediate") skillLevelCount.intermediate++;
+    else if (level === "advanced") skillLevelCount.advanced++;
+  }
+
+  const preferredSlot = profile.preferredTimeSlots?.[0]
+    ? slotToChinese(profile.preferredTimeSlots[0])
+    : null;
+
+  return {
+    skillLevelCount,
+    preferredSlot,
+    averageSessionMinutes: profile.averageSessionMinutes ?? null,
+  };
+}
+
+/** 时段标识转中文（用于 UI 显示） */
+function slotToChinese(slot: string): string {
+  const map: Record<string, string> = {
+    morning: "早上",
+    afternoon: "下午",
+    evening: "晚上",
+    night: "深夜",
+    "上午": "上午",
+    "下午": "下午",
+    "晚上": "晚上",
+    "深夜": "深夜",
+  };
+  return map[slot] ?? slot;
+}
+
+/**
+ * 派生最近 7 天能量趋势（新增）
+ *
+ * 简化实现：仅填充今日能量到对应 weekday 位置，其余为 null。
+ * 完整实现需后台任务读取最近 7 天 DailyStatus；为保持 1×RTT，此处仅用 todayStatus。
+ *
+ * @returns 长度 7 的数组，索引 0 = 周一 ... 6 = 周日
+ */
+export function deriveEnergyTrend(
+  todayStatus: DailyStatus | null,
+): Array<number | null> {
+  const trend: Array<number | null> = [null, null, null, null, null, null, null];
+  if (todayStatus?.energy) {
+    const jsDay = new Date().getDay();
+    const mondayIndex = jsDay === 0 ? 6 : jsDay - 1;
+    trend[mondayIndex] = todayStatus.energy;
+  }
+  return trend;
+}
+
+/**
+ * 派生 AI 质量摘要（新增）
+ *
+ * - todayCalls：今日 AI 调用数
+ * - adoptionRate：整体采纳率（按 calls 加权）
+ *
+ * null 表示今日无调用记录
+ */
+export function deriveAiQualitySummary(
+  report: { totalCalls: number; scenes: Array<{ adoptionRate: number | null; calls: number }> },
+): HomeData["aiQualitySummary"] {
+  if (report.totalCalls === 0) return null;
+
+  let totalWeight = 0;
+  let weightedSum = 0;
+  for (const scene of report.scenes) {
+    if (scene.adoptionRate !== null) {
+      weightedSum += scene.adoptionRate * scene.calls;
+      totalWeight += scene.calls;
+    }
+  }
+  const adoptionRate = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+  return {
+    todayCalls: report.totalCalls,
+    adoptionRate: Math.round(adoptionRate * 100) / 100,
+  };
 }
 
 /** 从 logs 计算最近 7 天热力图数据 */
@@ -234,14 +356,19 @@ export function useHomeData(): HomeData & {
     recentMistakes: [],
     newAchievements: [],
     healthAlerts: [],
+    userProfileSummary: null,
+    energyTrend: [null, null, null, null, null, null, null],
+    aiQualitySummary: null,
   });
 
   const load = useCallback(async () => {
     const today = chinaDateNow();
     const todayStatusKey = KEY_PREFIXES.STATUS + today;
+    // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
+    const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
 
-    // 7 路并行查询（互不依赖）
-    const [cards, plans, logs, todayStatus, profile, emotions, mistakes] =
+    // 9 路并行查询（互不依赖）：原 7 路 + userProfile + aiQualityReport
+    const [cards, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport] =
       await Promise.all([
         listItems<ReviewCard>(KEY_PREFIXES.CARD),
         listItems<LearningPlan>(KEY_PREFIXES.PLAN),
@@ -250,6 +377,8 @@ export function useHomeData(): HomeData & {
         getItem<PublicProfile>("my:profile"),
         listItems<EmotionEntry>(KEY_PREFIXES.EMOTION),
         getUnresolvedMistakes(),
+        getUserProfile(),
+        getQualityReport(todayStartIso),
       ]);
 
     // 内存派生计算（无 IO）
@@ -262,6 +391,18 @@ export function useHomeData(): HomeData & {
       latestPlan,
       hasPlans,
     } = computeTodaySchedule(plans);
+
+    // 派生：用户画像摘要（从 UserProfile 计算三档节点数）
+    const userProfileSummary = deriveUserProfileSummary(userProfile);
+
+    // 派生：最近 7 天能量趋势（从 DailyStatus 列表计算）
+    // 注：这里复用 logs 的 date 信息；为避免新增 IO，从 logs 的 date 集合 + 已加载的 todayStatus 派生
+    // 完整实现需要读取最近 7 天的 DailyStatus；为保持 1×RTT，此处仅用 todayStatus，
+    // 后续可通过后台任务或扩展查询补全历史数据
+    const energyTrend = deriveEnergyTrend(todayStatus ?? null);
+
+    // 派生：AI 质量摘要（从 QualityReport 计算今日调用数 + 整体采纳率）
+    const aiQualitySummary = deriveAiQualitySummary(qualityReport);
 
     setData({
       dueCount: due.length,
@@ -278,6 +419,9 @@ export function useHomeData(): HomeData & {
       recentMistakes: mistakes.slice(0, 3),
       newAchievements: [],
       healthAlerts: [],
+      userProfileSummary,
+      energyTrend,
+      aiQualitySummary,
     });
 
     // 后台维护任务：不阻塞 UI，失败静默

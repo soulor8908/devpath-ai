@@ -101,7 +101,9 @@ export const onRequestPut: PagesFunction<PagesEnv> = async (context) => {
   if (body.profile) {
     const existing = (await kv.getProfile(username)) ?? {
       username,
-      displayName: username,
+      // 不再默认 displayName = username（会间接泄露用户名）
+      // 用户未设置 displayName 时显示为空，由前端显示"未设置"
+      displayName: "",
       avatar: undefined,
       bio: "",
       visibility: { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: false },
