@@ -39,6 +39,14 @@ export type ToastListener = (toasts: ToastItem[]) => void;
 const DEFAULT_DURATION_MS = 3000;
 
 let state: ToastItem[] = [];
+/**
+ * 缓存的快照引用。useSyncExternalStore 的 getSnapshot 要求：
+ * 在 store 状态未变化时，多次调用必须返回引用相等的值（Object.is 为 true）。
+ * 若每次返回 state.slice() 新数组 → React 误判 store 变了 → 无限重渲染（React #185）。
+ *
+ * 只在 state 真正变化时（通过 updateState）才重新生成新数组。
+ */
+let cachedSnapshot: ToastItem[] = state;
 const listeners = new Set<ToastListener>();
 let seq = 0;
 
@@ -47,11 +55,21 @@ function genId(): string {
   return `t_${Date.now().toString(36)}_${seq.toString(36)}`;
 }
 
+/**
+ * 更新 state 并刷新缓存快照。
+ * 所有状态变更必须走此函数，保证 cachedSnapshot 与 state 同步。
+ */
+function updateState(newState: ToastItem[]): void {
+  state = newState;
+  cachedSnapshot = state.slice();
+  emit();
+}
+
 function emit() {
-  const snapshot = state.slice();
+  // 通知监听器时传 cachedSnapshot（与 getToasts 返回值一致）
   for (const l of listeners) {
     try {
-      l(snapshot);
+      l(cachedSnapshot);
     } catch {
       // 单个监听器抛错不影响其他
     }
@@ -63,7 +81,7 @@ export function subscribeToasts(listener: ToastListener): () => void {
   listeners.add(listener);
   // 立即推送当前快照（同样容错）
   try {
-    listener(state.slice());
+    listener(cachedSnapshot);
   } catch {
     // 单个监听器抛错不影响其他
   }
@@ -72,9 +90,13 @@ export function subscribeToasts(listener: ToastListener): () => void {
   };
 }
 
-/** 获取当前快照（非响应式） */
+/**
+ * 获取当前快照（引用稳定）。
+ * 供 useSyncExternalStore 的 getSnapshot 使用——在 state 未变化时
+ * 多次调用返回同一引用，避免 React 无限重渲染。
+ */
 export function getToasts(): ToastItem[] {
-  return state.slice();
+  return cachedSnapshot;
 }
 
 /** 推送一个 toast，返回其 id */
@@ -93,8 +115,7 @@ export function pushToast(
     createdAt: Date.now(),
     confirm,
   };
-  state = [...state, item];
-  emit();
+  updateState([...state, item]);
   // 自动消失（confirm 类型不自动消失）
   if (durationMs > 0 && !confirm && typeof window !== "undefined") {
     window.setTimeout(() => {
@@ -108,15 +129,13 @@ export function pushToast(
 export function dismissToast(id: string): void {
   const exists = state.some((t) => t.id === id);
   if (!exists) return;
-  state = state.filter((t) => t.id !== id);
-  emit();
+  updateState(state.filter((t) => t.id !== id));
 }
 
 /** 清空所有 toast（主要用于测试和路由切换） */
 export function clearToasts(): void {
   if (state.length === 0) return;
-  state = [];
-  emit();
+  updateState([]);
 }
 
 /** 快捷方法 */
