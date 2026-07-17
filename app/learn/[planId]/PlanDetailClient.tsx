@@ -326,9 +326,9 @@ export default function PlanDetailClient() {
         >
           ← 返回
         </button>
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold">{plan.topic}</h1>
+            <h1 className="text-xl font-bold break-words">{plan.topic}</h1>
             <p className="text-sm text-gray-500 mt-1">
               {plan.knowledgeTree.length} 个知识点 · {plan.questions.length} 道题 ·{" "}
               {days.length} 天计划
