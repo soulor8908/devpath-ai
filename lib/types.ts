@@ -406,6 +406,8 @@ export const KEY_PREFIXES = {
   PRIORITY_CACHE: "priority_cache:",
   /** 限流客户端估算：rate_limit:<YYYY-MM-DD>:<scene>（仅 UI 提示） */
   RATE_LIMIT: "rate_limit:",
+  /** 学习向导草稿：learn:plan_draft:<topic>（断点续传用，保存后自动删除） */
+  PLAN_DRAFT: "learn:plan_draft:",
 } as const;
 
 // AI 模型配置（用户可在 profile 配置多个）

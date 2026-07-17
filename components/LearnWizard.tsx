@@ -20,7 +20,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { aiFetch } from "@/lib/api-client";
-import { setItem } from "@/lib/storage/db";
+import { getItem, setItem, delItem } from "@/lib/storage/db";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import { nanoid } from "nanoid";
@@ -117,12 +117,51 @@ export function LearnWizard({
     }
   }, [topic, promptText]);
 
-  // 首次挂载自动开始拆知识点
+  // 首次挂载：优先恢复草稿，无草稿才自动开始拆知识点
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    void fetchKnowledge();
-  }, [fetchKnowledge]);
+    void (async () => {
+      try {
+        const draft = await getItem<{
+          topic: string;
+          nodes: KnowledgeNode[];
+          questions: Question[];
+          answerProgress: { done: number; total: number };
+          step: Step;
+          savedAt: number;
+        }>(KEY_PREFIXES.PLAN_DRAFT + topic);
+        if (draft && draft.nodes?.length > 0) {
+          setNodes(draft.nodes);
+          setQuestions(draft.questions || []);
+          setAnswerProgress(draft.answerProgress || { done: 0, total: 0 });
+          setStep(draft.step || "knowledge");
+          toast.info("已恢复上次未完成的草稿");
+          return; // 跳过自动抓取
+        }
+      } catch {
+        // 草稿读取失败：静默回退到自动抓取
+      }
+      void fetchKnowledge();
+    })();
+  // 仅挂载时执行一次：fetchKnowledge 通过 didInitRef 守卫避免 StrictMode 双触发
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 草稿持久化：nodes/questions/answerProgress/step 任一变化即写回 IndexedDB
+  // 仅当已生成实质内容时写入，避免空草稿覆盖已有草稿
+  useEffect(() => {
+    if (topic && (nodes.length > 0 || questions.length > 0)) {
+      void setItem(KEY_PREFIXES.PLAN_DRAFT + topic, {
+        topic,
+        nodes,
+        questions,
+        answerProgress,
+        step,
+        savedAt: Date.now(),
+      }).catch(() => {});
+    }
+  }, [topic, nodes, questions, answerProgress, step]);
 
   // ---- Step 2: 生成题目（answer 字段清空） ----
   const fetchQuestions = useCallback(async () => {
@@ -256,6 +295,8 @@ export function LearnWizard({
       };
       await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
       await savePlanSummary(plan);
+      // 计划已保存：清除草稿（避免下次进入向导时误恢复）
+      await delItem(KEY_PREFIXES.PLAN_DRAFT + topic).catch(() => {});
 
       // Demo 数据清除提示
       const hasDemo = await hasDemoData();
@@ -601,15 +642,18 @@ export function LearnWizard({
             ))}
           </ul>
 
-          {/* 完成 → 保存 */}
-          {!loading && answerProgress.done >= answerProgress.total && answerProgress.total > 0 && (
+          {/* 完成 → 保存（允许部分答案未生成：进入详情页可继续生成） */}
+          {!loading && answerProgress.total > 0 && (
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={saveAndRedirect}
                 className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black text-sm rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1"
               >
-                确认完成 → 创建学习计划
-                <Icon name="check" className="w-4 h-4 inline-block" />
+                {answerProgress.done < answerProgress.total ? (
+                  `完成（${answerProgress.total - answerProgress.done} 题未生成答案）`
+                ) : (
+                  <>确认完成 → 创建学习计划 <Icon name="check" className="w-4 h-4 inline-block" /></>
+                )}
               </button>
             </div>
           )}

@@ -14,6 +14,7 @@ import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavo
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
 import { logLearning } from "@/lib/learn-log";
+import { createCard, findExistingCard } from "@/lib/fsrs";
 import {
   recordAICall,
   startTimer,
@@ -36,6 +37,8 @@ export default function PlanDetailClient() {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<string | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // 批量补生成缺失答案（学习向导 Step 3 未完成时进入详情页可继续）
+  const [generatingAnswers, setGeneratingAnswers] = useState(false);
 
   // 重新生成弹窗状态
   const [showRegenModal, setShowRegenModal] = useState(false);
@@ -154,6 +157,29 @@ export default function PlanDetailClient() {
         nodeId: oldItem.nodeId,
         type: oldItem.type === "learn" ? "learn_complete" : "review_complete",
       }).catch(() => {});
+
+      // learn_complete 时自动为该知识点下的题目造复习卡（带查重，避免重复）
+      if (oldItem.type === "learn") {
+        const nodeQuestions = plan.questions.filter((q) => q.nodeId === oldItem.nodeId);
+        for (const q of nodeQuestions) {
+          try {
+            const existing = await findExistingCard({ planId: plan.id, questionId: q.id });
+            if (!existing) {
+              const card = createCard(
+                plan.id,
+                oldItem.nodeId,
+                q.id,
+                q.question,
+                q.answer || "",
+                plan.fsrsMode
+              );
+              await setItem(KEY_PREFIXES.CARD + card.id, card);
+            }
+          } catch {
+            // 造卡失败不阻塞标记完成流程
+          }
+        }
+      }
     }
   }
 
@@ -280,6 +306,101 @@ export default function PlanDetailClient() {
     }
   }
 
+  // 批量补生成缺失答案：复用 /api/learn/answers 流式接口
+  // 仅对 answer 为空的题目发起请求，逐题回写本地 plan
+  async function handleContinueGenerate() {
+    if (!plan) return;
+    const missingQuestions = plan.questions.filter((q) => !q.answer);
+    if (missingQuestions.length === 0) return;
+    setGeneratingAnswers(true);
+    try {
+      const res = await fetch("/api/learn/answers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questions: missingQuestions,
+          nodes: plan.knowledgeTree,
+          topic: plan.topic,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败 (${res.status})`);
+      }
+      if (!res.body) throw new Error("响应无流");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const updatedQuestions = [...plan.questions];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line) as {
+              questionId?: string;
+              answer?: string;
+              done?: boolean;
+            };
+            if (data.questionId && data.answer) {
+              const idx = updatedQuestions.findIndex(
+                (q) => q.id === data.questionId,
+              );
+              if (idx >= 0) {
+                updatedQuestions[idx] = {
+                  ...updatedQuestions[idx],
+                  answer: data.answer,
+                };
+                // 增量回写：让用户看到逐题完成的进度
+                setPlan({ ...plan, questions: [...updatedQuestions] });
+              }
+            }
+          } catch {
+            // 单行 JSON 解析失败：跳过（不影响后续行）
+          }
+        }
+      }
+      // 处理流末尾残留 buffer
+      if (buffer.trim()) {
+        try {
+          const data = JSON.parse(buffer) as {
+            questionId?: string;
+            answer?: string;
+          };
+          if (data.questionId && data.answer) {
+            const idx = updatedQuestions.findIndex(
+              (q) => q.id === data.questionId,
+            );
+            if (idx >= 0) {
+              updatedQuestions[idx] = {
+                ...updatedQuestions[idx],
+                answer: data.answer,
+              };
+            }
+          }
+        } catch {
+          // 忽略残留解析失败
+        }
+      }
+      // 持久化最终结果
+      const updatedPlan = { ...plan, questions: updatedQuestions, updatedAt: nowISO() };
+      await setItem(KEY_PREFIXES.PLAN + plan.id, updatedPlan);
+      await savePlanSummary(updatedPlan);
+      setPlan(updatedPlan);
+      toast.success("答案生成完成");
+    } catch (err) {
+      toast.error("生成失败：" + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setGeneratingAnswers(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -380,7 +501,29 @@ export default function PlanDetailClient() {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-lg font-bold mb-3">面试题（{filteredQuestions.length}/{plan.questions.length}）</h2>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-lg font-bold">面试题（{filteredQuestions.length}/{plan.questions.length}）</h2>
+          {plan.questions.some((q) => !q.answer) && (
+            <button
+              onClick={handleContinueGenerate}
+              disabled={generatingAnswers}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1"
+              title="对未生成答案的题目批量调用 AI 生成"
+            >
+              {generatingAnswers ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Icon name="refresh-cw" className="w-3.5 h-3.5 inline-block" />
+                  继续生成答案（{plan.questions.filter((q) => !q.answer).length} 题缺失）
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <div className="mb-3 p-3 bg-gray-50 rounded-lg space-y-2">
           {/* Row 1: bigTech + difficulty */}
           <div className="flex flex-wrap items-center gap-2">
@@ -477,6 +620,7 @@ export default function PlanDetailClient() {
             <div key={q.id} ref={(el) => { questionRefs.current[q.id] = el; }}>
               <QuestionCard
                 question={q}
+                planId={plan.id}
                 onFavoriteToggle={handleQuestionFavorite}
                 onRegenerate={handleRegenerate}
                 regenerating={regeneratingId === q.id}
