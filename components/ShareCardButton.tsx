@@ -8,6 +8,7 @@ import { generateShareCard } from "@/lib/share-image";
 import { listItems } from "@/lib/storage/db";
 import type { PublicProfile, LearnLog, ReviewCard } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { toast } from "@/lib/toast";
 
 interface Props {
   profile: PublicProfile;
@@ -39,7 +40,9 @@ export function ShareCardButton({ profile }: Props) {
         return acc;
       }, []);
 
-      const radarData = profile.visibility.radar
+      // visibility 可能为 undefined（旧数据/未初始化），做 null-safety 降级
+      const vis = profile.visibility ?? { radar: true, heatmap: true, currentTopic: true, notes: false, achievements: true };
+      const radarData = vis.radar
         ? cards.slice(0, 5).map((c) => ({
             node: c.nodeId,
             value: Math.min(100, Math.round((c.stability / 30) * 100)),
@@ -51,7 +54,7 @@ export function ShareCardButton({ profile }: Props) {
         displayName: profile.displayName,
         streakDays,
         totalMinutes,
-        heatmapData: profile.visibility.heatmap ? heatmapData : undefined,
+        heatmapData: vis.heatmap ? heatmapData : undefined,
         radarData,
         // 公开主页 URL（用于生成二维码，扫码即可访问）
         shareUrl: `${window.location.origin}/u/${encodeURIComponent(profile.username)}`,
@@ -64,6 +67,9 @@ export function ShareCardButton({ profile }: Props) {
       a.download = `devpath-${profile.username}-${new Date().toISOString().slice(0, 10)}.png`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[share-image] 生成失败:", err);
+      toast.error(`分享图生成失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setGenerating(false);
     }

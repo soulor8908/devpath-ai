@@ -32,9 +32,15 @@ interface ShareCardData {
  */
 export async function generateShareCard(data: ShareCardData): Promise<Blob> {
   const container = document.createElement("div");
+  // 不使用 left:-9999px 屏幕外定位——部分浏览器会跳过屏外元素的合成/绘制，
+  // 导致 html-to-image 截出空白。改为留在视口内但 opacity:0 + pointer-events:none，
+  // 既保证参与渲染流水线，又对用户不可见、不可交互。
   container.style.position = "fixed";
-  container.style.left = "-9999px";
+  container.style.left = "0";
   container.style.top = "0";
+  container.style.opacity = "0";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "-1";
   container.style.width = "640px";
   // 高度由内容决定，不固定 height
   container.style.padding = "0";
@@ -140,6 +146,20 @@ export async function generateShareCard(data: ShareCardData): Promise<Blob> {
   `;
 
   document.body.appendChild(container);
+
+  // 等待容器内所有图片（尤其是二维码 data URL）完成加载/解码后再截图，
+  // 否则 html-to-image 可能在 <img> 尚未 onload 时渲染，导致分享图空白或二维码缺失
+  const images = container.querySelectorAll("img");
+  await Promise.all(
+    Array.from(images).map((img) => {
+      if (img.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      });
+    })
+  );
+
   try {
     const blob = await toPng(container, { pixelRatio: 2, cacheBust: true }).then(async (dataUrl) => {
       const res = await fetch(dataUrl);
