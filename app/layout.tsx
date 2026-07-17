@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { ToastContainer } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "devpath-ai — AI 驱动的开发者成长 OS",
@@ -39,6 +40,7 @@ export default function RootLayout({
       </head>
       <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen pb-16">
         {children}
+        <ToastContainer />
         <Nav />
         <script
           dangerouslySetInnerHTML={{
