@@ -7,20 +7,22 @@ import { nanoid } from "nanoid";
 import { nowISO } from "./time";
 import { KEY_PREFIXES } from "./types";
 import type { FavoriteDeck, LearningPlan, Question } from "./types";
-import { savePlanSummary } from "./plan-summary";
+import { savePlanSummary, normalizePlan } from "./plan-summary";
 
 // ===== 纯逻辑函数 =====
 
 export function buildFavoriteDeck(plan: LearningPlan): FavoriteDeck {
+  const questions = Array.isArray(plan.questions) ? plan.questions : [];
+  const knowledgeTree = Array.isArray(plan.knowledgeTree) ? plan.knowledgeTree : [];
   return {
     id: nanoid(),
     planId: plan.id,
     topic: plan.topic,
-    questionIds: plan.questions.map((q) => q.id),
-    questionCount: plan.questions.length,
+    questionIds: questions.map((q) => q.id),
+    questionCount: questions.length,
     favoritedAt: nowISO(),
-    questions: plan.questions.map((q) => ({ ...q })),
-    knowledgeTree: plan.knowledgeTree.map((n) => ({ ...n })),
+    questions: questions.map((q) => ({ ...q })),
+    knowledgeTree: knowledgeTree.map((n) => ({ ...n })),
   };
 }
 
@@ -95,8 +97,10 @@ export async function listFavoritedQuestions(): Promise<FavoritedQuestionWithPla
   const favorited: FavoritedQuestionWithPlan[] = [];
   for (const plan of plans) {
     if (!plan) continue;
-    for (const q of plan.questions) {
-      if (q.favorited) favorited.push({ question: q, planId: plan.id, planTopic: plan.topic });
+    // 规范化：旧 IndexedDB plan 可能缺 questions/knowledgeTree/schedule 字段
+    const normalized = normalizePlan(plan);
+    for (const q of normalized.questions) {
+      if (q.favorited) favorited.push({ question: q, planId: normalized.id, planTopic: normalized.topic });
     }
   }
   return favorited;

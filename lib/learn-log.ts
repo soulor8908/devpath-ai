@@ -141,13 +141,13 @@ export async function computeStats(): Promise<LearnStats> {
   const allPlans = await listItems<LearningPlan>(KEY_PREFIXES.PLAN);
   const nodeProgress: Record<string, { completed: number; total: number; mastery: number }> = {};
   for (const plan of allPlans) {
-    for (const node of plan.knowledgeTree) {
+    for (const node of plan.knowledgeTree ?? []) {
       if (!nodeProgress[node.id]) {
         nodeProgress[node.id] = { completed: 0, total: 0, mastery: 0 };
       }
       nodeProgress[node.id].total += 1;
     }
-    for (const item of plan.schedule) {
+    for (const item of plan.schedule ?? []) {
       if (item.completed && nodeProgress[item.nodeId]) {
         nodeProgress[item.nodeId].completed += 1;
       }

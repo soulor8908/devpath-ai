@@ -42,7 +42,7 @@ export function applyReviewFilters(
   // Also planId -> plan (for plan topic lookup, though filtering by planId is direct on card.planId)
   const nodeMap = new Map<string, { difficulty: number; bigTech?: boolean }>();
   for (const plan of ctx.plans) {
-    for (const node of plan.knowledgeTree) {
+    for (const node of plan.knowledgeTree ?? []) {
       if (!nodeMap.has(node.id)) {
         nodeMap.set(node.id, { difficulty: node.difficulty, bigTech: node.bigTech });
       }

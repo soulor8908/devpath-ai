@@ -35,7 +35,7 @@ import {
   shouldRunHealthCheck,
 } from "@/lib/ai/plan-health";
 import { getQualityReport } from "@/lib/ai/quality-tracker";
-import { listPlanSummaries } from "@/lib/plan-summary";
+import { listPlanSummaries, migrateSummaries } from "@/lib/plan-summary";
 
 // ============ 打卡可视化元数据 ============
 
@@ -303,7 +303,7 @@ export function computeTodaySchedule(plans: LearningPlanSummary[]): {
   let todayLearn = 0;
   const todayItems: Array<ScheduleItem & { planId: string; topic: string }> = [];
   for (const plan of plans) {
-    const today = plan.schedule.filter((s) => s.day === 1 && !s.completed);
+    const today = (plan.schedule ?? []).filter((s) => s.day === 1 && !s.completed);
     for (const s of today) {
       todayItems.push({ ...s, planId: plan.id, topic: plan.topic });
     }
@@ -368,6 +368,9 @@ export function useHomeData(): HomeData & {
     // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
     const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
 
+    // 先迁移旧摘要（补齐缺失/过期 summary，含 schedule 字段），
+    // 再并行加载首页数据。迁移为 no-op 时仅扫 key，开销极小。
+    await migrateSummaries();
     // P1 精准查询优化（替代全量加载）：
     //   - 卡片：countDueCards(now) 走 dueAt 索引精准计数，O(due) 而非 O(n)
     //     （首页只需要 dueCount，不需要卡片数据本身）

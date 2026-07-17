@@ -21,19 +21,47 @@ const SUMMARY_LIST_CACHE_KEY = "__cache:plan_summaries";
 /** 缓存 TTL：5 分钟 */
 const SUMMARY_CACHE_TTL_MS = 5 * 60 * 1000;
 
-/** 从完整 plan 提取摘要 */
+/**
+ * 规范化 LearningPlan：对 knowledgeTree/questions/schedule 做回退，
+ * 避免旧 IndexedDB 数据缺字段导致渲染崩溃。
+ * 调用方需先过滤 undefined（本函数入参必填）。
+ */
+export function normalizePlan(plan: LearningPlan): LearningPlan {
+  return {
+    ...plan,
+    knowledgeTree: Array.isArray(plan.knowledgeTree) ? plan.knowledgeTree : [],
+    questions: Array.isArray(plan.questions) ? plan.questions : [],
+    schedule: Array.isArray(plan.schedule) ? plan.schedule : [],
+  };
+}
+
+/**
+ * 规范化 LearningPlanSummary：对 schedule 做回退，
+ * 避免旧摘要缺 schedule 字段导致首页 computeTodaySchedule 崩溃。
+ */
+export function normalizePlanSummary(summary: LearningPlanSummary): LearningPlanSummary {
+  return {
+    ...summary,
+    schedule: Array.isArray(summary.schedule) ? summary.schedule : [],
+  };
+}
+
+/** 从完整 plan 提取摘要（对旧数据缺字段做回退，避免 .length/.map 崩溃） */
 export function toSummary(plan: LearningPlan): LearningPlanSummary {
+  const knowledgeTree = Array.isArray(plan.knowledgeTree) ? plan.knowledgeTree : [];
+  const questions = Array.isArray(plan.questions) ? plan.questions : [];
+  const schedule = Array.isArray(plan.schedule) ? plan.schedule : [];
   return {
     id: plan.id,
     topic: plan.topic,
-    knowledgeCount: plan.knowledgeTree.length,
-    questionCount: plan.questions.length,
-    scheduleDays: new Set(plan.schedule.map((s) => s.day)).size,
+    knowledgeCount: knowledgeTree.length,
+    questionCount: questions.length,
+    scheduleDays: new Set(schedule.map((s) => s.day)).size,
     dailyMinutes: plan.dailyMinutes,
     maxNewPerDay: plan.maxNewPerDay,
     // P1 优化：包含完整 schedule，首页 computeTodaySchedule 无需加载完整 plan
     // schedule 体积小（~6KB/30天计划），远小于 knowledgeTree + questions（~100KB+）
-    schedule: plan.schedule,
+    schedule,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
@@ -55,9 +83,12 @@ export async function listPlanSummaries(): Promise<LearningPlanSummary[]> {
     SUMMARY_LIST_CACHE_KEY,
     async () => {
       const items = await listItems<LearningPlanSummary>(KEY_PREFIXES.PLAN_SUMMARY);
-      return items.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      // 规范化：旧摘要可能缺 schedule 字段，回退为 [] 避免首页崩溃
+      return items
+        .map(normalizePlanSummary)
+        .sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
     },
     SUMMARY_CACHE_TTL_MS,
   ) ?? [];

@@ -89,7 +89,7 @@ export default function ReviewPage() {
   const allNodes = useMemo<KnowledgeNode[]>(() => {
     const map = new Map<string, KnowledgeNode>();
     for (const p of plans) {
-      for (const n of p.knowledgeTree) {
+      for (const n of p.knowledgeTree ?? []) {
         if (!map.has(n.id)) map.set(n.id, n);
       }
     }
