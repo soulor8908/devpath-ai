@@ -6,6 +6,9 @@ import type { Question } from "@/lib/types";
 import { AnswerContent, CodeBlock } from "@/components/CodeBlock";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
+import { createCard, findExistingCard } from "@/lib/fsrs";
+import { setItem } from "@/lib/storage/db";
+import { KEY_PREFIXES } from "@/lib/types";
 
 // 停留时间阈值（毫秒）
 const DWELL_TOO_SIMPLE_MS = 3_000;   // < 3s → 太简单
@@ -13,13 +16,15 @@ const DWELL_NEEDS_PRACTICE_MS = 300_000; // > 5min → 需要更多练习
 
 interface Props {
   question: Question;
+  /** 关联计划 ID（用于收藏时自动造复习卡） */
+  planId?: string;
   onFavoriteToggle?: (questionId: string) => void;
   onRegenerate?: (questionId: string) => void;
   regenerating?: boolean;
   onFollowUpClick?: (followUp: string) => void;
 }
 
-export function QuestionCard({ question, onFavoriteToggle, onRegenerate, regenerating, onFollowUpClick }: Props) {
+export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate, regenerating, onFollowUpClick }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const isFailed = question.question === "生成失败，点击重试";
@@ -93,8 +98,29 @@ export function QuestionCard({ question, onFavoriteToggle, onRegenerate, regener
         </button>
         {onFavoriteToggle && (
           <button
-            onClick={() => {
-              if (!question.favorited) trackImplicit("favorited");
+            onClick={async () => {
+              if (!question.favorited) {
+                trackImplicit("favorited");
+                // 即将收藏 → 同步造复习卡（带查重，避免重复）
+                if (planId) {
+                  try {
+                    const existing = await findExistingCard({ planId, questionId: question.id });
+                    if (!existing) {
+                      const card = createCard(
+                        planId,
+                        question.nodeId,
+                        question.id,
+                        question.question,
+                        question.answer || "",
+                        "standard"
+                      );
+                      await setItem(KEY_PREFIXES.CARD + card.id, card);
+                    }
+                  } catch {
+                    // 造卡失败不影响收藏本身
+                  }
+                }
+              }
               onFavoriteToggle(question.id);
             }}
             className={`text-lg ${question.favorited ? "text-yellow-500" : "text-gray-300"}`}

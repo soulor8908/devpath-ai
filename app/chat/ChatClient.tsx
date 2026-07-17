@@ -12,6 +12,7 @@ import {
   type Conversation,
   type ModelConfig,
   type LearningPlan,
+  type ChatSource,
   KEY_PREFIXES,
 } from "@/lib/types";
 import {
@@ -40,6 +41,8 @@ import { createReminder, startReminderPolling } from "@/lib/reminder";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { scheduleAutoSync, getUserId } from "@/lib/sync";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { toast } from "@/lib/toast";
+import { createSession } from "@/lib/timer/pomodoro";
 import {
   recordAICall,
   trackAIFeedback,
@@ -105,6 +108,9 @@ export default function ChatClient() {
   const aiCallIdMap = useRef<Map<string, string>>(new Map());
   // 初始加载守卫：避免在 modal 反复挂载/卸载或 StrictMode 双调用时重复自动选中最近对话
   const initialRestoreDone = useRef(false);
+  // 预填充来源信息：当通过 URL 参数 prefill 进入新对话时，暂存来源（题目/知识点），
+  // 供 handleSend 创建对话时写入 Conversation.source
+  const pendingSourceRef = useRef<ChatSource | null>(null);
 
   // 刷新对话列表
   const refreshConversations = useCallback(async () => {
@@ -152,6 +158,9 @@ export default function ChatClient() {
 
         const convId = searchParams.get("conversationId");
         const prefill = searchParams.get("prefill");
+        const sourceType = searchParams.get("sourceType");
+        const sourceId = searchParams.get("sourceId");
+        const sourceTitle = searchParams.get("sourceTitle");
         if (convId) {
           const conv = await getConversation(convId);
           if (cancelled) return;
@@ -159,6 +168,36 @@ export default function ChatClient() {
             await loadConversation(conv);
             if (conv.modelConfigId) setSelectedModelId(conv.modelConfigId);
           }
+        } else if (prefill) {
+          // prefill 存在 → 开启新对话，不恢复最近一条对话（追问场景）
+          initialRestoreDone.current = true;
+          if (
+            sourceType === "question" ||
+            sourceType === "knowledge" ||
+            sourceType === "manual"
+          ) {
+            // 暂存来源信息，供 handleSend 创建对话时写入 Conversation.source
+            let decodedTitle = "";
+            try {
+              decodedTitle = sourceTitle ? decodeURIComponent(sourceTitle) : "";
+            } catch {
+              decodedTitle = sourceTitle ?? "";
+            }
+            pendingSourceRef.current = {
+              type: sourceType,
+              id: sourceId ?? "",
+              title: decodedTitle,
+            };
+          }
+          setActiveConv(null);
+          setMessages([]);
+          try {
+            setInput(decodeURIComponent(prefill));
+          } catch {
+            setInput(prefill);
+          }
+          // 清理 URL 参数，避免刷新后重复 prefill
+          router.replace("/chat");
         } else if (!initialRestoreDone.current) {
           // 无显式 conversationId（如模态模式直接打开）：默认恢复最近一条对话
           initialRestoreDone.current = true;
@@ -168,13 +207,6 @@ export default function ChatClient() {
             if (latest.modelConfigId) setSelectedModelId(latest.modelConfigId);
           }
           // 列表为空则保持空状态（messages 区会展示快捷指引）
-        }
-        if (prefill) {
-          try {
-            setInput(decodeURIComponent(prefill));
-          } catch {
-            setInput(prefill);
-          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -349,19 +381,17 @@ export default function ChatClient() {
               plan_id?: string;
               node_id?: string;
             };
-            // 写入一个 session 记录到 IndexedDB，供专注页读取启动
-            const session = {
-              id: crypto.randomUUID(),
+            // 通过 createSession 写入 status=running 的 PomodoroSession，
+            // key 前缀为 KEY_PREFIXES.POMODORO_SESSION，getRunningSession() 可直接扫描到
+            const session = await createSession({
               taskDescription: params.task_description,
+              type: "focus",
               durationMinutes: params.duration_minutes,
               planId: params.plan_id,
               nodeId: params.node_id,
-              status: "pending" as const,
-              createdAt: new Date().toISOString(),
-            };
-            await dbSet("focus:pending_session", session);
-            // 跳转到专注页，由专注页接管
-            window.location.href = `/focus?session=${session.id}`;
+            });
+            // 跳转到番茄钟页（/timer），由 PomodoroFull 读取 running session 接管
+            window.location.href = `/timer?session=${session.id}`;
             success = true;
             break;
           }
@@ -634,7 +664,7 @@ export default function ChatClient() {
             return "";
           }
         }
-        if (type === "a") {
+        if (type === "6") {
           try {
             const parsed = JSON.parse(payload) as {
               result?: { clientAction?: ClientAction };
@@ -693,19 +723,48 @@ export default function ChatClient() {
       setStreaming(false);
 
       // 执行工具返回的客户端动作（传入 callId 用于结果回传）
-      // 失败时收集错误信息展示给用户（不再静默吞掉）
+      // 失败时收集错误信息展示给用户（不再静默吞掉）+ 成功/失败 toast 反馈
       if (pendingActions.length > 0) {
-        const results = await Promise.allSettled(
-          pendingActions.map((a) => executeClientAction(a, callId)),
-        );
         const failedMessages: string[] = [];
-        for (const r of results) {
-          if (r.status === "fulfilled") {
-            if (!r.value.ok && r.value.error) {
-              failedMessages.push(r.value.error);
+        for (const action of pendingActions) {
+          try {
+            const result = await executeClientAction(action, callId);
+            if (result.ok) {
+              // 按动作类型显示成功 toast
+              switch (action.type) {
+                case "start_focus_session":
+                  toast.success("番茄钟已启动");
+                  break;
+                case "create_reminder":
+                  toast.success("提醒已设置");
+                  break;
+                case "adjust_plan":
+                  toast.success("计划已调整");
+                  break;
+                case "toggle_plan_freeze": {
+                  const freeze = (action.params as { freeze?: boolean }).freeze;
+                  toast.success(freeze ? "计划已冻结" : "计划已解冻");
+                  break;
+                }
+                case "set_plan_priority":
+                  toast.success("优先级已调整");
+                  break;
+                case "reorder_schedule":
+                  toast.success("日程已优化");
+                  break;
+                case "generate_plan":
+                  toast.success("学习计划已生成，正在跳转...");
+                  break;
+              }
+            } else {
+              const msg = result.error ?? "未知错误";
+              failedMessages.push(msg);
+              toast.error("工具执行失败：" + msg);
             }
-          } else {
-            failedMessages.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            failedMessages.push(msg);
+            toast.error("工具执行失败：" + msg);
           }
         }
         if (failedMessages.length > 0) {
@@ -750,10 +809,14 @@ export default function ChatClient() {
     try {
       // 没有活动对话则先创建
       if (!conv) {
+        // 消费暂存的来源信息（追问场景通过 prefill 进入时写入）
+        const source = pendingSourceRef.current;
         conv = await createConversation({
           title: text.slice(0, 30),
           modelConfigId: selectedModelId || undefined,
+          source,
         });
+        pendingSourceRef.current = null;
         setActiveConv(conv);
         const params = new URLSearchParams();
         params.set("conversationId", conv.id);
@@ -968,6 +1031,15 @@ export default function ChatClient() {
       {/* 顶部精简工具条：新建对话 + 标题 + 收藏/删除
           （ChatModal 已提供标题栏与关闭按钮，这里只保留对话级操作） */}
       <header className="shrink-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-3 py-2 flex items-center gap-1 z-20">
+        <button
+          type="button"
+          onClick={() => setShowHistory(true)}
+          aria-label="历史对话"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-300"
+          title="历史对话"
+        >
+          <Icon name="clock" className="w-5 h-5" />
+        </button>
         <button
           type="button"
           onClick={handleNewConversation}
@@ -1284,6 +1356,94 @@ export default function ChatClient() {
           </button>
         </div>
       </footer>
+
+      {/* 历史对话抽屉：左侧滑入面板，点击遮罩或选中对话后关闭 */}
+      {showHistory && (
+        <div
+          className="fixed inset-0 z-[70] flex"
+          onClick={() => setShowHistory(false)}
+        >
+          <div className="absolute inset-0 bg-black/30" />
+          <div
+            className="relative w-80 max-w-[80vw] bg-white dark:bg-gray-800 h-full flex flex-col shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b dark:border-gray-700">
+              <h3 className="font-semibold">历史对话</h3>
+              <button
+                type="button"
+                onClick={() => setShowHistory(false)}
+                aria-label="关闭"
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Search */}
+            <div className="p-2 border-b dark:border-gray-700">
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索对话..."
+                className="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-0 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            {/* List */}
+            <div className="flex-1 overflow-y-auto">
+              {filteredConversations.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-8">暂无对话</p>
+              ) : (
+                filteredConversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-700 cursor-pointer group"
+                    onClick={() => {
+                      switchConversation(conv);
+                      setShowHistory(false);
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        {conv.pinned && (
+                          <Icon name="pin" className="w-3 h-3 text-blue-500" />
+                        )}
+                        <p className="text-sm font-medium truncate">
+                          {conv.title || "未命名对话"}
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        {new Date(conv.lastMessageAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div
+                      className="flex gap-1 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePin(conv.id)}
+                        aria-label="收藏"
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                      >
+                        <Icon name="pin" className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(conv.id)}
+                        aria-label="删除"
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                      >
+                        <Icon name="trash" className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

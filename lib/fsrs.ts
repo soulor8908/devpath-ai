@@ -98,22 +98,28 @@ export function createCard(
 }
 
 /**
- * 查重：根据 deckId + questionId 找已存在的卡片
+ * 查重：根据 deckId + questionId 或 planId + questionId 找已存在的卡片
  *
- * 用途：「开始复习」时避免重复创建卡片（用户多次点击同一试题集的「开始复习」按钮）
- * - deckId 未提供 → 返回 undefined（无法查重，按"无重复"处理）
+ * 用途：「开始复习」/ 学习完成 / 单题收藏 / 错题记录时避免重复创建卡片
+ * - 传 deckId → 按 deckId + questionId 查重（收藏试题集场景）
+ * - 不传 deckId 但传 planId → 按 planId + questionId 查重（学习/收藏单题/错题场景）
+ * - 都不传 → 返回 undefined（无法查重，按"无重复"处理）
  * - 找到匹配 → 返回已存在的 ReviewCard，调用方应跳过创建
  * - 未找到 → 返回 undefined，调用方按需创建
  *
- * 性能：一次性 listItems 读全部 card，仅在点击时调用，OK
+ * 性能：一次性 listItems 读全部 card，仅在用户行为触发时调用，OK
  */
-export async function findExistingCard(
-  deckId: string | undefined,
-  questionId: string
-): Promise<ReviewCard | undefined> {
-  if (!deckId) return undefined;
-  const all = await listItems<ReviewCard>(KEY_PREFIXES.CARD);
-  return all.find((c) => c.deckId === deckId && c.questionId === questionId);
+export async function findExistingCard(opts: {
+  deckId?: string;
+  planId?: string;
+  questionId: string;
+}): Promise<ReviewCard | undefined> {
+  const allCards = await listItems<ReviewCard>(KEY_PREFIXES.CARD);
+  return allCards.find((c) => {
+    if (opts.deckId && c.deckId === opts.deckId && c.questionId === opts.questionId) return true;
+    if (!opts.deckId && c.planId === opts.planId && c.questionId === opts.questionId) return true;
+    return false;
+  });
 }
 
 // app Rating (1|2|3|4) → ts-fsrs Grade (排除 Rating.Manual) 映射

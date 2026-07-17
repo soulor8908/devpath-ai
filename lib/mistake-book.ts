@@ -4,13 +4,16 @@
 import { nanoid } from "nanoid";
 import { getItem, setItem, listItems, delItem } from "./storage/db";
 import { KEY_PREFIXES, type MistakeRecord, type Question } from "./types";
+import { createCard, findExistingCard } from "./fsrs";
 
-/** 记录答错（如果已存在则增加 wrongCount） */
+/** 记录答错（如果已存在则增加 wrongCount），同时自动造复习卡（带查重） */
 export async function recordMistake(params: {
   planId: string;
   questionId: string;
   nodeId: string;
   questionText: string;
+  /** 答案文本（可选，用于自动造卡时填充卡片背面） */
+  answerText?: string;
 }): Promise<void> {
   const existing = await findMistake(params.questionId);
   const now = new Date().toISOString();
@@ -34,6 +37,27 @@ export async function recordMistake(params: {
       createdAt: now,
     };
     await setItem(KEY_PREFIXES.MISTAKE + record.id, record);
+  }
+
+  // 同步造复习卡（带查重，避免重复造卡）
+  try {
+    const existingCard = await findExistingCard({
+      planId: params.planId,
+      questionId: params.questionId,
+    });
+    if (!existingCard) {
+      const card = createCard(
+        params.planId,
+        params.nodeId,
+        params.questionId,
+        params.questionText,
+        params.answerText ?? "",
+        "standard"
+      );
+      await setItem(KEY_PREFIXES.CARD + card.id, card);
+    }
+  } catch {
+    // 造卡失败不影响错题记录主流程
   }
 }
 

@@ -69,7 +69,7 @@ export default function FavoritesPage() {
       const newCardKeys: string[] = [];
       for (const q of deck.questions) {
         // 查重：deckId + questionId 唯一标识一张卡，已存在则跳过
-        const existingCard = await findExistingCard(deck.id, q.id);
+        const existingCard = await findExistingCard({ deckId: deck.id, questionId: q.id });
         if (existingCard) {
           skipped++;
           continue;

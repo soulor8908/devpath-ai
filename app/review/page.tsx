@@ -11,7 +11,7 @@
 //   - 答错（Again）自动加入错题本
 //   - 完成后展示统计
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { listItems, setItem, delItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES } from "@/lib/types";
@@ -129,6 +129,26 @@ export default function ReviewPage() {
     setCurrentIndex((i) => Math.min(dueCards.length - 1, i + 1));
   }
 
+  // 触摸滑动：左滑下一条、右滑上一条（水平位移 > 50px 且 > 2*垂直位移）
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 2) {
+      if (dx < 0) goNext(); // 左滑 → 下一条
+      else goPrev(); // 右滑 → 上一条
+    }
+    touchStartRef.current = null;
+  }
+
   async function handleRate(rating: Rating) {
     const card = dueCards[currentIndex];
     if (!card) return;
@@ -161,6 +181,7 @@ export default function ReviewPage() {
             questionId: card.questionId,
             nodeId: card.nodeId,
             questionText: card.front,
+            answerText: card.back,
           });
         } catch {
           // 错题记录失败不影响复习流程
@@ -456,12 +477,6 @@ export default function ReviewPage() {
                 复习 {card.reps} 次 · 失误 {card.lapses} 次
               </p>
             </div>
-            <button
-              onClick={() => handleDelete(card.id)}
-              className="text-xs text-red-500 hover:text-red-700 shrink-0"
-            >
-              <Icon name="trash" className="w-4 h-4 inline-block" /> 删除
-            </button>
           </div>
         </div>
       )}
@@ -486,7 +501,9 @@ export default function ReviewPage() {
         </div>
       ) : (
         <>
-          <ReviewCardView key={card.id} card={card} onRate={handleRate} />
+          <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            <ReviewCardView key={card.id} card={card} onRate={handleRate} />
+          </div>
 
           {/* 操作行 */}
           <div className="mt-3 flex items-center justify-between gap-2">
