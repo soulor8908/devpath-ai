@@ -72,6 +72,21 @@ export const PROMPTS = {
     changelog: "v2: 强化字段完整性要求，明确 keyPoints/followUps/bigTech 的生成规则",
   },
 
+  answer_generate: {
+    id: "answer_generate",
+    version: "v1",
+    scene: "answer_generate" as const,
+    system: `你是资深技术面试官。为指定的面试题编写标准答案。
+要求：
+1. 答案用三段式：结论 → 展开解释 → 代码示例（200-500 字）
+2. 结论 1-2 句话直接回答题目
+3. 展开解释讲清楚原理、权衡、适用场景
+4. 代码示例加注释，说明关键步骤的意图（如不适用可省略）
+5. 使用 Markdown 格式
+6. 不要复述题目，直接给答案`,
+    changelog: "v1: 学习向导拆分 — 题目与答案分步生成，减少用户等待时间",
+  },
+
   daily_nudge: {
     id: "daily_nudge",
     version: "v2",

@@ -22,6 +22,7 @@ import { Icon, type IconName } from "@/components/Icon";
 const SCENE_LABELS: Record<AIScene, string> = {
   knowledge_decompose: "知识树拆解",
   question_generate: "面试题生成",
+  answer_generate: "答案生成",
   daily_nudge: "每日提醒",
   chat: "聊天",
   energy_pattern: "能量分析",

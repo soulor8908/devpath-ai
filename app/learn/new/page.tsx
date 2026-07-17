@@ -2,13 +2,15 @@
 
 // app/learn/new/page.tsx
 // 学习教练创建页（原 /learn/page.tsx 迁移而来）：
-// - 顶部：AI 主题输入（任意主题 → AI 拆解）
+// - 顶部：AI 主题输入（任意主题 → 渐进式向导）
 // - 中部：4 个预设知识库（算法200题/前端/后端/AI）—— 内置数据秒级加载
 //   · 点击预设 → 弹窗展示知识树脑图（可点击节点开始学习）
 //   · 右上角"重新生成"按钮 → 调用 AI 重新生成整个知识树
+// - 非预设主题提交 → 进入 LearnWizard 4 步向导（知识点 → 题目 → 答案 → 计划）
+// - 快捷输入：基于用户最近学习/复习/聊天记录智能推荐（无数据用默认）
 // 历史计划列表已迁移到 /learn/list，本页聚焦"创建"。
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setItem } from "@/lib/storage/db";
@@ -27,13 +29,10 @@ import { savePlanSummary } from "@/lib/plan-summary";
 import { nanoid } from "nanoid";
 import { Icon } from "@/components/Icon";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
-
-const EXAMPLES = [
-  "前端性能优化",
-  "React 源码原理",
-  "TypeScript 进阶",
-  "系统设计基础",
-];
+import { LearnWizard } from "@/components/LearnWizard";
+import { getRecommendedQuickInputs, getDefaultQuickInputs } from "@/lib/recommend-quick-inputs";
+import { toast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 interface PresetPlanData {
   topic: string;
@@ -49,6 +48,26 @@ export default function LearnNewPage() {
   const [error, setError] = useState("");
   const [dailyMinutes, setDailyMinutes] = useState(30);
   const [maxNewPerDay, setMaxNewPerDay] = useState(1);
+
+  // 视图状态：form 表单 / wizard 渐进式向导
+  const [view, setView] = useState<"form" | "wizard">("form");
+
+  // 快捷输入推荐：基于用户最近学习/复习/聊天记录
+  const [quickInputs, setQuickInputs] = useState<string[]>(getDefaultQuickInputs());
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const inputs = await getRecommendedQuickInputs();
+        if (!cancelled && inputs.length > 0) setQuickInputs(inputs);
+      } catch {
+        // 推荐失败静默回退默认（不阻塞用户）
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 预设弹窗状态
   const [activePreset, setActivePreset] = useState<PresetMeta | null>(null);
@@ -159,8 +178,15 @@ export default function LearnNewPage() {
     await savePlanSummary(plan);
     // 创建真实计划后，若存在 Demo 数据则提示清除
     const hasDemo = await hasDemoData();
-    if (hasDemo && window.confirm("检测到示例数据，是否清除示例数据？")) {
-      await clearDemoData();
+    if (hasDemo) {
+      const ok = await confirmDialog({
+        title: "清除示例数据？",
+        message: "检测到首次访问注入的示例数据。已创建真实学习计划，是否清除示例数据？",
+        confirmText: "清除",
+        cancelText: "保留",
+        danger: true,
+      });
+      if (ok) await clearDemoData();
     }
     // 如果点击了具体节点，通过 query 选中该节点
     const query = node ? `?node=${encodeURIComponent(node.id)}` : "";
@@ -171,75 +197,25 @@ export default function LearnNewPage() {
     e.preventDefault();
     if (!topic.trim()) return;
 
-    // P2 AI 等待优化：优先匹配预设，立即展示骨架知识树，AI 异步优化
-    // 旧版：调 /api/learn 全屏 loading 30-90 秒
-    // 新版：匹配到预设 → openPreset 弹窗骨架秒开 → 用户点"重新生成"才异步调 AI
-    //       无匹配 → 回退到原 AI 全量生成流程
+    // 精确匹配预设 → 立即打开预设弹窗（零等待，预设数据秒开）
+    // 无匹配 → 进入 LearnWizard 渐进式向导（拆知识点 → 题目 → 答案 → 计划）
     const matched = matchPresetByTopic(topic.trim());
     if (matched) {
-      // 立即打开预设弹窗（零等待）
-      // 注意：这里用 topic 覆盖 preset.topic，让弹窗显示用户输入的主题
       const customizedPreset: PresetMeta = {
         ...matched,
-        topic: topic.trim(), // 保留用户原始输入作为主题
+        topic: topic.trim(),
       };
       openPreset(customizedPreset);
-      // 提示用户可点"重新生成"用 AI 优化
       setError("");
       setLoading(false);
       return;
     }
 
-    // 无匹配预设 → 回退到 AI 全量生成
-    setLoading(true);
+    // 无匹配预设 → 进入渐进式向导（取代旧版 /api/learn 全量生成）
+    // 向导内部依次调用 /api/learn/knowledge → /questions → /answers
+    // 用户每步确认后再继续，减少等待焦虑
     setError("");
-    try {
-      const res = await aiFetch("/api/learn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          dailyMinutes,
-          maxNewPerDay,
-          prompt: promptText.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `请求失败 (${res.status})`);
-      }
-      const { planId, plan } = (await res.json()) as { planId: string; plan: LearningPlan };
-      await setItem(KEY_PREFIXES.PLAN + planId, plan);
-      await savePlanSummary(plan);
-      // 如果使用了提示词，标记使用
-      if (promptText.trim()) {
-        // 提示词库可能尚未加载，仅在已加载时尝试匹配
-        if (promptLibraryLoaded) {
-          const matched = promptLibrary.find((p) => p.content === promptText.trim());
-          if (matched) {
-            await markPromptUsed(matched.id);
-            // 刷新提示词库
-            const prompts = await listPrompts();
-            setPromptLibrary(prompts);
-          }
-        } else {
-          // 库未加载：直接按内容查找一次（按需）
-          const all = await listPrompts();
-          const matched = all.find((p) => p.content === promptText.trim());
-          if (matched) await markPromptUsed(matched.id);
-        }
-      }
-      // 创建真实计划后，若存在 Demo 数据则提示清除
-      const hasDemo = await hasDemoData();
-      if (hasDemo && window.confirm("检测到示例数据，是否清除示例数据？")) {
-        await clearDemoData();
-      }
-      router.push(`/learn/${planId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "未知错误");
-    } finally {
-      setLoading(false);
-    }
+    setView("wizard");
   }
 
   // 选择某个常用提示词
@@ -271,25 +247,20 @@ export default function LearnNewPage() {
 
   const loadingState = loading || regenerating;
 
-  if (loadingState && !activePreset) {
+  // 向导视图：渐进式 AI 生成（拆知识点 → 题目 → 答案 → 计划）
+  if (view === "wizard") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-8">
-        <div className="mb-6 animate-pulse">
-          <Icon name="sparkles" className="w-12 h-12 inline-block" />
-        </div>
-        <p className="text-xl font-bold mb-2">
-          {regenerating ? "AI 正在重新生成知识树..." : "AI 正在拆解知识树..."}
-        </p>
-        <p className="text-sm text-gray-500 mb-1">
-          主题：{regenerating ? presetData?.topic : topic}
-        </p>
-        <p className="text-xs text-gray-400 mt-4">预计 30-90 秒，请稍候</p>
-        {!regenerating && (
-          <p className="text-xs text-blue-500 mt-2 max-w-md text-center">
-            💡 等不及？下方可选预设知识库（秒开），AI 后台帮你优化
-          </p>
-        )}
-      </div>
+      <LearnWizard
+        topic={topic}
+        initialPrompt={promptText}
+        dailyMinutes={dailyMinutes}
+        maxNewPerDay={maxNewPerDay}
+        onExit={() => {
+          setView("form");
+          setTopic("");
+          setPromptText("");
+        }}
+      />
     );
   }
 
@@ -315,17 +286,17 @@ export default function LearnNewPage() {
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="你想学什么？"
-          className="w-full px-4 py-3 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
           autoFocus
         />
 
         <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map((ex) => (
+          {quickInputs.map((ex) => (
             <button
               key={ex}
               type="button"
               onClick={() => setTopic(ex)}
-              className="px-3 py-1 text-sm bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               {ex}
             </button>
