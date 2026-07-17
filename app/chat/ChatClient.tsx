@@ -1253,17 +1253,13 @@ export default function ChatClient() {
 
       {/* 底部输入栏（两行布局：上=快捷指令+模型图标，下=输入框+发送） */}
       <footer className="shrink-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-3 space-y-2">
-        {/* 第 1 行：快捷指令（占据剩余空间，横向滚动） + 模型图标选择器 */}
+        {/* 第 1 行：快捷指令按钮 + 模型图标选择器（左对齐并排） */}
         <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0 overflow-x-auto">
-            <QuickShortcuts onSelect={handleShortcutSelect} />
-          </div>
-          <div className="shrink-0">
-            <ModelIconSelector
-              selectedModelId={selectedModelId || null}
-              onSelect={setSelectedModelId}
-            />
-          </div>
+          <QuickShortcuts onSelect={handleShortcutSelect} />
+          <ModelIconSelector
+            selectedModelId={selectedModelId || null}
+            onSelect={setSelectedModelId}
+          />
         </div>
         {/* 第 2 行：输入框 + 发送按钮 */}
         <div className="flex items-end gap-2">
