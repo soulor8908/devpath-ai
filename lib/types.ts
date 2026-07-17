@@ -430,6 +430,7 @@ export interface ModelConfig {
 export type AIScene =
   | "knowledge_decompose"
   | "question_generate"
+  | "answer_generate"
   | "daily_nudge"
   | "chat"
   | "energy_pattern"

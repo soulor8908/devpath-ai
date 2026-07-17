@@ -73,33 +73,25 @@ export function getPresetById(id: string): PresetMeta | undefined {
 }
 
 /**
- * P2 AI 等待优化：按主题关键词匹配最接近的预设
- * 用于"输入主题 → 立即展示骨架知识树 → 右上角 AI 异步优化"流程
+ * 按主题精确匹配预设
+ *
+ * 改造说明（卡帕西视角）：
+ *   - 旧逻辑：模糊匹配（includes name/tags）会导致「前端性能优化」误匹配「前端工程师」
+ *   - 新逻辑：仅当用户输入完全等于某个预设的 topic 或 name 时才匹配
+ *   - 用户通过预设卡片入口直接选择预设（保持现有 UI）
+ *   - 输入「前端性能优化」不再秒出「前端工程师」题库
  *
  * 匹配规则：
- * 1. 主题包含预设 name 或 tags 中任一关键词 → 返回该预设
- * 2. 多个匹配 → 返回得分最高的（命中 tag 数多者胜）
- * 3. 无匹配 → 返回 undefined（调用方回退到 AI 全量生成）
+ * 1. 完全等于预设 topic（大小写不敏感、去空白）→ 返回该预设
+ * 2. 完全等于预设 name（同上）→ 返回该预设
+ * 3. 无匹配 → 返回 undefined（走 LearnWizard 渐进式向导）
  */
 export function matchPresetByTopic(topic: string): PresetMeta | undefined {
   const t = topic.trim().toLowerCase();
   if (!t) return undefined;
-
-  let best: { preset: PresetMeta; score: number } | null = null;
   for (const p of PRESETS) {
-    let score = 0;
-    // name 命中得 3 分（强信号）
-    if (t.includes(p.name.toLowerCase())) score += 3;
-    // tags 命中每个得 2 分
-    for (const tag of p.tags) {
-      if (t.includes(tag.toLowerCase())) score += 2;
-    }
-    // topic 命中（预设主题通常更具体）得 1 分
-    if (t.includes(p.topic.toLowerCase().slice(0, 4))) score += 1;
-
-    if (score > 0 && (!best || score > best.score)) {
-      best = { preset: p, score };
-    }
+    if (t === p.topic.trim().toLowerCase()) return p;
+    if (t === p.name.trim().toLowerCase()) return p;
   }
-  return best?.preset;
+  return undefined;
 }
