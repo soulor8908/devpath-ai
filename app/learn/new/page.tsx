@@ -69,6 +69,31 @@ export default function LearnNewPage() {
     };
   }, []);
 
+  // 读取 AI 工具生成的待处理计划参数（从聊天页 generate_learning_plan 跳转携带）
+  // sessionStorage 中存放的是预填参数（topic/dailyMinutes/maxNewPerDay/prompt），
+  // 非完整 LearningPlan，因此填入表单供用户确认后走正常创建流程
+  useEffect(() => {
+    const pending = sessionStorage.getItem("learn:pending_plan");
+    if (!pending) return;
+    try {
+      const planData = JSON.parse(pending) as {
+        topic?: string;
+        dailyMinutes?: number;
+        maxNewPerDay?: number;
+        prompt?: string;
+      };
+      if (planData.topic) setTopic(planData.topic);
+      if (typeof planData.dailyMinutes === "number") setDailyMinutes(planData.dailyMinutes);
+      if (typeof planData.maxNewPerDay === "number") setMaxNewPerDay(planData.maxNewPerDay);
+      if (planData.prompt) setPromptText(planData.prompt);
+      toast.success("已填入 AI 生成的学习计划参数，请确认后开始");
+    } catch {
+      // 解析失败静默忽略
+    } finally {
+      sessionStorage.removeItem("learn:pending_plan");
+    }
+  }, []);
+
   // 预设弹窗状态
   const [activePreset, setActivePreset] = useState<PresetMeta | null>(null);
   const [presetData, setPresetData] = useState<PresetPlanData | null>(null);

@@ -457,7 +457,7 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* ===== 卡片元信息 + 删除 ===== */}
+      {/* ===== 卡片元信息 ===== */}
       {card && (
         <div className="mb-2">
           <div className="flex items-start justify-between gap-2">
