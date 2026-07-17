@@ -896,7 +896,7 @@ export default function ProfilePage() {
             <div className="text-sm text-gray-500">
               @{profile.username || "username"}
             </div>
-            <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
               {profile.bio || "(暂无简介)"}
             </p>
           </div>

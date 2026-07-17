@@ -7,9 +7,9 @@ const STORAGE_KEY = "devpath:theme";
 
 /** 获取存储的主题偏好 */
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   const stored = localStorage.getItem(STORAGE_KEY);
-  return (stored as Theme) || "system";
+  return (stored as Theme) || "light";
 }
 
 /** 获取实际应用的主题（system 时根据 prefers-color-scheme） */

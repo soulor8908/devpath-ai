@@ -31,7 +31,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
-              var stored = localStorage.getItem('devpath:theme') || 'system';
+              var stored = localStorage.getItem('devpath:theme') || 'light';
               var dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
               if (dark) document.documentElement.classList.add('dark');
             } catch(e) {}
