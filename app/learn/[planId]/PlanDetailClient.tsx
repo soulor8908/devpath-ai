@@ -22,7 +22,7 @@ import {
   generateCallId,
 } from "@/lib/ai/quality-tracker";
 import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
-import { FullscreenPrompt } from "@/components/FullscreenPrompt";
+import { toast } from "@/lib/toast";
 
 export default function PlanDetailClient() {
   const params = useParams<{ planId: string }>();
@@ -309,12 +309,6 @@ export default function PlanDetailClient() {
 
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto pb-20">
-      {fullscreen.supported && fullscreen.needsPrompt && (
-        <FullscreenPrompt
-          onEnter={fullscreen.enterFullscreen}
-          onDismiss={fullscreen.dismissPrompt}
-        />
-      )}
       <div className="mb-6">
         <button
           onClick={() => router.push("/learn")}
@@ -345,6 +339,22 @@ export default function PlanDetailClient() {
             >
               <Icon name="pen" className="w-4 h-4 inline-block align-middle" /> 调整计划
             </Link>
+            {fullscreen.supported && (
+              <button
+                onClick={async () => {
+                  const ok = await fullscreen.enterFullscreen();
+                  if (ok) {
+                    toast.info("已进入全屏专注，按 Esc 退出");
+                  } else {
+                    toast.warning("当前浏览器不支持全屏");
+                  }
+                }}
+                className="px-3 py-1.5 text-xs border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                title="进入全屏专注模式（默认竖屏）"
+              >
+                <Icon name="monitor" className="w-4 h-4 inline-block align-middle" /> 全屏
+              </button>
+            )}
           </div>
         </div>
         <button

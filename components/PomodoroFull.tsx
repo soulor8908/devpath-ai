@@ -39,6 +39,9 @@ import {
   getUserProfile,
   saveUserProfile,
 } from "@/lib/ai/memory/user-profile";
+import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
+import { toast } from "@/lib/toast";
+import { Icon } from "@/components/Icon";
 
 type View = "form" | "running" | "completed";
 
@@ -81,6 +84,20 @@ export function PomodoroFull() {
   const [error, setError] = useState("");
   // 通知权限
   const [notifPermission, setNotifPermission] = useState(false);
+
+  // 全屏 hook（主动触发）
+  const fullscreen = useAutoFullscreen();
+
+  const handleEnterFullscreen = useCallback(async () => {
+    const ok = await fullscreen.enterFullscreen();
+    if (ok) {
+      toast.info("已进入全屏专注，按 Esc 退出");
+    } else if (fullscreen.supported) {
+      toast.warning("进入全屏失败，请重试");
+    } else {
+      toast.warning("当前浏览器不支持全屏");
+    }
+  }, [fullscreen]);
 
   // 防止重复完成
   const completingRef = useRef(false);
@@ -338,9 +355,20 @@ export function PomodoroFull() {
       <div className="mx-auto max-w-md p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">番茄专注</h1>
-          <Link href="/" className="text-sm text-blue-500 hover:underline">
-            ← 返回
-          </Link>
+          <div className="flex items-center gap-3">
+            {fullscreen.supported && (
+              <button
+                onClick={handleEnterFullscreen}
+                className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 flex items-center gap-1"
+                title="进入全屏专注模式（默认竖屏）"
+              >
+                <Icon name="monitor" className="w-4 h-4" /> 全屏
+              </button>
+            )}
+            <Link href="/" className="text-sm text-blue-500 hover:underline">
+              ← 返回
+            </Link>
+          </div>
         </div>
 
         {error && <p className="text-red-500 text-xs">{error}</p>}
@@ -466,9 +494,24 @@ export function PomodoroFull() {
                 ? "短休息"
                 : "长休息"}
           </h1>
-          <Link href="/" className="text-sm text-blue-500 hover:underline">
-            ← 返回
-          </Link>
+          <div className="flex items-center gap-3">
+            {fullscreen.supported && (
+              <button
+                onClick={handleEnterFullscreen}
+                className={`text-sm flex items-center gap-1 ${
+                  fullscreen.isFullscreen
+                    ? "text-blue-500"
+                    : "text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400"
+                }`}
+                title={fullscreen.isFullscreen ? "当前已全屏" : "进入全屏专注模式（默认竖屏）"}
+              >
+                <Icon name="monitor" className="w-4 h-4" /> 全屏
+              </button>
+            )}
+            <Link href="/" className="text-sm text-blue-500 hover:underline">
+              ← 返回
+            </Link>
+          </div>
         </div>
 
         {error && <p className="text-red-500 text-xs">{error}</p>}
