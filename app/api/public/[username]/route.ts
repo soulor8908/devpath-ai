@@ -43,12 +43,12 @@ function getValidTokens(): string[] {
 }
 
 interface RouteContext {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }
 
 export async function GET(_req: NextRequest, ctx: RouteContext) {
   await initCloudflareEnv();
-  const username = ctx.params.username;
+  const { username } = await ctx.params;
 
   const store = createKVStore(getCloudflareKV());
   const profile = await store.getProfile(username);
@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
   await initCloudflareEnv();
-  const username = ctx.params.username;
+  const { username } = await ctx.params;
 
   // 鉴权（与原 functions 实现一致：PUBLIC_AUTH_TOKEN + API_TOKEN）
   const authHeader = req.headers.get("Authorization") ?? "";
