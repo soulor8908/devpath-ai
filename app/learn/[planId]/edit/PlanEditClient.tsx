@@ -11,7 +11,12 @@ import {
   type Routine,
   type KnowledgeNode,
 } from "@/lib/types";
-import { getRoutine, saveRoutine, DEFAULT_ROUTINE } from "@/lib/learn-log";
+import {
+  getRoutine,
+  saveRoutine,
+  DEFAULT_ROUTINE,
+  normalizeRoutine,
+} from "@/lib/learn-log";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
 import { Icon } from "@/components/Icon";
@@ -57,6 +62,14 @@ export default function PlanEditClient() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // 折叠面板：当前展开的 section
+  const [openSection, setOpenSection] = useState<
+    "routine" | "priority" | "questions" | "ai"
+  >("routine");
+  // 脏数据跟踪
+  const [dirty, setDirty] = useState(false);
+  const [aiAdjusted, setAiAdjusted] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -80,7 +93,7 @@ export default function PlanEditClient() {
       }
       const r = await getRoutine();
       if (!cancelled) {
-        setRoutine(r ?? DEFAULT_ROUTINE);
+        setRoutine(normalizeRoutine(r));
       }
       setLoading(false);
     })();
@@ -91,10 +104,12 @@ export default function PlanEditClient() {
 
   // ---- Routine 编辑 ----
   function updateRoutine(patch: Partial<Routine>) {
+    setDirty(true);
     setRoutine((prev) => ({ ...prev, ...patch }));
   }
 
   function updateSlot(index: number, patch: Partial<RoutineSlot>) {
+    setDirty(true);
     setRoutine((prev) => ({
       ...prev,
       slots: prev.slots.map((s, i) => (i === index ? { ...s, ...patch } : s)),
@@ -102,6 +117,7 @@ export default function PlanEditClient() {
   }
 
   function addSlot() {
+    setDirty(true);
     setRoutine((prev) => ({
       ...prev,
       slots: [
@@ -112,6 +128,7 @@ export default function PlanEditClient() {
   }
 
   function removeSlot(index: number) {
+    setDirty(true);
     setRoutine((prev) => ({
       ...prev,
       slots: prev.slots.filter((_, i) => i !== index),
@@ -119,6 +136,7 @@ export default function PlanEditClient() {
   }
 
   function toggleWeekday(day: number) {
+    setDirty(true);
     setRoutine((prev) => {
       const has = prev.weekdays.includes(day);
       return {
@@ -134,6 +152,7 @@ export default function PlanEditClient() {
   function moveNode(index: number, dir: -1 | 1) {
     const newIndex = index + dir;
     if (newIndex < 0 || newIndex >= nodes.length) return;
+    setDirty(true);
     const next = [...nodes];
     [next[index], next[newIndex]] = [next[newIndex], next[index]];
     setNodes(next.map((n, i) => ({ ...n, customOrder: i })));
@@ -141,6 +160,7 @@ export default function PlanEditClient() {
 
   // ---- 题目包含 ----
   function toggleQuestion(qid: string) {
+    setDirty(true);
     setIncludedIds((prev) => {
       const next = new Set(prev);
       if (next.has(qid)) next.delete(qid);
@@ -151,10 +171,12 @@ export default function PlanEditClient() {
 
   function selectAllQuestions() {
     if (!plan) return;
+    setDirty(true);
     setIncludedIds(new Set(plan.questions.map((q) => q.id)));
   }
 
   function clearAllQuestions() {
+    setDirty(true);
     setIncludedIds(new Set());
   }
 
@@ -188,6 +210,8 @@ export default function PlanEditClient() {
       };
       setPlan(updated);
       setAiSuccess(true);
+      setAiAdjusted(true);
+      setDirty(true);
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "AI 调整失败");
     } finally {
@@ -213,6 +237,8 @@ export default function PlanEditClient() {
       await setItem(includedKey(plan.id), Array.from(includedIds));
       setPlan(updated);
       setSaved(true);
+      setDirty(false);
+      setAiAdjusted(false);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "保存失败");
@@ -232,7 +258,7 @@ export default function PlanEditClient() {
   if (!plan) return null;
 
   return (
-    <div className="min-h-screen p-4 max-w-3xl mx-auto pb-20">
+    <div className="min-h-screen p-4 max-w-3xl mx-auto pb-24">
       {/* Header */}
       <div className="mb-6">
         <button
@@ -246,9 +272,20 @@ export default function PlanEditClient() {
       </div>
 
       {/* Routine 作息 */}
-      <section className="border rounded-lg p-4 mb-4">
-        <h2 className="text-base font-bold mb-3">作息时间表</h2>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+      <section className="border rounded-lg mb-4 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOpenSection("routine")}
+          className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          <h2 className="text-base font-bold">作息时间表</h2>
+          <span className="text-gray-400">
+            {openSection === "routine" ? "▼" : "▶"}
+          </span>
+        </button>
+        {openSection === "routine" && (
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-3 mb-3">
           <label className="block">
             <span className="text-xs text-gray-600 block mb-1">起床时间</span>
             <input
@@ -379,15 +416,28 @@ export default function PlanEditClient() {
             )}
           </div>
         </div>
+          </div>
+        )}
       </section>
 
       {/* Priority 节点优先级 */}
-      <section className="border rounded-lg p-4 mb-4">
-        <h2 className="text-base font-bold mb-1">知识点优先级</h2>
-        <p className="text-xs text-gray-400 mb-3">
-          排在前面的优先学习（customOrder 越小优先级越高）
-        </p>
-        <div className="space-y-2">
+      <section className="border rounded-lg mb-4 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOpenSection("priority")}
+          className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          <h2 className="text-base font-bold">知识点优先级</h2>
+          <span className="text-gray-400">
+            {openSection === "priority" ? "▼" : "▶"}
+          </span>
+        </button>
+        {openSection === "priority" && (
+          <div className="p-4">
+            <p className="text-xs text-gray-400 mb-3">
+              排在前面的优先学习（customOrder 越小优先级越高）
+            </p>
+            <div className="space-y-2">
           {nodes.map((node, i) => (
             <div
               key={node.id}
@@ -434,17 +484,30 @@ export default function PlanEditClient() {
             </div>
           ))}
         </div>
+          </div>
+        )}
       </section>
 
       {/* Question inclusion 题目包含 */}
-      <section className="border rounded-lg p-4 mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-bold">题目包含</h2>
-          <span className="text-xs text-gray-500">
-            已选 {includedIds.size}/{plan.questions.length}
+      <section className="border rounded-lg mb-4 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOpenSection("questions")}
+          className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold">题目包含</h2>
+            <span className="text-xs text-gray-500">
+              已选 {includedIds.size}/{plan.questions.length}
+            </span>
+          </div>
+          <span className="text-gray-400">
+            {openSection === "questions" ? "▼" : "▶"}
           </span>
-        </div>
-        <div className="flex gap-2 mb-3">
+        </button>
+        {openSection === "questions" && (
+          <div className="p-4">
+            <div className="flex gap-2 mb-3">
           <button
             type="button"
             onClick={selectAllQuestions}
@@ -490,72 +553,99 @@ export default function PlanEditClient() {
             <p className="text-xs text-gray-400">暂无题目</p>
           )}
         </div>
+          </div>
+        )}
       </section>
 
       {/* AI 调整 */}
-      <section className="border rounded-lg p-4 mb-4">
-        <h2 className="text-base font-bold mb-1">AI 调整日程</h2>
-        <p className="text-xs text-gray-400 mb-3">
-          用自然语言描述调整需求，AI 会重排 schedule（不改变知识点和题目）
-        </p>
-        <textarea
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          placeholder="例如：每天只学30分钟 / 把大厂题优先排前面 / 周末多安排些复习"
-          rows={3}
-          className="w-full px-3 py-2 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
-          disabled={aiLoading}
-        />
-        {aiError && (
-          <div className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
-            {aiError}
-          </div>
-        )}
-        {aiSuccess && (
-          <div className="mt-2 rounded bg-green-50 px-3 py-2 text-sm text-green-700">
-            日程已调整，记得点击下方保存。
-          </div>
-        )}
+      <section className="border rounded-lg mb-4 overflow-hidden">
         <button
           type="button"
-          onClick={handleAIAdjust}
-          disabled={aiLoading || !instruction.trim()}
-          className="mt-3 w-full py-2.5 bg-black text-white rounded-lg font-medium text-sm disabled:opacity-50 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+          onClick={() => setOpenSection("ai")}
+          className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
         >
-          {aiLoading ? (
-            <>
-              <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              AI 调整中...
-            </>
-          ) : (
-            "让 AI 调整"
-          )}
+          <h2 className="text-base font-bold">AI 调整日程</h2>
+          <span className="text-gray-400">
+            {openSection === "ai" ? "▼" : "▶"}
+          </span>
         </button>
+        {openSection === "ai" && (
+          <div className="p-4">
+            <p className="text-xs text-gray-400 mb-3">
+              用自然语言描述调整需求，AI 会重排 schedule（不改变知识点和题目）
+            </p>
+            <textarea
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder="例如：每天只学30分钟 / 把大厂题优先排前面 / 周末多安排些复习"
+              rows={3}
+              className="w-full px-3 py-2 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
+              disabled={aiLoading}
+            />
+            {aiError && (
+              <div className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
+                {aiError}
+              </div>
+            )}
+            {aiSuccess && (
+              <div className="mt-2 rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+                日程已调整，记得点击下方保存。
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleAIAdjust}
+              disabled={aiLoading || !instruction.trim()}
+              className="mt-3 w-full py-2.5 bg-black text-white rounded-lg font-medium text-sm disabled:opacity-50 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+            >
+              {aiLoading ? (
+                <>
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  AI 调整中...
+                </>
+              ) : (
+                "让 AI 调整"
+              )}
+            </button>
+          </div>
+        )}
       </section>
 
-      {/* Save */}
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-3 bg-black text-white rounded-lg font-medium text-sm disabled:opacity-50 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-      >
-        {saving ? (
-          <>
-            <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            保存中...
-          </>
-        ) : saved ? (
-          <><Icon name="check" className="w-3.5 h-3.5 inline-block" /> 已保存</>
-        ) : (
-          "保存全部修改"
-        )}
-      </button>
-      {saveError && (
-        <div className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
-          {saveError}
+      {/* 吸底保存条 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+          {aiAdjusted && (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              日程已更新，记得保存
+            </span>
+          )}
+          {dirty && !aiAdjusted && (
+            <span className="text-xs text-gray-500">有未保存的修改</span>
+          )}
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+              dirty
+                ? "bg-black text-white hover:bg-gray-800"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {saving ? (
+              <>
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                保存中...
+              </>
+            ) : (
+              <>
+                <Icon name="check" className="w-4 h-4 inline-block" /> 保存全部修改
+              </>
+            )}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

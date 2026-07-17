@@ -187,6 +187,32 @@ export async function saveRoutine(routine: Routine): Promise<void> {
   await setItem(KEY_PREFIXES.ROUTINE_DATA, routine);
 }
 
+/**
+ * 规范化 Routine：对每个字段做回退，避免旧数据缺字段导致渲染崩溃。
+ * - 入参 undefined → 返回 DEFAULT_ROUTINE 的深拷贝
+ * - 非数组的 slots/weeks 回退到默认
+ * - 缺失的标量字段回退到默认
+ */
+export function normalizeRoutine(r?: Routine): Routine {
+  if (!r)
+    return {
+      ...DEFAULT_ROUTINE,
+      slots: DEFAULT_ROUTINE.slots.map((s) => ({ ...s })),
+      weekdays: [...DEFAULT_ROUTINE.weekdays],
+    };
+  return {
+    wakeTime: r.wakeTime ?? DEFAULT_ROUTINE.wakeTime,
+    sleepTime: r.sleepTime ?? DEFAULT_ROUTINE.sleepTime,
+    slots: Array.isArray(r.slots)
+      ? r.slots
+      : DEFAULT_ROUTINE.slots.map((s) => ({ ...s })),
+    weekdays: Array.isArray(r.weekdays)
+      ? r.weekdays
+      : [...DEFAULT_ROUTINE.weekdays],
+    intensity: r.intensity ?? DEFAULT_ROUTINE.intensity,
+  };
+}
+
 /** 默认作息时间表 */
 export const DEFAULT_ROUTINE: Routine = {
   wakeTime: "08:00",

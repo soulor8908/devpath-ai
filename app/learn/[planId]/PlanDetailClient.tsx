@@ -343,7 +343,7 @@ export default function PlanDetailClient() {
             <Link
               href={`/learn/${plan.id}/edit`}
               className="px-3 py-1.5 text-xs border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-              title="调整作息、优先级、纳入范围"
+              title="编辑作息、优先级与题目范围"
             >
               <Icon name="pen" className="w-4 h-4 inline-block align-middle" /> 调整计划
             </Link>
