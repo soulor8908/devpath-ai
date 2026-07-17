@@ -11,6 +11,7 @@ import { listPlanSummaries, migrateSummaries, deletePlanSummary } from "@/lib/pl
 import { delItem } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlanSummary } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 export default function ListClient() {
   const router = useRouter();
@@ -107,13 +108,10 @@ export default function ListClient() {
                 </p>
               </div>
               <div className="flex items-center gap-2 ml-2">
-                <button
+                <Button
                   onClick={(e) => deletePlan(p.id, e)}
-                  className={`text-xs px-2 py-1 rounded transition-colors ${
-                    confirmingDeleteId === p.id
-                      ? "bg-red-500 text-white"
-                      : "text-gray-400 hover:bg-red-50 hover:text-red-500"
-                  }`}
+                  variant={confirmingDeleteId === p.id ? "danger" : "ghost"}
+                  size="sm"
                   aria-label="删除计划"
                 >
                   {confirmingDeleteId === p.id ? (
@@ -121,7 +119,7 @@ export default function ListClient() {
                   ) : (
                     <Icon name="x" className="w-3.5 h-3.5 inline-block" />
                   )}
-                </button>
+                </Button>
                 <span className="text-xs text-gray-400">查看 →</span>
               </div>
             </div>

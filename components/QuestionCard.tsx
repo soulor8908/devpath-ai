@@ -6,6 +6,7 @@ import type { Question } from "@/lib/types";
 import { AnswerContent, CodeBlock } from "@/components/CodeBlock";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import { createCard, findExistingCard } from "@/lib/fsrs";
 import { setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
@@ -97,7 +98,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           {question.question}
         </button>
         {onFavoriteToggle && (
-          <button
+          <Button
             onClick={async () => {
               if (!question.favorited) {
                 trackImplicit("favorited");
@@ -123,11 +124,13 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               }
               onFavoriteToggle(question.id);
             }}
+            variant="ghost"
+            size="sm"
             className={`text-lg ${question.favorited ? "text-yellow-500" : "text-gray-300"}`}
             aria-label="收藏"
           >
             <Icon name="star" className="w-5 h-5" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -149,14 +152,16 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               <p className="text-xs font-medium text-gray-500 mt-2">追问（点击向 AI 提问）：</p>
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {question.followUps.map((fu, i) => (
-                  <button
+                  <Button
                     key={i}
                     onClick={() => handleFollowUpClick(fu)}
-                    className="text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-full transition-colors border border-blue-100"
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full border border-blue-100"
                     title="点击进入 AI 聊天"
                   >
                     <Icon name="message-circle" className="w-3.5 h-3.5 inline-block align-middle" /> {fu}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -173,20 +178,22 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
 
       <div className="flex items-center gap-2 mt-2">
         {!expanded && question.answer && (
-          <button
+          <Button
             onClick={() => {
               trackImplicit("expanded");
               expandTimeRef.current = Date.now();
               dwellTrackedRef.current = false;
               setExpanded(true);
             }}
-            className="text-xs text-blue-500"
+            variant="ghost"
+            size="sm"
+            className="text-blue-500"
           >
             展开答案 ▼
-          </button>
+          </Button>
         )}
         {onRegenerate && (
-          <button
+          <Button
             onClick={() => {
               trackDwell();
               // 隐式反馈：用户主动换题 = 对当前题目不满意
@@ -199,15 +206,19 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               }
               onRegenerate(question.id);
             }}
+            variant="ghost"
+            size="sm"
+            loading={regenerating}
             disabled={regenerating}
-            className={`text-xs ml-auto px-2 py-1 rounded ${
+            leftIcon="refresh-cw"
+            className={`ml-auto ${
               isFailed
                 ? "bg-red-100 text-red-600 hover:bg-red-200"
                 : "text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-            } disabled:opacity-50`}
+            }`}
           >
-            {regenerating ? "生成中..." : (<><Icon name="refresh-cw" className="w-3.5 h-3.5 inline-block align-middle" /> {isFailed ? "重新生成" : "换一题"}</>)}
-          </button>
+            {regenerating ? "生成中..." : (isFailed ? "重新生成" : "换一题")}
+          </Button>
         )}
       </div>
     </div>

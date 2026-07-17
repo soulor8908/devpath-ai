@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { resolveLearnEntry } from "@/lib/learn-router";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 export default function LearnRouterPage() {
   const router = useRouter();
@@ -43,12 +44,14 @@ export default function LearnRouterPage() {
       </div>
       <p className="text-sm text-gray-400">正在进入学习…</p>
       {failed && (
-        <button
+        <Button
           onClick={() => router.replace("/learn/new")}
-          className="mt-4 text-xs text-blue-500 underline"
+          variant="ghost"
+          size="sm"
+          className="mt-4 text-blue-500 underline"
         >
           点击手动进入
-        </button>
+        </Button>
       )}
     </div>
   );

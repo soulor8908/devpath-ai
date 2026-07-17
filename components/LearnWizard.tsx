@@ -27,6 +27,7 @@ import { nanoid } from "nanoid";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
+import { Button, Textarea } from "@/components/ui";
 import { recordInputHistory } from "@/lib/learn-input-history";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
@@ -351,12 +352,15 @@ export function LearnWizard({
             学习向导 · {dailyMinutes} 分钟/天 · 每日 {maxNewPerDay} 个新内容
           </p>
         </div>
-        <button
+        <Button
           onClick={handleExit}
-          className="ml-2 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1"
+          variant="ghost"
+          size="sm"
+          leftIcon="x"
+          className="ml-2"
         >
-          <Icon name="x" className="w-4 h-4 inline-block" /> 退出
-        </button>
+          退出
+        </Button>
       </div>
 
       {/* 进度条 */}
@@ -390,18 +394,17 @@ export function LearnWizard({
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">知识点拆解</h2>
-            <button
+            <Button
               onClick={fetchKnowledge}
+              variant="ghost"
+              size="sm"
+              loading={loading}
               disabled={loading}
-              className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
+              leftIcon="refresh-cw"
+              className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
-              {loading ? (
-                <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Icon name="refresh-cw" className="w-3.5 h-3.5 inline-block" />
-              )}
-              {nodes.length > 0 ? "重新生成" : "重新生成"}
-            </button>
+              重新生成
+            </Button>
           </div>
 
           {/* 提示词输入（可调整后重新生成） */}
@@ -409,15 +412,15 @@ export function LearnWizard({
             <summary className="text-sm cursor-pointer text-gray-700 dark:text-gray-300">
               <Icon name="target" className="w-4 h-4 inline-block align-middle" /> 自定义提示词（调整后点&ldquo;重新生成&rdquo;生效）
             </summary>
-            <textarea
+            <Textarea
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="例如：请以大厂面试官视角拆解，重点考察高并发场景和源码原理"
               rows={3}
               maxLength={2000}
-              className="w-full mt-2 px-3 py-2 text-sm border rounded resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
+              showCount
+              className="mt-2"
             />
-            <p className="text-[11px] text-gray-400 mt-1">{promptText.length}/2000 字</p>
           </details>
 
           {/* 节点列表 */}
@@ -467,23 +470,22 @@ export function LearnWizard({
           {/* 下一步 */}
           {nodes.length > 0 && (
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button
+              <Button
                 onClick={fetchQuestions}
+                variant="dark"
+                size="md"
+                loading={loading}
                 disabled={loading}
-                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black text-sm rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1"
               >
                 {loading ? (
-                  <>
-                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent dark:border-black dark:border-t-transparent rounded-full animate-spin" />
-                    生成题目中...
-                  </>
+                  "生成题目中..."
                 ) : (
                   <>
                     确认知识点 → 生成题目
                     <Icon name="chevron-right" className="w-4 h-4 inline-block" />
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -495,25 +497,25 @@ export function LearnWizard({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">面试题（{questions.length} 题）</h2>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={handleBack}
+                variant="ghost"
+                size="sm"
                 disabled={loading}
-                className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 ← 返回知识点
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={fetchQuestions}
+                variant="ghost"
+                size="sm"
+                loading={loading}
                 disabled={loading}
-                className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
+                leftIcon="refresh-cw"
+                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
               >
-                {loading ? (
-                  <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Icon name="refresh-cw" className="w-3.5 h-3.5 inline-block" />
-                )}
                 重新生成
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -558,14 +560,15 @@ export function LearnWizard({
 
           {!loading && questions.length > 0 && (
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button
+              <Button
                 onClick={fetchAnswers}
+                variant="dark"
+                size="md"
                 disabled={loading}
-                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black text-sm rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1"
               >
                 确认题目 → 生成答案
                 <Icon name="chevron-right" className="w-4 h-4 inline-block" />
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -576,13 +579,14 @@ export function LearnWizard({
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">答案生成</h2>
-            <button
+            <Button
               onClick={handleBack}
+              variant="ghost"
+              size="sm"
               disabled={loading}
-              className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               ← 返回题目
-            </button>
+            </Button>
           </div>
 
           {/* 进度条 */}
@@ -645,16 +649,17 @@ export function LearnWizard({
           {/* 完成 → 保存（允许部分答案未生成：进入详情页可继续生成） */}
           {!loading && answerProgress.total > 0 && (
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button
+              <Button
                 onClick={saveAndRedirect}
-                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black text-sm rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1"
+                variant="dark"
+                size="md"
               >
                 {answerProgress.done < answerProgress.total ? (
                   `完成（${answerProgress.total - answerProgress.done} 题未生成答案）`
                 ) : (
                   <>确认完成 → 创建学习计划 <Icon name="check" className="w-4 h-4 inline-block" /></>
                 )}
-              </button>
+              </Button>
             </div>
           )}
         </section>

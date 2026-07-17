@@ -20,6 +20,7 @@ import {
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Textarea, Checkbox } from "@/components/ui";
 
 type RoutineSlot = Routine["slots"][number];
 
@@ -263,12 +264,14 @@ export default function PlanEditClient() {
     <div className="min-h-screen p-4 max-w-3xl mx-auto pb-24">
       {/* Header */}
       <div className="mb-6">
-        <button
+        <Button
           onClick={() => router.back()}
-          className="text-sm text-gray-400 mb-2"
+          variant="ghost"
+          size="sm"
+          className="mb-2"
         >
           ← 返回
-        </button>
+        </Button>
         <h1 className="text-xl font-bold">调整计划</h1>
         <p className="text-sm text-gray-500 mt-1">{plan.topic}</p>
       </div>
@@ -290,20 +293,20 @@ export default function PlanEditClient() {
             <div className="grid grid-cols-2 gap-3 mb-3">
           <label className="block">
             <span className="text-xs text-gray-600 block mb-1">起床时间</span>
-            <input
+            <Input
               type="time"
               value={routine.wakeTime}
               onChange={(e) => updateRoutine({ wakeTime: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
+              className="w-full"
             />
           </label>
           <label className="block">
             <span className="text-xs text-gray-600 block mb-1">睡觉时间</span>
-            <input
+            <Input
               type="time"
               value={routine.sleepTime}
               onChange={(e) => updateRoutine({ sleepTime: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
+              className="w-full"
             />
           </label>
         </div>
@@ -315,18 +318,14 @@ export default function PlanEditClient() {
               const day = i + 1;
               const active = routine.weekdays.includes(day);
               return (
-                <button
+                <Button
                   key={day}
-                  type="button"
+                  variant={active ? "dark" : "secondary"}
+                  size="sm"
                   onClick={() => toggleWeekday(day)}
-                  className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                    active
-                      ? "bg-black text-white border-black"
-                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                  }`}
                 >
                   {label}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -336,18 +335,14 @@ export default function PlanEditClient() {
           <span className="text-xs text-gray-600 block mb-1">学习强度</span>
           <div className="flex gap-2">
             {INTENSITY_OPTIONS.map((opt) => (
-              <button
+              <Button
                 key={opt.value}
-                type="button"
+                variant={routine.intensity === opt.value ? "dark" : "secondary"}
+                size="sm"
                 onClick={() => updateRoutine({ intensity: opt.value })}
-                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                  routine.intensity === opt.value
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                }`}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
           <p className="text-[11px] text-gray-400 mt-1">
@@ -358,13 +353,14 @@ export default function PlanEditClient() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-600">学习时段</span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={addSlot}
-              className="text-xs text-blue-600 hover:underline"
+              className="text-blue-600 hover:underline"
             >
               + 添加时段
-            </button>
+            </Button>
           </div>
           <div className="space-y-2">
             {routine.slots.map((slot, i) => (
@@ -372,45 +368,50 @@ export default function PlanEditClient() {
                 key={i}
                 className="flex items-center gap-2 flex-wrap bg-gray-50 rounded-lg p-2"
               >
-                <input
+                <Input
                   type="text"
                   value={slot.label}
                   onChange={(e) => updateSlot(i, { label: e.target.value })}
                   placeholder="标签"
-                  className="px-2 py-1 border rounded text-xs w-20"
+                  inputSize="sm"
+                  className="w-20"
                 />
-                <input
+                <Input
                   type="time"
                   value={slot.start}
                   onChange={(e) => updateSlot(i, { start: e.target.value })}
-                  className="px-2 py-1 border rounded text-xs"
+                  inputSize="sm"
+                  className="w-24"
                 />
                 <span className="text-xs text-gray-400">-</span>
-                <input
+                <Input
                   type="time"
                   value={slot.end}
                   onChange={(e) => updateSlot(i, { end: e.target.value })}
-                  className="px-2 py-1 border rounded text-xs"
+                  inputSize="sm"
+                  className="w-24"
                 />
                 <label className="flex items-center gap-1 text-xs text-gray-600">
-                  <input
+                  <Input
                     type="number"
                     value={slot.minutes}
                     min={0}
                     onChange={(e) =>
                       updateSlot(i, { minutes: Number(e.target.value) })
                     }
-                    className="px-2 py-1 border rounded text-xs w-16"
+                    inputSize="sm"
+                    className="w-16"
                   />
                   min
                 </label>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => removeSlot(i)}
-                  className="text-xs text-red-500 hover:underline ml-auto"
+                  className="text-red-500 hover:underline ml-auto"
                 >
                   删除
-                </button>
+                </Button>
               </div>
             ))}
             {routine.slots.length === 0 && (
@@ -464,24 +465,26 @@ export default function PlanEditClient() {
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => moveNode(i, -1)}
                   disabled={i === 0}
-                  className="w-7 h-7 border rounded text-xs disabled:opacity-30 hover:bg-gray-50"
+                  className="w-7 h-7"
                   aria-label="上移"
                 >
                   ↑
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => moveNode(i, 1)}
                   disabled={i === nodes.length - 1}
-                  className="w-7 h-7 border rounded text-xs disabled:opacity-30 hover:bg-gray-50"
+                  className="w-7 h-7"
                   aria-label="下移"
                 >
                   ↓
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -510,36 +513,32 @@ export default function PlanEditClient() {
         {openSection === "questions" && (
           <div className="p-4">
             <div className="flex gap-2 mb-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={selectAllQuestions}
-            className="px-3 py-1 text-xs border rounded-lg hover:bg-gray-50"
           >
             全选
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={clearAllQuestions}
-            className="px-3 py-1 text-xs border rounded-lg hover:bg-gray-50"
           >
             全不选
-          </button>
+          </Button>
         </div>
         <div className="space-y-1 max-h-72 overflow-y-auto">
           {plan.questions.map((q) => {
             const checked = includedIds.has(q.id);
             const node = nodes.find((n) => n.id === q.nodeId);
             return (
-              <label
+              <Checkbox
                 key={q.id}
-                className="flex items-start gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                checked={checked}
+                onChange={() => toggleQuestion(q.id)}
+                className="w-full items-start p-2 rounded hover:bg-gray-50"
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleQuestion(q.id)}
-                  className="mt-0.5"
-                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{q.question}</p>
                   {node && (
@@ -548,7 +547,7 @@ export default function PlanEditClient() {
                     </p>
                   )}
                 </div>
-              </label>
+              </Checkbox>
             );
           })}
           {plan.questions.length === 0 && (
@@ -576,13 +575,13 @@ export default function PlanEditClient() {
             <p className="text-xs text-gray-400 mb-3">
               用自然语言描述调整需求，AI 会重排 schedule（不改变知识点和题目）
             </p>
-            <textarea
+            <Textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               placeholder="例如：每天只学30分钟 / 把大厂题优先排前面 / 周末多安排些复习"
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
               disabled={aiLoading}
+              className="w-full"
             />
             {aiError && (
               <div className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -594,21 +593,16 @@ export default function PlanEditClient() {
                 日程已调整，记得点击下方保存。
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleAIAdjust}
+            <Button
+              variant="dark"
+              block
+              loading={aiLoading}
               disabled={aiLoading || !instruction.trim()}
-              className="mt-3 w-full py-2.5 bg-black text-white rounded-lg font-medium text-sm disabled:opacity-50 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+              onClick={handleAIAdjust}
+              className="mt-3"
             >
-              {aiLoading ? (
-                <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  AI 调整中...
-                </>
-              ) : (
-                "让 AI 调整"
-              )}
-            </button>
+              {aiLoading ? "AI 调整中..." : "让 AI 调整"}
+            </Button>
           </div>
         )}
       </section>
@@ -625,27 +619,15 @@ export default function PlanEditClient() {
             <span className="text-xs text-gray-500">有未保存的修改</span>
           )}
           <div className="flex-1" />
-          <button
-            type="button"
-            onClick={handleSave}
+          <Button
+            variant="dark"
+            loading={saving}
             disabled={saving || !dirty}
-            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
-              dirty
-                ? "bg-black text-white hover:bg-gray-800"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
+            onClick={handleSave}
+            leftIcon="check"
           >
-            {saving ? (
-              <>
-                <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                保存中...
-              </>
-            ) : (
-              <>
-                <Icon name="check" className="w-4 h-4 inline-block" /> 保存全部修改
-              </>
-            )}
-          </button>
+            {saving ? "保存中..." : "保存全部修改"}
+          </Button>
         </div>
       </div>
     </div>
