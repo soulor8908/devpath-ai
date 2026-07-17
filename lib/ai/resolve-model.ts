@@ -5,12 +5,15 @@
 // 所有 AI API 路由统一使用此 helper，确保用户配置的 DeepSeek/GLM 等模型
 // 能跨所有 AI 功能（聊天、学习计划、周报、每日提醒等）生效
 //
-// P1 可靠性升级：服务端默认模型自动接入 fallback 链（主模型 30s 超时 → 切备选 provider）。
-// 路由无需改动——fallback 通过 wrapModelWithFallback 代理在 model 层透明执行。
+// 注意：fallback 链（wrapModelWithFallback）在无 AI_FALLBACK_PROVIDER 配置时
+// 虽然逻辑上返回原模型，但 _resolveFallbackEntry 的调用链在 Cloudflare Workers
+// 运行时可能触发异常（Object.create 代理 + AbortSignal API 兼容性问题）。
+// 当前线上未配置 fallback，直接用 getModel() 保持简单稳定。
+// fallback 功能保留在 provider.ts 中，待配置 AI_FALLBACK_PROVIDER 后再启用。
 
 import type { LanguageModel } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { getModel, wrapModelWithFallback, _resolvePrimaryEntry, _resolveFallbackEntry } from "./provider";
+import { getModel } from "./provider";
 import { wrapModelWithObservability } from "./observability";
 
 /** 客户端传来的模型配置（与 lib/types.ts ModelConfig 兼容） */
@@ -32,8 +35,8 @@ export interface ResolvedModel {
 
 /**
  * 从 modelConfig 解析出可用的 LanguageModel。
- * - 有 apiKey → 创建用户自定义模型（免服务端鉴权，无 fallback——用户自己的 key 自己负责）
- * - 无 apiKey → 回退服务端默认模型（需 API_TOKEN），自动接入 fallback 链
+ * - 有 apiKey → 创建用户自定义模型（免服务端鉴权）
+ * - 无 apiKey → 回退服务端默认模型（需 API_TOKEN）
  */
 export function resolveModel(
   modelConfig: ClientModelConfig | undefined,
@@ -59,24 +62,6 @@ export function resolveModel(
       providerId,
     };
   }
-  // 服务端默认模型：接入 fallback 链
-  const primary = _resolvePrimaryEntry();
-  const fallback = _resolveFallbackEntry();
-  if (primary) {
-    // 用 fallback 代理包装主模型（无 fallback 时 wrapModelWithFallback 返回原模型，零开销）
-    const withFallback = wrapModelWithFallback(
-      primary.model,
-      fallback?.model ?? null,
-      primary.providerId,
-      fallback?.providerId,
-    );
-    return {
-      model: wrapModelWithObservability(withFallback, `${label}:default`),
-      useServerModel: true,
-      providerId: primary.providerId,
-    };
-  }
-  // 兜底：primary 解析失败（缺 apiKey 等）——保留原行为让 getModel 抛错
   return {
     model: wrapModelWithObservability(getModel(), `${label}:default`),
     useServerModel: true,
