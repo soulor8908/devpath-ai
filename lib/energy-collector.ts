@@ -11,7 +11,7 @@
 import { nanoid } from "nanoid";
 import { getItem, setItem, listItems } from "./storage/db";
 import { KEY_PREFIXES } from "./types";
-import type { LearnLog } from "./types";
+import type { LearnLog, DopamineTrigger } from "./types";
 import { chinaDateNow } from "./time";
 
 /**
@@ -34,6 +34,8 @@ export interface EnergySample {
   actualMinutes: number;
   /** ISO 创建时间 */
   createdAt: string;
+  /** 多巴胺干扰来源（P3 特征工程增强，可选——旧数据无此字段按"无"处理） */
+  dopamineTrigger?: DopamineTrigger;
 }
 
 /**

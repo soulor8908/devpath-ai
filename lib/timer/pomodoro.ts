@@ -15,6 +15,7 @@ import { KEY_PREFIXES, type PomodoroSession, type LearnLog } from "@/lib/types";
 import { chinaDateNow } from "@/lib/time";
 import { updateActualMinutes } from "@/lib/energy-collector";
 import { getTodayCount, getTodayFocusMinutes } from "@/lib/timer/session-tracker";
+import { refreshAverageSessionMinutes } from "@/lib/ai/memory/user-profile";
 
 /** createSession 入参 */
 export interface CreateSessionParams {
@@ -105,6 +106,10 @@ export async function completeSession(
     // 累计今日专注分钟数（含本 session，因为 status 已是 completed）
     const totalMinutes = await getTodayFocusMinutes();
     await updateActualMinutes(chinaDateNow(), totalMinutes);
+    // 事件驱动更新画像高频维度（替代等 24h 批量重建）
+    // actualMinutes 已回填 → 立即重算 averageSessionMinutes 写回画像
+    // fire-and-forget：不阻塞番茄完成主流程，失败由内部 try/catch 静默
+    void refreshAverageSessionMinutes();
   }
 }
 

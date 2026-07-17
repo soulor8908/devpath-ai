@@ -12,6 +12,9 @@ vi.mock("../lib/ai/provider", () => ({
   createAIProvider: vi.fn(() => ({})),
   getModel: vi.fn(() => ({})),
   hasAIKey: () => false,
+  _resolvePrimaryEntry: () => null,
+  _resolveFallbackEntry: () => null,
+  wrapModelWithFallback: (m: unknown) => m,
 }));
 
 import { decomposeKnowledge } from "../lib/ai/knowledge";

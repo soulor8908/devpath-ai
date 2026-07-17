@@ -8,10 +8,15 @@
 // - 拉取时先读 IndexedDB，跨设备时调云端合并
 
 import { nanoid } from "nanoid";
-import { getItem, setItem, listKeys, getMany, bulkPutItems, getChangesSince } from "@/lib/storage/db";
+import { getItem, setItem, listKeys, getMany, bulkPutItems, getChangesSince, delItem, cleanExpiredTombstones } from "@/lib/storage/db";
 import { apiFetch } from "@/lib/api-client";
 import type { UserBackup } from "./types";
 import { KEY_PREFIXES } from "./types";
+
+/** tombstone key 前缀（与 db.ts delItem 写入一致） */
+const TOMBSTONE_PREFIX = "tombstone:";
+/** tombstone TTL（30 天） */
+const TOMBSTONE_TTL_DAYS = 30;
 
 // IndexedDB key：用户唯一标识
 const USER_ID_KEY = "auth:user_id";
@@ -19,11 +24,12 @@ const USER_ID_KEY = "auth:user_id";
 const LAST_SYNC_KEY = "sync:last_synced_at";
 
 // 需要同步的数据 key 前缀（所有用户业务数据）
-// MODEL_CONFIG 含 apiKey，同步到用户私有 KV 命名空间（需 API_TOKEN 鉴权），
-// 确保跨设备可用 AI 模型配置，否则换设备后会报 503（未配置 AI）
+// 安全决策（P0）：MODEL_CONFIG 不在同步列表中——含明文 apiKey，
+// 同步到云端 KV 会导致 userId 泄漏即所有 AI Key 泄漏。
+// API Key 仅本地存储，换设备需重新输入（与 lib/types.ts ModelConfig.apiKey 注释一致）。
 // DAILY_NUDGE / WEEKLY 是缓存，无需同步
 // DAILY_LOG（每日日志 Markdown）和 EMOTION（情绪笔记）需同步以支持跨设备
-const SYNC_PREFIXES = [
+export const SYNC_PREFIXES = [
   KEY_PREFIXES.PLAN,
   KEY_PREFIXES.PLAN_SUMMARY,
   KEY_PREFIXES.CARD,
@@ -37,7 +43,6 @@ const SYNC_PREFIXES = [
   KEY_PREFIXES.CONVERSATION,
   KEY_PREFIXES.CHAT_MESSAGE,
   KEY_PREFIXES.PROMPT,
-  KEY_PREFIXES.MODEL_CONFIG,
   KEY_PREFIXES.REMINDER,
   KEY_PREFIXES.DAILY_LOG,
 ] as const;
@@ -83,8 +88,11 @@ export async function getLastSyncedAt(): Promise<string | null> {
  * - key 仅在某一方存在 → 取存在的一方
  * - 两方都有 updatedAt → 取较新者
  * - 无法比较 updatedAt → 以云端为准（last-write-wins）
+ * - tombstone: 远端是 tombstone → 标记删除本地对应 key（P2 删除传播）
+ *
  * @param local 本地数据（key → value）
  * @param remote 云端数据（key → value）
+ * @returns merged 合并后的数据；tombstone 对应的原 key 被设为 undefined（调用方应删除）
  */
 export function mergeData(
   local: Record<string, unknown>,
@@ -92,6 +100,18 @@ export function mergeData(
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...local };
   for (const [key, remoteVal] of Object.entries(remote)) {
+    // tombstone 处理：远端是 tombstone → 删除本地对应原 key
+    if (key.startsWith(TOMBSTONE_PREFIX)) {
+      const tombstone = remoteVal as { deletedAt?: string; originalKey?: string };
+      const originalKey = tombstone.originalKey ?? key.slice(TOMBSTONE_PREFIX.length);
+      if (originalKey) {
+        // 标记为删除：调用方（downloadAll）会据此 delItem
+        delete merged[originalKey];
+      }
+      // tombstone 本身也存入（避免重复处理）——但 value 标记为 tombstone
+      merged[key] = remoteVal;
+      continue;
+    }
     const localVal = merged[key];
     if (localVal === undefined) {
       merged[key] = remoteVal;
@@ -107,6 +127,20 @@ export function mergeData(
     }
   }
   return merged;
+}
+
+/** 返回 mergeData 结果中需要删除的原 key 列表（来自 tombstone） */
+export function extractTombstoneDeletions(
+  remote: Record<string, unknown>,
+): string[] {
+  const deletions: string[] = [];
+  for (const [key, val] of Object.entries(remote)) {
+    if (!key.startsWith(TOMBSTONE_PREFIX)) continue;
+    const tombstone = val as { originalKey?: string };
+    const originalKey = tombstone.originalKey ?? key.slice(TOMBSTONE_PREFIX.length);
+    if (originalKey) deletions.push(originalKey);
+  }
+  return deletions;
 }
 
 function getUpdatedAt(v: unknown): string | undefined {
@@ -136,6 +170,14 @@ export async function uploadAll(): Promise<void> {
       if (values[i] !== undefined) data[k] = values[i];
     });
   }
+  // 同步 tombstone 记录（删除传播）
+  const tombstoneKeys = await listKeys(TOMBSTONE_PREFIX);
+  if (tombstoneKeys.length > 0) {
+    const tombstoneValues = await getMany<unknown>(tombstoneKeys);
+    tombstoneKeys.forEach((k, i) => {
+      if (tombstoneValues[i] !== undefined) data[k] = tombstoneValues[i];
+    });
+  }
   // 同步独立 key（如 my:profile）
   for (const key of SYNC_EXTRA_KEYS) {
     const v = await getItem<unknown>(key);
@@ -157,6 +199,15 @@ export async function uploadAll(): Promise<void> {
     throw new Error(`上传失败: ${res.status}${msg ? ` ${msg}` : ""}`);
   }
   await setItem(LAST_SYNC_KEY, backup.updatedAt);
+  // P2: 清理过期 tombstone（30 天 TTL），避免无限增长
+  try {
+    const cleaned = await cleanExpiredTombstones(TOMBSTONE_TTL_DAYS);
+    if (cleaned > 0) {
+      console.info(`[sync] cleaned ${cleaned} expired tombstones`);
+    }
+  } catch {
+    // 清理失败不影响同步主流程
+  }
 }
 
 /**
@@ -263,6 +314,17 @@ export async function downloadAll(): Promise<boolean> {
     toWrite.push({ key: k, value: v });
   }
   await bulkPutItems(toWrite);
+
+  // P2: 处理 tombstone 删除——远端 tombstone 指示本地应删除的原 key
+  // 注：delItem 会写新 tombstone，但重复 tombstone 无害（LWW 合并时取较新者，幂等）
+  const deletions = extractTombstoneDeletions(remote.data);
+  for (const originalKey of deletions) {
+    try {
+      await delItem(originalKey);
+    } catch {
+      // 删除失败不影响其他 key
+    }
+  }
 
   await setItem(LAST_SYNC_KEY, new Date().toISOString());
   return true;

@@ -100,7 +100,9 @@ export default function PlanEditClient() {
     return () => {
       cancelled = true;
     };
-  }, [planId, router]);
+  // router 引用稳定（App Router），不作为 effect 依赖避免重渲染（React #185）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId]);
 
   // ---- Routine 编辑 ----
   function updateRoutine(patch: Partial<Routine>) {

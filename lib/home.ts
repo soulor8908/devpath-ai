@@ -10,11 +10,10 @@
 //   便于单测、复用、且使 page.tsx 渲染层保持"纯展示"。
 
 import { useState, useEffect, useCallback } from "react";
-import { getItem, listItems } from "@/lib/storage/db";
+import { getItem, countDueCards, listRecentItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
-  LearningPlan,
-  ReviewCard,
+  LearningPlanSummary,
   LearnLog,
   ScheduleItem,
   DailyStatus,
@@ -26,7 +25,6 @@ import type {
   UserProfile,
 } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { getDueCards } from "@/lib/fsrs";
 import { getUnresolvedMistakes } from "@/lib/mistake-book";
 import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
 import { maybeRetrain } from "@/lib/energy-regression";
@@ -37,6 +35,7 @@ import {
   shouldRunHealthCheck,
 } from "@/lib/ai/plan-health";
 import { getQualityReport } from "@/lib/ai/quality-tracker";
+import { listPlanSummaries } from "@/lib/plan-summary";
 
 // ============ 打卡可视化元数据 ============
 
@@ -292,8 +291,10 @@ export function computeHeatmap(
   return out;
 }
 
-/** 从 plans 计算今日学习安排 + 待学数 + 最新 plan */
-export function computeTodaySchedule(plans: LearningPlan[]): {
+/** 从 plans 计算今日学习安排 + 待学数 + 最新 plan
+ *  P1 优化：接受 LearningPlanSummary（含 schedule 字段），避免首页加载完整 plan 的 knowledgeTree/questions
+ */
+export function computeTodaySchedule(plans: LearningPlanSummary[]): {
   todaySchedule: Array<ScheduleItem & { planId: string; topic: string }>;
   todayLearnCount: number;
   latestPlan: { id: string; topic: string } | null;
@@ -367,22 +368,26 @@ export function useHomeData(): HomeData & {
     // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
     const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
 
-    // 9 路并行查询（互不依赖）：原 7 路 + userProfile + aiQualityReport
-    const [cards, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport] =
-      await Promise.all([
-        listItems<ReviewCard>(KEY_PREFIXES.CARD),
-        listItems<LearningPlan>(KEY_PREFIXES.PLAN),
-        listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG),
-        getItem<DailyStatus>(todayStatusKey),
-        getItem<PublicProfile>("my:profile"),
-        listItems<EmotionEntry>(KEY_PREFIXES.EMOTION),
-        getUnresolvedMistakes(),
-        getUserProfile(),
-        getQualityReport(todayStartIso),
-      ]);
+    // P1 精准查询优化（替代全量加载）：
+    //   - 卡片：countDueCards(now) 走 dueAt 索引精准计数，O(due) 而非 O(n)
+    //     （首页只需要 dueCount，不需要卡片数据本身）
+    //   - 计划：listPlanSummaries() 加载轻量 summary（含 schedule），避免拉取 knowledgeTree/questions
+    //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
+    const [
+      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport,
+    ] = await Promise.all([
+      countDueCards(new Date()),
+      listPlanSummaries(),
+      listRecentItems<LearnLog>(KEY_PREFIXES.LEARN_LOG, 7),
+      getItem<DailyStatus>(todayStatusKey),
+      getItem<PublicProfile>("my:profile"),
+      listRecentItems<EmotionEntry>(KEY_PREFIXES.EMOTION, 7),
+      getUnresolvedMistakes(),
+      getUserProfile(),
+      getQualityReport(todayStartIso),
+    ]);
 
     // 内存派生计算（无 IO）
-    const due = getDueCards(cards);
     const { streak, lastStreak } = computeStreaks(logs);
     const heatmapData = computeHeatmap(logs);
     const {
@@ -405,7 +410,7 @@ export function useHomeData(): HomeData & {
     const aiQualitySummary = deriveAiQualitySummary(qualityReport);
 
     setData({
-      dueCount: due.length,
+      dueCount,
       todayLearnCount,
       streak,
       lastStreak,

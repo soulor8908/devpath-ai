@@ -16,6 +16,8 @@ interface CallMetric {
   durationMs: number;
   error?: string;
   timestamp: string;
+  /** 实际使用的 provider ID（如 "glm/glm-4-flash"）；fallback 时与主 provider 不同 */
+  providerId?: string;
 }
 
 // 内存缓冲（仅本地开发可见，生产环境走 console）
@@ -113,10 +115,13 @@ export function wrapModelWithObservability(
  * 通用计时包装器：用于非 LanguageModel 路径的 AI 调用（如直接 generateObject）
  * 用法：
  *   const result = await observeCall("knowledge:decompose", () => generateObject({...}));
+ *   // 标注实际使用的 provider（fallback 时与主 provider 不同）
+ *   await observeCall("chat", () => fn(), { providerId: "deepseek/deepseek-chat" });
  */
 export async function observeCall<T>(
   tag: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options?: { providerId?: string },
 ): Promise<T> {
   const start = performance.now();
   try {
@@ -126,6 +131,7 @@ export async function observeCall<T>(
       ok: true,
       durationMs: Math.round(performance.now() - start),
       timestamp: new Date().toISOString(),
+      providerId: options?.providerId,
     });
     return result;
   } catch (e) {
@@ -135,6 +141,7 @@ export async function observeCall<T>(
       durationMs: Math.round(performance.now() - start),
       error: e instanceof Error ? e.message : String(e),
       timestamp: new Date().toISOString(),
+      providerId: options?.providerId,
     });
     throw e;
   }

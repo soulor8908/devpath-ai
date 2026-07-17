@@ -32,7 +32,9 @@ export default function LearnRouterPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+    // router 引用稳定（App Router），不作为 effect 依赖避免重渲染（React #185）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8">

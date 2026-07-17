@@ -4,7 +4,7 @@
 // 学习计划列表页：展示所有计划摘要，点击进详情，支持删除。
 // 空态防御：若用户在本页把所有计划删完，自动跳回 /learn/new。
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { listPlanSummaries, migrateSummaries, deletePlanSummary } from "@/lib/plan-summary";
@@ -14,6 +14,9 @@ import { Icon } from "@/components/Icon";
 
 export default function ListClient() {
   const router = useRouter();
+  // router 通过 ref 在 effect 内访问，避免 router 引用抖动触发无限渲染（React #185）
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [plans, setPlans] = useState<LearningPlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -25,14 +28,16 @@ export default function ListClient() {
       if (summaries.length === 0) {
         // 防御：理论上 router 不会让 0 计划用户进入 list，
         // 但用户可能在本页删完所有计划，此时回到创建页
-        router.replace("/learn/new");
+        routerRef.current.replace("/learn/new");
         return;
       }
       setPlans(summaries);
     } finally {
       setLoading(false);
     }
-  }, [router]);
+    // router 通过 ref 访问，不作为依赖（ref 引用稳定）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     refresh();

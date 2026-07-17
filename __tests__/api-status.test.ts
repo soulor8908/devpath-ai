@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../lib/ai/provider", () => ({
   hasAIKey: () => false,
   getModel: () => ({}),
+  _resolvePrimaryEntry: () => null,
+  _resolveFallbackEntry: () => null,
+  wrapModelWithFallback: (m: unknown) => m,
 }));
 
 vi.mock("../lib/storage/db", () => ({

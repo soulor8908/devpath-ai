@@ -58,6 +58,8 @@ export function setCloudflareEnv(env: Record<string, unknown>): void {
   globalThis.__cloudflareEnv = filtered;
   // 重置缓存，让下次 getModel 重新读取
   cachedModel = null;
+  cachedPrimary = null;
+  cachedFallback = undefined;
 }
 
 function resolveConfig(): ProviderConfig {
@@ -127,6 +129,8 @@ export function createAIProvider(): LanguageModel {
 /** 用于测试：重置缓存 */
 export function _resetModelCache(): void {
   cachedModel = null;
+  cachedPrimary = null;
+  cachedFallback = undefined;
 }
 
 export function getProviderInfo(): { provider: string; model: string; baseURL: string } {
@@ -142,4 +146,227 @@ export function getProviderInfo(): { provider: string; model: string; baseURL: s
 /** 获取预设列表（供前端展示） */
 export function getPresets() {
   return PRESETS;
+}
+
+// ========== Provider Fallback 链（P1 可靠性） ==========
+// 卡帕西视角：单点故障不可接受——一个 GLM 宕机就全盘崩溃是工程债。
+// Fallback 链：主模型（AI_PROVIDER）30s 超时 → 切备选（AI_FALLBACK_PROVIDER）
+// 设计：
+//   - getModelWithFallback(): 返回主模型 + providerId（用于成本追踪）
+//   - withFallback<T>(): 高阶函数，调用层包装（routes 显式使用）
+//   - wrapModelWithFallback(): 模型代理，透明 fallback（resolveModel 集成用）
+//   - 超时用 AbortSignal.timeout（Node 20+ / 现代浏览器原生支持）
+
+const PRIMARY_TIMEOUT_MS = 30_000;
+
+interface ProviderEntry {
+  model: LanguageModel;
+  providerId: string;
+}
+
+let cachedPrimary: ProviderEntry | null = null;
+// undefined = 未解析；null = 已解析但无 fallback；ProviderEntry = 已解析
+let cachedFallback: ProviderEntry | null | undefined;
+
+function buildProviderEntry(
+  provider: string,
+  baseURL: string,
+  model: string,
+  apiKey: string,
+): ProviderEntry {
+  const openai = createOpenAI({ baseURL, apiKey });
+  return {
+    model: openai(model),
+    providerId: `${provider}/${model}`,
+  };
+}
+
+function resolvePrimary(): ProviderEntry {
+  if (cachedPrimary) return cachedPrimary;
+  const { baseURL, model, apiKey } = resolveConfig();
+  if (!apiKey) {
+    throw new Error(
+      "AI API Key 未配置：请设置 AI_API_KEY 或对应 provider 的 key 环境变量",
+    );
+  }
+  const provider = (getEnv("AI_PROVIDER") || "glm").toLowerCase();
+  cachedPrimary = buildProviderEntry(provider, baseURL, model, apiKey);
+  return cachedPrimary;
+}
+
+/**
+ * 解析备选 provider（从 AI_FALLBACK_* 环境变量）。
+ * 备选 apiKey 可独立配置（AI_FALLBACK_API_KEY），也可复用 provider 专属 key。
+ * 未配置或配置不全时返回 null（无 fallback）。
+ */
+function resolveFallback(): ProviderEntry | null {
+  if (cachedFallback !== undefined) return cachedFallback;
+  const fallbackProvider = (getEnv("AI_FALLBACK_PROVIDER") || "").toLowerCase();
+  if (!fallbackProvider) {
+    cachedFallback = null;
+    return null;
+  }
+  const preset = PRESETS[fallbackProvider];
+  const baseURL = getEnv("AI_FALLBACK_API_URL") || preset?.baseURL;
+  const model = getEnv("AI_FALLBACK_MODEL") || preset?.model;
+  const apiKey =
+    getEnv("AI_FALLBACK_API_KEY") ||
+    (fallbackProvider === "glm" && getEnv("GLM_API_KEY")) ||
+    (fallbackProvider === "deepseek" && getEnv("DEEPSEEK_API_KEY")) ||
+    (fallbackProvider === "mimo" && getEnv("MIMO_API_KEY")) ||
+    "";
+  if (!baseURL || !model || !apiKey) {
+    cachedFallback = null;
+    return null;
+  }
+  cachedFallback = buildProviderEntry(fallbackProvider, baseURL, model, apiKey);
+  return cachedFallback;
+}
+
+/**
+ * 获取主模型 + providerId（带缓存）。
+ * 用于需要标注实际使用模型 ID 的场景（成本追踪 / observability）。
+ * 注意：此函数只返回主模型，fallback 由 withFallback() 在调用时执行。
+ */
+export function getModelWithFallback(): {
+  model: LanguageModel;
+  providerId: string;
+} {
+  const primary = resolvePrimary();
+  return { model: primary.model, providerId: primary.providerId };
+}
+
+/** 获取备选 providerId（未配置返回 null），用于 observability 预期标注 */
+export function getFallbackProviderId(): string | null {
+  const fb = resolveFallback();
+  return fb?.providerId ?? null;
+}
+
+/**
+ * 带 fallback 的 AI 调用包装器（高阶函数）。
+ * - 主模型 30s 超时（AbortSignal.timeout），超时或异常后切备选 provider
+ * - 全部失败抛最后一个错误
+ * - 返回值带 providerId 标注实际使用的模型（用于成本追踪）
+ *
+ * 用法：
+ *   const { result, providerId } = await withFallback(
+ *     (model, signal) => generateObject({ model, abortSignal: signal, ... })
+ *   );
+ */
+export async function withFallback<T>(
+  fn: (model: LanguageModel, signal?: AbortSignal) => Promise<T>,
+): Promise<{ result: T; providerId: string }> {
+  const primary = resolvePrimary();
+  const fallback = resolveFallback();
+
+  try {
+    const signal = AbortSignal.timeout(PRIMARY_TIMEOUT_MS);
+    const result = await fn(primary.model, signal);
+    return { result, providerId: primary.providerId };
+  } catch (primaryErr) {
+    if (!fallback) throw primaryErr;
+    console.warn(
+      `[ai:fallback] primary (${primary.providerId}) failed, switching to ${fallback.providerId}:`,
+      primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+    );
+    // fallback 不设超时，让备选 provider 有充足时间响应
+    const result = await fn(fallback.model);
+    return { result, providerId: fallback.providerId };
+  }
+}
+
+/**
+ * 合并多个 AbortSignal（任一触发即 abort）。
+ * 优先用原生 AbortSignal.any（Node 20+ / 现代浏览器），否则手动组合。
+ */
+function combineSignals(
+  ...signals: (AbortSignal | null | undefined)[]
+): AbortSignal | undefined {
+  const valid = signals.filter(Boolean) as AbortSignal[];
+  if (valid.length === 0) return undefined;
+  if (valid.length === 1) return valid[0];
+  if (typeof AbortSignal.any === "function") {
+    return AbortSignal.any(valid);
+  }
+  // 兜底：手动组合（旧运行时）
+  const controller = new AbortController();
+  for (const sig of valid) {
+    if (sig.aborted) {
+      controller.abort(sig.reason);
+      break;
+    }
+    sig.addEventListener(
+      "abort",
+      () => controller.abort(sig.reason),
+      { once: true },
+    );
+  }
+  return controller.signal;
+}
+
+/**
+ * 模型代理：透明 fallback（用于 resolveModel 集成，路由无需改动）。
+ * - doGenerate/doStream 调用时：主模型 + 30s 超时
+ * - 主模型失败/超时 → 切备选 provider（不设超时）
+ * - 无备选时直接返回原模型（零开销）
+ *
+ * 注意：此包装不改变 model 的其他属性（如 specification），仅覆盖两个核心方法。
+ */
+export function wrapModelWithFallback(
+  primary: LanguageModel,
+  fallback: LanguageModel | null,
+  primaryProviderId: string,
+  fallbackProviderId: string | undefined,
+  timeoutMs = PRIMARY_TIMEOUT_MS,
+): LanguageModel {
+  if (!fallback) return primary;
+  const wrapped = Object.create(primary) as LanguageModel;
+
+  wrapped.doGenerate = async function (
+    params: Parameters<LanguageModel["doGenerate"]>[0],
+  ) {
+    try {
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      const combined = combineSignals(params.abortSignal, timeoutSignal);
+      return await primary.doGenerate({ ...params, abortSignal: combined });
+    } catch (primaryErr) {
+      console.warn(
+        `[ai:fallback] doGenerate primary (${primaryProviderId}) failed, switching to ${fallbackProviderId}:`,
+        primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+      );
+      return await fallback.doGenerate(params);
+    }
+  };
+
+  wrapped.doStream = async function (
+    params: Parameters<LanguageModel["doStream"]>[0],
+  ) {
+    try {
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      const combined = combineSignals(params.abortSignal, timeoutSignal);
+      return await primary.doStream({ ...params, abortSignal: combined });
+    } catch (primaryErr) {
+      console.warn(
+        `[ai:fallback] doStream primary (${primaryProviderId}) failed, switching to ${fallbackProviderId}:`,
+        primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+      );
+      return await fallback.doStream(params);
+    }
+  };
+
+  return wrapped;
+}
+
+/** 内部导出：供 resolveModel 构建带 fallback 的默认模型 */
+export function _resolvePrimaryEntry(): ProviderEntry | null {
+  try {
+    return resolvePrimary();
+  } catch {
+    return null;
+  }
+}
+
+/** 内部导出：供 resolveModel 构建带 fallback 的默认模型 */
+export function _resolveFallbackEntry(): ProviderEntry | null {
+  return resolveFallback();
 }

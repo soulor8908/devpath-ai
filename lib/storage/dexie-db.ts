@@ -27,6 +27,12 @@ export interface KVRecord {
   prefix: string;
   /** 从 value.updatedAt 提取的时间戳（ISO 字符串），用于增量同步 */
   updatedAt?: string;
+  /**
+   * 从 value.due 提取的到期时间（ISO 字符串），仅 ReviewCard 有此字段。
+   * 用于 countDueCards(now) 精准查询，避免全量加载 cards 只为算 dueCount。
+   * P1 性能优化：500 张卡片全量加载 → O(due) 索引查询。
+   */
+  dueAt?: string;
 }
 
 /**
@@ -67,6 +73,26 @@ export async function getDB(): Promise<AppDBInstance | null> {
         //   - updatedAt 索引：增量同步 getChangesSince(ts) 直接索引范围查询
         this.version(1).stores({
           kv: "&key, prefix, updatedAt",
+        });
+        // v2: 新增 dueAt 索引（从 ReviewCard.due 提取）
+        //   - countDueCards(now) 走索引查询，避免全量加载 cards
+        //   - Dexie 自动处理 schema 升级；upgrade 回填旧记录的 dueAt
+        this.version(2).stores({
+          kv: "&key, prefix, updatedAt, dueAt",
+        }).upgrade(async (tx) => {
+          // 回填现有 ReviewCard 记录的 dueAt 字段
+          await tx.table("kv").toCollection().modify((rec: KVRecord) => {
+            if (
+              rec.value &&
+              typeof rec.value === "object" &&
+              "due" in rec.value
+            ) {
+              const due = (rec.value as { due?: unknown }).due;
+              if (typeof due === "string") {
+                rec.dueAt = due;
+              }
+            }
+          });
         });
       }
     }
@@ -176,3 +202,18 @@ function extractUpdatedAtFromValue(value: unknown): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * 从 value.due 提取到期时间（仅 ReviewCard 有此字段）。
+ * 用于 dueAt 索引，支持 countDueCards 精准查询。
+ */
+function extractDueAtFromValue(value: unknown): string | undefined {
+  if (value && typeof value === "object" && "due" in value) {
+    const due = (value as { due?: unknown }).due;
+    return typeof due === "string" ? due : undefined;
+  }
+  return undefined;
+}
+
+/** 导出 extractDueAtFromValue 供 db.ts 使用 */
+export { extractDueAtFromValue };

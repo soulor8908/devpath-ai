@@ -19,6 +19,7 @@ function makeSummary(id: string): LearningPlanSummary {
     scheduleDays: 7,
     dailyMinutes: 30,
     maxNewPerDay: 1,
+    schedule: [],
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",
   };

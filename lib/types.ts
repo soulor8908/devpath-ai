@@ -27,6 +27,7 @@ export interface LearningPlan {
 
 // 学习计划摘要（仅用于列表展示，体积小、加载快）
 // 列表页只加载摘要，点击进入详情时才加载完整 plan
+// P1 优化：包含 schedule（轻量字段），首页 computeTodaySchedule 无需加载完整 plan
 export interface LearningPlanSummary {
   id: string;
   topic: string;
@@ -35,6 +36,8 @@ export interface LearningPlanSummary {
   scheduleDays: number;
   dailyMinutes: number;
   maxNewPerDay: number;
+  /** 完整 schedule（P1 新增）：首页计算今日安排用，避免加载 knowledgeTree/questions */
+  schedule: ScheduleItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -414,7 +417,7 @@ export interface ModelConfig {
   provider: "glm" | "deepseek" | "mimo" | "kimi" | "custom";
   /** API baseURL（OpenAI 兼容格式） */
   baseURL: string;
-  /** API Key（存储在 IndexedDB，不上传到云端） */
+  /** API Key（仅本地存储 IndexedDB，不同步到云端 KV——换设备需重新输入） */
   apiKey: string;
   /** 模型名称（如 gpt-4o, deepseek-chat, glm-4-flash） */
   model: string;

@@ -31,6 +31,9 @@ export function toSummary(plan: LearningPlan): LearningPlanSummary {
     scheduleDays: new Set(plan.schedule.map((s) => s.day)).size,
     dailyMinutes: plan.dailyMinutes,
     maxNewPerDay: plan.maxNewPerDay,
+    // P1 优化：包含完整 schedule，首页 computeTodaySchedule 无需加载完整 plan
+    // schedule 体积小（~6KB/30天计划），远小于 knowledgeTree + questions（~100KB+）
+    schedule: plan.schedule,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
@@ -68,24 +71,41 @@ export async function deletePlanSummary(planId: string): Promise<void> {
 }
 
 /**
- * 一次性迁移：扫描所有旧 plan（无 summary 的）并补齐 summary
- * 返回新增的摘要数量；列表页据此判断是否需要刷新
+ * 一次性迁移：扫描所有旧 plan（无 summary 或 summary 缺 schedule 字段）并补齐
+ * 返回新增/修复的摘要数量；列表页据此判断是否需要刷新
+ *
+ * P1 扩展：除了补齐缺失的 summary，还修复旧 summary（缺 schedule 字段的）
  */
 export async function migrateSummaries(): Promise<number> {
   // 找出所有 plan key 和已有 summary key
-  const [planKeys, summaryKeys] = await Promise.all([
+  const [planKeys, existingSummaries] = await Promise.all([
     listKeys(KEY_PREFIXES.PLAN),
-    listKeys(KEY_PREFIXES.PLAN_SUMMARY),
+    listItems<LearningPlanSummary>(KEY_PREFIXES.PLAN_SUMMARY),
   ]);
-  const summaryIds = new Set(summaryKeys.map((k) => k.slice(KEY_PREFIXES.PLAN_SUMMARY.length)));
-  const missingKeys = planKeys.filter(
-    (k) => !summaryIds.has(k.slice(KEY_PREFIXES.PLAN.length)),
-  );
-  if (missingKeys.length === 0) return 0;
 
-  // 按需加载缺失的 plan（只加载这一次）
+  const summaryIds = new Set(existingSummaries.map((s) => s.id));
+  // 缺失 summary 的 plan key
+  const missingKeys = planKeys.filter((k) => {
+    const id = k.slice(KEY_PREFIXES.PLAN.length);
+    return !summaryIds.has(id);
+  });
+  // 旧 summary 缺 schedule 字段的（P1 升级前的数据）
+  const staleIds = new Set(
+    existingSummaries
+      .filter((s) => !Array.isArray(s.schedule))
+      .map((s) => s.id),
+  );
+  const staleKeys = planKeys.filter((k) => {
+    const id = k.slice(KEY_PREFIXES.PLAN.length);
+    return staleIds.has(id);
+  });
+
+  const toRebuild = [...new Set([...missingKeys, ...staleKeys])];
+  if (toRebuild.length === 0) return 0;
+
+  // 按需加载缺失/过期的 plan（只加载这一次）
   const plans = await Promise.all(
-    missingKeys.map((k) => getItem<LearningPlan>(k)),
+    toRebuild.map((k) => getItem<LearningPlan>(k)),
   );
   await Promise.all(
     plans
@@ -94,7 +114,7 @@ export async function migrateSummaries(): Promise<number> {
   );
   // 迁移后失效列表缓存
   invalidateCache(SUMMARY_LIST_CACHE_KEY);
-  return missingKeys.length;
+  return toRebuild.length;
 }
 
 /**
