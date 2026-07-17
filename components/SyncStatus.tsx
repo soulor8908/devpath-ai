@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getUserId, setUserId, uploadAll, downloadAll, getLastSyncedAt } from "@/lib/sync";
 import { Icon } from "@/components/Icon";
+import { Button, Input } from "@/components/ui";
 import { maskUserId } from "@/lib/username-mask";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
@@ -185,56 +186,50 @@ export function SyncStatus() {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">用户 ID</label>
         {importing ? (
           <div className="mt-1 space-y-2">
-            <input
+            <Input
               type="text"
               value={importValue}
               onChange={(e) => setImportValue(e.target.value)}
               placeholder="粘贴旧设备的 userId"
               autoFocus
-              className="w-full rounded border bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 px-2 py-1 font-mono text-xs"
+              inputSize="sm"
+              error={!!importError}
             />
             {importError && (
               <p className="text-xs text-red-600 dark:text-red-400">{importError}</p>
             )}
             <div className="flex gap-2">
-              <button
-                onClick={submitImport}
-                className="rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 transition-colors"
-              >
-                确认导入
-              </button>
-              <button
-                onClick={cancelImport}
-                className="rounded-lg border dark:border-gray-600 px-3 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                取消
-              </button>
+              <Button size="sm" onClick={submitImport}>确认导入</Button>
+              <Button size="sm" variant="secondary" onClick={cancelImport}>取消</Button>
             </div>
           </div>
         ) : (
           <div className="mt-1 flex gap-2">
-            <input
+            <Input
               value={displayId}
               readOnly
               aria-label="用户 ID"
-              className="w-full rounded border bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 px-2 py-1 font-mono text-xs"
+              inputSize="sm"
+              className="font-mono"
             />
-            <button
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setRevealId((v) => !v)}
-              className="shrink-0 flex items-center gap-1 rounded-lg border dark:border-gray-600 px-3 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               title={revealId ? "隐藏完整 ID" : "显示完整 ID"}
             >
               <Icon name={revealId ? "check-circle" : "info"} className="w-3.5 h-3.5" />
               {revealId ? "隐藏" : "显示"}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={copyUserId}
-              className="shrink-0 flex items-center gap-1 rounded-lg border dark:border-gray-600 px-3 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               title="复制完整 ID（脱敏显示不影响复制内容）"
             >
               <Icon name={copied ? "check" : "copy"} className="w-3.5 h-3.5" />
               {copied ? "已复制" : "复制"}
-            </button>
+            </Button>
           </div>
         )}
         {!importing && (
@@ -247,30 +242,29 @@ export function SyncStatus() {
       {message && <p className={`text-sm ${status === "error" ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-300"}`}>{message}</p>}
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           onClick={handleUpload}
           disabled={status === "syncing"}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          leftIcon="cloud"
         >
-          <Icon name="cloud" className="w-4 h-4" />
           上传到云端
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={handleDownload}
           disabled={status === "syncing"}
-          className="flex items-center gap-1.5 rounded-lg border dark:border-gray-600 px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+          leftIcon="cloud-download"
         >
-          <Icon name="cloud-download" className="w-4 h-4" />
           从云端恢复
-        </button>
+        </Button>
         {!importing && (
-          <button
+          <Button
+            variant="ghost"
             onClick={startImport}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-300 dark:border-blue-700 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+            leftIcon="plus"
           >
-            <Icon name="plus" className="w-4 h-4" />
             导入已有 ID
-          </button>
+          </Button>
         )}
       </div>
     </div>

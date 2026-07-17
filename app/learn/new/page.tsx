@@ -33,6 +33,7 @@ import { LearnWizard } from "@/components/LearnWizard";
 import { getRecommendedQuickInputs, getDefaultQuickInputs } from "@/lib/recommend-quick-inputs";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { Button, Input, Textarea } from "@/components/ui";
 
 interface PresetPlanData {
   topic: string;
@@ -306,12 +307,12 @@ export default function LearnNewPage() {
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input
+        <Input
           type="text"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="你想学什么？"
-          className="w-full px-4 py-3 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
+          inputSize="lg"
           autoFocus
         />
 
@@ -331,24 +332,24 @@ export default function LearnNewPage() {
         <div className="flex gap-4">
           <label className="flex-1">
             <span className="text-sm text-gray-600">每日学习时间（分钟）</span>
-            <input
+            <Input
               type="number"
               value={dailyMinutes}
               onChange={(e) => setDailyMinutes(Number(e.target.value))}
               min={15}
               max={120}
-              className="w-full px-3 py-2 border rounded mt-1"
+              className="mt-1"
             />
           </label>
           <label className="flex-1">
             <span className="text-sm text-gray-600">每日新内容数</span>
-            <input
+            <Input
               type="number"
               value={maxNewPerDay}
               onChange={(e) => setMaxNewPerDay(Number(e.target.value))}
               min={1}
               max={5}
-              className="w-full px-3 py-2 border rounded mt-1"
+              className="mt-1"
             />
           </label>
         </div>
@@ -381,17 +382,17 @@ export default function LearnNewPage() {
               )}
             </div>
           </div>
-          <textarea
+          <Textarea
             value={promptText}
             onChange={(e) => setPromptText(e.target.value)}
             placeholder="例如：请以大厂面试官视角拆解，重点考察高并发场景和源码原理；或留空使用默认生成逻辑"
             rows={3}
             maxLength={2000}
-            className="w-full px-3 py-2 text-sm border rounded resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
+            showCount
           />
           {promptText.trim() && (
             <p className="text-[11px] text-gray-400 mt-1">
-              {promptText.length}/2000 字 · 生成时会附加到 AI 请求
+              生成时会附加到 AI 请求
             </p>
           )}
 
@@ -444,28 +445,31 @@ export default function LearnNewPage() {
           {/* 保存为常用提示词 */}
           {showSavePrompt && promptText.trim() && (
             <div className="mt-2 border-t pt-2 flex items-center gap-2">
-              <input
+              <Input
                 type="text"
                 value={savePromptTitle}
                 onChange={(e) => setSavePromptTitle(e.target.value)}
                 placeholder="给这个提示词起个名字"
-                className="flex-1 px-2 py-1 text-sm border rounded"
+                inputSize="sm"
                 maxLength={40}
+                className="flex-1"
               />
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="success"
                 onClick={saveCurrentPrompt}
-                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
               >
                 保存
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                size="sm"
+                variant="ghost"
                 onClick={() => setShowSavePrompt(false)}
-                className="px-2 py-1 text-xs text-gray-500"
               >
                 取消
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -474,13 +478,16 @@ export default function LearnNewPage() {
           <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded">{error}</p>
         )}
 
-        <button
+        <Button
           type="submit"
-          disabled={!topic.trim() || loading}
-          className="w-full py-3 bg-black text-white rounded-lg font-medium disabled:opacity-50 hover:bg-gray-800 transition-colors"
+          variant="dark"
+          size="lg"
+          block
+          disabled={!topic.trim()}
+          loading={loading}
         >
           {loading ? "AI 生成中..." : "开始学习"}
-        </button>
+        </Button>
       </form>
 
       {/* 预设知识库 */}
@@ -616,21 +623,16 @@ function PresetMindMapModal({
             </div>
           </div>
           <div className="flex items-center gap-2 ml-2">
-            <button
+            <Button
+              size="sm"
+              variant="dark"
               onClick={onRegenerate}
-              disabled={regenerating}
-              className="px-3 py-1.5 text-xs bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-1"
+              loading={regenerating}
+              leftIcon={regenerating ? undefined : "refresh-cw"}
               title="调用 AI 重新生成整个知识树、面试题与学习计划"
             >
-              {regenerating ? (
-                <>
-                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  生成中...
-                </>
-              ) : (
-                <><Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 重新生成</>
-              )}
-            </button>
+              {regenerating ? "生成中..." : "重新生成"}
+            </Button>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -679,12 +681,13 @@ function PresetMindMapModal({
           <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 hidden sm:block">
             <Icon name="lightbulb" className="w-4 h-4 inline-block align-middle" /> 点击任意知识点可立即开始学习该节点 · <Icon name="building" className="w-4 h-4 inline-block align-middle" /> 标记为大厂高频考点
           </p>
-          <button
+          <Button
             onClick={onImportAll}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition-colors w-full sm:w-auto"
+            block
+            className="sm:w-auto"
           >
             一键导入全部 →
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -36,6 +36,7 @@ import {
   makeInputDigest,
 } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
+import { Button, Input } from "@/components/ui";
 
 // 情绪标签 + emoji 映射
 const EMOTION_OPTIONS: Array<{ tag: EmotionTag; emoji: string }> = [
@@ -221,12 +222,11 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
       {/* Step 2: 原因+影响（合并 1 个框） */}
       <div>
         <p className="text-xs text-gray-500 mb-2">2. 发生了什么？对你有什么影响？</p>
-        <input
+        <Input
           type="text"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="如：被领导批评了，心慌无法集中"
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
         />
       </div>
 
@@ -276,12 +276,13 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
 
         {/* 自定义应对 */}
         {suggestions.length > 0 && (
-          <input
+          <Input
             type="text"
             value={customCoping}
             onChange={(e) => setCustomCoping(e.target.value)}
             placeholder="+ 自定义应对方式（可选）"
-            className="mt-2 w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-400"
+            inputSize="sm"
+            className="mt-2"
           />
         )}
 
@@ -309,13 +310,13 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
       </div>
 
       {/* 保存 */}
-      <button
+      <Button
         onClick={handleSave}
         disabled={!tag}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        block
       >
         保存
-      </button>
+      </Button>
     </div>
   );
 }

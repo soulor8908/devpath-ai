@@ -35,6 +35,7 @@ import {
 } from "@/lib/model-config";
 import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button, Input, Textarea, Select, Checkbox } from "@/components/ui";
 import { maybeRetrain } from "@/lib/energy-regression";
 import { getUserProfile, saveUserProfile } from "@/lib/ai/memory/user-profile";
 import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
@@ -719,22 +720,24 @@ export default function ProfilePage() {
         {/* 新建 / 收起表单按钮 */}
         <div>
           {!showModelForm ? (
-            <button
+            <Button
+              variant="secondary"
+              block
               onClick={openNewModelForm}
-              className="w-full rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
             >
               + 新建模型配置
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="secondary"
+              block
               onClick={() => {
                 setShowModelForm(false);
                 resetModelForm();
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
             >
               ▲ 收起表单
-            </button>
+            </Button>
           )}
         </div>
 
@@ -763,85 +766,87 @@ export default function ProfilePage() {
             {/* 名称 */}
             <div>
               <label className="block text-sm font-medium">名称</label>
-              <input
+              <Input
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
                 placeholder="如 我的 GPT"
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               />
             </div>
 
             {/* Provider */}
             <div>
               <label className="block text-sm font-medium">Provider</label>
-              <select
+              <Select
                 value={modelProvider}
                 onChange={(e) =>
                   handleProviderChange(e.target.value as ModelConfig["provider"])
                 }
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               >
                 <option value="glm">glm（智谱）</option>
                 <option value="deepseek">deepseek</option>
                 <option value="mimo">mimo（小米）</option>
                 <option value="kimi">kimi（Moonshot AI）</option>
                 <option value="custom">custom</option>
-              </select>
+              </Select>
             </div>
 
             {/* baseURL */}
             <div>
               <label className="block text-sm font-medium">baseURL</label>
-              <input
+              <Input
                 value={modelBaseURL}
                 onChange={(e) => setModelBaseURL(e.target.value)}
                 placeholder="https://api.openai.com/v1"
-                className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs"
+                inputSize="sm"
+                className="mt-1 font-mono"
               />
             </div>
 
             {/* API Key（密码 + 显隐） */}
             <div>
               <label className="block text-sm font-medium">API Key</label>
-              <div className="mt-1 flex gap-2">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  value={modelApiKey}
-                  onChange={(e) => setModelApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="flex-1 rounded border px-2 py-1 font-mono text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey((v) => !v)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
-                >
-                  {showApiKey ? "隐藏" : "显示"}
-                </button>
-              </div>
+              <Input
+                type={showApiKey ? "text" : "password"}
+                value={modelApiKey}
+                onChange={(e) => setModelApiKey(e.target.value)}
+                placeholder="sk-..."
+                inputSize="sm"
+                showPasswordToggle={false}
+                className="mt-1 font-mono"
+                rightSlot={
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-1"
+                  >
+                    {showApiKey ? "隐藏" : "显示"}
+                  </button>
+                }
+              />
             </div>
 
             {/* 模型名称 */}
             <div>
               <label className="block text-sm font-medium">模型名称</label>
-              <input
+              <Input
                 value={modelModel}
                 onChange={(e) => setModelModel(e.target.value)}
                 placeholder="如 gpt-4o-mini / deepseek-chat"
-                className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs"
+                inputSize="sm"
+                className="mt-1 font-mono"
               />
             </div>
 
             {/* 设为默认 */}
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={modelIsDefault}
-                onChange={(e) => setModelIsDefault(e.target.checked)}
-                className="h-5 w-5"
-              />
-              <span className="text-sm">设为默认模型</span>
-            </label>
+            <Checkbox
+              checked={modelIsDefault}
+              onChange={(e) => setModelIsDefault(e.target.checked)}
+              className="mt-1"
+            >
+              设为默认模型
+            </Checkbox>
 
             {/* 错误提示 */}
             {modelError && (
@@ -850,17 +855,12 @@ export default function ProfilePage() {
 
             {/* 保存按钮 */}
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={saveModelConfig}
-                disabled={modelSaving}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                loading={modelSaving}
               >
-                {modelSaving
-                  ? "保存中..."
-                  : editingModel
-                    ? "更新配置"
-                    : "保存配置"}
-              </button>
+                {editingModel ? "更新配置" : "保存配置"}
+              </Button>
               {editingModel && (
                 <span className="text-xs text-gray-500">编辑中：{editingModel.name}</span>
               )}
@@ -925,18 +925,19 @@ export default function ProfilePage() {
         )}
 
         {/* 编辑表单：复用原 editOpen 状态 */}
-        <button
+        <Button
+          variant="secondary"
+          block
           onClick={() => setEditOpen((v) => !v)}
-          className="w-full rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
         >
           {editOpen ? "▲ 收起编辑表单" : "▼ 展开编辑表单"}
-        </button>
+        </Button>
 
         {editOpen && (
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium">用户名（URL 标识）</label>
-              <input
+              <Input
                 value={profile.username}
                 onChange={(e) =>
                   update(
@@ -945,7 +946,7 @@ export default function ProfilePage() {
                   )
                 }
                 placeholder="alice"
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               />
               {profile.username && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -955,27 +956,27 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="block text-sm font-medium">显示名</label>
-              <input
+              <Input
                 value={profile.displayName}
                 onChange={(e) => update("displayName", e.target.value)}
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               />
             </div>
             <div>
               <label className="block text-sm font-medium">简介</label>
-              <textarea
+              <Textarea
                 value={profile.bio}
                 onChange={(e) => update("bio", e.target.value)}
                 rows={2}
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               />
             </div>
             <div>
               <label className="block text-sm font-medium">头像 URL（可选）</label>
-              <input
+              <Input
                 value={profile.avatar ?? ""}
                 onChange={(e) => update("avatar", e.target.value || undefined)}
-                className="mt-1 w-full rounded border px-2 py-1"
+                className="mt-1"
               />
             </div>
 
@@ -1006,13 +1007,13 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={save}
                 disabled={saving || !profile.username}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                loading={saving}
               >
-                {saving ? "保存中..." : "保存"}
-              </button>
+                保存
+              </Button>
               {saved && <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
             </div>
           </div>
@@ -1040,7 +1041,7 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-500">
             配置后首页会显示&quot;现在该做什么&quot;+ 剩余分钟 + 下一项，并联动 FSRS 复习 / 休息工具
           </p>
-          <textarea
+          <Textarea
             value={routine}
             onChange={(e) => {
               setRoutine(e.target.value);
@@ -1049,25 +1050,27 @@ export default function ProfilePage() {
             }}
             rows={12}
             placeholder={defaultRoutineMarkdown()}
-            className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs"
+            inputSize="sm"
+            className="mt-1 font-mono"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
+              size="sm"
               onClick={saveRoutine}
-              disabled={routineSaving}
-              className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              loading={routineSaving}
             >
-              {routineSaving ? "保存中..." : "保存时间表"}
-            </button>
-            <button
+              保存时间表
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => {
                 setRoutine(defaultRoutineMarkdown());
                 setRoutineSaved(false);
               }}
-              className="rounded-lg border px-3 py-1 text-sm hover:bg-gray-50"
             >
               使用模板
-            </button>
+            </Button>
             {routineSaved && (
               <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>
             )}
@@ -1155,27 +1158,28 @@ export default function ProfilePage() {
               { key: "achievements" as const, label: "成就墙" },
             ]
           ).map((item) => (
-            <label
+            <div
               key={item.key}
               className="flex items-center justify-between"
             >
               <span className="text-sm">{item.label}</span>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={profile.visibility[item.key]}
                 onChange={() => toggleVisibility(item.key)}
-                className="h-5 w-5"
+                checkboxSize="lg"
+                labelPosition="left"
               />
-            </label>
+            </div>
           ))}
           <div className="flex items-center gap-2 pt-1">
-            <button
+            <Button
+              size="sm"
               onClick={save}
               disabled={saving || !profile.username}
-              className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              loading={saving}
             >
-              {saving ? "保存中..." : "保存隐私设置"}
-            </button>
+              保存隐私设置
+            </Button>
             {saved && <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
             {!profile.username && (
               <span className="text-xs text-gray-400">需先设置用户名</span>
@@ -1195,12 +1199,13 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-500">
                 开启后可每日定时提醒你学习（外部监督）
               </p>
-              <button
+              <Button
+                size="sm"
+                variant="dark"
                 onClick={requestNotifPermission}
-                className="rounded-lg bg-black px-3 py-1 text-sm text-white hover:bg-gray-800"
               >
                 开启通知
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1238,7 +1243,7 @@ export default function ProfilePage() {
                   <p className="text-orange-500"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 如果没有部署服务端默认模型（未设 OPENAI_API_KEY 等环境变量），即使填了 API_TOKEN 也无法使用默认模型。建议直接配置自己的 AI 模型。</p>
                 </div>
               </details>
-              <input
+              <Input
                 type="password"
                 value={apiToken}
                 onChange={(e) => {
@@ -1246,15 +1251,15 @@ export default function ProfilePage() {
                   setTokenSaved(false);
                 }}
                 placeholder="大多数用户留空即可"
-                className="w-full rounded border px-2 py-1 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
+                inputSize="sm"
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  size="sm"
                   onClick={saveToken}
-                  className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
                 >
                   保存 Token
-                </button>
+                </Button>
                 {tokenSaved && (
                   <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>
                 )}

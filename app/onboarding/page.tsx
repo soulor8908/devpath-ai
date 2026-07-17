@@ -23,6 +23,7 @@ import { KEY_PREFIXES, type LearningPlan } from "@/lib/types";
 import { PRESETS, type PresetMeta } from "@/lib/presets";
 import { MindMap } from "@/components/MindMap";
 import { Icon } from "@/components/Icon";
+import { Button, Input } from "@/components/ui";
 import { nanoid } from "nanoid";
 
 export default function OnboardingPage() {
@@ -230,12 +231,11 @@ export default function OnboardingPage() {
           <label className="block text-sm font-medium mb-1">
             AI API Key（可选）
           </label>
-          <input
+          <Input
             value={aiKey}
             onChange={(e) => setAiKey(e.target.value)}
             placeholder="sk-... 留空则用预设数据"
             type="password"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
           />
           <p className="text-xs text-gray-500 mt-1">
             填入可解锁 AI 重新生成知识树 + 面试题生成（支持 GLM/DeepSeek/MiMo）
@@ -244,20 +244,16 @@ export default function OnboardingPage() {
       </div>
 
       {/* 开始按钮 */}
-      <button
+      <Button
+        variant="success"
+        size="lg"
+        block
         onClick={confirmAndStart}
-        disabled={saving}
-        className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+        loading={saving}
+        leftIcon={saving ? undefined : "zap"}
       >
-        {saving ? (
-          "创建计划中..."
-        ) : (
-          <>
-            <Icon name="zap" className="w-4 h-4" />
-            开始学习 →
-          </>
-        )}
-      </button>
+        {saving ? "创建计划中..." : "开始学习 →"}
+      </Button>
       <p className="text-center text-xs text-gray-400 mt-2">
         计划创建后可随时在「学习」页用 AI 重新生成
       </p>
