@@ -377,7 +377,7 @@ export default function UserPageClient() {
         )}
 
         {/* ============ Footer ============ */}
-        <footer className="text-center text-xs text-gray-400 dark:text-gray-600 pt-4">
+        <footer className="text-center text-xs text-gray-400 dark:text-gray-500 pt-4">
           <Link
             href="/"
             className="inline-flex items-center gap-1 hover:text-purple-500 transition-colors"

@@ -995,7 +995,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                 {profile.bio || "(暂无简介)"}
               </p>
               <div className="mt-2 flex gap-2 text-xs text-gray-500">
@@ -1277,7 +1277,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="shrink-0 text-gray-500">技术栈</dt>
-              <dd className="text-right text-gray-700">
+              <dd className="text-right text-gray-700 dark:text-gray-300">
                 Next.js 15 · React 19 · TypeScript · Cloudflare Pages · IndexedDB · FSRS · Vercel AI SDK
               </dd>
             </div>
@@ -1296,7 +1296,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-gray-500">部署平台</dt>
-              <dd className="text-gray-700">Cloudflare Pages（edge runtime）</dd>
+              <dd className="text-gray-700 dark:text-gray-300">Cloudflare Pages（edge runtime）</dd>
             </div>
           </dl>
         </div>
@@ -1328,7 +1328,7 @@ export default function ProfilePage() {
                     ›
                   </span>
                 </summary>
-                <p className="mt-2 text-gray-600">{faq.a}</p>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">{faq.a}</p>
               </details>
             ))}
           </div>
@@ -1347,7 +1347,7 @@ export default function ProfilePage() {
 
           <div className="flex items-center justify-between border-t pt-4 text-sm">
             <span className="text-gray-500">快捷键</span>
-            <span className="text-gray-700">
+            <span className="text-gray-700 dark:text-gray-300">
               <kbd className="rounded border bg-gray-50 px-1.5 py-0.5 text-xs">
                 Cmd/Ctrl+K
               </kbd>{" "}
