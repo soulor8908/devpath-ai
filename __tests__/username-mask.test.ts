@@ -2,7 +2,7 @@
 // 测试用户名脱敏函数
 
 import { describe, it, expect } from "vitest";
-import { maskUsername } from "../lib/username-mask";
+import { maskUsername, maskUserId } from "../lib/username-mask";
 
 describe("maskUsername", () => {
   it("长度 > 6：保留前 2 + 后 2，中间固定 4 个 *", () => {
@@ -50,5 +50,55 @@ describe("maskUsername", () => {
     const masked = maskUsername("soulor8908");
     expect(masked.startsWith("so")).toBe(true);
     expect(masked.endsWith("08")).toBe(true);
+  });
+});
+
+describe("maskUserId", () => {
+  it("长度 21（nanoid 默认）：前 4 + **** + 后 4", () => {
+    const id = "V1StGXRK_Z5jdHi6J5oPq"; // 长度 21
+    const masked = maskUserId(id);
+    expect(masked).toBe("V1St" + "****" + "5oPq");
+    expect(masked.length).toBe(12);
+  });
+
+  it("长度 12：前 4 + **** + 后 4", () => {
+    expect(maskUserId("abcdefghijkl")).toBe("abcd****ijkl");
+  });
+
+  it("长度 9：前 4 + **** + 后 4", () => {
+    expect(maskUserId("abcdefghi")).toBe("abcd****fghi");
+  });
+
+  it("长度 8：前 2 + **** + 后 2", () => {
+    expect(maskUserId("abcdefgh")).toBe("ab****gh");
+  });
+
+  it("长度 6：前 2 + **** + 后 2", () => {
+    expect(maskUserId("abcdef")).toBe("ab****ef");
+  });
+
+  it("空 ID 返回空串", () => {
+    expect(maskUserId("")).toBe("");
+  });
+
+  it("脱敏后始终包含 4 个 *（不暴露原始长度）", () => {
+    const short = maskUserId("abc");      // 长度 3
+    const medium = maskUserId("abcdefgh"); // 长度 8
+    const long = maskUserId("V1StGXRK_Z5jdHi6J5"); // 长度 18
+    // 都包含 4 个连续 *
+    expect(short.includes("****")).toBe(true);
+    expect(medium.includes("****")).toBe(true);
+    expect(long.includes("****")).toBe(true);
+  });
+
+  it("长度 3：前 2 + **** + 后 2（脱敏后字符比原长，仍按规则）", () => {
+    expect(maskUserId("abc")).toBe("ab****bc");
+  });
+
+  it("保留首末字符让用户能认出自己", () => {
+    const id = "V1StGXRK_Z5jdHi6J5oPq";
+    const masked = maskUserId(id);
+    expect(masked.startsWith("V1St")).toBe(true);  // 前 4
+    expect(masked.endsWith("5oPq")).toBe(true);   // 后 4
   });
 });

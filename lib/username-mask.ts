@@ -32,3 +32,32 @@ export function maskUsername(username: string): string {
   // len > 6：前 2 + 固定 4 个 * + 后 2（不暴露长度）
   return username.slice(0, 2) + "****" + username.slice(-2);
 }
+
+/**
+ * 用户 ID 脱敏
+ *
+ * userId（nanoid 生成的同步钥匙）与 username 不同：
+ *   - 长度更长（默认 nanoid 21 字符）
+ *   - 是敏感凭证：泄露后他人可同步/覆盖你的数据
+ *
+ * 规则：
+ *   - 空：原样返回
+ *   - 长度 ≤ 8：前 2 + 固定 4 个 * + 后 2
+ *   - 长度 > 8：前 4 + 固定 4 个 * + 后 4
+ *
+ * @example
+ *   maskUserId("V1StGXRK_Z5jdHi6J5")   → "V1St****i6J5"（nanoid 默认长度 21）
+ *   maskUserId("V1StGXRK_Z5")          → "V1St****K_Z5"
+ *   maskUserId("abcd")                  → "ab****cd"
+ *   maskUserId("")                       → ""
+ */
+export function maskUserId(userId: string): string {
+  if (!userId) return "";
+  const len = userId.length;
+  if (len <= 8) {
+    // 长度 ≤ 8：前 2 + 4 个 * + 后 2
+    return userId.slice(0, 2) + "****" + userId.slice(-2);
+  }
+  // 长度 > 8：前 4 + 4 个 * + 后 4
+  return userId.slice(0, 4) + "****" + userId.slice(-4);
+}
