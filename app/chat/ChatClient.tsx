@@ -31,6 +31,8 @@ import {
 import { listModelConfigs, getDefaultModelConfig } from "@/lib/model-config";
 import { AnswerContent } from "@/components/CodeBlock";
 import { Icon } from "@/components/Icon";
+import { QuickShortcuts } from "@/components/QuickShortcuts";
+import { ModelIconSelector } from "@/components/ModelIconSelector";
 import { buildChatContext, buildToolContext } from "@/lib/ai/chat-context";
 import type { ClientAction } from "@/lib/ai/chat-tools";
 import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
@@ -93,11 +95,16 @@ export default function ChatClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // 用户消息编辑：仅最新一条 user 消息可编辑，编辑时渲染 textarea 替代气泡
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   // AI 调用记录 ID 映射：messageId → callId（用于反馈归因，仅当前会话有效）
   const aiCallIdMap = useRef<Map<string, string>>(new Map());
+  // 初始加载守卫：避免在 modal 反复挂载/卸载或 StrictMode 双调用时重复自动选中最近对话
+  const initialRestoreDone = useRef(false);
 
   // 刷新对话列表
   const refreshConversations = useCallback(async () => {
@@ -152,6 +159,15 @@ export default function ChatClient() {
             await loadConversation(conv);
             if (conv.modelConfigId) setSelectedModelId(conv.modelConfigId);
           }
+        } else if (!initialRestoreDone.current) {
+          // 无显式 conversationId（如模态模式直接打开）：默认恢复最近一条对话
+          initialRestoreDone.current = true;
+          if (convs.length > 0) {
+            const latest = convs[0]; // listConversations 已按 pinned + lastMessageAt desc 排序
+            await loadConversation(latest);
+            if (latest.modelConfigId) setSelectedModelId(latest.modelConfigId);
+          }
+          // 列表为空则保持空状态（messages 区会展示快捷指引）
         }
         if (prefill) {
           try {
@@ -175,6 +191,14 @@ export default function ChatClient() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) => c.title.toLowerCase().includes(q));
+  })();
+
+  // 最新一条 user 消息 id（用于"编辑"与"刷新"按钮的展示判定）
+  const lastUserMessageId = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].id;
+    }
+    return null;
   })();
 
   // 页面重新可见时刷新模型配置（从 profile 页添加模型后返回）
@@ -506,6 +530,12 @@ export default function ChatClient() {
     inputRef.current?.focus();
   }, []);
 
+  // 快捷指令：直接填入输入框（覆盖），不自动发送
+  const handleShortcutSelect = useCallback((prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
+
   // 共享：调用 /api/chat 流式获取 AI 回复，返回完整内容 + 执行 clientAction
   // convId/msgs/history 由调用方决定（普通发送 vs 重新生成）
   const streamAIResponse = useCallback(
@@ -772,39 +802,43 @@ export default function ChatClient() {
     router,
   ]);
 
-  // 重新生成某条 AI 回复：删除该消息及其后所有消息，用前一条 user 消息重新请求 AI
+  // 重新生成：以 user 消息为锚点，删除其后的 AI 回复及后续消息，用该 user 消息重新请求 AI
+  // 入参由原先的 assistantMessageId 改为 userMessageId（刷新按钮挂在 user 消息下）
   const handleRegenerateAnswer = useCallback(
-    async (assistantMessageId: string) => {
+    async (userMessageId: string) => {
       if (streaming) return;
       setError(null);
       try {
-        // 1. 找到该 AI 消息及其前一条 user 消息
-        const idx = messages.findIndex((m) => m.id === assistantMessageId);
-        if (idx === -1) return;
-        const targetMsg = messages[idx];
-        if (targetMsg.role !== "assistant") return;
-        // 向前找最近的 user 消息
-        let userIdx = idx - 1;
-        while (userIdx >= 0 && messages[userIdx].role !== "user") userIdx--;
-        if (userIdx < 0) {
-          setError("找不到对应的用户提问，无法重新生成");
-          return;
-        }
+        // 1. 定位该 user 消息
+        const userIdx = messages.findIndex((m) => m.id === userMessageId);
+        if (userIdx === -1) return;
         const userMsg = messages[userIdx];
+        if (userMsg.role !== "user") return;
+        const convId = userMsg.conversationId;
+        if (!convId) return;
 
-        // 2. 删除该 AI 消息及其后的所有消息（保留 user 消息及更早的消息）
-        // 使用 deleteMessagesFrom 删除从 targetMsg 开始的（含）
-        await deleteMessagesFrom(assistantMessageId);
-        // 更新本地 state：只保留 userIdx（含）之前的消息
-        const remaining = messages.slice(0, idx);
+        // 2. 找到其后的下一条 assistant 消息（要被删除的 AI 回复起点）
+        let assistantIdx = userIdx + 1;
+        while (
+          assistantIdx < messages.length &&
+          messages[assistantIdx].role !== "assistant"
+        ) {
+          assistantIdx++;
+        }
+
+        // 3. 删除该 assistant 消息及其后的所有消息（保留 user 消息及更早的消息）
+        if (assistantIdx < messages.length) {
+          await deleteMessagesFrom(messages[assistantIdx].id);
+        }
+        // 本地 state：保留 user 消息（含）及之前的消息
+        const remaining = messages.slice(0, userIdx + 1);
         setMessages(remaining);
 
-        // 3. 用截断后的历史重新请求 AI
+        // 4. 用截断后的历史重新请求 AI（user 消息已在 history 末尾）
         const history = remaining.map((m) => ({
           role: m.role,
           content: m.content,
         }));
-        const convId = targetMsg.conversationId;
         const result = await streamAIResponse({
           convId,
           history,
@@ -856,6 +890,60 @@ export default function ChatClient() {
     }).catch(() => {});
   }, []);
 
+  // 保存编辑后的用户消息：删除该消息及之后所有消息 → 重新写入编辑后的 user 消息 → 重新请求 AI
+  const handleSaveEdit = useCallback(
+    async (messageId: string) => {
+      const text = editContent.trim();
+      if (!text || streaming) return;
+      const idx = messages.findIndex((m) => m.id === messageId);
+      if (idx === -1) return;
+      const targetMsg = messages[idx];
+      if (targetMsg.role !== "user") return;
+      const convId = targetMsg.conversationId;
+      if (!convId) return;
+
+      setError(null);
+      setEditingMessageId(null);
+      setEditContent("");
+
+      try {
+        // 1. 删除该 user 消息及其后所有消息（含对应的 AI 回复）
+        await deleteMessagesFrom(messageId);
+        // 2. 写入编辑后的新 user 消息
+        const newUserMsg = await addMessage({
+          conversationId: convId,
+          role: "user",
+          content: text,
+        });
+        // 3. 本地 state：保留 idx 之前的消息 + 新 user 消息
+        const remaining = messages.slice(0, idx);
+        const newMessages = [...remaining, newUserMsg];
+        setMessages(newMessages);
+        // 4. 用截断后的历史重新请求 AI
+        const history = newMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        const result = await streamAIResponse({
+          convId,
+          history,
+          label: text,
+        });
+        if ("error" in result) {
+          setError(result.error);
+        } else {
+          await refreshConversations();
+        }
+      } catch (e) {
+        setStreaming(false);
+        setStreamContent("");
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+      }
+    },
+    [editContent, streaming, messages, streamAIResponse, refreshConversations],
+  );
+
   // 键盘快捷键：Enter 发送，Shift+Enter 换行
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -869,23 +957,25 @@ export default function ChatClient() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bottom-16 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <p className="text-gray-400 dark:text-gray-500">加载中...</p>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bottom-16 flex flex-col overflow-hidden">
-      {/* 顶部栏（固定不动） */}
-      <header className="shrink-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-3 py-2.5 flex items-center gap-1 z-20">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* 顶部精简工具条：新建对话 + 标题 + 收藏/删除
+          （ChatModal 已提供标题栏与关闭按钮，这里只保留对话级操作） */}
+      <header className="shrink-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-3 py-2 flex items-center gap-1 z-20">
         <button
           type="button"
-          onClick={() => setShowHistory(true)}
-          aria-label="历史对话"
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          onClick={handleNewConversation}
+          aria-label="新建对话"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-blue-500"
+          title="新建对话"
         >
-          <Icon name="menu" className="w-5 h-5" />
+          <Icon name="plus" className="w-5 h-5" />
         </button>
         <h1 className="flex-1 truncate font-medium text-sm px-1">
           {activeConv?.title ?? "新对话"}
@@ -1005,28 +1095,99 @@ export default function ChatClient() {
           m.role === "user" ? (
             <div
               key={m.id}
-              className="ml-auto max-w-[80%] bg-blue-500 text-white rounded-2xl rounded-br-sm px-3 py-2 text-sm whitespace-pre-wrap break-words group relative"
+              className="ml-auto max-w-[80%] group relative flex flex-col items-end"
             >
-              {m.content}
-              {/* 删除单条消息按钮（hover 显示） */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const ok = await confirmDialog({
-                    title: "删除这条消息？",
-                    message: "确定删除这条消息吗？此操作不可恢复。",
-                    confirmText: "删除",
-                    cancelText: "取消",
-                    danger: true,
-                  });
-                  if (ok) handleDeleteMessage(m.id);
-                }}
-                className="absolute -left-7 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="删除消息"
-                title="删除消息"
-              >
-                <Icon name="trash" className="w-3.5 h-3.5" />
-              </button>
+              {m.id === editingMessageId ? (
+                /* 编辑模式：textarea + 保存/取消 */
+                <div className="w-full bg-blue-50 dark:bg-blue-900/30 rounded-2xl rounded-br-sm p-2 border border-blue-200 dark:border-blue-800">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    rows={3}
+                    autoFocus
+                    className="w-full resize-none border-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 p-1"
+                  />
+                  <div className="flex justify-end gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingMessageId(null);
+                        setEditContent("");
+                      }}
+                      className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(m.id)}
+                      disabled={!editContent.trim() || streaming}
+                      className="px-2.5 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-40"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* 正常气泡 */
+                <div className="bg-blue-500 text-white rounded-2xl rounded-br-sm px-3 py-2 text-sm whitespace-pre-wrap break-words">
+                  {m.content}
+                </div>
+              )}
+
+              {/* 操作按钮（hover 显示；编辑模式下隐藏） */}
+              {m.id !== editingMessageId && (
+                <>
+                  {/* 删除单条消息按钮 */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirmDialog({
+                        title: "删除这条消息？",
+                        message: "确定删除这条消息吗？此操作不可恢复。",
+                        confirmText: "删除",
+                        cancelText: "取消",
+                        danger: true,
+                      });
+                      if (ok) handleDeleteMessage(m.id);
+                    }}
+                    className="absolute -left-7 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="删除消息"
+                    title="删除消息"
+                  >
+                    <Icon name="trash" className="w-3.5 h-3.5" />
+                  </button>
+                  {/* 编辑按钮：仅最新一条 user 消息 + 非流式输出时显示 */}
+                  {!streaming && m.id === lastUserMessageId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingMessageId(m.id);
+                        setEditContent(m.content);
+                      }}
+                      className="absolute -left-14 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="编辑消息"
+                      title="编辑消息"
+                    >
+                      <Icon name="pen" className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* 刷新按钮：仅最新一条 user 消息下方显示（重新生成对应 AI 回复） */}
+              {!streaming && m.id === lastUserMessageId && m.id !== editingMessageId && (
+                <button
+                  type="button"
+                  onClick={() => handleRegenerateAnswer(m.id)}
+                  className="mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="刷新回答"
+                  title="重新生成 AI 回答"
+                >
+                  <Icon name="refresh-cw" className="w-3 h-3" />
+                  刷新
+                </button>
+              )}
             </div>
           ) : (
             <div
@@ -1034,20 +1195,9 @@ export default function ChatClient() {
               className="mr-auto max-w-[80%] bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-sm px-3 py-2 text-sm group"
             >
               <AnswerContent text={m.content} />
-              {/* 操作工具栏：重新生成 / 删除 / 反馈（hover 显示） */}
+              {/* 操作工具栏：删除 / 反馈（hover 显示）
+                  注：重新生成入口已迁移到"最新 user 消息下方的刷新按钮"，此处不再重复 */}
               <div className="mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                {/* 重新生成：仅当不在流式输出中、且该消息后面没有更新的消息（即它是最后一条 AI 消息）时显示 */}
-                {!streaming && messages.indexOf(m) === messages.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRegenerateAnswer(m.id)}
-                    className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-500"
-                    aria-label="重新生成"
-                    title="重新生成此回答"
-                  >
-                    <Icon name="refresh-cw" className="w-3.5 h-3.5" />
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={async () => {
@@ -1101,33 +1251,22 @@ export default function ChatClient() {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* 底部输入栏（固定在底部，不随消息滚动） */}
-      <footer className="shrink-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-3">
-        {showPrompts && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {BUILTIN_PROMPTS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => applyPrompt(p)}
-                className="px-3 py-1 text-xs bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-full transition-colors"
-              >
-                {p}
-              </button>
-            ))}
+      {/* 底部输入栏（两行布局：上=快捷指令+模型图标，下=输入框+发送） */}
+      <footer className="shrink-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-3 space-y-2">
+        {/* 第 1 行：快捷指令（占据剩余空间，横向滚动） + 模型图标选择器 */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 overflow-x-auto">
+            <QuickShortcuts onSelect={handleShortcutSelect} />
           </div>
-        )}
+          <div className="shrink-0">
+            <ModelIconSelector
+              selectedModelId={selectedModelId || null}
+              onSelect={setSelectedModelId}
+            />
+          </div>
+        </div>
+        {/* 第 2 行：输入框 + 发送按钮 */}
         <div className="flex items-end gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPrompts((v) => !v)}
-            aria-label="提示词库"
-            className={`p-2.5 rounded-lg shrink-0 transition-colors ${
-              showPrompts ? "bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400" : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
-            }`}
-          >
-            <Icon name="zap" className="w-5 h-5" />
-          </button>
           <textarea
             ref={inputRef}
             value={input}
@@ -1148,147 +1287,7 @@ export default function ChatClient() {
             <Icon name="send" className="w-5 h-5" />
           </button>
         </div>
-        {/* 模型选择器 */}
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          <span className="text-gray-500 dark:text-gray-400">模型:</span>
-          {modelConfigs.length === 0 ? (
-            <span className="text-gray-400 dark:text-gray-500">
-              <span className="text-red-500 font-medium"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 未配置模型</span>{" "}
-              ·{" "}
-              <Link href="/profile" className="text-blue-500 hover:underline">
-                去添加 →
-              </Link>
-            </span>
-          ) : (
-            <select
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            >
-              {modelConfigs.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
       </footer>
-
-      {/* 历史抽屉 */}
-      {showHistory && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setShowHistory(false)}
-            aria-hidden="true"
-          />
-          <aside className="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-800 shadow-lg z-50 transform transition-transform flex flex-col">
-            {/* 抽屉顶部：新建按钮 */}
-            <div className="p-3 border-b dark:border-gray-700">
-              <button
-                type="button"
-                onClick={handleNewConversation}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-              >
-                <Icon name="plus" className="w-4 h-4" />
-                新建对话
-              </button>
-            </div>
-            {/* 对话列表 */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {filteredConversations.length === 0 ? (
-                <p className="text-center text-gray-400 dark:text-gray-500 text-sm py-6">
-                  {searchQuery ? "无匹配对话" : "暂无历史对话"}
-                </p>
-              ) : (
-                filteredConversations.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`group p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      activeConv?.id === c.id ? "bg-blue-50 dark:bg-blue-900/30" : ""
-                    }`}
-                    onClick={() => switchConversation(c)}
-                  >
-                    <div className="flex items-start gap-1">
-                      <span className="text-sm flex-1 truncate text-gray-800 dark:text-gray-200">{c.title}</span>
-                      {c.pinned && <Icon name="pin" className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />}
-                    </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {relativeTime(c.lastMessageAt)}
-                      </span>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleTogglePin(c.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-blue-500 rounded"
-                          aria-label="收藏"
-                        >
-                          <Icon name="pin" className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRename(c.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                          aria-label="重命名"
-                        >
-                          <Icon name="pen" className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const ok = await confirmDialog({
-                              title: "删除此对话？",
-                              message: "确定删除此对话吗？所有消息将一并删除，此操作不可恢复。",
-                              confirmText: "删除",
-                              cancelText: "取消",
-                              danger: true,
-                            });
-                            if (ok) {
-                              handleDelete(c.id);
-                            }
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-500 rounded"
-                          aria-label="删除"
-                        >
-                          <Icon name="trash" className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {/* 抽屉底部：搜索框 */}
-            <div className="p-3 border-t dark:border-gray-700">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={async (e) => {
-                  setSearchQuery(e.target.value);
-                  const q = e.target.value.trim();
-                  if (q) {
-                    const results = await searchConversations(q);
-                    setConversations(results);
-                  } else {
-                    await refreshConversations();
-                  }
-                }}
-                placeholder="搜索对话..."
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
-              />
-            </div>
-          </aside>
-        </>
-      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { ToastContainer } from "@/components/Toast";
+import { FloatingChat } from "@/components/FloatingChat";
 
 export const metadata: Metadata = {
   title: "devpath-ai — AI 驱动的开发者成长 OS",
@@ -42,6 +43,7 @@ export default function RootLayout({
         {children}
         <ToastContainer />
         <Nav />
+        <FloatingChat />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
