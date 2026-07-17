@@ -27,6 +27,7 @@ import { recordMistake } from "@/lib/mistake-book";
 import { listFavoriteDecks } from "@/lib/favorite";
 import { ReviewCardView } from "@/components/ReviewCardView";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select } from "@/components/ui";
 import {
   applyReviewFilters,
   DEFAULT_FILTERS,
@@ -305,22 +306,23 @@ export default function ReviewPage() {
               <span className="text-[10px] text-blue-500">·已筛选</span>
             )}
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setFilterCollapsed((v) => !v)}
-            className="text-xs text-gray-500 hover:text-gray-700"
           >
             {filterCollapsed ? "展开过滤" : "收起"}
-          </button>
+          </Button>
         </div>
 
         {!filterCollapsed && (
           <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
             {/* 计划 + 知识点下拉 */}
             <div className="grid grid-cols-2 gap-2">
-              <select
+              <Select
+                inputSize="sm"
                 value={filters.planId}
                 onChange={(e) => setFilters((f) => ({ ...f, planId: e.target.value }))}
-                className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
               >
                 <option value="all">全部计划</option>
                 {plans.map((p) => (
@@ -328,11 +330,11 @@ export default function ReviewPage() {
                     {p.topic}
                   </option>
                 ))}
-              </select>
-              <select
+              </Select>
+              <Select
+                inputSize="sm"
                 value={filters.nodeId}
                 onChange={(e) => setFilters((f) => ({ ...f, nodeId: e.target.value }))}
-                className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
               >
                 <option value="all">全部知识点</option>
                 {allNodes.map((n) => (
@@ -340,7 +342,7 @@ export default function ReviewPage() {
                     {n.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* 难度按钮 */}
@@ -386,26 +388,22 @@ export default function ReviewPage() {
 
             {/* 搜索 + 清除 */}
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Icon
-                  name="search"
-                  className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2"
-                />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                  placeholder="搜索正面 / 背面"
-                  className="w-full text-xs border border-gray-200 rounded pl-7 pr-2 py-1"
-                />
-              </div>
-              <button
+              <Input
+                inputSize="sm"
+                leftIcon="search"
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                placeholder="搜索正面 / 背面"
+                className="flex-1"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setFilters(DEFAULT_FILTERS)}
                 disabled={!isFiltered}
-                className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-40"
               >
                 清除筛选
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -415,26 +413,29 @@ export default function ReviewPage() {
       {dueCards.length > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={goPrev}
               disabled={currentIndex === 0}
-              className="text-xs px-2 py-1 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
             >
               <Icon name="chevron-right" className="w-3.5 h-3.5 inline-block rotate-180" /> 上一条
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowJumpSlider((v) => !v)}
-              className="text-xs text-gray-600 hover:text-gray-900"
             >
               {currentIndex + 1} / {dueCards.length}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={goNext}
               disabled={currentIndex >= dueCards.length - 1}
-              className="text-xs px-2 py-1 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
             >
               下一条 <Icon name="chevron-right" className="w-3.5 h-3.5 inline-block" />
-            </button>
+            </Button>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
             <div
@@ -507,24 +508,28 @@ export default function ReviewPage() {
 
           {/* 操作行 */}
           <div className="mt-3 flex items-center justify-between gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleSkip}
-              className="text-xs px-3 py-1.5 rounded border border-gray-200 bg-white hover:bg-gray-50"
             >
               跳过
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleBury}
-              className="text-xs px-3 py-1.5 rounded border border-gray-200 bg-white hover:bg-gray-50"
             >
               暂不复习
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon="trash"
               onClick={() => handleDelete(card.id)}
-              className="text-xs px-3 py-1.5 rounded border border-red-200 text-red-500 bg-white hover:bg-red-50"
             >
-              <Icon name="trash" className="w-3.5 h-3.5 inline-block" /> 删除
-            </button>
+              删除
+            </Button>
           </div>
         </>
       )}

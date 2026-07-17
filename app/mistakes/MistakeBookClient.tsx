@@ -12,6 +12,7 @@ import {
   resolveMistake,
 } from "@/lib/mistake-book";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 /** 相对时间（"2小时前"） */
 function relativeTime(iso: string): string {
@@ -192,12 +193,13 @@ export default function MistakeBookClient() {
                     <span>{relativeTime(m.lastWrongAt)}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => handleResolve(m.id)}
-                      className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded font-medium hover:bg-green-100 transition-colors"
                     >
                       已掌握
-                    </button>
+                    </Button>
                     <Link
                       href="/review"
                       className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded font-medium hover:bg-blue-100 transition-colors"

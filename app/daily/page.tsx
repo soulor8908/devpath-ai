@@ -10,7 +10,7 @@ import { getItem, setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES, type DailyLog } from "@/lib/types";
 import { parseDailyLog, toggleChecklistItem, createEmptyLog, formatDailyLog } from "@/lib/daily";
 import { chinaDateNow } from "@/lib/time";
-import { Icon } from "@/components/Icon";
+import { Button, Input, Textarea, Checkbox } from "@/components/ui";
 
 export default function DailyPage() {
   const [date, setDate] = useState(chinaDateNow());
@@ -117,17 +117,15 @@ export default function DailyPage() {
         <p className="text-sm font-medium mb-2 text-gray-800 dark:text-gray-200">今日执行 checklist</p>
         <div className="space-y-2">
           {log.checklist.map((item, i) => (
-            <label key={i} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={() => toggleChecklist(i)}
-                className="w-4 h-4"
-              />
+            <Checkbox
+              key={i}
+              checked={item.checked}
+              onChange={() => toggleChecklist(i)}
+            >
               <span className={`text-sm ${item.checked ? "line-through text-gray-400" : "text-gray-700 dark:text-gray-300"}`}>
                 {item.text}
               </span>
-            </label>
+            </Checkbox>
           ))}
           {log.checklist.length === 0 && (
             <p className="text-xs text-gray-400">当日无 checklist</p>
@@ -141,33 +139,27 @@ export default function DailyPage() {
         <div className="grid grid-cols-2 gap-2 text-sm">
           <label className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
             睡眠
-            <input
-              type="text"
+            <Input
+              inputSize="sm"
               value={log.energy.sleep}
               onChange={(e) => setLog({ ...log, energy: { ...log.energy, sleep: e.target.value } })}
               placeholder="7.5"
-              className="w-12 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              className="w-12"
             />
             h
           </label>
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={log.energy.sleepOnTime === true}
-              onChange={(e) => setLog({ ...log, energy: { ...log.energy, sleepOnTime: e.target.checked } })}
-              className="w-4 h-4"
-            />
-            <span className="text-xs">22:45 关灯</span>
-          </label>
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={log.energy.exerciseDone === true}
-              onChange={(e) => setLog({ ...log, energy: { ...log.energy, exerciseDone: e.target.checked } })}
-              className="w-4 h-4"
-            />
-            <span className="text-xs">晨练执行</span>
-          </label>
+          <Checkbox
+            checked={log.energy.sleepOnTime === true}
+            onChange={(e) => setLog({ ...log, energy: { ...log.energy, sleepOnTime: e.target.checked } })}
+            label={<span className="text-xs">22:45 关灯</span>}
+            className="text-gray-700 dark:text-gray-300"
+          />
+          <Checkbox
+            checked={log.energy.exerciseDone === true}
+            onChange={(e) => setLog({ ...log, energy: { ...log.energy, exerciseDone: e.target.checked } })}
+            label={<span className="text-xs">晨练执行</span>}
+            className="text-gray-700 dark:text-gray-300"
+          />
           <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
             晨
             {[1, 2, 3, 4, 5].map((n) => (
@@ -210,33 +202,38 @@ export default function DailyPage() {
       {/* 复盘 */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-2">
         <p className="text-sm font-medium text-gray-800 dark:text-gray-200">复盘</p>
-        <textarea
+        <Textarea
+          inputSize="sm"
+          rows={3}
           value={log.review.good}
           onChange={(e) => setLog({ ...log, review: { ...log.review, good: e.target.value } })}
           placeholder="今天做得好的"
-          className="w-full border rounded px-2 py-1 text-xs h-16 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
         />
-        <textarea
+        <Textarea
+          inputSize="sm"
+          rows={3}
           value={log.review.problems}
           onChange={(e) => setLog({ ...log, review: { ...log.review, problems: e.target.value } })}
           placeholder="今天的问题"
-          className="w-full border rounded px-2 py-1 text-xs h-16 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
         />
-        <textarea
+        <Textarea
+          inputSize="sm"
+          rows={3}
           value={log.review.tomorrow}
           onChange={(e) => setLog({ ...log, review: { ...log.review, tomorrow: e.target.value } })}
           placeholder="明天的调整"
-          className="w-full border rounded px-2 py-1 text-xs h-16 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
         />
       </div>
 
-      <button
+      <Button
+        variant="primary"
+        block
+        loading={saving}
+        leftIcon={savedAt && Date.now() - savedAt < 3000 ? "check" : undefined}
         onClick={save}
-        disabled={saving}
-        className="w-full bg-blue-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-600 disabled:opacity-40 transition-colors"
       >
-        {saving ? "保存中..." : savedAt && Date.now() - savedAt < 3000 ? <span className="inline-flex items-center gap-1"><Icon name="check" className="w-4 h-4 inline-block" />已保存</span> : "保存日志"}
-      </button>
+        {saving ? "保存中..." : savedAt && Date.now() - savedAt < 3000 ? "已保存" : "保存日志"}
+      </Button>
     </div>
   );
 }

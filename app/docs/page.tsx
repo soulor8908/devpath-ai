@@ -7,6 +7,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { AnswerContent } from "@/components/CodeBlock";
+import { Button, Input } from "@/components/ui";
 import { DOC_CATEGORIES, DOC_SECTIONS, type DocSection } from "@/lib/docs-content";
 
 export default function DocsPage() {
@@ -65,13 +66,15 @@ export default function DocsPage() {
       {/* 标题栏 */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="切换目录"
+            className="lg:hidden"
           >
             <Icon name="list" className="w-5 h-5" />
-          </button>
+          </Button>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Icon name="book" className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             使用文档
@@ -87,25 +90,27 @@ export default function DocsPage() {
       </div>
 
       {/* 搜索框 */}
-      <div className="relative mb-4">
-        <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索文档…（如：同步、模型、复习、错题）"
-          className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            aria-label="清除搜索"
-          >
-            <Icon name="x" className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      <Input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="搜索文档…（如：同步、模型、复习、错题）"
+        leftIcon="search"
+        inputSize="md"
+        className="w-full mb-4"
+        rightSlot={
+          search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="清除搜索"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="flex gap-6">
         {/* 侧边栏目录 */}

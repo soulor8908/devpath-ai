@@ -10,6 +10,7 @@ import { KEY_PREFIXES } from "@/lib/types";
 import type { FavoriteDeck } from "@/lib/types";
 import type { FavoritedQuestionWithPlan } from "@/lib/favorite";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { Button } from "@/components/ui";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -175,25 +176,29 @@ export default function FavoritesPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handleStartReview(deck)}
-                    disabled={reviewStarting === deck.id}
-                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50 inline-flex items-center gap-1"
+                    loading={reviewStarting === deck.id}
                   >
                     {reviewStarting === deck.id ? "准备中..." : "开始复习"}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setExpandedDeck(expandedDeck === deck.id ? null : deck.id)}
-                    className="px-3 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium hover:bg-gray-200"
                   >
                     {expandedDeck === deck.id ? "收起" : "查看题目"}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon="trash"
                     onClick={() => handleDeleteDeck(deck.id, deck.topic)}
-                    className="px-3 py-1 bg-red-50 text-red-600 rounded text-xs font-medium hover:bg-red-100"
                   >
                     删除
-                  </button>
+                  </Button>
                 </div>
                 {expandedDeck === deck.id && (
                   <div className="mt-3 space-y-2">
@@ -224,12 +229,15 @@ export default function FavoritesPage() {
                     <p className="text-sm font-medium">{q.question}</p>
                     <p className="text-xs text-gray-400 mt-1">来自：{planTopic}</p>
                   </div>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon="trash"
+                    className="shrink-0"
                     onClick={() => handleUnfavorQuestion(planId, q.id, q.question)}
-                    className="shrink-0 px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-medium hover:bg-red-100"
                   >
                     取消收藏
-                  </button>
+                  </Button>
                 </div>
                 {q.keyPoints.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">

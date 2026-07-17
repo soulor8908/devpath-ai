@@ -29,6 +29,7 @@ import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
 import { StatusCard } from "@/components/StatusCard";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
@@ -141,14 +142,14 @@ export default function HomeClient() {
               {new Date().toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })}
             </p>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon="share"
             onClick={handleShare}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
           >
-            <Icon name="share" className="w-3.5 h-3.5" />
             分享
-          </button>
+          </Button>
         </div>
         {shareMsg && (
           <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-2 text-sm text-blue-700 dark:text-blue-300 break-all">
@@ -369,13 +370,14 @@ export default function HomeClient() {
                   <Icon name="heart" className="w-4 h-4 text-pink-500" />
                   今日情绪
                 </h3>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon="plus"
                   onClick={() => setShowEmotionRecorder(!showEmotionRecorder)}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
                 >
-                  <Icon name="plus" className="w-3.5 h-3.5" />
                   {showEmotionRecorder ? "收起" : "记一次"}
-                </button>
+                </Button>
               </div>
 
               {showEmotionRecorder && (
