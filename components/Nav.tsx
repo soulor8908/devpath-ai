@@ -13,7 +13,6 @@ import { Icon, type IconName } from "@/components/Icon";
 const items: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/", label: "今日", icon: "home" },
   { href: "/learn", label: "学习", icon: "book" },
-  { href: "/chat", label: "AI", icon: "chat" },
   { href: "/review", label: "复习", icon: "repeat" },
   { href: "/profile", label: "我的", icon: "user" },
 ];

@@ -326,7 +326,7 @@ export default function PlanDetailClient() {
         >
           ← 返回
         </button>
-        <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="flex flex-col gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold break-words">{plan.topic}</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -334,7 +334,7 @@ export default function PlanDetailClient() {
               {days.length} 天计划
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             <button
               onClick={openRegenModal}
               className="px-3 py-1.5 text-xs bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors"
