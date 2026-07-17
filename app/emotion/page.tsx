@@ -21,6 +21,7 @@ import {
   getDisplayCoping,
   migrateAllEmotionEntries,
 } from "@/lib/emotion-migrate";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 // 按日期分组
 type EmotionEntryWithLegacy = EmotionEntry & LegacyEmotionFields;
@@ -63,7 +64,14 @@ export default function EmotionPage() {
   }, [loadEntries]);
 
   const handleDelete = async (entry: EmotionEntryWithLegacy) => {
-    if (!confirm("确定删除这条情绪记录？")) return;
+    const ok = await confirmDialog({
+      title: "删除情绪记录？",
+      message: "确定删除这条情绪记录吗？此操作不可恢复。",
+      confirmText: "删除",
+      cancelText: "保留",
+      danger: true,
+    });
+    if (!ok) return;
     await delItem(`${KEY_PREFIXES.EMOTION}${entry.date}_${entry.id}`);
     await loadEntries();
   };

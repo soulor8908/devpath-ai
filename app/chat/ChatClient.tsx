@@ -37,6 +37,7 @@ import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
 import { createReminder, startReminderPolling } from "@/lib/reminder";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { scheduleAutoSync, getUserId } from "@/lib/sync";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import {
   recordAICall,
   trackAIFeedback,
@@ -1010,8 +1011,15 @@ export default function ChatClient() {
               {/* 删除单条消息按钮（hover 显示） */}
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm("删除这条消息？")) handleDeleteMessage(m.id);
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: "删除这条消息？",
+                    message: "确定删除这条消息吗？此操作不可恢复。",
+                    confirmText: "删除",
+                    cancelText: "取消",
+                    danger: true,
+                  });
+                  if (ok) handleDeleteMessage(m.id);
                 }}
                 className="absolute -left-7 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                 aria-label="删除消息"
@@ -1042,8 +1050,15 @@ export default function ChatClient() {
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("删除这条回复？")) handleDeleteMessage(m.id);
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: "删除这条回复？",
+                      message: "确定删除这条回复吗？此操作不可恢复。",
+                      confirmText: "删除",
+                      cancelText: "取消",
+                      danger: true,
+                    });
+                    if (ok) handleDeleteMessage(m.id);
                   }}
                   className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500"
                   aria-label="删除回复"
@@ -1228,9 +1243,16 @@ export default function ChatClient() {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            if (window.confirm("确定删除此对话？")) {
+                            const ok = await confirmDialog({
+                              title: "删除此对话？",
+                              message: "确定删除此对话吗？所有消息将一并删除，此操作不可恢复。",
+                              confirmText: "删除",
+                              cancelText: "取消",
+                              danger: true,
+                            });
+                            if (ok) {
                               handleDelete(c.id);
                             }
                           }}

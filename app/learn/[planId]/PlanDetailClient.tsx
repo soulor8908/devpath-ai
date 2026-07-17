@@ -23,6 +23,7 @@ import {
 } from "@/lib/ai/quality-tracker";
 import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
 import { toast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 export default function PlanDetailClient() {
   const params = useParams<{ planId: string }>();
@@ -99,7 +100,14 @@ export default function PlanDetailClient() {
     if (!plan) return;
     if (deckFavorited && deckId) {
       // 已收藏 → 取消收藏（二次确认）
-      if (!confirm("确定取消收藏这份试题集吗？")) return;
+      const ok = await confirmDialog({
+        title: "取消收藏？",
+        message: "确定取消收藏这份试题集吗？",
+        confirmText: "取消收藏",
+        cancelText: "保留",
+        danger: true,
+      });
+      if (!ok) return;
       await deleteFavoriteDeck(deckId);
       setDeckFavorited(false);
       setDeckId(null);

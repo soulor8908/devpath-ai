@@ -41,6 +41,7 @@ import {
 } from "@/lib/ai/memory/user-profile";
 import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
 import { toast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
 
 type View = "form" | "running" | "completed";
@@ -256,7 +257,14 @@ export function PomodoroFull() {
   // 放弃（用户主动）
   async function handleAbandon() {
     if (!session) return;
-    if (!window.confirm("确定放弃这个番茄吗？本次专注将不计入统计")) return;
+    const ok = await confirmDialog({
+      title: "放弃本次番茄？",
+      message: "确定放弃这个番茄吗？本次专注将不计入统计",
+      confirmText: "放弃",
+      cancelText: "继续",
+      danger: true,
+    });
+    if (!ok) return;
     stopGuard();
     try {
       await abandonSession(session.id, "user_abandon");
@@ -274,8 +282,8 @@ export function PomodoroFull() {
     stopGuard();
     try {
       await abandonSession(session.id, "strict_mode_3_interruptions");
-      // 提示用户
-      window.alert("⚠️ 严格模式：连续 3 次打断，已自动放弃本次番茄");
+      // 提示用户（非阻塞式 toast，替代 window.alert）
+      toast.warning("严格模式：连续 3 次打断，已自动放弃本次番茄");
       setSession(null);
       setView("form");
       setInterruptions(0);

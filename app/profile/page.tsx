@@ -13,6 +13,7 @@ import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { apiFetch, getApiToken, setApiToken } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { ShareCardButton } from "@/components/ShareCardButton";
 import { SyncStatus } from "@/components/SyncStatus";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -485,7 +486,14 @@ export default function ProfilePage() {
 
   /** 删除模型配置 */
   async function handleDeleteModel(id: string) {
-    if (!confirm("确定删除该模型配置？")) return;
+    const ok = await confirmDialog({
+      title: "删除模型配置？",
+      message: "确定删除该模型配置吗？此操作不可恢复。",
+      confirmText: "删除",
+      cancelText: "取消",
+      danger: true,
+    });
+    if (!ok) return;
     await deleteModelConfig(id);
     await refreshModelConfigs();
     if (editingModel?.id === id) {

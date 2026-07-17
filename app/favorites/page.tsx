@@ -9,6 +9,7 @@ import { getItem, setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type { FavoriteDeck } from "@/lib/types";
 import type { FavoritedQuestionWithPlan } from "@/lib/favorite";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -33,13 +34,28 @@ export default function FavoritesPage() {
   }, []);
 
   async function handleDeleteDeck(id: string, topic: string) {
-    if (!confirm(`确定删除试题集「${topic}」吗？此操作不可恢复。`)) return;
+    const ok = await confirmDialog({
+      title: "删除试题集？",
+      message: `确定删除试题集「${topic}」吗？此操作不可恢复。`,
+      confirmText: "删除",
+      cancelText: "取消",
+      danger: true,
+    });
+    if (!ok) return;
     await deleteFavoriteDeck(id);
     await loadData();
   }
 
   async function handleUnfavorQuestion(planId: string, questionId: string, questionText: string) {
-    if (!confirm(`确定取消收藏这道题吗？\n\n${questionText.slice(0, 50)}${questionText.length > 50 ? "..." : ""}`)) return;
+    const preview = questionText.length > 50 ? questionText.slice(0, 50) + "..." : questionText;
+    const ok = await confirmDialog({
+      title: "取消收藏？",
+      message: `确定取消收藏这道题吗？\n\n${preview}`,
+      confirmText: "取消收藏",
+      cancelText: "保留",
+      danger: true,
+    });
+    if (!ok) return;
     await unfavorQuestion(planId, questionId);
     await loadData();
   }

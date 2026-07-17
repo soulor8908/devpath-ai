@@ -22,6 +22,7 @@ import {
   abandonSession,
 } from "@/lib/timer/pomodoro";
 import { notify } from "@/lib/timer/notification-permission";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -92,7 +93,14 @@ export function PomodoroWidget() {
 
   async function handleAbandon() {
     if (!session) return;
-    if (!window.confirm("确定放弃这个番茄吗？本次专注将不计入统计")) return;
+    const ok = await confirmDialog({
+      title: "放弃本次番茄？",
+      message: "确定放弃这个番茄吗？本次专注将不计入统计",
+      confirmText: "放弃",
+      cancelText: "继续",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await abandonSession(session.id, "user_abandon_from_widget");
