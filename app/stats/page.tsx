@@ -2,9 +2,11 @@
 
 // app/stats/page.tsx
 // 数据可视化总览：顶部 Tab 切换 热力图 / 雷达图 / 周报
+// 阶段 7：支持 ?tab= query 初始化（来自「我的」统计按钮跳转）
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
 import { WeeklyReport } from "@/components/WeeklyReport";
@@ -13,8 +15,16 @@ import type { KnowledgeNode, ReviewCard, ReviewLog, LearnLog, DailyStatus, Learn
 
 type Tab = "heatmap" | "radar" | "weekly";
 
-export default function StatsPage() {
-  const [tab, setTab] = useState<Tab>("heatmap");
+const VALID_TABS: Tab[] = ["heatmap", "radar", "weekly"];
+
+function parseTab(value: string | null | undefined): Tab {
+  if (value && (VALID_TABS as string[]).includes(value)) return value as Tab;
+  return "heatmap";
+}
+
+function StatsInner() {
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => parseTab(searchParams.get("tab")));
   const [nodes, setNodes] = useState<KnowledgeNode[]>([]);
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [reviewLogs, setReviewLogs] = useState<ReviewLog[]>([]);
@@ -85,5 +95,13 @@ export default function StatsPage() {
 
       {tab === "weekly" && <WeeklyReport learnLogs={learnLogs} reviewLogs={reviewLogs} statuses={statuses} />}
     </div>
+  );
+}
+
+export default function StatsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">加载中...</div>}>
+      <StatsInner />
+    </Suspense>
   );
 }

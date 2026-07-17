@@ -585,27 +585,34 @@ export default function ProfilePage() {
             <div className="text-xs text-gray-500">本周分钟</div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Link
-            href="/stats"
+            href="/stats?tab=heatmap"
             className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
           >
             <Icon name="calendar" className="w-3.5 h-3.5" />
             热力图
           </Link>
           <Link
-            href="/stats"
+            href="/stats?tab=radar"
             className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
           >
             <Icon name="target" className="w-3.5 h-3.5" />
             雷达图
           </Link>
           <Link
-            href="/stats"
+            href="/stats?tab=weekly"
             className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
           >
             <Icon name="sparkles" className="w-3.5 h-3.5" />
             AI 周报
+          </Link>
+          <Link
+            href="/mistakes"
+            className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
+          >
+            <Icon name="book" className="w-3.5 h-3.5" />
+            错题本
           </Link>
         </div>
       </Section>
