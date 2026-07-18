@@ -5,13 +5,13 @@
 // - 有剩余：轻量提示
 // - 已耗尽：醒目 banner + "配置自己的 API Key"链接（指向 /profile）
 //
-// 仅在使用服务端默认模型时需要限流；用户自带 modelConfig 时不展示本组件
-// （由调用方根据 useServerModel 状态决定是否渲染）
+// 鉴权（apiKey Session 改造后）：
+//   - /api/rate-limit 已用 requireSession，userId 从 session 取
+//   - 客户端用 apiFetch 自动附加签名头，无需再传 ?userId= query
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getApiToken } from "@/lib/api-client";
-import { getUserId } from "@/lib/sync";
+import { apiFetch } from "@/lib/api-client";
 
 interface SceneStatus {
   scene: string;
@@ -39,18 +39,8 @@ export function RateLimitBanner({
     let cancelled = false;
     void (async () => {
       try {
-        const userId = await getUserId().catch(() => null);
-        if (!userId) {
-          setLoading(false);
-          return;
-        }
-        const token = await getApiToken();
-        const res = await fetch(
-          `/api/rate-limit?userId=${encodeURIComponent(userId)}`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          },
-        );
+        // apiFetch 自动注入签名头，userId 由服务端从 session 取
+        const res = await apiFetch("/api/rate-limit", { method: "GET" });
         if (!res.ok) {
           setLoading(false);
           return;
@@ -60,7 +50,7 @@ export function RateLimitBanner({
         const found = data.scenes.find((s) => s.scene === scene);
         setStatus(found ?? null);
       } catch {
-        // 静默失败，不影响聊天
+        // 静默失败，不影响聊天（如 session 未建立）
       } finally {
         if (!cancelled) setLoading(false);
       }

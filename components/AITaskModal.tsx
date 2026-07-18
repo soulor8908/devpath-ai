@@ -16,7 +16,7 @@
 //   - 自动滚动到底部（流式输出时跟随）
 //   - useLayoutEffect 避免滚动抖动
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useAITask } from "@/lib/hooks/use-ai-task";
 import {
   abortCurrentAITask,
@@ -29,14 +29,13 @@ import { Button } from "@/components/ui";
 export function AITaskModal() {
   const task = useAITask();
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const [autoCloseTimer, setAutoCloseTimer] = useState<number | null>(null);
 
   // 流式输出时自动滚动到底部
   useEffect(() => {
     if (task && contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
-  }, [task?.content]);
+  }, [task]);
 
   // 任务完成后 1.5s 自动清除（让用户看到结果）
   useEffect(() => {
@@ -45,12 +44,11 @@ export function AITaskModal() {
       const timer = window.setTimeout(() => {
         clearAITask();
       }, 1800);
-      setAutoCloseTimer(timer);
       return () => {
         window.clearTimeout(timer);
       };
     }
-  }, [task?.status]);
+  }, [task]);
 
   if (!task) return null;
 

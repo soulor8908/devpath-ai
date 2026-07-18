@@ -48,6 +48,22 @@ export interface KVLike {
 }
 
 /**
+ * Cloudflare Workers KV namespace 最小接口（apiKey Session 安全架构用）。
+ * 真实运行时由 @cloudflare/workers-types 提供 KVNamespace 全局类型；
+ * 该包未安装时使用本接口（与 Cloudflare KV API 子集兼容）。
+ * put 的 options 支持 expirationTtl，用于 session/nonce TTL。
+ */
+export interface KVNamespace {
+  get(key: string): Promise<string | null>;
+  put(
+    key: string,
+    value: string,
+    options?: { expirationTtl?: number; expiration?: number },
+  ): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+
+/**
  * 从当前 Cloudflare Pages 请求上下文获取 KV namespace binding。
  * app/api 的 Edge runtime 路由无 context.env，需通过 getRequestContext 读取。
  * 非 Cloudflare 环境（如本地 next dev）返回 undefined，调用方可降级为 mock。
@@ -68,4 +84,52 @@ export function getCloudflareKV(): KVLike | undefined {
     // 非 Cloudflare 环境，忽略
   }
   return undefined;
+}
+
+/**
+ * 通用 KV binding 读取：从 Cloudflare Pages 请求上下文按 binding 名取 KV namespace。
+ * 校验 get/put/delete 均为 function，避免误把非 KV binding 当 KV 使用。
+ * 非 Cloudflare 环境或 binding 不存在 → 返回 null，调用方（SessionStore）降级为内存 Map。
+ */
+function getAuthKV(binding: string): KVNamespace | null {
+  try {
+    const ctx = (globalThis as Record<symbol, { env?: Record<string, unknown> } | undefined>)[CF_CTX_SYMBOL];
+    const kv = ctx?.env?.[binding];
+    if (
+      kv &&
+      typeof kv === "object" &&
+      typeof (kv as { get?: unknown }).get === "function" &&
+      typeof (kv as { put?: unknown }).put === "function" &&
+      typeof (kv as { delete?: unknown }).delete === "function"
+    ) {
+      return kv as unknown as KVNamespace;
+    }
+  } catch {
+    // 非 Cloudflare 环境，忽略
+  }
+  return null;
+}
+
+/**
+ * 获取 AUTH_SESSIONS KV namespace（存储加密后的 session 记录）。
+ * 非 Cloudflare 环境返回 null，调用方降级为内存 Map（仅本地开发）。
+ */
+export function getAuthSessionsKV(): KVNamespace | null {
+  return getAuthKV("AUTH_SESSIONS");
+}
+
+/**
+ * 获取 AUTH_NONCES KV namespace（存储已用 nonce 防重放）。
+ * 非 Cloudflare 环境返回 null，调用方降级为内存 Map（仅本地开发）。
+ */
+export function getAuthNoncesKV(): KVNamespace | null {
+  return getAuthKV("AUTH_NONCES");
+}
+
+/**
+ * 获取 AUTH_AUDIT KV namespace（存储审计日志）。
+ * 非 Cloudflare 环境返回 null，调用方降级为内存 Map（仅本地开发）。
+ */
+export function getAuthAuditKV(): KVNamespace | null {
+  return getAuthKV("AUTH_AUDIT");
 }

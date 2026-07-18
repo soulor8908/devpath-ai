@@ -277,8 +277,6 @@ export default function LearnNewPage() {
     }
   }
 
-  const loadingState = loading || regenerating;
-
   // 向导视图：渐进式 AI 生成（拆知识点 → 题目 → 答案 → 计划）
   if (view === "wizard") {
     return (

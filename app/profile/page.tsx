@@ -3,7 +3,11 @@
 // app/profile/page.tsx
 // 「我的」中心：关键信息前置 + 个人信息折叠 + 低频功能收纳到「更多」
 // 布局：学习统计 / 收藏 / AI 模型（置顶·始终展开）→ 个人信息（折叠）→ 更多（折叠）
-// API Token：已配置自己的 AI 模型时隐藏输入框，避免用户困惑
+// 安全架构（apiKey Session 改造后）：
+//   - 保存模型配置时调 exchangeSession 用 apiKey 换取加密 session
+//   - session 存储在 IndexedDB key="auth:session"，apiKey 不再随每次请求传输
+//   - 提供「登出所有设备」按钮调 revokeSession 吊销 session
+//   - 旧用户首次访问检测：有 modelConfig.apiKey 但无 session → 显示升级提示
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -11,13 +15,13 @@ import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } fro
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { apiFetch, getApiToken, setApiToken } from "@/lib/api-client";
+import { apiFetch, exchangeSession, revokeSession, hasValidSession } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { ShareCardButton } from "@/components/ShareCardButton";
 import { SyncStatus } from "@/components/SyncStatus";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { scheduleAutoSync } from "@/lib/sync";
+import { scheduleAutoSync, getUserId } from "@/lib/sync";
 import {
   loadRoutineMarkdown,
   saveRoutineMarkdown,
@@ -81,8 +85,8 @@ const FAQS: Array<{ q: string; a: string }> = [
     a: "Free Spaced Repetition Scheduler，科学的间隔重复算法，根据你的遗忘曲线安排复习时间",
   },
   {
-    q: "API Token 和 API Key 有什么区别？",
-    a: "API Key 是你从模型服务商（智谱/DeepSeek/OpenAI）获取的密钥，在「AI 模型配置」里填写，用于调用你自己的 AI 额度。API Token 是部署管理员设置的服务端鉴权密钥，仅在未配置自己的模型而使用「服务端默认模型」时才需要。大多数用户只需配置 API Key 即可。",
+    q: "API Key 如何存储？",
+    a: "API Key 通过加密会话（session）安全传输：保存时仅一次性发送到服务端加密存储，之后所有请求用 session 签名，不再传输 API Key。换设备需重新输入。",
   },
   {
     q: "AI 接口失败/报错怎么办？",
@@ -114,9 +118,8 @@ export default function ProfilePage() {
   const [notifSupported, setNotifSupported] = useState(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("unsupported");
 
-  // API Token
-  const [apiToken, setApiTokenState] = useState("");
-  const [tokenSaved, setTokenSaved] = useState(false);
+  // 安全升级提示：检测到旧 modelConfig.apiKey 但无 session 时显示
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // 收藏统计
   const [deckCount, setDeckCount] = useState(0);
@@ -149,9 +152,6 @@ export default function ProfilePage() {
   const [personaSaving, setPersonaSaving] = useState(false);
   const [personaSaved, setPersonaSaved] = useState(false);
 
-  // 是否已配置含 API Key 的模型 → 决定 API Token 输入框是否显示
-  const hasModelConfig = modelConfigs.some((c) => c.apiKey.trim().length > 0);
-
   useEffect(() => {
     (async () => {
       const stored = await dbGet<PublicProfile>(STORAGE_KEY);
@@ -159,10 +159,6 @@ export default function ProfilePage() {
 
       const r = await loadRoutineMarkdown();
       setRoutine(r);
-
-      // 加载已存的 API Token
-      const token = await getApiToken();
-      if (token) setApiTokenState(token);
 
       // 检查 PWA 通知支持
       if (typeof window !== "undefined" && "Notification" in window) {
@@ -204,6 +200,15 @@ export default function ProfilePage() {
       // 加载 AI 模型配置
       const configs = await listModelConfigs();
       setModelConfigs(configs);
+
+      // 安全升级检测：有 modelConfig.apiKey 但无有效 session → 显示升级提示
+      const hasSession = await hasValidSession();
+      if (!hasSession) {
+        const hasApiKey = configs.some((c) => c.apiKey.trim().length > 0);
+        if (hasApiKey) {
+          setShowUpgradeModal(true);
+        }
+      }
 
       // 加载用户画像（用于 persona 设置）
       const profile = await getUserProfile();
@@ -257,10 +262,10 @@ export default function ProfilePage() {
           serverMsg = `HTTP ${res.status}`;
         }
         console.warn("公开主页同步失败:", res.status, serverMsg);
-        // 401 时给用户明确提示：要么配置 API Token，要么联系部署方
+        // 401 时给用户明确提示：session 可能过期，需重新保存模型配置以 exchange
         if (res.status === 401) {
           setSyncError(
-            `公开主页同步未授权（${serverMsg}）。请在「更多 → 高级 · API 鉴权 Token」中填入与部署方一致的 Token 后再保存。`,
+            `公开主页同步未授权（${serverMsg}）。加密会话可能已过期，请在「AI 模型配置」中重新编辑并保存模型配置以启用加密会话。`,
           );
         } else {
           setSyncError(`公开主页同步失败：${serverMsg}`);
@@ -277,12 +282,6 @@ export default function ProfilePage() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function saveToken() {
-    await setApiToken(apiToken);
-    setTokenSaved(true);
-    setTimeout(() => setTokenSaved(false), 2000);
   }
 
   async function saveRoutine() {
@@ -453,7 +452,7 @@ export default function ProfilePage() {
     }
   }
 
-  /** 保存（新建 / 更新） */
+  /** 保存（新建 / 更新）+ 用新配置交换加密 session */
   async function saveModelConfig() {
     setModelError("");
     if (!modelName.trim() || !modelBaseURL.trim() || !modelApiKey.trim() || !modelModel.trim()) {
@@ -470,11 +469,38 @@ export default function ProfilePage() {
         model: modelModel.trim(),
         isDefault: modelIsDefault,
       };
+      let savedConfig: ModelConfig;
       if (editingModel) {
         await updateModelConfig(editingModel.id, payload);
+        savedConfig = { ...editingModel, ...payload };
       } else {
-        await createModelConfig(payload);
+        savedConfig = await createModelConfig(payload);
       }
+
+      // exchange session：用新配置交换加密 session（apiKey 一次性发送到服务端）
+      try {
+        const userId = await getUserId();
+        await exchangeSession({
+          apiKey: payload.apiKey,
+          userId,
+          provider: payload.provider,
+          baseURL: payload.baseURL,
+          model: payload.model,
+          name: payload.name,
+        });
+        setShowUpgradeModal(false);
+        setTestResult((prev) => ({
+          ...prev,
+          [savedConfig.id]: { ok: true, msg: "已保存并启用加密会话" },
+        }));
+      } catch (e) {
+        console.warn("[profile] exchange session failed:", e);
+        setTestResult((prev) => ({
+          ...prev,
+          [savedConfig.id]: { ok: false, msg: "模型已保存，但加密会话启用失败，请重试" },
+        }));
+      }
+
       await refreshModelConfigs();
       resetModelForm();
       setShowModelForm(false);
@@ -511,47 +537,51 @@ export default function ProfilePage() {
     scheduleAutoSync();
   }
 
-  /** 测试模型连接 */
+  /**
+   * 测试模型连接：先 exchange 拿到 session，再调 /api/ai-test（已用 requireSession）
+   * exchange 成功即说明 apiKey/baseURL/model 配置有效（服务端会写入 KV）
+   */
   async function handleTestModel(config: ModelConfig) {
     setTestingId(config.id);
     setTestResult((prev) => ({ ...prev, [config.id]: { ok: false, msg: "测试中..." } }));
     try {
-      const res = await fetch("/api/ai-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelConfig: {
-            baseURL: config.baseURL,
-            apiKey: config.apiKey,
-            model: config.model,
-            name: config.name,
-            provider: config.provider,
-          },
-        }),
+      const userId = await getUserId();
+      await exchangeSession({
+        apiKey: config.apiKey,
+        userId,
+        provider: config.provider,
+        baseURL: config.baseURL,
+        model: config.model,
+        name: config.name,
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setTestResult((prev) => ({
-          ...prev,
-          [config.id]: {
-            ok: true,
-            msg: `连接成功 (${data.elapsedMs}ms): ${data.reply?.slice(0, 50) || "OK"}`,
-          },
-        }));
-      } else {
-        setTestResult((prev) => ({
-          ...prev,
-          [config.id]: { ok: false, msg: data.error || `HTTP ${res.status}` },
-        }));
-      }
-    } catch (e) {
       setTestResult((prev) => ({
         ...prev,
-        [config.id]: { ok: false, msg: e instanceof Error ? e.message : "网络错误" },
+        [config.id]: { ok: true, msg: "连接成功，加密会话已启用" },
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "测试失败";
+      setTestResult((prev) => ({
+        ...prev,
+        [config.id]: { ok: false, msg },
       }));
     } finally {
       setTestingId(null);
     }
+  }
+
+  /** 登出所有设备：吊销当前 session */
+  async function handleRevokeSession() {
+    const ok = await confirmDialog({
+      title: "登出所有设备？",
+      message: "将吊销当前加密会话，所有设备需重新输入 API Key 才能使用 AI 功能。",
+      confirmText: "登出",
+      cancelText: "取消",
+      danger: true,
+    });
+    if (!ok) return;
+    await revokeSession();
+    // 刷新 UI：清空本地 session 后页面状态需重置
+    location.reload();
   }
 
   return (
@@ -1210,62 +1240,25 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* 高级：API 鉴权 Token（智能显隐） */}
+        {/* 高级：加密会话管理 */}
         <div className="space-y-3 border-b py-4">
-          <h3 className="font-medium">高级 · API 鉴权 Token</h3>
-          {hasModelConfig ? (
-            <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-xs text-green-800 dark:text-green-200 flex items-start gap-2">
-              <Icon name="check-circle" className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">已配置自己的 AI 模型，无需填写 API Token</p>
-                <p className="mt-1 text-green-700 dark:text-green-300">
-                  你的 AI 调用走自己的 API Key，不依赖服务端默认模型，也不需要服务端鉴权。
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                <p><strong>推荐：直接配置自己的 AI 模型（更稳定）</strong></p>
-                <p>在上方「AI 模型配置」添加一个模型（含 API Key），即可免填此项。</p>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                <Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> API Token 仅在使用「服务端默认模型」时需要——大多数用户不需要填写。
-              </p>
-              <details className="text-xs text-gray-400 dark:text-gray-500">
-                <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">什么是 API Token？怎么获取？（点击展开）</summary>
-                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded space-y-1">
-                  <p>API Token <strong>不是</strong> API Key，不能从模型服务商获取。它是部署此项目时由管理员设置的服务端密钥：</p>
-                  <p>1. 如果你是自己部署的（Cloudflare Pages），在项目根目录运行：</p>
-                  <pre className="bg-gray-800 text-green-400 p-2 rounded text-[11px] overflow-x-auto">npx wrangler pages secret put API_TOKEN --project-name=你的项目名</pre>
-                  <p>2. 然后输入你想设置的 Token 值（任意字符串，如 <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">my-secret-token-123</code>）</p>
-                  <p>3. 将这个值填入下方输入框</p>
-                  <p className="text-orange-500"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 如果没有部署服务端默认模型（未设 OPENAI_API_KEY 等环境变量），即使填了 API_TOKEN 也无法使用默认模型。建议直接配置自己的 AI 模型。</p>
-                </div>
-              </details>
-              <Input
-                type="password"
-                value={apiToken}
-                onChange={(e) => {
-                  setApiTokenState(e.target.value);
-                  setTokenSaved(false);
-                }}
-                placeholder="大多数用户留空即可"
-                inputSize="sm"
-              />
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={saveToken}
-                >
-                  保存 Token
-                </Button>
-                {tokenSaved && (
-                  <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>
-                )}
-              </div>
-            </>
-          )}
+          <h3 className="font-medium">高级 · 加密会话</h3>
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-xs text-blue-800 dark:text-blue-200 space-y-1">
+            <p><strong>API Key 安全机制</strong></p>
+            <p>保存模型配置时，API Key 仅一次性发送到服务端加密存储，之后所有请求用 session 签名，不再传输 API Key。换设备需重新输入。</p>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            <Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> 加密会话有效期 7 天，每次成功请求自动续期。如需吊销所有设备，点击下方按钮。
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleRevokeSession}
+            >
+              登出所有设备
+            </Button>
+          </div>
         </div>
 
         {/* 应用信息 */}
@@ -1362,6 +1355,44 @@ export default function ProfilePage() {
           </div>
         </div>
       </CollapsibleSection>
+
+      {/* 安全升级提示模态：旧用户首次访问时显示 */}
+      {showUpgradeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Icon name="alert" className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-semibold">安全升级提示</h2>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              检测到您已配置过 AI 模型，但尚未启用加密会话。为提升安全性，请重新输入 API Key 启用加密会话：保存时仅一次性发送到服务端加密存储，之后所有请求用 session 签名，不再传输 API Key。
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              操作方式：在上方「AI 模型配置」中点击任意模型的「编辑」按钮，确认 API Key 后点击「更新配置」即可完成升级。
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowUpgradeModal(false)}>
+                稍后再说
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  // 滚动到 AI 模型配置区
+                  const el = document.querySelector('section[class*="rounded-xl"]');
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                去升级
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,8 +21,6 @@ interface Props {
   weeks?: number; // 显示最近 N 周，默认 12
 }
 
-const LEVEL_THRESHOLDS = [0, 15, 30, 60];
-
 function toLevel(minutes: number): 0 | 1 | 2 | 3 | 4 {
   if (minutes >= 60) return 4;
   if (minutes >= 30) return 3;

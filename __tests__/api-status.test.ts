@@ -3,9 +3,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../lib/ai/provider", () => ({
   hasAIKey: () => false,
   getModel: () => ({}),
+  getModelFromSession: () => ({}),
   _resolvePrimaryEntry: () => null,
   _resolveFallbackEntry: () => null,
   wrapModelWithFallback: (m: unknown) => m,
+}));
+
+// mock requireSession：跳过签名校验，直接注入 fake session
+vi.mock("../lib/ai/session-middleware", () => ({
+  requireSession: vi.fn(async () => ({
+    session: {
+      userId: "test-user",
+      apiKey: "test-key",
+      provider: "glm",
+      baseURL: "https://api.glm.com/v1",
+      model: "glm-4-flash",
+      name: "test",
+      sessionId: "sess-1",
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    },
+  })),
 }));
 
 vi.mock("../lib/storage/db", () => ({

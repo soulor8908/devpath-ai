@@ -3,7 +3,7 @@
 
 import { nanoid } from "nanoid";
 import { getItem, setItem, listItems, delItem } from "./storage/db";
-import { KEY_PREFIXES, type MistakeRecord, type Question } from "./types";
+import { KEY_PREFIXES, type MistakeRecord } from "./types";
 import { createCard, findExistingCard } from "./fsrs";
 
 /** 记录答错（如果已存在则增加 wrongCount），同时自动造复习卡（带查重） */

@@ -1,15 +1,14 @@
 // app/api/sync/route.ts
 // 用户数据云端同步 API（Cloudflare KV）
-// - GET  ?userId=xxx：读取 user:${userId}:backup，返回完整备份数据
-// - POST body=UserBackup：写入 user:${userId}:backup
-// 鉴权：数据操作（dataOperation=true），不消耗 AI 额度，
-//       未配置 API_TOKEN 时放行（数据按 userId 隔离，无滥用风险）
+// - GET  ：读取 user:${userId}:backup，返回完整备份数据（userId 从 session 取）
+// - POST body=UserBackup：写入 user:${userId}:backup（userId 从 session 取）
+// 鉴权：统一走 requireSession（apiKey Session 安全架构）。
 // 运行时：edge。通过 getCloudflareKV() 拿到 Cloudflare KV binding，
 //         无 binding 时降级为内存 mock（仅本地开发）。
 
 import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { UserBackup } from "@/lib/types";
 
@@ -17,17 +16,15 @@ export const runtime = "edge";
 
 const BACKUP_VERSION = 1;
 
-/** 同步请求体：以 mode 作为判别字段，区分全量 / 增量两种模式 */
+/** 同步请求体：以 mode 作为判别字段，区分全量 / 增量两种模式（不再含 userId） */
 type SyncRequestBody =
   | {
-      userId: string;
       mode?: "full"; // 省略时默认全量，向后兼容旧客户端
       data: Record<string, unknown>;
       updatedAt?: string;
       version?: number;
     }
   | {
-      userId: string;
       mode: "incremental";
       changes: Record<string, unknown>;
       baseUpdatedAt?: string;
@@ -35,15 +32,12 @@ type SyncRequestBody =
 
 export async function GET(req: NextRequest) {
   await initCloudflareEnv();
-  // 数据操作：不消耗 AI 额度，未配置 API_TOKEN 时放行
-  const authError = requireAuth(req, { dataOperation: true });
-  if (authError) return authError;
+  // 统一 session 鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
 
-  const userId = req.nextUrl.searchParams.get("userId");
-  if (!userId) {
-    return NextResponse.json({ error: "缺少 userId 参数" }, { status: 400 });
-  }
-
+  const userId = session.userId;
   const store = createKVStore(getCloudflareKV());
   const backup = await store.getUserBackup(userId);
   if (!backup) {
@@ -54,9 +48,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
-  // 数据操作：不消耗 AI 额度，未配置 API_TOKEN 时放行
-  const authError = requireAuth(req, { dataOperation: true });
-  if (authError) return authError;
+  // 统一 session 鉴权（requireSession 内部用 req.clone().text() 读 body 签名校验，不消费原 body）
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
 
   let body: SyncRequestBody;
   try {
@@ -65,10 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  if (!body.userId || typeof body.userId !== "string") {
-    return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
-  }
-
+  const userId = session.userId;
   const store = createKVStore(getCloudflareKV());
 
   // 增量同步模式：只合并变更的 key
@@ -79,7 +71,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const updatedAt = await store.mergeUserBackup(body.userId, body.changes);
+    const updatedAt = await store.mergeUserBackup(userId, body.changes);
     return NextResponse.json({ ok: true, updatedAt });
   }
 
@@ -89,12 +81,12 @@ export async function POST(req: NextRequest) {
   }
 
   const backup: UserBackup = {
-    userId: body.userId,
+    userId,
     updatedAt: body.updatedAt ?? new Date().toISOString(),
     version: body.version ?? BACKUP_VERSION,
     data: body.data,
   };
 
-  await store.setUserBackup(body.userId, backup);
+  await store.setUserBackup(userId, backup);
   return NextResponse.json({ ok: true, updatedAt: backup.updatedAt });
 }

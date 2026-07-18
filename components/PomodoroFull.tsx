@@ -31,7 +31,6 @@ import { getTodayCount } from "@/lib/timer/session-tracker";
 import {
   startGuard,
   stopGuard,
-  resolveGuardMode,
   type FocusGuardMode,
 } from "@/lib/timer/focus-guard";
 import { notify, requestPermission, hasPermission } from "@/lib/timer/notification-permission";
@@ -43,6 +42,7 @@ import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Checkbox } from "@/components/ui";
 
 type View = "form" | "running" | "completed";
 
@@ -161,6 +161,22 @@ export function PomodoroFull() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session]);
 
+  // 严格模式自动放弃
+  const handleAbandonStrict = useCallback(async () => {
+    if (!session) return;
+    stopGuard();
+    try {
+      await abandonSession(session.id, "strict_mode_3_interruptions");
+      // 提示用户（非阻塞式 toast，替代 window.alert）
+      toast.warning("严格模式：连续 3 次打断，已自动放弃本次番茄");
+      setSession(null);
+      setView("form");
+      setInterruptions(0);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "自动放弃失败");
+    }
+  }, [session]);
+
   // 启动专注保护（基于 focus-guard，复用 interruption-tracker）
   const startInterruptTracking = useCallback(
     (sessionId: string) => {
@@ -179,7 +195,7 @@ export function PomodoroFull() {
         },
       });
     },
-    [strictMode],
+    [strictMode, handleAbandonStrict],
   );
 
   // 启动一个新 session
@@ -276,21 +292,6 @@ export function PomodoroFull() {
     }
   }
 
-  // 严格模式自动放弃
-  async function handleAbandonStrict() {
-    if (!session) return;
-    stopGuard();
-    try {
-      await abandonSession(session.id, "strict_mode_3_interruptions");
-      // 提示用户（非阻塞式 toast，替代 window.alert）
-      toast.warning("严格模式：连续 3 次打断，已自动放弃本次番茄");
-      setSession(null);
-      setView("form");
-      setInterruptions(0);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "自动放弃失败");
-    }
-  }
 
   // 恢复中断的 session
   async function handleRecoverContinue() {

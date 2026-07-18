@@ -1,18 +1,21 @@
 // app/api/chat/route.ts
-// 流式聊天接口：接收 { messages, modelConfig, contextSnapshot, toolContext } → 调用 streamText → 返回流式响应
+// 流式聊天接口：接收 { messages, contextSnapshot, toolContext } → 调用 streamText → 返回流式响应
 // AI Native 升级：
 //   1. 支持客户端注入"用户上下文快照"（contextSnapshot），让 LLM 知道用户当前在学什么
 //   2. 支持 8 个 AI 工具（toolContext + tools），让 AI 能查看状态、创建提醒、调整计划
 // 工具架构：
 //   - 只读工具在服务端执行，直接返回 toolContext 中的数据
 //   - 写入工具返回 clientAction 描述符，客户端在流结束后解析并执行 IndexedDB 操作
+//
+// 鉴权（apiKey Session 安全架构）：
+//   - requireSession 校验签名 + 注入 session（apiKey / baseURL / model）
+//   - body 不含客户端凭证；模型从 session 构造
 
 import { NextRequest, NextResponse } from "next/server";
 import { streamText } from "ai";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
-import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
-import { getProviderInfo } from "@/lib/ai/provider";
+import { requireSession } from "@/lib/ai/session-middleware";
+import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
 import { buildToolSystemSuffix } from "@/lib/ai/tool-registry";
@@ -37,13 +40,17 @@ const TOOL_SYSTEM_SUFFIX = buildToolSystemSuffix();
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   try {
+    // 先鉴权（requireSession 内部用 req.clone().text() 读 body 签名校验，不消费原 body）
+    const sessionResult = await requireSession(req);
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const { session } = sessionResult;
+
+    // 再读 body（不再含客户端凭证字段）
     const body = await req.json();
-    const { messages, modelConfig, contextSnapshot, toolContext, userId, personaContext, preferredPersona } = body as {
+    const { messages, contextSnapshot, toolContext, personaContext, preferredPersona } = body as {
       messages?: ChatMessage[];
-      modelConfig?: ClientModelConfig;
       contextSnapshot?: string;
       toolContext?: ToolContext;
-      userId?: string;
       /** Persona 选择上下文（客户端聚合：energy/mood/streak/topic） */
       personaContext?: PersonaContext;
       /** 用户手动设置的偏好 Persona（覆盖自动选择） */
@@ -57,24 +64,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { model, useServerModel } = resolveModel(modelConfig, "chat");
-    const authError = requireAuth(req, { useServerModel });
-    if (authError) return authError;
+    // 用 session 创建模型
+    const model = getModelFromSession(session, "chat");
 
-    // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
-    if (useServerModel && userId) {
-      const kv = createKVStore(getCloudflareKV());
-      const { allowed, remaining, limit } = await checkRateLimit(userId, "chat", kv);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "chat", remaining: 0, limit },
-          { status: 429 },
-        );
-      }
-      // 乐观计数：流式响应前先 +1，失败不回滚（可接受，保守计数）
-      await incrementRateLimit(userId, "chat", kv);
-      void remaining; // remaining 仅用于 429 响应，此处已通过检查
+    // 限流：所有请求都限流（按 session.userId 计数）
+    const kv = createKVStore(getCloudflareKV());
+    const { allowed, limit } = await checkRateLimit(session.userId, "chat", kv);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "chat", remaining: 0, limit },
+        { status: 429 },
+      );
     }
+    // 乐观计数：流式响应前先 +1，失败不回滚（可接受，保守计数）
+    await incrementRateLimit(session.userId, "chat", kv);
 
     const safeContext =
       typeof contextSnapshot === "string" && contextSnapshot.length > 0
@@ -113,12 +116,8 @@ export async function POST(req: NextRequest) {
     const hasTools = toolContext && Array.isArray(toolContext.plans);
     const tools = hasTools ? createChatTools(toolContext!) : undefined;
 
-    // 解析当前使用的模型 ID（用于客户端成本估算）
-    // - 用户自定义模型：从 modelConfig.model 取
-    // - 服务端默认模型：从 getProviderInfo().model 取
-    const currentModelId = useServerModel
-      ? getProviderInfo().model
-      : modelConfig?.model ?? "unknown";
+    // 解析当前使用的模型 ID（用于客户端成本估算）：直接从 session 取
+    const currentModelId = session.model;
 
     const result = await streamText({
       model,

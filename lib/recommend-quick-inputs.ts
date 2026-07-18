@@ -12,7 +12,7 @@
 import { getInputHistory } from "@/lib/learn-input-history";
 import { getAllLogs } from "@/lib/learn-log";
 import { listItems } from "@/lib/storage/db";
-import { KEY_PREFIXES, type LearnLog, type LearningPlan, type ReviewLog, type Conversation } from "@/lib/types";
+import { KEY_PREFIXES, type LearningPlan, type ReviewLog, type Conversation } from "@/lib/types";
 
 const DEFAULT_QUICK_INPUTS = [
   "前端性能优化",
@@ -76,7 +76,6 @@ export async function getRecommendedQuickInputs(): Promise<string[]> {
   );
   if (recentLogs.length > 0) {
     // 收集所有 planId 并 join plan.topic
-    const planIds = [...new Set(recentLogs.map((l) => l.planId))];
     const plans = await listItems<LearningPlan>(KEY_PREFIXES.PLAN);
     const planMap = new Map(plans.map((p) => [p.id, p]));
     for (const log of recentLogs) {

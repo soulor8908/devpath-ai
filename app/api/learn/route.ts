@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { generateQuestions } from "@/lib/ai/question";
-import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
+import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import type { LearningPlan } from "@/lib/types";
@@ -16,29 +16,29 @@ export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
+
   const body = await req.json();
-  const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt, modelConfig, userId } = body as {
+  const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt } = body as {
     topic?: string;
     dailyMinutes?: number;
     maxNewPerDay?: number;
     prompt?: string;
-    modelConfig?: ClientModelConfig;
-    userId?: string;
   };
-  const { model, useServerModel } = resolveModel(modelConfig, "learn");
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
 
-  // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
-  if (useServerModel && userId) {
-    const kv = createKVStore(getCloudflareKV());
-    const { allowed } = await checkRateLimit(userId, "plan_generate", kv);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "plan_generate", remaining: 0 },
-        { status: 429 },
-      );
-    }
+  const model = getModelFromSession(session, "learn");
+
+  // 限流：所有请求都限流（按 session.userId 计数）
+  const kv = createKVStore(getCloudflareKV());
+  const { allowed } = await checkRateLimit(session.userId, "plan_generate", kv);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "plan_generate", remaining: 0 },
+      { status: 429 },
+    );
   }
 
   try {
@@ -95,10 +95,7 @@ export async function POST(req: NextRequest) {
 
     // 返回给前端，由前端存 IndexedDB（API route 无法访问客户端 IndexedDB）
     // 限流计数 +1（成功生成后）
-    if (useServerModel && userId) {
-      const kv = createKVStore(getCloudflareKV());
-      await incrementRateLimit(userId, "plan_generate", kv);
-    }
+    await incrementRateLimit(session.userId, "plan_generate", kv);
     return NextResponse.json({ planId: plan.id, plan });
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";

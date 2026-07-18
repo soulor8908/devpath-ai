@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { listItems, getItem } from "@/lib/storage/db";
+import { listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type LearnStats } from "@/lib/types";
 import { computeStats } from "@/lib/learn-log";
 import { Icon, type IconName } from "@/components/Icon";

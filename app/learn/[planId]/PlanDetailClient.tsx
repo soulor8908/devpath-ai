@@ -102,7 +102,7 @@ export default function PlanDetailClient() {
           });
         }, 100);
       }
-    });
+    })();
   // router/searchParams 引用稳定（App Router），不作为 effect 依赖避免重渲染
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);

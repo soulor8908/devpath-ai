@@ -7,14 +7,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:perf": "vitest run --testNamePattern='benchmark|perf'",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "quality-gate": "npm run lint && npm run typecheck && npm test"
+    "quality-gate": "npm run lint && npm run typecheck && npm test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0"
+    ]
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.66",
@@ -48,7 +54,9 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.3.9",
     "fake-indexeddb": "^6.0.0",
+    "husky": "^9.1.7",
     "jsdom": "^24.1.0",
+    "lint-staged": "^17.0.8",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.0",

@@ -486,7 +486,7 @@ func lengthOfLIS2(nums []int) int {
 ];
 
 // 生成学习计划：8 知识点 × 15 题，按拓扑顺序排 10 天
-function buildSchedule(nodes: KnowledgeNode[]): ScheduleItem[] {
+function buildSchedule(_nodes: KnowledgeNode[]): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   const order = [
     ["arr-hash", "learn", 30],

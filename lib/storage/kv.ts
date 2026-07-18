@@ -1,8 +1,9 @@
 // lib/storage/kv.ts
-// Cloudflare KV 封装（公开主页数据）
+// Cloudflare KV 封装（公开主页数据 + apiKey Session 安全架构存储）
 // 运行时：Cloudflare Pages Functions 通过 env.KV binding 注入
 // 本地开发/测试：无 env.KV 时降级为内存 Map（mock）
 
+import type { KVNamespace } from "../ai/cloudflare-env";
 import type { PublicProfile, UserBackup, Achievement } from "../types";
 
 export interface PublicStats {
@@ -201,4 +202,178 @@ function createMockKV(): KVLike {
       map.set(key, value);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// apiKey Session 安全架构存储（tasks.md Task 5）
+// ---------------------------------------------------------------------------
+
+/**
+ * Session 记录。敏感字段（apiKey / sessionSecret）已在上游加密，
+ * KV 中只保存密文，明文绝不落盘。
+ */
+export interface SessionRecord {
+  userId: string;
+  /** AES-GCM 加密后的 apiKey 密文（base64） */
+  encryptedApiKey: string;
+  /** AES-GCM 加密后的 sessionSecret 密文（base64），用于服务端校验签名 */
+  encryptedSecret: string;
+  provider: string;
+  baseURL: string;
+  model: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+}
+
+/** 内存降级模式下的条目（带 TTL 过期时间） */
+interface MemoryEntry {
+  value: string;
+  /** epoch ms，过期时间；0 表示立即过期（本场景均带 TTL，仅占位） */
+  expiresAt: number;
+}
+
+/**
+ * Session 存储封装：管理 session / nonce / audit 三类 KV 数据。
+ *
+ * 构造时传入 Cloudflare KV namespace binding；传 null 时降级为内存 Map
+ * （仅本地开发/测试，与 KVStore 的 mock 风格一致）。
+ *
+ * KV key 设计：
+ * - session: `auth:session:${sessionId}`
+ * - nonce:   `auth:nonce:${nonce}`
+ * - audit:   `auth:audit:${sessionId}:${timestamp}`
+ */
+export class SessionStore {
+  private memory: Map<string, MemoryEntry> | null;
+
+  constructor(private kv: KVNamespace | null) {
+    // kv 为 null → 本地开发/测试，降级为内存 Map
+    this.memory = kv === null ? new Map() : null;
+  }
+
+  /** 读取原始字符串（带内存 TTL 过期检查） */
+  private async getRaw(key: string): Promise<string | null> {
+    if (this.kv) {
+      return await this.kv.get(key);
+    }
+    const entry = this.memory!.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt && Date.now() > entry.expiresAt) {
+      this.memory!.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  /** 写入原始字符串（带 TTL） */
+  private async putRaw(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<void> {
+    if (this.kv) {
+      await this.kv.put(key, value, { expirationTtl: ttlSeconds });
+    } else {
+      this.memory!.set(key, {
+        value,
+        expiresAt: Date.now() + ttlSeconds * 1000,
+      });
+    }
+  }
+
+  /** 删除 */
+  private async deleteRaw(key: string): Promise<void> {
+    if (this.kv) {
+      await this.kv.delete(key);
+    } else {
+      this.memory!.delete(key);
+    }
+  }
+
+  /** 创建 session（覆盖写入，TTL 由调用方指定，如 7 天） */
+  async createSession(
+    sessionId: string,
+    record: SessionRecord,
+    ttlSeconds: number,
+  ): Promise<void> {
+    await this.putRaw(
+      `auth:session:${sessionId}`,
+      JSON.stringify(record),
+      ttlSeconds,
+    );
+  }
+
+  /** 读取 session；不存在或 JSON 损坏返回 null */
+  async getSession(sessionId: string): Promise<SessionRecord | null> {
+    const raw = await this.getRaw(`auth:session:${sessionId}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as SessionRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  /** 增量更新 session 字段（合并 patch 后整体重写，刷新 TTL） */
+  async updateSession(
+    sessionId: string,
+    patch: Partial<SessionRecord>,
+    ttlSeconds: number,
+  ): Promise<void> {
+    const existing = await this.getSession(sessionId);
+    if (!existing) return;
+    const merged: SessionRecord = { ...existing, ...patch };
+    await this.putRaw(
+      `auth:session:${sessionId}`,
+      JSON.stringify(merged),
+      ttlSeconds,
+    );
+  }
+
+  /** 删除 session */
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.deleteRaw(`auth:session:${sessionId}`);
+  }
+
+  /**
+   * 消费 nonce（防重放）。
+   * - 首次使用（KV 中不存在）→ 写入（TTL）返回 true
+   * - 重复使用（已存在）→ 返回 false
+   */
+  async useNonce(nonce: string, ttlSeconds: number): Promise<boolean> {
+    const key = `auth:nonce:${nonce}`;
+    const existing = await this.getRaw(key);
+    if (existing !== null) {
+      return false;
+    }
+    await this.putRaw(
+      key,
+      JSON.stringify({ usedAt: new Date().toISOString() }),
+      ttlSeconds,
+    );
+    return true;
+  }
+
+  /**
+   * 写入审计日志。不包含 apiKey / sessionSecret 明文（调用方负责脱敏）。
+   * key 含时间戳避免同一 session 多条日志互相覆盖。
+   */
+  async writeAudit(
+    sessionId: string,
+    action: string,
+    meta: Record<string, unknown>,
+    ttlSeconds: number,
+  ): Promise<void> {
+    const timestamp = Date.now();
+    const key = `auth:audit:${sessionId}:${timestamp}`;
+    const entry = {
+      sessionId,
+      action,
+      meta,
+      timestamp: new Date().toISOString(),
+    };
+    await this.putRaw(key, JSON.stringify(entry), ttlSeconds);
+  }
 }

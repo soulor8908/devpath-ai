@@ -1,12 +1,14 @@
 // app/api/adjust-plan/route.ts
 // 调整学习计划：接收 { plan, instruction, routine? } → 调 AI → 返回调整后的 schedule
+//
+// 鉴权：requireSession 注入 session，body 不含客户端凭证
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
+import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { LearningPlan, Routine } from "@/lib/types";
 
@@ -37,16 +39,18 @@ const WEEKDAY_NAMES = ["一", "二", "三", "四", "五", "六", "日"];
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
+
   const body = await req.json();
-  const { plan, instruction, routine, modelConfig } = body as {
+  const { plan, instruction, routine } = body as {
     plan?: LearningPlan;
     instruction?: string;
     routine?: Routine;
-    modelConfig?: ClientModelConfig;
   };
-  const { model, useServerModel } = resolveModel(modelConfig, "adjust-plan");
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
+  const model = getModelFromSession(session, "adjust-plan");
   try {
 
     if (!plan || !Array.isArray(plan.schedule) || !Array.isArray(plan.knowledgeTree)) {

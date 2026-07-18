@@ -71,11 +71,10 @@ export function createCard(
   questionId: string,
   front: string,
   back: string,
-  mode: FSRSMode = "standard",
+  _mode: FSRSMode = "standard",
   /** 可选 deckId：收藏试题集生成的卡片会带上，便于查重 */
   deckId?: string
 ): ReviewCard {
-  const f = getFsrs(mode);
   const empty = createEmptyCard(new Date());
   return {
     id: nanoid(),

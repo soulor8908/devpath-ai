@@ -202,7 +202,6 @@ export function createChatTools(ctx: ToolContext) {
         '根据用户当前时间、作息和学习计划，推荐接下来该做什么。当用户问"接下来学什么"、"现在该干什么"、"下一步"时调用。',
       parameters: z.object({}),
       execute: async () => {
-        const now = new Date(ctx.now);
         const currentTime = formatTime(ctx.now);
         const todayWeekday = getTodayWeekday(ctx.now);
         const isLearningDay = ctx.routine?.weekdays?.includes(todayWeekday) ?? true;

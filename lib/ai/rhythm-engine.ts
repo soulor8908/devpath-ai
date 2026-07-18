@@ -23,7 +23,6 @@ import {
   type ReviewLog,
   type LearningPlan,
   type Routine,
-  type UserProfile,
   type ScheduleItem,
   type MistakeRecord,
   type DailyStatus,

@@ -6,6 +6,12 @@
 // - 云端数据以 userId 为前缀存入 KV：user:${userId}:backup
 // - 客户端先写 IndexedDB（离线可用），再异步同步到 KV
 // - 拉取时先读 IndexedDB，跨设备时调云端合并
+//
+// 安全架构（apiKey Session 改造后）：
+// - /api/sync 已用 requireSession，userId 从 session 取，客户端不再传 userId
+// - getUserId() 仍保留：本地 IndexedDB 需 userId 用于 exchange / UI 展示
+// - uploadAll / uploadIncremental 的 body 不再含 userId 字段
+// - downloadAll 的 URL 不再带 ?userId= query
 
 import { nanoid } from "nanoid";
 import { getItem, setItem, listKeys, getMany, bulkPutItems, getChangesSince, delItem, cleanExpiredTombstones } from "@/lib/storage/db";
@@ -159,7 +165,8 @@ function getUpdatedAt(v: unknown): string | undefined {
  *   - Dexie prefix 索引 + bulkGet 比 idb-keyval 快 3-5x
  */
 export async function uploadAll(): Promise<void> {
-  const userId = await getUserId();
+  // userId 仍本地读取（用于 UI / exchange），但不再放入 body
+  // 服务端 /api/sync 已用 requireSession，userId 从 session 取
   const data: Record<string, unknown> = {};
   for (const prefix of SYNC_PREFIXES) {
     const keys = await listKeys(prefix);
@@ -183,8 +190,8 @@ export async function uploadAll(): Promise<void> {
     const v = await getItem<unknown>(key);
     if (v !== undefined) data[key] = v;
   }
-  const backup: UserBackup = {
-    userId,
+  // body 不含 userId（服务端从 session 取）
+  const backup: Omit<UserBackup, "userId"> = {
     updatedAt: new Date().toISOString(),
     version: BACKUP_VERSION,
     data,
@@ -232,7 +239,6 @@ export async function uploadAll(): Promise<void> {
  * @returns "incremental" | "full" | "noop" 表示本次同步的实际模式
  */
 export async function uploadIncremental(): Promise<"incremental" | "full" | "noop"> {
-  const userId = await getUserId();
   const lastSyncAt = await getLastSyncedAt();
 
   // 首次同步 → 降级为全量
@@ -252,11 +258,11 @@ export async function uploadIncremental(): Promise<"incremental" | "full" | "noo
     data[rec.key] = rec.value;
   }
 
+  // body 不含 userId（服务端从 session 取）
   const res = await apiFetch("/api/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      userId,
       mode: "incremental" as const,
       changes: data,
       baseUpdatedAt: lastSyncAt,
@@ -284,11 +290,8 @@ export async function uploadIncremental(): Promise<"incremental" | "full" | "noo
  *   - 用 bulkPutItems 批量写入合并结果（10x+ 快于逐条 setItem）
  */
 export async function downloadAll(): Promise<boolean> {
-  const userId = await getUserId();
-  const res = await apiFetch(
-    `/api/sync?userId=${encodeURIComponent(userId)}`,
-    { method: "GET" },
-  );
+  // userId 不再放入 URL query（服务端从 session 取）
+  const res = await apiFetch("/api/sync", { method: "GET" });
   if (res.status === 404) return false;
   if (!res.ok) {
     const msg = await safeErrText(res);

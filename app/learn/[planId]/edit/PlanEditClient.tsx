@@ -19,7 +19,6 @@ import {
 } from "@/lib/learn-log";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
-import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Checkbox } from "@/components/ui";
 import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
@@ -61,8 +60,6 @@ export default function PlanEditClient() {
   const [aiSuccess, setAiSuccess] = useState(false);
 
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   // 折叠面板：当前展开的 section
   const [openSection, setOpenSection] = useState<
@@ -232,8 +229,6 @@ export default function PlanEditClient() {
   async function handleSave() {
     if (!plan) return;
     setSaving(true);
-    setSaveError(null);
-    setSaved(false);
     try {
       const updated: LearningPlan = {
         ...plan,
@@ -245,12 +240,10 @@ export default function PlanEditClient() {
       await saveRoutine(routine);
       await setItem(includedKey(plan.id), Array.from(includedIds));
       setPlan(updated);
-      setSaved(true);
       setDirty(false);
       setAiAdjusted(false);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "保存失败");
+    } catch {
+      // 保存失败由 finally 中的 setSaving(false) 处理 UI 状态
     } finally {
       setSaving(false);
     }

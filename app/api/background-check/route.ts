@@ -3,18 +3,19 @@
 // 从 Cloudflare KV 读取用户的复习卡片和学习日志，返回是否需要通知
 //
 // 设计：
-//   - POST 请求，body: { userId }
-//   - 从 KV 读取 user:${userId}:backup（UserBackup.data 含全量 IndexedDB key-value）
+//   - POST 请求，body 不再含 userId
+//   - 从 session 拿 userId 后从 KV 读取 user:${userId}:backup
+//     （UserBackup.data 含全量 IndexedDB key-value）
 //   - 检查 card: 前缀的 ReviewCard.due <= now → hasDueCards / dueCount
 //   - 检查 learn_log: 前缀的 LearnLog 最新时间 → daysSinceLastLearn
 //   - 返回 { hasDueCards, dueCount, daysSinceLastLearn, shouldNotify, message }
 //   - daysSinceLastLearn >= 3 → 个性化回归消息；hasDueCards → 复习提醒
 //
-// 鉴权：数据操作（dataOperation=true），与 /api/sync 一致
+// 鉴权：requireSession 注入 session，userId 从 session 取
 
 import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { ReviewCard, LearnLog } from "@/lib/types";
 
@@ -24,22 +25,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
-  // 数据操作：不消耗 AI 额度，未配置 API_TOKEN 时放行（与 /api/sync 一致）
-  const authError = requireAuth(req, { dataOperation: true });
-  if (authError) return authError;
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
 
-  let body: { userId?: string };
+  // 消费 body（即使为空，避免上游 req.json() 报错；当前路由无 body 必填字段）
   try {
-    body = await req.json();
+    await req.json();
   } catch {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const userId = body.userId;
-  if (!userId || typeof userId !== "string") {
-    return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
-  }
-
+  const userId = session.userId;
   const store = createKVStore(getCloudflareKV());
   const backup = await store.getUserBackup(userId);
 

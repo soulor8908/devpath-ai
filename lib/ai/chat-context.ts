@@ -10,7 +10,7 @@
 //   6. 当前 routine 时段（如果正在学习时段内）
 
 import { getItem, listItems } from "../storage/db";
-import { KEY_PREFIXES, type LearningPlan, type LearnLog, type MistakeRecord, type DailyStatus, type Routine, type ReviewLog, type Reminder, type UserProfile, type SkillLevel } from "../types";
+import { KEY_PREFIXES, type LearningPlan, type LearnLog, type MistakeRecord, type DailyStatus, type Routine, type ReviewLog, type UserProfile, type SkillLevel } from "../types";
 import { chinaDateNow, chinaDateShift } from "../time";
 import { getPendingReminders } from "../reminder";
 import type { ToolContext, PlanContextItem } from "./chat-tools";
@@ -433,7 +433,7 @@ function timeSlotPrefix(slot: string): string {
  */
 export async function buildProfileContext(profile: UserProfile): Promise<string> {
   // 从所有计划解析 nodeId → 标题（best-effort，找不到就用 nodeId）
-  let titleByNodeId = new Map<string, string>();
+  const titleByNodeId = new Map<string, string>();
   try {
     const plans = await listItems<LearningPlan>(KEY_PREFIXES.PLAN);
     for (const p of plans) {

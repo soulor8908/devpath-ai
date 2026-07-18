@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Question } from "@/lib/types";
 import { AnswerContent, CodeBlock } from "@/components/CodeBlock";
@@ -35,17 +35,17 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
   const dwellTrackedRef = useRef(false);
 
   // 隐式反馈：记录用户对这道题的行为（仅当有 aiCallId 时触发，老题目静默跳过）
-  const trackImplicit = (implicitAction: "expanded" | "followed_up" | "favorited" | "too_simple" | "needs_practice" | "copied") => {
+  const trackImplicit = useCallback((implicitAction: "expanded" | "followed_up" | "favorited" | "too_simple" | "needs_practice" | "copied") => {
     if (!question.aiCallId) return;
     void trackAIFeedback({
       callRecordId: question.aiCallId,
       scene: "question_generate",
       implicitAction,
     });
-  };
+  }, [question.aiCallId]);
 
   // 根据停留时间推断隐式反馈
-  const trackDwell = () => {
+  const trackDwell = useCallback(() => {
     if (!expandTimeRef.current || dwellTrackedRef.current) return;
     const dwellMs = Date.now() - expandTimeRef.current;
     if (dwellMs < DWELL_TOO_SIMPLE_MS) {
@@ -55,14 +55,14 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
       trackImplicit("needs_practice");
       dwellTrackedRef.current = true;
     }
-  };
+  }, [trackImplicit]);
 
   // 组件卸载时记录停留时间
   useEffect(() => {
     return () => {
       trackDwell();
     };
-  }, []);
+  }, [trackDwell]);
 
   const handleFollowUpClick = (fu: string) => {
     trackImplicit("followed_up");

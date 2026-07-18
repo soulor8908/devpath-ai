@@ -24,7 +24,6 @@ export async function buildPublicStats(
   currentTopic: string | undefined,
 ): Promise<PublicStats> {
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
 
   // 连续打卡：从今天往前数，连续有 learnLog 的天数
   const datesSet = new Set(learnLogs.map((l) => l.date));

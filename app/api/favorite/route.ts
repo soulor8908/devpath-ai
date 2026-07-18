@@ -1,25 +1,29 @@
 // app/api/favorite/route.ts
 // POST /api/favorite: 接收 { action, plan?, deckId?, questionId? }
 // 纯逻辑计算，返回结果给前端存储
+//
+// 鉴权：requireSession 注入 session，body 不含客户端凭证
+// （favorite 是纯规则计算，session 仅用于身份校验）
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildFavoriteDeck, toggleQuestionInPlan } from "@/lib/favorite";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import type { LearningPlan } from "@/lib/types";
-import type { ClientModelConfig } from "@/lib/ai/resolve-model";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
 
   let body: {
     action?: string;
     plan?: LearningPlan;
     deckId?: string;
     questionId?: string;
-    modelConfig?: ClientModelConfig;
   };
   try {
     body = await req.json();
@@ -27,11 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const { action, plan, deckId, questionId, modelConfig } = body;
-  const useServerModel = !(modelConfig && modelConfig.apiKey);
-
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
+  const { action, plan, deckId, questionId } = body;
   try {
     switch (action) {
       case "create_deck": {

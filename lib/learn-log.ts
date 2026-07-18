@@ -73,7 +73,7 @@ function computeStreak(dates: string[]): { current: number; longest: number } {
 
   // 当前连续：从最后一天往前数
   let current = 0;
-  let lastDate = sorted[sorted.length - 1];
+  const lastDate = sorted[sorted.length - 1];
   // 如果最后一天是今天或昨天，从那天开始数
   if (lastDate === today || lastDate === yesterday) {
     current = 1;

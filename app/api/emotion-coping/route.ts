@@ -1,16 +1,18 @@
 // app/api/emotion-coping/route.ts
 // P3 情绪简化 — AI 应对建议生成
-// 输入：{ tag, reason, modelConfig? }
+// 输入：{ tag, reason }
 // 输出：{ suggestions: string[], source: "ai" | "rule" }
-// 失败/无 key 时降级到规则模板（按情绪类型给固定建议）
+// 失败时降级到规则模板（按情绪类型给固定建议）
+//
+// 鉴权：requireSession 注入 session，body 不含客户端凭证
+// （session 中的 apiKey 由 exchange 保证可用，无 key 不会进入此路由）
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
-import { hasAIKey } from "@/lib/ai/provider";
+import { requireSession } from "@/lib/ai/session-middleware";
+import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
-import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
 import type { EmotionTag } from "@/lib/types";
 
 export const runtime = "edge";
@@ -20,11 +22,14 @@ const PROMPT_DEF = getPrompt("emotion_coping");
 interface EmotionCopingBody {
   tag?: EmotionTag;
   reason?: string;
-  modelConfig?: ClientModelConfig;
 }
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
 
   let body: EmotionCopingBody;
   try {
@@ -33,11 +38,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const { tag, reason, modelConfig } = body;
-  const { model, useServerModel } = resolveModel(modelConfig, "emotion-coping");
-
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
+  const { tag, reason } = body;
+  const model = getModelFromSession(session, "emotion-coping");
 
   if (!tag) {
     return NextResponse.json({ error: "缺少 tag 字段" }, { status: 400 });
@@ -47,14 +49,6 @@ export async function POST(req: NextRequest) {
     typeof reason === "string" && reason.length > 0
       ? reason.slice(0, 500)
       : "";
-
-  // 无 AI key 降级到规则模板
-  if (useServerModel && !hasAIKey()) {
-    return NextResponse.json({
-      suggestions: ruleBasedCoping(tag),
-      source: "rule",
-    });
-  }
 
   try {
     const userPrompt = `情绪：${tag}\n原因/影响：${safeReason || "（用户未填写）"}\n\n请生成 3-5 条应对建议：`;

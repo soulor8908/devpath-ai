@@ -19,7 +19,6 @@ import { DailyNudge } from "@/components/DailyNudge";
 import { HealthAlertCard } from "@/components/HealthAlertCard";
 import type { Achievement, HealthAlert } from "@/lib/types";
 import { AchievementCard } from "@/components/AchievementCard";
-import { Icon } from "@/components/Icon";
 
 interface Props {
   newAchievements: Achievement[];

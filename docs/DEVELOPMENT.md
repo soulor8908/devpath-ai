@@ -14,6 +14,47 @@ npm run dev
 
 > 首次访问会自动注入 Demo 数据（前端工程师示例计划 + 3 张复习卡片 + 2 天学习日志）。创建真实计划后会提示清除 Demo 数据。
 
+## 安全配置
+
+### MASTER_KEY（必须配置）
+
+`MASTER_KEY` 是加密会话的根密钥，用于加解密存储在 KV 中的 `apiKey` 和 `sessionSecret`。**未配置时 `/api/auth/exchange` 会返回 500**，所有需要 AI 调用的功能（聊天 / 学习计划 / 复习 / 周报 / sync 等）都将不可用。
+
+- 格式：32 字节 base64 字符串
+- 生成命令：
+
+```bash
+openssl rand -base64 32
+```
+
+#### 本地开发
+
+将生成的密钥写入 `.env.local`：
+
+```bash
+echo "MASTER_KEY=$(openssl rand -base64 32)" >> .env.local
+```
+
+> 本地开发环境**不要**复用生产密钥；每个开发者使用独立的 `MASTER_KEY`。
+
+#### Cloudflare Pages 部署
+
+通过 wrangler 上传为 Pages Secret（不要写入 `wrangler.toml` 的 `[vars]`）：
+
+```bash
+npx wrangler pages secret put MASTER_KEY --project-name=devpath-ai
+```
+
+执行后粘贴密钥并回车。Secret 加密存储在 Cloudflare，不会出现在仓库或构建产物中。
+
+#### 密钥轮换
+
+更换 `MASTER_KEY` 后，KV 中所有已加密的 session 立即无法解密，用户需重新访问「我的 → AI 模型配置」输入 apiKey 重新 exchange。轮换流程：
+
+1. 上传新的 `MASTER_KEY`
+2. 触发一次重新部署（`wrangler pages deploy` 或推送到 main 分支）
+3. 通知所有用户重新输入 apiKey（旧 session 自动失效）
+
 ## 测试
 
 ```bash
@@ -403,17 +444,14 @@ npm run quality-gate
 
 > 提交前建议本地跑一次 `npm run quality-gate`，避免把明显的错误推到远程。
 
-### Git pre-push 钩子（可选但推荐）
+### Git 钩子（husky + lint-staged）
 
-安装一个本地 pre-push 钩子，在 `git push` 之前自动跑 lint + typecheck（为速度考虑跳过测试，完整测试交给 CI）：
+项目已通过 [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) 配置本地 Git 钩子，无需手动安装：
 
-```bash
-bash scripts/install-git-hooks.sh
-```
-
-- 脚本幂等，可重复执行（每次覆盖旧钩子）。
-- 钩子安装在 `.git/hooks/pre-push`，仅作用于当前本地仓库，不会提交到远程。
-- 临时绕过：`git push --no-verify`。
+- `npm install` 时会自动触发 `prepare` 脚本注册 husky，`.husky/` 目录下的钩子会被链接到 `.git/hooks/`。
+- `pre-commit`：对暂存的 `*.{ts,tsx}` 文件执行 `eslint --fix --max-warnings 0`，有 lint error 时拒绝提交。
+- `pre-push`：执行 `npm run lint && npm run typecheck`，有 lint 或类型错误时拒绝推送（为速度考虑跳过测试，完整测试交给 CI）。
+- 临时绕过：`git commit --no-verify` / `git push --no-verify`。
 
 ### CI 自动门禁
 

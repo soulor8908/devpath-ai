@@ -4,16 +4,17 @@
 // 设计：
 //   - 客户端从 IndexedDB 聚合快照后 POST 过来
 //   - 服务端调一次 LLM，返回短文本
-//   - 失败/无 key 时降级为规则模板
+//   - 失败时降级为规则模板（session 中的 apiKey 由 exchange 保证可用，无 key 不会进入此路由）
 //   - 客户端按当天缓存（IndexedDB），避免每次进首页都跑 LLM
+//
+// 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
-import { hasAIKey } from "@/lib/ai/provider";
+import { requireSession } from "@/lib/ai/session-middleware";
+import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
-import { resolveModel, type ClientModelConfig } from "@/lib/ai/resolve-model";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
@@ -24,30 +25,29 @@ const PROMPT_DEF = getPrompt("daily_nudge");
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
+  const { session } = sessionResult;
 
-  let body: { contextSnapshot?: string; modelConfig?: ClientModelConfig; userId?: string };
+  let body: { contextSnapshot?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const { contextSnapshot, modelConfig, userId } = body;
-  const { model, useServerModel } = resolveModel(modelConfig, "daily-nudge");
+  const { contextSnapshot } = body;
+  const model = getModelFromSession(session, "daily-nudge");
 
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
-
-  // 限流：仅使用服务端默认模型时检查（用户自带 modelConfig 不限流）
-  if (useServerModel && userId) {
-    const kv = createKVStore(getCloudflareKV());
-    const { allowed } = await checkRateLimit(userId, "daily_nudge", kv);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "daily_nudge", remaining: 0 },
-        { status: 429 },
-      );
-    }
+  // 限流：所有请求都限流
+  const kv = createKVStore(getCloudflareKV());
+  const { allowed } = await checkRateLimit(session.userId, "daily_nudge", kv);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "daily_nudge", remaining: 0 },
+      { status: 429 },
+    );
   }
 
   try {
@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
         ? contextSnapshot.slice(0, 4000)
         : "";
 
-    // 无 AI key 降级到规则模板
-    if ((useServerModel && !hasAIKey()) || !safeSnapshot) {
+    // 无 contextSnapshot 时降级到规则模板
+    if (!safeSnapshot) {
       return NextResponse.json({
         nudge: ruleBasedNudge(safeSnapshot),
         source: "rule",
@@ -83,10 +83,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 限流计数 +1（AI 成功生成后；规则降级不计数）
-      if (useServerModel && userId) {
-        const kv = createKVStore(getCloudflareKV());
-        await incrementRateLimit(userId, "daily_nudge", kv);
-      }
+      await incrementRateLimit(session.userId, "daily_nudge", kv);
 
       return NextResponse.json({
         nudge: cleaned.slice(0, 200),

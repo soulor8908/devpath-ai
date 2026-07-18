@@ -6,6 +6,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 import type { ModelConfig } from "../types";
+import { wrapModelWithObservability } from "./observability";
+import type { SessionContext } from "./session-middleware";
 
 export type AIProvider = "glm" | "deepseek" | "mimo" | "custom";
 
@@ -108,6 +110,20 @@ export function getModelFromConfig(config: ModelConfig): LanguageModel {
   }
   const openai = createOpenAI({ baseURL: config.baseURL, apiKey: config.apiKey });
   return openai(config.model);
+}
+
+/**
+ * 从已鉴权 session 创建模型（无缓存，每次新建）。
+ * - 用 session.apiKey / baseURL / model 直接构造 OpenAI 兼容客户端
+ * - 包裹 observability 计时（tag 为 `${label}:session`）
+ * - session-middleware.ts 不 import 本文件，无循环依赖
+ */
+export function getModelFromSession(
+  session: SessionContext,
+  label: string,
+): LanguageModel {
+  const openai = createOpenAI({ baseURL: session.baseURL, apiKey: session.apiKey });
+  return wrapModelWithObservability(openai(session.model), `${label}:session`);
 }
 
 /** 检查是否配置了 AI Key */

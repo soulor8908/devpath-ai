@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getApiToken } from "@/lib/api-client";
+import { aiFetch } from "@/lib/api-client";
 import {
   type ChatMessage,
   type Conversation,
@@ -23,9 +23,7 @@ import {
   getMessages,
   addMessage,
   togglePin,
-  renameConversation,
   cleanupOldConversations,
-  searchConversations,
   deleteMessage,
   deleteMessagesFrom,
 } from "@/lib/chat-store";
@@ -39,7 +37,7 @@ import type { ClientAction } from "@/lib/ai/chat-tools";
 import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
 import { createReminder, startReminderPolling } from "@/lib/reminder";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
-import { scheduleAutoSync, getUserId } from "@/lib/sync";
+import { scheduleAutoSync } from "@/lib/sync";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
 import { createSession } from "@/lib/timer/pomodoro";
@@ -56,7 +54,6 @@ import {
 import {
   startAITask,
   appendAITaskContent,
-  setAITaskContent,
   completeAITask,
   errorAITask,
 } from "@/lib/ai-task-queue";
@@ -69,25 +66,6 @@ const BUILTIN_PROMPTS = [
   "面试中怎么回答",
   "常见误区有哪些",
 ];
-
-// 格式化为相对时间（如"3 分钟前"、"昨天"）
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const t = new Date(iso).getTime();
-  const diff = now - t;
-  if (diff < 0) return "刚刚";
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return "刚刚";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} 分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
-  const day = Math.floor(hr / 24);
-  if (day === 1) return "昨天";
-  if (day < 7) return `${day} 天前`;
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 export default function ChatClient() {
   const router = useRouter();
@@ -102,7 +80,6 @@ export default function ChatClient() {
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState("");
   const [showHistory, setShowHistory] = useState(false);
-  const [showPrompts, setShowPrompts] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -543,28 +520,12 @@ export default function ChatClient() {
     [activeConv, refreshConversations]
   );
 
-  // 重命名对话
-  const handleRename = useCallback(
-    async (id: string) => {
-      const title = window.prompt("请输入新的对话标题", activeConv?.title ?? "");
-      if (title === null) return;
-      await renameConversation(id, title);
-      await refreshConversations();
-      if (activeConv?.id === id) {
-        const updated = await getConversation(id);
-        if (updated) setActiveConv(updated);
-      }
-    },
-    [activeConv, refreshConversations]
-  );
-
   // 应用提示词
   const applyPrompt = useCallback((prompt: string) => {
     setInput((prev) => {
       if (!prev.trim()) return prompt;
       return `${prev}\n${prompt}`;
     });
-    setShowPrompts(false);
     inputRef.current?.focus();
   }, []);
 
@@ -620,26 +581,24 @@ export default function ChatClient() {
       const callId = generateCallId();
       const stopTimer = startTimer();
 
-      const token = await getApiToken();
-      const userId = await getUserId().catch(() => undefined);
+      // session 鉴权由 aiFetch 自动处理（签名头注入）
+      // body 不含 modelConfig / userId（服务端从 session 取）
       const { id: aiTaskId, signal: aiSignal } = startAITask("AI 对话回复");
       let res: Response;
       try {
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        res = await aiFetch(
+          "/api/chat",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              messages: params.history,
+              contextSnapshot,
+              toolContext,
+            }),
+            signal: aiSignal,
           },
-          body: JSON.stringify({
-            messages: params.history,
-            modelConfig,
-            contextSnapshot,
-            toolContext,
-            userId,
-          }),
-          signal: aiSignal,
-        });
+          0, // 流式响应不设超时（由用户中止按钮控制）
+        );
       } catch (err) {
         if (!aiSignal.aborted) {
           errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));

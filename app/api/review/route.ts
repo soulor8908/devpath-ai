@@ -2,26 +2,30 @@
 // POST /api/review: 接收 { card, rating, mode }
 // 服务端用 FSRS 计算评分后的卡片，返回更新后的 card + ReviewLog
 // 客户端负责将结果存入 IndexedDB
+//
+// 鉴权：requireSession 注入 session，body 不含客户端凭证
+// （review 是纯规则计算，session 仅用于身份校验，模型不实际使用）
 
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { rateCard } from "@/lib/fsrs";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
-import { requireAuth } from "@/lib/auth";
+import { requireSession } from "@/lib/ai/session-middleware";
 import { nowISO } from "@/lib/time";
 import type { ReviewCard, ReviewLog, Rating } from "@/lib/types";
-import type { ClientModelConfig } from "@/lib/ai/resolve-model";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+  // 先鉴权（review 是纯规则计算，session 仅用于身份校验，模型不实际使用）
+  const sessionResult = await requireSession(req);
+  if (sessionResult instanceof NextResponse) return sessionResult;
 
   let body: {
     card?: ReviewCard;
     rating?: Rating;
     mode?: "conservative" | "standard" | "aggressive";
-    modelConfig?: ClientModelConfig;
   };
   try {
     body = await req.json();
@@ -29,11 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
 
-  const { card, rating, mode = "standard", modelConfig } = body;
-  const useServerModel = !(modelConfig && modelConfig.apiKey);
-
-  const authError = requireAuth(req, { useServerModel });
-  if (authError) return authError;
+  const { card, rating, mode = "standard" } = body;
   try {
     if (!card || !card.id) {
       return NextResponse.json({ error: "card 是必填项" }, { status: 400 });

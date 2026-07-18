@@ -169,9 +169,10 @@ npx next lint      # ESLint
 需在仓库 Settings → Secrets 配置：
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API 令牌
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare 账户 ID
-- `API_TOKEN` — 应用鉴权 token（客户端在 profile 页面填相同值）
-- `DEEPSEEK_API_KEY` / `GLM_API_KEY` — 服务端默认模型用
+- `MASTER_KEY` — 加密会话根密钥（必须配置，否则 `/api/auth/exchange` 返回 500）。生成：`openssl rand -base64 32`；本地写入 `.env.local`，Cloudflare Pages 用 `wrangler pages secret put MASTER_KEY` 上传
+- `DEEPSEEK_API_KEY` / `GLM_API_KEY` — 服务端默认模型用（如启用免费模式）
 
+> 详细配置说明见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#安全配置) 的「安全配置」章节。
 > Workflow 会自动创建 Pages 项目（如不存在），首次部署后访问 https://devpath-ai.pages.dev
 
 ## 🔒 数据与隐私

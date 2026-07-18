@@ -1,4 +1,27 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// mock requireSession：跳过签名校验，直接注入 fake session
+vi.mock("../lib/ai/session-middleware", () => ({
+  requireSession: vi.fn(async () => ({
+    session: {
+      userId: "test-user",
+      apiKey: "test-key",
+      provider: "glm",
+      baseURL: "https://api.glm.com/v1",
+      model: "glm-4-flash",
+      name: "test",
+      sessionId: "sess-1",
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    },
+  })),
+}));
+
+// mock cloudflare-env：避免 initCloudflareEnv 报错
+vi.mock("../lib/ai/cloudflare-env", () => ({
+  initCloudflareEnv: vi.fn(),
+  getCloudflareKV: () => undefined,
+}));
+
 import { POST } from "../app/api/review/route";
 import type { ReviewCard } from "../lib/types";
 

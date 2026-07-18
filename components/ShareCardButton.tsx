@@ -7,7 +7,6 @@ import { useState } from "react";
 import { generateShareCard } from "@/lib/share-image";
 import { listItems } from "@/lib/storage/db";
 import type { PublicProfile, LearnLog, ReviewCard } from "@/lib/types";
-import { Icon } from "@/components/Icon";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui";
 

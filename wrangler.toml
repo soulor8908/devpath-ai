@@ -13,9 +13,27 @@ id = "086d793456e5425bacb04836da93ad9b"
 # 预览环境使用独立 namespace，避免污染生产数据
 preview_id = "preview-kv-namespace-placeholder"
 
+# apiKey Session 安全架构专用 namespace（tasks.md Task 5）
+# 以下三个 namespace 的 id 暂用 placeholder，部署时需用以下命令创建并替换 id：
+#   npx wrangler kv namespace create AUTH_SESSIONS
+#   npx wrangler kv namespace create AUTH_NONCES
+#   npx wrangler kv namespace create AUTH_AUDIT
+# 预览环境（如有）需另行创建并填入 preview_id 字段
+[[kv_namespaces]]
+binding = "AUTH_SESSIONS"
+id = "placeholder_auth_sessions"
+
+[[kv_namespaces]]
+binding = "AUTH_NONCES"
+id = "placeholder_auth_nonces"
+
+[[kv_namespaces]]
+binding = "AUTH_AUDIT"
+id = "placeholder_auth_audit"
+
 [vars]
 AI_PROVIDER = "deepseek"
 # 以下密钥通过 `wrangler pages secret put <NAME> --project-name=devpath-ai` 上传：
-# - API_TOKEN        : API 鉴权 token（客户端在 profile 页面配置相同值）
+# - MASTER_KEY        : 加密会话根密钥（32 字节 base64，必须配置，openssl rand -base64 32 生成）
 # - DEEPSEEK_API_KEY : DeepSeek API Key
 # - GLM_API_KEY       : 智谱 GLM API Key（如使用 glm provider）
