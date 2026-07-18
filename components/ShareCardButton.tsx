@@ -9,6 +9,7 @@ import { listItems } from "@/lib/storage/db";
 import type { PublicProfile, LearnLog, ReviewCard } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { toast } from "@/lib/toast";
+import { Button } from "@/components/ui";
 
 interface Props {
   profile: PublicProfile;
@@ -76,13 +77,13 @@ export function ShareCardButton({ profile }: Props) {
   }
 
   return (
-    <button
+    <Button
+      variant="secondary"
       onClick={handleClick}
-      disabled={generating}
-      className="flex items-center gap-1.5 rounded-lg border dark:border-gray-600 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+      loading={generating}
+      leftIcon="sparkles"
     >
-      <Icon name="sparkles" className="w-4 h-4" />
       {generating ? "生成中..." : "生成分享图"}
-    </button>
+    </Button>
   );
 }

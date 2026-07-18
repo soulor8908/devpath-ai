@@ -41,15 +41,19 @@ export async function apiFetch(
  * 如果用户配置了模型（含 apiKey），服务端将使用用户模型并跳过鉴权。
  * 如果未配置模型，仅附加 token，服务端使用默认模型并要求鉴权。
  *
- * 超时：60 秒（非流式请求的兜底）。流式接口（/api/learn/answers）
- * 不走 aiFetch，不受此超时影响——流式响应靠逐题推进天然防止挂死。
+ * 超时策略（卡帕西视角）：
+ *   - 默认 timeoutMs=180000（3 分钟），覆盖 AI 拆知识点/生成题目等较慢的请求
+ *   - 调用方可传 timeoutMs=0 表示不超时（用于流式响应或特别慢的 AI 调用）
+ *   - 流式接口（/api/learn/answers、/api/chat）推荐不传 signal 也不设超时，
+ *     改由全局 AI 等待模态窗的中止按钮提供用户侧的取消能力
  */
 export async function aiFetch(
   url: string,
   options: RequestInit = {},
+  timeoutMs: number = 180000,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
   try {
     const token = await getApiToken();
@@ -118,10 +122,15 @@ export async function aiFetch(
     return res;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("请求超时（60秒），请重试");
+      // 超时或被外部 signal 中止
+      if (timeoutMs > 0) {
+        throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}秒），请重试`);
+      }
+      // timeoutMs=0 时只有外部 signal 才会触发 abort
+      throw new Error("请求已中止");
     }
     throw err;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }

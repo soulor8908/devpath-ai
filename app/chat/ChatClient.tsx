@@ -43,6 +43,7 @@ import { scheduleAutoSync, getUserId } from "@/lib/sync";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
 import { createSession } from "@/lib/timer/pomodoro";
+import { Button, Input, Textarea } from "@/components/ui";
 import {
   recordAICall,
   trackAIFeedback,
@@ -52,6 +53,13 @@ import {
   generateCallId,
   parseUsageFromFinishMessage,
 } from "@/lib/ai/quality-tracker";
+import {
+  startAITask,
+  appendAITaskContent,
+  setAITaskContent,
+  completeAITask,
+  errorAITask,
+} from "@/lib/ai-task-queue";
 
 // 内置提示词库
 const BUILTIN_PROMPTS = [
@@ -614,27 +622,41 @@ export default function ChatClient() {
 
       const token = await getApiToken();
       const userId = await getUserId().catch(() => undefined);
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          messages: params.history,
-          modelConfig,
-          contextSnapshot,
-          toolContext,
-          userId,
-        }),
-      });
+      const { id: aiTaskId, signal: aiSignal } = startAITask("AI 对话回复");
+      let res: Response;
+      try {
+        res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            messages: params.history,
+            modelConfig,
+            contextSnapshot,
+            toolContext,
+            userId,
+          }),
+          signal: aiSignal,
+        });
+      } catch (err) {
+        if (!aiSignal.aborted) {
+          errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));
+        }
+        throw err;
+      }
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
-        return { error: `请求失败 (${res.status})${errText ? `: ${errText}` : ""}` };
+        const msg = `请求失败 (${res.status})${errText ? `: ${errText}` : ""}`;
+        errorAITask(aiTaskId, msg);
+        return { error: msg };
       }
       if (!res.body) {
-        return { error: "响应没有流式内容" };
+        const msg = "响应没有流式内容";
+        errorAITask(aiTaskId, msg);
+        return { error: msg };
       }
 
       // 从响应头读取模型 ID（用于成本估算）
@@ -684,32 +706,41 @@ export default function ChatClient() {
         return "";
       };
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let nlIdx: number;
-        while ((nlIdx = buffer.indexOf("\n")) !== -1) {
-          const rawLine = buffer.slice(0, nlIdx);
-          buffer = buffer.slice(nlIdx + 1);
-          const line = rawLine.trim();
-          if (!line) continue;
-          if (line.startsWith("data:")) {
-            const data = line.slice(5).trim();
-            if (data === "[DONE]") continue;
-            const chunk = parseDataLine(data);
-            if (chunk) {
-              acc += chunk;
-              setStreamContent(acc);
-            }
-          } else if (!line.startsWith(":")) {
-            const chunk = parseDataLine(line);
-            if (chunk) {
-              acc += chunk;
-              setStreamContent(acc);
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let nlIdx: number;
+          while ((nlIdx = buffer.indexOf("\n")) !== -1) {
+            const rawLine = buffer.slice(0, nlIdx);
+            buffer = buffer.slice(nlIdx + 1);
+            const line = rawLine.trim();
+            if (!line) continue;
+            if (line.startsWith("data:")) {
+              const data = line.slice(5).trim();
+              if (data === "[DONE]") continue;
+              const chunk = parseDataLine(data);
+              if (chunk) {
+                acc += chunk;
+                setStreamContent(acc);
+                appendAITaskContent(aiTaskId, chunk);
+              }
+            } else if (!line.startsWith(":")) {
+              const chunk = parseDataLine(line);
+              if (chunk) {
+                acc += chunk;
+                setStreamContent(acc);
+                appendAITaskContent(aiTaskId, chunk);
+              }
             }
           }
         }
+      } catch (err) {
+        if (!aiSignal.aborted) {
+          errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));
+        }
+        throw err;
       }
 
       const finalContent = acc || "(无响应内容)";
@@ -794,6 +825,7 @@ export default function ChatClient() {
         modelId: responseModelId,
       }).catch(() => {});
 
+      completeAITask(aiTaskId);
       return { content: finalContent, callId };
     },
     [modelConfigs, selectedModelId, executeClientAction],
@@ -1172,32 +1204,32 @@ export default function ChatClient() {
               {m.id === editingMessageId ? (
                 /* 编辑模式：textarea + 保存/取消 */
                 <div className="w-full bg-blue-50 dark:bg-blue-900/30 rounded-2xl rounded-br-sm p-2 border border-blue-200 dark:border-blue-800">
-                  <textarea
+                  <Textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={3}
                     autoFocus
-                    className="w-full resize-none border-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 p-1"
+                    inputSize="sm"
+                    className="border-0 bg-transparent focus:ring-0"
                   />
                   <div className="flex justify-end gap-2 mt-1">
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => {
                         setEditingMessageId(null);
                         setEditContent("");
                       }}
-                      className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     >
                       取消
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={() => handleSaveEdit(m.id)}
                       disabled={!editContent.trim() || streaming}
-                      className="px-2.5 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-40"
                     >
                       保存
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -1335,25 +1367,24 @@ export default function ChatClient() {
         </div>
         {/* 第 2 行：输入框 + 发送按钮 */}
         <div className="flex items-end gap-2">
-          <textarea
+          <Textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
             rows={1}
-            className="flex-1 resize-none border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 max-h-32 bg-white dark:bg-gray-700 dark:text-gray-100"
+            className="flex-1 max-h-32"
             disabled={streaming}
           />
-          <button
-            type="button"
+          <Button
             onClick={handleSend}
             disabled={!input.trim() || streaming}
-            className="p-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-colors"
+            className="shrink-0 px-3 py-2.5"
             aria-label="发送"
           >
             <Icon name="send" className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </footer>
 
@@ -1382,11 +1413,13 @@ export default function ChatClient() {
             </div>
             {/* Search */}
             <div className="p-2 border-b dark:border-gray-700">
-              <input
+              <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="搜索对话..."
-                className="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-0 focus:ring-1 focus:ring-blue-500"
+                inputSize="sm"
+                leftIcon="search"
+                className="w-full"
               />
             </div>
             {/* List */}

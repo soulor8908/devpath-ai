@@ -1,13 +1,21 @@
 "use client";
 
 // components/MindMap.tsx
-// 知识树脑图组件（水平树形布局，左→右展开）
-// 功能：
-// 1. DAG → Tree 转换（节点挂到最深 prereq 下，保证唯一父节点）
-// 2. 内部缩放（桌面滚轮 zoom / 移动端两指 pinch zoom + 单指拖拽 pan）
-//    使用 touch-action: none 拦截浏览器默认手势，避免外层页面被缩放
-// 3. 节点可点击：点击后调用 onSelectNode
-// 4. 大厂标记渲染（bigTech=true 的节点用 🏢 + 黄色边框）
+// 知识树脑图组件（水平树形布局，左→右展开，可折叠子树）
+//
+// 设计（乔布斯视角）：
+//   - 节点不截断 title，通过更大节点 + 多行排版解决"看不清"
+//   - 支持点击节点切换子树展开/收起（解决"放最大也看不清"的拥挤问题）
+//   - 节点右侧有"进入学习"小按钮，点击触发 onSelectNode（与展开区分）
+//   - 节点内显示：title（多行）/ 难度星级 / 频率 / 大厂标记 / 掌握度进度条
+//   - 工具栏：放大 + 缩小 + 重置 + 全部展开 + 全部收起 + 适配视图
+//
+// 设计（卡帕西视角）：
+//   - DAG → Tree 转换保留（每节点挂到最深 prereq 下）
+//   - 折叠态：子树不参与 layout，画布更紧凑
+//   - foreignObject 用于 HTML 节点（比纯 SVG text 更易实现多行 + 样式）
+//   - 拖拽 + 缩放交互保留（桌面滚轮 + 移动端 pinch）
+//   - 节点点击分两个区域：标题区 = 切换展开，"进入"按钮 = onSelectNode
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { KnowledgeNode } from "@/lib/types";
@@ -19,6 +27,8 @@ interface MindMapProps {
   onSelectNode?: (node: KnowledgeNode) => void;
   /** 是否填充父容器高度（用于弹窗内嵌场景），默认 false 使用固定 400px 最小高度 */
   fillHeight?: boolean;
+  /** 是否显示"进入学习"按钮（仅在传了 onSelectNode 时生效） */
+  showEnterButton?: boolean;
 }
 
 interface TreeNode {
@@ -27,35 +37,37 @@ interface TreeNode {
   leafCount: number;
 }
 
-const NODE_W = 180;
-const NODE_H = 64;
-const COL_GAP = 80;
-const ROW_GAP = 12;
-const PADDING = 28;
+const NODE_W = 220;
+const NODE_H = 96;
+const COL_GAP = 60;
+const ROW_GAP = 16;
+const PADDING = 32;
 
-// 计算每个节点的深度（从根到此节点的最长路径长度）
+// 计算每个节点的深度
 function computeDepth(
   nodeId: string,
   nodeMap: Map<string, KnowledgeNode>,
   depthCache: Map<string, number>,
-  visiting: Set<string>
+  visiting: Set<string>,
 ): number {
   if (depthCache.has(nodeId)) return depthCache.get(nodeId)!;
-  if (visiting.has(nodeId)) return 0; // 循环依赖
+  if (visiting.has(nodeId)) return 0;
   const node = nodeMap.get(nodeId);
   if (!node) return 0;
   visiting.add(nodeId);
   let maxDepth = 0;
   for (const p of node.prerequisites) {
     if (!nodeMap.has(p)) continue;
-    maxDepth = Math.max(maxDepth, computeDepth(p, nodeMap, depthCache, visiting) + 1);
+    maxDepth = Math.max(
+      maxDepth,
+      computeDepth(p, nodeMap, depthCache, visiting) + 1,
+    );
   }
   visiting.delete(nodeId);
   depthCache.set(nodeId, maxDepth);
   return maxDepth;
 }
 
-// 构建树：每个节点挂到最深 prereq 下
 function buildTree(nodes: KnowledgeNode[]): TreeNode[] {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const depthCache = new Map<string, number>();
@@ -68,7 +80,7 @@ function buildTree(nodes: KnowledgeNode[]): TreeNode[] {
       parentOf.set(n.id, null);
     } else {
       const sorted = validPrereqs.sort(
-        (a, b) => (depthCache.get(b) ?? 0) - (depthCache.get(a) ?? 0)
+        (a, b) => (depthCache.get(b) ?? 0) - (depthCache.get(a) ?? 0),
       );
       parentOf.set(n.id, sorted[0]);
     }
@@ -91,11 +103,23 @@ function buildTree(nodes: KnowledgeNode[]): TreeNode[] {
     .map(build);
 }
 
+// 收集一棵树中所有节点 id（用于全部展开/收起）
+function collectAllIds(roots: TreeNode[]): string[] {
+  const ids: string[] = [];
+  function walk(tn: TreeNode) {
+    ids.push(tn.node.id);
+    tn.children.forEach(walk);
+  }
+  roots.forEach(walk);
+  return ids;
+}
+
 interface Positioned {
   id: string;
   x: number;
   y: number;
   node: KnowledgeNode;
+  hasChildren: boolean;
 }
 
 interface Edge {
@@ -105,7 +129,11 @@ interface Edge {
   y2: number;
 }
 
-function layout(roots: TreeNode[]): { positions: Positioned[]; edges: Edge[] } {
+// 根据 expanded 集合做 layout：折叠的子树不参与布局
+function layout(
+  roots: TreeNode[],
+  expanded: Set<string>,
+): { positions: Positioned[]; edges: Edge[] } {
   const positions: Positioned[] = [];
   const edges: Edge[] = [];
   const ROW_UNIT = NODE_H + ROW_GAP;
@@ -113,15 +141,25 @@ function layout(roots: TreeNode[]): { positions: Positioned[]; edges: Edge[] } {
 
   function place(tn: TreeNode, depth: number): { topY: number; midY: number; bottomY: number } {
     const x = depth * (NODE_W + COL_GAP);
-    if (tn.children.length === 0) {
+    const isExpanded = expanded.has(tn.node.id);
+    // 折叠态：子节点不布局，父节点当作叶子
+    const visibleChildren = isExpanded ? tn.children : [];
+
+    if (visibleChildren.length === 0) {
       const y = cursorY;
-      positions.push({ id: tn.node.id, x, y, node: tn.node });
+      positions.push({
+        id: tn.node.id,
+        x,
+        y,
+        node: tn.node,
+        hasChildren: tn.children.length > 0,
+      });
       cursorY += ROW_UNIT;
       return { topY: y, midY: y + NODE_H / 2, bottomY: y + NODE_H };
     }
 
     const childMids: number[] = [];
-    for (const c of tn.children) {
+    for (const c of visibleChildren) {
       const m = place(c, depth + 1);
       childMids.push(m.midY);
     }
@@ -130,52 +168,70 @@ function layout(roots: TreeNode[]): { positions: Positioned[]; edges: Edge[] } {
     const avgMid = (minMid + maxMid) / 2;
     let y = avgMid - NODE_H / 2;
     if (y < cursorY) y = cursorY;
-    positions.push({ id: tn.node.id, x, y, node: tn.node });
+    positions.push({
+      id: tn.node.id,
+      x,
+      y,
+      node: tn.node,
+      hasChildren: tn.children.length > 0,
+    });
     return { topY: y, midY: y + NODE_H / 2, bottomY: y + NODE_H };
   }
 
   roots.forEach((r) => place(r, 0));
 
   const posMap = new Map(positions.map((p) => [p.id, p]));
-  function walkEdges(tn: TreeNode) {
+  function walkEdges(tn: TreeNode, parentExpanded: boolean) {
+    if (!parentExpanded) return;
     const p = posMap.get(tn.node.id);
     if (!p) return;
-    tn.children.forEach((c) => {
-      const cp = posMap.get(c.node.id);
-      if (cp) {
-        edges.push({
-          x1: p.x + NODE_W,
-          y1: p.y + NODE_H / 2,
-          x2: cp.x,
-          y2: cp.y + NODE_H / 2,
-        });
-      }
-      walkEdges(c);
-    });
+    if (expanded.has(tn.node.id)) {
+      tn.children.forEach((c) => {
+        const cp = posMap.get(c.node.id);
+        if (cp) {
+          edges.push({
+            x1: p.x + NODE_W,
+            y1: p.y + NODE_H / 2,
+            x2: cp.x,
+            y2: cp.y + NODE_H / 2,
+          });
+        }
+        walkEdges(c, true);
+      });
+    }
   }
-  roots.forEach(walkEdges);
+  roots.forEach((r) => walkEdges(r, true));
 
   return { positions, edges };
 }
 
 const DIFF_BG = ["#dbeafe", "#bfdbfe", "#fde68a", "#fdba74", "#fca5a5"];
 const DIFF_BORDER = ["#3b82f6", "#60a5fa", "#f59e0b", "#f97316", "#ef4444"];
+const DIFF_LABEL = ["入门", "基础", "进阶", "高级", "专家"];
 
 export function MindMap({
   nodes,
   selectedNodeId,
   onSelectNode,
   fillHeight = false,
+  showEnterButton = true,
 }: MindMapProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
-  // 缩放与平移状态
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  // 鼠标拖拽中
+  // 折叠状态：默认全部展开
+  const treeRoots = useMemo(() => buildTree(nodes), [nodes]);
+  const allIds = useMemo(() => collectAllIds(treeRoots), [treeRoots]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(allIds));
+
+  // nodes 变化时重置 expanded（如切换不同预设）
+  useEffect(() => {
+    setExpanded(new Set(allIds));
+  }, [allIds]);
+
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 触摸手势状态（两指 pinch zoom + 单指 pan）
   const touchRef = useRef<{
     mode: "pan" | "pinch" | null;
     startX: number;
@@ -184,13 +240,10 @@ export function MindMap({
     originY: number;
     initialDist?: number;
     initialScale?: number;
-    midX?: number;
-    midY?: number;
   } | null>(null);
 
   const { positions, edges, width, height } = useMemo(() => {
-    const roots = buildTree(nodes);
-    const { positions, edges } = layout(roots);
+    const { positions, edges } = layout(treeRoots, expanded);
     const maxX = positions.reduce((m, p) => Math.max(m, p.x + NODE_W), 0);
     const maxY = positions.reduce((m, p) => Math.max(m, p.y + NODE_H), 0);
     return {
@@ -199,10 +252,8 @@ export function MindMap({
       width: maxX + PADDING * 2,
       height: maxY + PADDING * 2,
     };
-  }, [nodes]);
+  }, [treeRoots, expanded]);
 
-  // 桌面端滚轮缩放（在容器内拦截，不影响外层页面）
-  // 移动端不依赖滚轮，改用 touch 事件实现 pinch zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -213,9 +264,7 @@ export function MindMap({
     });
   }, []);
 
-  // 鼠标拖拽平移（桌面）
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // 只对非节点的空白区域响应拖拽
     if (e.target !== e.currentTarget && (e.target as SVGElement).tagName !== "svg") return;
     dragRef.current = {
       startX: e.clientX,
@@ -239,10 +288,7 @@ export function MindMap({
     dragRef.current = null;
   }, []);
 
-  // ============ 移动端触摸手势 ============
-  // 单指 → 平移；双指 → pinch zoom（同时支持平移）
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // 阻止浏览器默认手势（页面缩放、滚动等）
     e.preventDefault();
     if (e.touches.length === 1) {
       const t = e.touches[0];
@@ -257,58 +303,45 @@ export function MindMap({
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      const midX = (t1.clientX + t2.clientX) / 2;
-      const midY = (t1.clientY + t2.clientY) / 2;
       touchRef.current = {
         mode: "pinch",
-        startX: midX,
-        startY: midY,
+        startX: (t1.clientX + t2.clientX) / 2,
+        startY: (t1.clientY + t2.clientY) / 2,
         originX: translate.x,
         originY: translate.y,
         initialDist: dist,
         initialScale: scale,
-        midX,
-        midY,
       };
     }
   }, [translate.x, translate.y, scale]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // 必须 preventDefault 才能阻止页面级 pinch-to-zoom
     e.preventDefault();
     const t = touchRef.current;
     if (!t) return;
-
     if (t.mode === "pan" && e.touches.length === 1) {
       const touch = e.touches[0];
-      const dx = touch.clientX - t.startX;
-      const dy = touch.clientY - t.startY;
       setTranslate({
-        x: t.originX + dx,
-        y: t.originY + dy,
+        x: t.originX + (touch.clientX - t.startX),
+        y: t.originY + (touch.clientY - t.startY),
       });
     } else if (t.mode === "pinch" && e.touches.length === 2 && t.initialDist && t.initialScale) {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const ratio = dist / t.initialDist;
-      const next = Math.max(0.3, Math.min(2.5, t.initialScale * ratio));
-      setScale(next);
-      // 同时支持双指平移（按中点位移）
+      setScale(Math.max(0.3, Math.min(2.5, t.initialScale * ratio)));
       const midX = (t1.clientX + t2.clientX) / 2;
       const midY = (t1.clientY + t2.clientY) / 2;
-      const dx = midX - t.startX;
-      const dy = midY - t.startY;
       setTranslate({
-        x: t.originX + dx,
-        y: t.originY + dy,
+        x: t.originX + (midX - t.startX),
+        y: t.originY + (midY - t.startY),
       });
     }
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
-    // 手指全部离开时结束手势；从双指变单指时切回 pan 模式
     if (e.touches.length === 0) {
       touchRef.current = null;
     } else if (e.touches.length === 1 && touchRef.current?.mode === "pinch") {
@@ -323,19 +356,31 @@ export function MindMap({
     }
   }, [translate.x, translate.y]);
 
-  // 重置缩放
   const resetView = useCallback(() => {
     setScale(1);
     setTranslate({ x: 0, y: 0 });
   }, []);
 
-  // 放大/缩小按钮
   const zoomIn = useCallback(() => setScale((s) => Math.min(2.5, s + 0.2)), []);
   const zoomOut = useCallback(() => setScale((s) => Math.max(0.3, s - 0.2)), []);
+  const expandAll = useCallback(() => setExpanded(new Set(allIds)), [allIds]);
+  const collapseAll = useCallback(() => setExpanded(new Set()), []);
 
-  // 全局 mouseup 监听（处理鼠标拖出容器的情况）
+  // 适配视图：让所有节点刚好可见
+  const fitView = useCallback(() => {
+    if (!containerRef.current || positions.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const scaleX = (rect.width - PADDING * 2) / width;
+    const scaleY = (rect.height - PADDING * 2) / height;
+    const next = Math.max(0.3, Math.min(2.5, Math.min(scaleX, scaleY)));
+    setScale(next);
+    setTranslate({ x: 0, y: 0 });
+  }, [positions.length, width, height]);
+
   useEffect(() => {
-    const handler = () => { dragRef.current = null; };
+    const handler = () => {
+      dragRef.current = null;
+    };
     window.addEventListener("mouseup", handler);
     return () => window.removeEventListener("mouseup", handler);
   }, []);
@@ -353,7 +398,7 @@ export function MindMap({
       className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden ${fillHeight ? "h-full" : ""}`}
       style={{ minHeight: fillHeight ? "100%" : "400px" }}
     >
-      {/* 工具栏 - 固定在容器右上角，不随内容滚动 */}
+      {/* 工具栏 */}
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white dark:bg-gray-700 rounded-lg shadow-md p-1 border dark:border-gray-600">
         <button
           onClick={zoomOut}
@@ -374,6 +419,15 @@ export function MindMap({
         >
           +
         </button>
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+        <button
+          onClick={fitView}
+          className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-sm"
+          aria-label="适配视图"
+          title="适配视图"
+        >
+          ⤢
+        </button>
         <button
           onClick={resetView}
           className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-sm"
@@ -382,14 +436,31 @@ export function MindMap({
         >
           ⟲
         </button>
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+        <button
+          onClick={expandAll}
+          className="px-2 h-8 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+          aria-label="全部展开"
+          title="全部展开"
+        >
+          展开
+        </button>
+        <button
+          onClick={collapseAll}
+          className="px-2 h-8 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+          aria-label="全部收起"
+          title="全部收起"
+        >
+          收起
+        </button>
       </div>
 
-      {/* 缩放提示 */}
+      {/* 提示 */}
       <div className="absolute bottom-2 left-2 z-20 text-[10px] text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
-        双指缩放 · 单指拖拽
+        双指缩放 · 单指拖拽 · 点击节点展开/收起
       </div>
 
-      {/* SVG 画布 */}
+      {/* 画布 */}
       <div
         ref={containerRef}
         onWheel={handleWheel}
@@ -402,14 +473,12 @@ export function MindMap({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
-        // touch-action: none 阻止浏览器默认手势，确保我们的 touch handler 全权处理
-        // 这样移动端整页不会被 pinch-to-zoom
         style={{ minHeight: fillHeight ? "100%" : "400px", touchAction: "none" }}
       >
         <svg
           width="100%"
           height="100%"
-          viewBox={`0 0 ${width} ${height}`}
+          viewBox={`0 0 ${Math.max(width, 100)} ${Math.max(height, 100)}`}
           className="block"
           style={{ pointerEvents: "none" }}
         >
@@ -434,7 +503,12 @@ export function MindMap({
               const isHover = hoverId === p.id;
               const diff = p.node.difficulty;
               const isBigTech = p.node.bigTech === true;
-              const bg = isSelected ? "#0f172a" : isBigTech ? "#fef3c7" : DIFF_BG[diff - 1] || "#e2e8f0";
+              const isExpanded = expanded.has(p.id);
+              const bg = isSelected
+                ? "#0f172a"
+                : isBigTech
+                  ? "#fef3c7"
+                  : DIFF_BG[diff - 1] || "#e2e8f0";
               const border = isSelected
                 ? "#3b82f6"
                 : isBigTech
@@ -443,37 +517,188 @@ export function MindMap({
                     ? DIFF_BORDER[diff - 1] || "#475569"
                     : "#cbd5e1";
               const fg = isSelected ? "#fff" : "#1e293b";
-              const title = p.node.title;
-              const truncated = title.length > 12 ? title.slice(0, 12) + "…" : title;
-              const qCount = `${p.node.frequency} · ${"★".repeat(diff)}`;
+              const subFg = isSelected ? "#cbd5e1" : "#64748b";
+
+              // foreignObject 用于渲染 HTML 节点（多行文本 + 按钮）
               return (
                 <g
                   key={p.id}
                   transform={`translate(${p.x}, ${p.y})`}
-                  style={{ cursor: onSelectNode ? "pointer" : "default", pointerEvents: "all" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectNode?.(p.node);
-                  }}
+                  style={{ pointerEvents: "all" }}
                   onMouseEnter={() => setHoverId(p.id)}
                   onMouseLeave={() => setHoverId(null)}
                 >
                   <rect
                     width={NODE_W}
                     height={NODE_H}
-                    rx={10}
+                    rx={12}
                     fill={bg}
                     stroke={border}
                     strokeWidth={isSelected ? 2.5 : isBigTech ? 2 : isHover ? 2 : 1}
                   />
-                  <text x={14} y={26} fontSize={13} fontWeight={600} fill={fg}>
-                    {truncated}
-                  </text>
-                  <text x={14} y={48} fontSize={10} fill={isSelected ? "#cbd5e1" : "#64748b"}>
-                    {qCount}
-                    {p.node.customOrder ? ` · #${p.node.customOrder}` : ""}
-                    {isBigTech ? ` · 大厂` : ""}
-                  </text>
+                  <foreignObject x={0} y={0} width={NODE_W} height={NODE_H} style={{ pointerEvents: "none" }}>
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        padding: "10px 12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        color: fg,
+                        fontFamily: "inherit",
+                        boxSizing: "border-box",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      {/* 标题行 */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            lineHeight: "1.3",
+                            flex: 1,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            wordBreak: "break-word",
+                            cursor: p.hasChildren ? "pointer" : "default",
+                            pointerEvents: "auto",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (p.hasChildren) {
+                              setExpanded((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(p.id)) next.delete(p.id);
+                                else next.add(p.id);
+                                return next;
+                              });
+                            } else if (onSelectNode) {
+                              // 叶子节点直接触发 onSelectNode
+                              onSelectNode(p.node);
+                            }
+                          }}
+                        >
+                          {p.node.title}
+                        </div>
+                        {p.hasChildren && (
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: subFg,
+                              cursor: "pointer",
+                              pointerEvents: "auto",
+                              padding: "0 4px",
+                              userSelect: "none",
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpanded((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(p.id)) next.delete(p.id);
+                                else next.add(p.id);
+                                return next;
+                              });
+                            }}
+                          >
+                            {isExpanded ? "▾" : "▸"}
+                          </div>
+                        )}
+                      </div>
+                      {/* 元信息行 */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "11px",
+                          color: subFg,
+                          pointerEvents: "none",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>{DIFF_LABEL[diff - 1] || `D${diff}`}</span>
+                        <span>{"★".repeat(diff)}</span>
+                        <span>·</span>
+                        <span>{p.node.frequency}频</span>
+                        {isBigTech && (
+                          <>
+                            <span>·</span>
+                            <span style={{ color: isSelected ? "#fbbf24" : "#d97706" }}>大厂</span>
+                          </>
+                        )}
+                        {p.node.customOrder != null && (
+                          <>
+                            <span>·</span>
+                            <span>#{p.node.customOrder}</span>
+                          </>
+                        )}
+                      </div>
+                      {/* 掌握度进度条 + 进入按钮 */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <div
+                          style={{
+                            flex: 1,
+                            height: "4px",
+                            background: isSelected ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                            borderRadius: "2px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${p.node.mastery}%`,
+                              height: "100%",
+                              background: isSelected ? "#60a5fa" : "#3b82f6",
+                              borderRadius: "2px",
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontSize: "10px", color: subFg, minWidth: "28px" }}>
+                          {p.node.mastery}%
+                        </span>
+                        {onSelectNode && showEnterButton && (
+                          <button
+                            style={{
+                              fontSize: "10px",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              background: isSelected ? "#3b82f6" : "#1e293b",
+                              color: "#fff",
+                              border: "none",
+                              cursor: "pointer",
+                              pointerEvents: "auto",
+                              fontWeight: 500,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectNode(p.node);
+                            }}
+                          >
+                            进入
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </foreignObject>
                 </g>
               );
             })}

@@ -386,12 +386,11 @@ export function PomodoroFull() {
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
               任务描述
             </label>
-            <input
-              type="text"
+            <Input
               value={taskDescription}
               onChange={(e) => setTaskDescription(e.target.value)}
               placeholder="例如：完成 React Hooks 章节练习"
-              className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              className="w-full"
               autoFocus
             />
           </div>
@@ -422,53 +421,44 @@ export function PomodoroFull() {
               关联学习计划（可选）
             </summary>
             <div className="mt-2 space-y-2">
-              <input
-                type="text"
+              <Input
                 value={planId}
                 onChange={(e) => setPlanId(e.target.value)}
                 placeholder="planId"
-                className="w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                inputSize="sm"
+                className="w-full"
               />
-              <input
-                type="text"
+              <Input
                 value={nodeId}
                 onChange={(e) => setNodeId(e.target.value)}
                 placeholder="nodeId"
-                className="w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                inputSize="sm"
+                className="w-full"
               />
             </div>
           </details>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={strictMode}
-              onChange={async (e) => {
-                const next = e.target.checked;
-                setStrictMode(next);
-                // 持久化到 UserProfile.strictFocusMode（下次进入时读取）
-                try {
-                  const profile = await getUserProfile();
-                  if (profile) {
-                    await saveUserProfile({ ...profile, strictFocusMode: next });
-                  }
-                } catch {
-                  // 持久化失败不影响当前会话的 toggle
+          <Checkbox
+            checked={strictMode}
+            onChange={async (e) => {
+              const next = e.target.checked;
+              setStrictMode(next);
+              // 持久化到 UserProfile.strictFocusMode（下次进入时读取）
+              try {
+                const profile = await getUserProfile();
+                if (profile) {
+                  await saveUserProfile({ ...profile, strictFocusMode: next });
                 }
-              }}
-              className="w-4 h-4"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              严格模式（3 次打断自动放弃）
-            </span>
-          </label>
+              } catch {
+                // 持久化失败不影响当前会话的 toggle
+              }
+            }}
+            label="严格模式（3 次打断自动放弃）"
+          />
 
-          <button
-            onClick={handleStart}
-            className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
+          <Button block onClick={handleStart}>
             开始专注
-          </button>
+          </Button>
         </div>
 
         {todayCount > 0 && (
@@ -571,12 +561,9 @@ export function PomodoroFull() {
                 {isPaused ? "恢复" : "暂停"}
               </button>
             )}
-            <button
-              onClick={handleComplete}
-              className="flex-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 transition-colors"
-            >
+            <Button variant="success" className="flex-1" onClick={handleComplete}>
               提前完成
-            </button>
+            </Button>
             <button
               onClick={handleAbandon}
               className="flex-1 rounded-lg bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium py-2 transition-colors"
@@ -614,12 +601,9 @@ export function PomodoroFull() {
                 : `建议短休息 ${breakMinutes} 分钟 ☕`}
             </p>
             <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => handleStartBreak(nextBreak)}
-                className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 transition-colors"
-              >
+              <Button className="flex-1" onClick={() => handleStartBreak(nextBreak)}>
                 开始休息 {breakMinutes} 分钟
-              </button>
+              </Button>
               <button
                 onClick={handleStartAnother}
                 className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2 transition-colors"
@@ -662,12 +646,9 @@ function RecoveryCard({
         可能是浏览器刷新或关闭前未结束
       </p>
       <div className="flex gap-2 pt-2">
-        <button
-          onClick={onContinue}
-          className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 transition-colors"
-        >
+        <Button className="flex-1" onClick={onContinue}>
           继续专注
-        </button>
+        </Button>
         <button
           onClick={onAbandon}
           className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2 transition-colors"

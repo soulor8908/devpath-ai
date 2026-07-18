@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getItem, setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
@@ -25,11 +25,19 @@ import {
 import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import {
+  startAITask,
+  appendAITaskContent,
+  setAITaskContent,
+  completeAITask,
+  errorAITask,
+} from "@/lib/ai-task-queue";
 
 export default function PlanDetailClient() {
   const params = useParams<{ planId: string }>();
   const planId = params?.planId ?? "";
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [plan, setPlan] = useState<LearningPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [deckFavorited, setDeckFavorited] = useState(false);
@@ -37,6 +45,8 @@ export default function PlanDetailClient() {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<string | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // 题目区容器引用（用于从知识树跳转时滚动定位）
+  const questionsSectionRef = useRef<HTMLDivElement | null>(null);
   // 批量补生成缺失答案（学习向导 Step 3 未完成时进入详情页可继续）
   const [generatingAnswers, setGeneratingAnswers] = useState(false);
 
@@ -78,8 +88,22 @@ export default function PlanDetailClient() {
         setDeckFavorited(true);
         setDeckId(found.id);
       }
-    })();
-  // router 引用稳定（App Router），不作为 effect 依赖避免重渲染（React #185）
+
+      // URL 参数 ?node=xxx 自动筛选 + 滚动到题目区
+      // 用于从其他入口（脑图、知识树、追问等）带着知识点 id 进入
+      const nodeParam = searchParams?.get("node");
+      if (nodeParam && p.knowledgeTree.some((n) => n.id === nodeParam)) {
+        setFilterNodeId(nodeParam);
+        // 等 filteredQuestions 重渲染后再滚动
+        setTimeout(() => {
+          questionsSectionRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100);
+      }
+    });
+  // router/searchParams 引用稳定（App Router），不作为 effect 依赖避免重渲染
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
 
@@ -186,10 +210,26 @@ export default function PlanDetailClient() {
   // 跳转到对应知识点的第一道题
   function handleScheduleScroll(nodeId: string) {
     if (!plan) return;
-    const q = plan.questions.find((x) => x.nodeId === nodeId);
-    if (q && questionRefs.current[q.id]) {
-      questionRefs.current[q.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    // 设置筛选条件，只显示该知识点的题目
+    setFilterNodeId(nodeId);
+    // 滚动到题目区
+    setTimeout(() => {
+      const q = plan.questions.find((x) => x.nodeId === nodeId);
+      if (q && questionRefs.current[q.id]) {
+        questionRefs.current[q.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        // 该知识点暂无题目，滚动到题目区头部
+        questionsSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 50);
+  }
+
+  // 知识树点击「进入」：筛选该知识点题目 + 滚动到题目区
+  function handleKnowledgeNodeSelect(node: { id: string }) {
+    handleScheduleScroll(node.id);
   }
 
   // 重新生成单道题
@@ -206,11 +246,14 @@ export default function PlanDetailClient() {
     const callId = generateCallId();
     const stopTimer = startTimer();
 
+    // 启动全局 AI 任务（弹窗显示进度）
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 重新生成题目");
     try {
       const res = await aiFetch("/api/regenerate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ node }),
+        signal: aiSignal,
       });
       if (!res.ok) throw new Error(`请求失败 (${res.status})`);
       const { question } = (await res.json()) as { question: Question };
@@ -245,8 +288,11 @@ export default function PlanDetailClient() {
       setPlan(updated);
       await setItem(KEY_PREFIXES.PLAN + plan.id, updated);
       await savePlanSummary(updated);
+      setAITaskContent(aiTaskId, "题目已重新生成");
+      completeAITask(aiTaskId);
     } catch (e) {
       setRegenError(e instanceof Error ? e.message : "重新生成失败");
+      errorAITask(aiTaskId, e instanceof Error ? e.message : "重新生成失败");
     } finally {
       setRegeneratingId(null);
     }
@@ -272,6 +318,8 @@ export default function PlanDetailClient() {
     }
     setRegeneratingPlan(true);
     setRegenPlanError(null);
+    // 启动全局 AI 任务（弹窗显示进度）
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 重新生成学习计划");
     try {
       const res = await aiFetch("/api/learn", {
         method: "POST",
@@ -282,6 +330,7 @@ export default function PlanDetailClient() {
           maxNewPerDay: regenMaxNew,
           prompt: regenPrompt.trim() || undefined,
         }),
+        signal: aiSignal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -299,8 +348,11 @@ export default function PlanDetailClient() {
       await setItem(KEY_PREFIXES.PLAN + plan.id, replaced);
       await savePlanSummary(replaced);
       setShowRegenModal(false);
+      setAITaskContent(aiTaskId, "学习计划已重新生成");
+      completeAITask(aiTaskId);
     } catch (e) {
       setRegenPlanError(e instanceof Error ? e.message : "重新生成失败");
+      errorAITask(aiTaskId, e instanceof Error ? e.message : "重新生成失败");
     } finally {
       setRegeneratingPlan(false);
     }
@@ -313,16 +365,23 @@ export default function PlanDetailClient() {
     const missingQuestions = plan.questions.filter((q) => !q.answer);
     if (missingQuestions.length === 0) return;
     setGeneratingAnswers(true);
+    // 启动全局 AI 任务（弹窗显示进度，流式输出）
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 继续生成答案");
     try {
-      const res = await fetch("/api/learn/answers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questions: missingQuestions,
-          nodes: plan.knowledgeTree,
-          topic: plan.topic,
-        }),
-      });
+      const res = await aiFetch(
+        "/api/learn/answers",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questions: missingQuestions,
+            nodes: plan.knowledgeTree,
+            topic: plan.topic,
+          }),
+          signal: aiSignal,
+        },
+        0,
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `请求失败 (${res.status})`);
@@ -359,6 +418,8 @@ export default function PlanDetailClient() {
                 };
                 // 增量回写：让用户看到逐题完成的进度
                 setPlan({ ...plan, questions: [...updatedQuestions] });
+                // 流式追加到 AI 任务弹窗
+                appendAITaskContent(aiTaskId, `Q${idx + 1}: ${data.answer}\n\n`);
               }
             }
           } catch {
@@ -393,9 +454,18 @@ export default function PlanDetailClient() {
       await setItem(KEY_PREFIXES.PLAN + plan.id, updatedPlan);
       await savePlanSummary(updatedPlan);
       setPlan(updatedPlan);
+      const doneCount = missingQuestions.filter(
+        (mq) => updatedQuestions.find((u) => u.id === mq.id)?.answer,
+      ).length;
+      setAITaskContent(
+        aiTaskId,
+        `答案生成完成（${doneCount}/${missingQuestions.length}）`,
+      );
+      completeAITask(aiTaskId);
       toast.success("答案生成完成");
     } catch (err) {
       toast.error("生成失败：" + (err instanceof Error ? err.message : String(err)));
+      errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));
     } finally {
       setGeneratingAnswers(false);
     }
@@ -497,10 +567,14 @@ export default function PlanDetailClient() {
       </div>
 
       <div className="mb-6">
-        <KnowledgeTree nodes={plan.knowledgeTree} />
+        <KnowledgeTree
+          nodes={plan.knowledgeTree}
+          onSelectNode={handleKnowledgeNodeSelect}
+          selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
+        />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6" ref={questionsSectionRef}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h2 className="text-lg font-bold">面试题（{filteredQuestions.length}/{plan.questions.length}）</h2>
           {plan.questions.some((q) => !q.answer) && (

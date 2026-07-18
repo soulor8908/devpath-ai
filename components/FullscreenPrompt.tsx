@@ -4,6 +4,7 @@
 // 全屏提示卡片：进入学习页时显示，引导用户点击进入全屏专注模式
 
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface Props {
   onEnter: () => void;
@@ -26,18 +27,12 @@ export function FullscreenPrompt({ onEnter, onDismiss }: Props) {
           全屏可以屏蔽浏览器干扰，更专注地学习。点击下方按钮进入全屏。
         </p>
         <div className="flex flex-col gap-2">
-          <button
-            onClick={onEnter}
-            className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
+          <Button block size="lg" onClick={onEnter}>
             进入全屏
-          </button>
-          <button
-            onClick={onDismiss}
-            className="w-full rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
+          </Button>
+          <Button block variant="ghost" onClick={onDismiss}>
             暂不
-          </button>
+          </Button>
         </div>
       </div>
     </div>

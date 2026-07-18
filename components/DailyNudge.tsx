@@ -24,6 +24,7 @@ import {
   generateCallId,
 } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
+import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 interface NudgePayload {
   nudge: string;
@@ -80,11 +81,13 @@ export function DailyNudge() {
       }
 
       // 3. 调 API + AI 质量追踪
+      const { id: aiTaskId, signal: aiSignal } = startAITask("AI 准备今日建议");
       const newCallId = generateCallId();
       const stopTimer = startTimer();
       try {
         const res = await aiFetch("/api/daily-nudge", {
           method: "POST",
+          signal: aiSignal,
           body: JSON.stringify({ contextSnapshot }),
         });
 
@@ -116,7 +119,10 @@ export function DailyNudge() {
         } catch {
           /* 缓存写入失败忽略 */
         }
+        setAITaskContent(aiTaskId, "今日建议已生成");
+        completeAITask(aiTaskId);
       } catch (e) {
+        errorAITask(aiTaskId, e instanceof Error ? e.message : String(e));
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);

@@ -16,6 +16,7 @@ import { KEY_PREFIXES, type UserProfile, type SkillLevel, type LearningPlan } fr
 import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
 import { saveUserProfile } from "@/lib/ai/memory/user-profile";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 /** 技能等级 → 中文标签 */
 const SKILL_LABEL: Record<SkillLevel, string> = {
@@ -112,23 +113,14 @@ export function UserProfileCard({ profile }: Props) {
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">用户画像</h3>
         </div>
         <p className="text-sm text-gray-400 dark:text-gray-500 mb-3">暂无画像</p>
-        <button
+        <Button
+          block
           onClick={() => void handleRebuild()}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          loading={loading}
+          leftIcon="sparkles"
         >
-          {loading ? (
-            <>
-              <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              构建中...
-            </>
-          ) : (
-            <>
-              <Icon name="sparkles" className="w-3.5 h-3.5" />
-              手动重建画像
-            </>
-          )}
-        </button>
+          {loading ? "构建中..." : "手动重建画像"}
+        </Button>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       </div>
     );

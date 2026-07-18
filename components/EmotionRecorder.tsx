@@ -37,6 +37,7 @@ import {
 } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
 import { Button, Input } from "@/components/ui";
+import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 // 情绪标签 + emoji 映射
 const EMOTION_OPTIONS: Array<{ tag: EmotionTag; emoji: string }> = [
@@ -82,7 +83,7 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
   const lastFiredRef = useRef<string>(""); // 防止相同输入重复触发
 
   // 请求 AI 应对建议
-  const fetchSuggestions = async () => {
+  const fetchSuggestions = async (options?: { manual?: boolean }) => {
     if (!tag) {
       setError("请先选择情绪标签");
       return;
@@ -94,9 +95,20 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
     const timer = startTimer();
     const inputDigest = makeInputDigest({ tag, reason });
 
+    // 仅手动点击按钮时显示 AI 任务弹窗（自动 debounce 触发不弹窗，避免干扰输入）
+    const isManual = options?.manual === true;
+    let aiTaskId: string | null = null;
+    let aiSignal: AbortSignal | null = null;
+    if (isManual) {
+      const task = startAITask("AI 生成情绪应对建议");
+      aiTaskId = task.id;
+      aiSignal = task.signal;
+    }
+
     try {
       const res = await aiFetch("/api/emotion-coping", {
         method: "POST",
+        signal: aiSignal ?? undefined,
         body: JSON.stringify({ tag, reason }),
       });
       if (!res.ok) {
@@ -119,6 +131,11 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
         durationMs: timer(),
         source: data.source,
       }).catch(() => {});
+
+      if (aiTaskId) {
+        setAITaskContent(aiTaskId, "建议已生成");
+        completeAITask(aiTaskId);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "请求失败";
       setError(msg);
@@ -132,6 +149,10 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
         durationMs: timer(),
         source: "rule",
       }).catch(() => {});
+
+      if (aiTaskId) {
+        errorAITask(aiTaskId, msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -243,7 +264,7 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
             )}
           </p>
           <button
-            onClick={fetchSuggestions}
+            onClick={() => fetchSuggestions({ manual: true })}
             disabled={!tag || loading}
             className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             title="AI 会自动生成，也可手动重新生成"

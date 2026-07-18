@@ -9,6 +9,9 @@ import { listItems, setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry } from "@/lib/types";
 import { KEY_PREFIXES } from "@/lib/types";
+import { Button } from "@/components/ui";
+import { toast } from "@/lib/toast";
+import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 interface WeeklyEntry {
   id: string;
@@ -46,6 +49,7 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
 
   async function generate() {
     setLoading(true);
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 生成本周周报");
     try {
       const weekStart = getMondayStr();
       // 加载本周 EmotionEntry（用于情绪+多巴胺章节）
@@ -59,6 +63,7 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
       const res = await aiFetch("/api/weekly", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: aiSignal,
         body: JSON.stringify({ weekStart, learnLogs, reviewLogs, statuses, emotions }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -67,6 +72,12 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
       await setItem(KEY_PREFIXES.WEEKLY + data.id, data);
       setCurrent(data);
       setHistory((h) => [data, ...h.filter((x) => x.id !== data.id)]);
+      setAITaskContent(aiTaskId, "周报已生成");
+      completeAITask(aiTaskId);
+    } catch (err) {
+      errorAITask(aiTaskId, err instanceof Error ? err.message : "生成失败");
+      toast.error(err instanceof Error ? err.message : "周报生成失败");
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -74,13 +85,9 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={generate}
-        disabled={loading}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button onClick={generate} loading={loading}>
         {loading ? "生成中..." : "生成本周周报"}
-      </button>
+      </Button>
 
       {current && (
         <div className="rounded-lg border p-4">

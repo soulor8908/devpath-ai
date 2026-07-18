@@ -33,6 +33,7 @@ import { LearnWizard } from "@/components/LearnWizard";
 import { getRecommendedQuickInputs, getDefaultQuickInputs } from "@/lib/recommend-quick-inputs";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 import { Button, Input, Textarea } from "@/components/ui";
 
 interface PresetPlanData {
@@ -147,10 +148,12 @@ export default function LearnNewPage() {
     if (!activePreset || !presetData) return;
     setRegenerating(true);
     setRegenError("");
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 重新生成知识树");
     try {
       const res = await aiFetch("/api/learn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: aiSignal,
         body: JSON.stringify({
           topic: presetData.topic,
           dailyMinutes,
@@ -176,7 +179,10 @@ export default function LearnNewPage() {
         const matched = promptLibrary.find((p) => p.content === promptText.trim());
         if (matched) await markPromptUsed(matched.id);
       }
+      setAITaskContent(aiTaskId, "知识树已重新生成");
+      completeAITask(aiTaskId);
     } catch (err) {
+      errorAITask(aiTaskId, err instanceof Error ? err.message : "未知错误");
       setRegenError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setRegenerating(false);

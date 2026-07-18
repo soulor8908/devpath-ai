@@ -21,6 +21,7 @@ import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Checkbox } from "@/components/ui";
+import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 type RoutineSlot = Routine["slots"][number];
 
@@ -190,10 +191,12 @@ export default function PlanEditClient() {
     setAiLoading(true);
     setAiError(null);
     setAiSuccess(false);
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 调整学习日程");
     try {
       const res = await aiFetch("/api/adjust-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: aiSignal,
         body: JSON.stringify({
           plan: { ...plan, knowledgeTree: nodes },
           instruction: instruction.trim(),
@@ -215,7 +218,10 @@ export default function PlanEditClient() {
       setAiSuccess(true);
       setAiAdjusted(true);
       setDirty(true);
+      setAITaskContent(aiTaskId, "日程已调整");
+      completeAITask(aiTaskId);
     } catch (e) {
+      errorAITask(aiTaskId, e instanceof Error ? e.message : "AI 调整失败");
       setAiError(e instanceof Error ? e.message : "AI 调整失败");
     } finally {
       setAiLoading(false);

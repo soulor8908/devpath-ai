@@ -27,6 +27,7 @@ import {
 } from "@/lib/types";
 import { rankTasks, setCachedPriority } from "@/lib/ai/priority-engine";
 import { chinaDateNow } from "@/lib/time";
+import { Button } from "@/components/ui";
 
 interface HealthAlertCardProps {
   alerts: HealthAlert[];
@@ -212,18 +213,15 @@ export function HealthAlertCard({
 
             {!adopted ? (
               <div className="flex justify-end">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => handleAdopt(alert)}
-                  disabled={isAdopting}
-                  className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  loading={isAdopting}
+                  leftIcon="zap"
                 >
-                  <Icon
-                    name={isAdopting ? "refresh-cw" : "zap"}
-                    className={`w-3.5 h-3.5 ${isAdopting ? "animate-spin" : ""}`}
-                  />
                   {isAdopting ? "采纳中..." : "一键采纳（重排今日优先级）"}
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex justify-end">

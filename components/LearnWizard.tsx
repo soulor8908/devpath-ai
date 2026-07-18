@@ -33,6 +33,13 @@ import { savePlanSummary } from "@/lib/plan-summary";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { parseNDJSONChunk } from "@/lib/parse-ndjson";
 import {
+  startAITask,
+  appendAITaskContent,
+  setAITaskContent,
+  completeAITask,
+  errorAITask,
+} from "@/lib/ai-task-queue";
+import {
   KEY_PREFIXES,
   type LearningPlan,
   type KnowledgeNode,
@@ -90,6 +97,7 @@ export function LearnWizard({
   // ---- Step 1: 拆知识点 ----
   const fetchKnowledge = useCallback(async () => {
     setLoading(true);
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在拆解知识点");
     try {
       const res = await aiFetch("/api/learn/knowledge", {
         method: "POST",
@@ -98,6 +106,7 @@ export function LearnWizard({
           topic: topic.trim(),
           prompt: promptText.trim() || undefined,
         }),
+        signal: aiSignal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -110,9 +119,12 @@ export function LearnWizard({
       setNodes(data.nodes);
       await recordInputHistory(topic.trim()).catch(() => {});
       toast.success(`已拆解 ${data.nodes.length} 个知识点`);
+      setAITaskContent(aiTaskId, `已拆解 ${data.nodes.length} 个知识点`);
+      completeAITask(aiTaskId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`知识点拆解失败：${msg}`);
+      errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
@@ -168,11 +180,13 @@ export function LearnWizard({
   const fetchQuestions = useCallback(async () => {
     if (nodes.length === 0) return;
     setLoading(true);
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在生成题目");
     try {
       const res = await aiFetch("/api/learn/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nodes }),
+        signal: aiSignal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -185,9 +199,12 @@ export function LearnWizard({
       setQuestions(data.questions);
       toast.success(`已生成 ${data.questions.length} 道题目`);
       setStep("questions");
+      setAITaskContent(aiTaskId, `已生成 ${data.questions.length} 道题目`);
+      completeAITask(aiTaskId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`题目生成失败：${msg}`);
+      errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
@@ -200,6 +217,7 @@ export function LearnWizard({
     setAnswerProgress({ done: 0, total: questions.length });
     setAnswerErrors(0);
     setStep("answers");
+    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在逐题生成答案");
     try {
       const res = await aiFetch("/api/learn/answers", {
         method: "POST",
@@ -209,6 +227,7 @@ export function LearnWizard({
           nodes,
           topic: topic.trim(),
         }),
+        signal: aiSignal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -241,6 +260,7 @@ export function LearnWizard({
           setAnswerProgress({ done, total: questions.length });
           setAnswerErrors(errors);
           setQuestions([...updated]);
+          appendAITaskContent(aiTaskId, `Q${idx + 1}: ${chunk.answer ?? ""}\n\n`);
         }
       };
 
@@ -266,9 +286,12 @@ export function LearnWizard({
       } else {
         toast.success(`答案生成完成（${done}/${questions.length}）`);
       }
+      setAITaskContent(aiTaskId, `答案生成完成（${done}/${questions.length}）`);
+      completeAITask(aiTaskId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`答案生成失败：${msg}`);
+      errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }

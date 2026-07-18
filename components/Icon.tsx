@@ -71,7 +71,8 @@ export type IconName =
   | "party"
   | "calendar-check"
   | "tag"
-  | "snowflake";
+  | "snowflake"
+  | "loader";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: (
@@ -437,6 +438,18 @@ const PATHS: Record<IconName, React.ReactNode> = {
   snowflake: (
     <>
       <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07L19.07 4.93" />
+    </>
+  ),
+  loader: (
+    <>
+      <path d="M12 2v4" />
+      <path d="m16.2 7.8 2.9-2.9" />
+      <path d="M18 12h4" />
+      <path d="m16.2 16.2 2.9 2.9" />
+      <path d="M12 18v4" />
+      <path d="m4.9 19.1 2.9-2.9" />
+      <path d="M2 12h4" />
+      <path d="m4.9 4.9 2.9 2.9" />
     </>
   ),
 };
