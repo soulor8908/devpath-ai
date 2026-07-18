@@ -337,3 +337,156 @@ describe("requireSession: 滑动续期", () => {
     expect(updated!.lastUsedAt).not.toBe(nearExpiresAt);
   });
 });
+
+// ---------- 篡改与重放测试（补缺：body / path / method / 跨 session） ----------
+
+describe("requireSession: 篡改检测", () => {
+  it("body 篡改：用 body A 签名、发送 body B → 401 INVALID_SIGNATURE", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    // 用 body A 签名，但实际发 body B
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      body: '{"topic":"A"}',
+    });
+    // 手工重写 request 的 body 为 B（构造新 Request）
+    const tampered = new Request(req.url, {
+      method: "POST",
+      headers: req.headers,
+      body: '{"topic":"B"}',
+    });
+    const result = await requireSession(tampered);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+
+  it("非空 body 签名正确 → 通过（验证非空 body 真的参与签名）", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      body: '{"topic":"真实主题"}',
+    });
+    const result = await requireSession(req);
+    expect(result).not.toBeInstanceOf(Response);
+  });
+
+  it("path 篡改：为 /api/A 签名、发到 /api/B → 401 INVALID_SIGNATURE", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    // 为 path A 签名
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      path: "/api/A",
+    });
+    // 但实际请求 path B（签名头不变）
+    const tampered = new Request("https://example.com/api/B", {
+      method: "POST",
+      headers: req.headers,
+      body: "",
+    });
+    const result = await requireSession(tampered);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+
+  it("method 篡改：用 POST 签名、GET 发送 → 401 INVALID_SIGNATURE", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    // 用 POST 签名
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      method: "POST",
+    });
+    // 实际用 GET 发（GET 无 body）
+    const tampered = new Request(req.url, {
+      method: "GET",
+      headers: req.headers,
+    });
+    const result = await requireSession(tampered);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+
+  it("timestamp 篡改：签名时 T1，header 发 T2 → 401 INVALID_SIGNATURE（或 TIMESTAMP_OUT_OF_WINDOW）", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    // 用 T1 签名
+    const t1 = Math.floor(Date.now() / 1000).toString();
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      timestamp: t1,
+    });
+    // 把 header 里的 timestamp 改成 T2（仍在窗口内，避免被 TIMESTAMP_OUT_OF_WINDOW 提前拦截）
+    const t2 = (Math.floor(Date.now() / 1000) + 10).toString();
+    const tampered = new Request(req.url, {
+      method: "POST",
+      headers: new Headers([
+        ["x-session-id", sessionId],
+        ["x-request-timestamp", t2],
+        ["x-request-nonce", req.headers.get("x-request-nonce")!],
+        ["x-request-signature", req.headers.get("x-request-signature")!],
+      ]),
+      body: "",
+    });
+    const result = await requireSession(tampered);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    // 改了 timestamp 后重算签名对不上，应是 INVALID_SIGNATURE
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+});
+
+describe("requireSession: 跨 session 重放", () => {
+  it("用 session A 的 secret 签名，header 带 session B 的 sessionId → 401", async () => {
+    const seedA = await seedSession();
+    const seedB = await seedSession();
+    // 用 A 的 secret 签名
+    const req = await makeSignedRequest(seedA.sessionId, seedA.sessionSecret, {});
+    // 但把 header 里的 sessionId 改成 B
+    const tampered = new Request(req.url, {
+      method: "POST",
+      headers: new Headers([
+        ["x-session-id", seedB.sessionId],
+        ["x-request-timestamp", req.headers.get("x-request-timestamp")!],
+        ["x-request-nonce", req.headers.get("x-request-nonce")!],
+        ["x-request-signature", req.headers.get("x-request-signature")!],
+      ]),
+      body: "",
+    });
+    const result = await requireSession(tampered);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    // B 解密出的 secret 与签名时用的 A 的 secret 不同 → INVALID_SIGNATURE
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+});
+
+describe("requireSession: 非 ASCII / 大 body", () => {
+  it("中文 JSON body 签名正确 → 通过（验证 UTF-8 编码两端一致）", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    const chineseBody = JSON.stringify({
+      topic: "前端学习路径",
+      detail: "深入理解 React Hooks 与并发模式",
+    });
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      body: chineseBody,
+    });
+    const result = await requireSession(req);
+    expect(result).not.toBeInstanceOf(Response);
+  });
+
+  it("大 body（>32KB）签名正确 → 通过", async () => {
+    const { sessionId, sessionSecret } = await seedSession();
+    // 构造 > 32KB 的 body（验证 bytesToBase64 分块逻辑不影响 sha256）
+    const big = "x".repeat(40000);
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      body: JSON.stringify({ data: big }),
+    });
+    const result = await requireSession(req);
+    expect(result).not.toBeInstanceOf(Response);
+  });
+});

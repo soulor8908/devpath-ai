@@ -172,6 +172,10 @@ async function signRequest(
 /**
  * 带 session 签名的 fetch（非 AI 路由用，如 /api/sync）
  * 不再附加 Authorization: Bearer，改用 HMAC 签名
+ *
+ * body 必须是 string（JSON.stringify 后传入）。
+ * 若传入非 string body（如 Blob/FormData/URLSearchParams），会抛错——
+ * 否则客户端会签空 body 但发真实 body，服务端必然返回 INVALID_SIGNATURE。
  */
 export async function apiFetch(
   url: string,
@@ -181,7 +185,7 @@ export async function apiFetch(
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   const path = new URL(url, window.location.origin).pathname;
-  const body = typeof options.body === "string" ? options.body : "";
+  const body = resolveBodyForSigning(options.body);
   const sigHeaders = await signRequest(
     options.method ?? "GET",
     path,
@@ -192,6 +196,28 @@ export async function apiFetch(
     headers.set(k, v);
   }
   return fetch(url, { ...options, headers });
+}
+
+/**
+ * 解析用于签名的 body 字符串。
+ *
+ * 签名时必须用与实际请求体完全一致的字符串，否则服务端 sha256(body) 对不上
+ * 会返回 INVALID_SIGNATURE。这里强制要求 body 是 string 类型：
+ *   - undefined / null → 签空字符串（GET 请求常见）
+ *   - string → 直接用
+ *   - 其它（Blob/FormData/URLSearchParams/ReadableStream 等）→ 抛错
+ *
+ * 历史问题：旧实现 `typeof options.body === "string" ? options.body : ""`
+ * 会对所有非 string body 静默回退到 ""，导致客户端签空 body 但发真实 body，
+ * 服务端必然返回 INVALID_SIGNATURE，且无任何警告。此函数显式抛错避免回归。
+ */
+function resolveBodyForSigning(body: BodyInit | null | undefined): string {
+  if (body == null) return "";
+  if (typeof body === "string") return body;
+  throw new Error(
+    `签名失败：body 必须是 string 类型（请用 JSON.stringify），收到 ${typeof body}。` +
+      "非 string body 会导致客户端签空 body、服务端读真实 body，必然 INVALID_SIGNATURE",
+  );
 }
 
 /**
@@ -213,7 +239,7 @@ export async function aiFetch(
     const session = await getValidSession();
     const headers = new Headers(options.headers);
     headers.set("Content-Type", "application/json");
-    const body = typeof options.body === "string" ? options.body : "";
+    const body = resolveBodyForSigning(options.body);
     const path = new URL(url, window.location.origin).pathname;
     const sigHeaders = await signRequest(
       options.method ?? "POST",

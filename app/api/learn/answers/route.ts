@@ -43,6 +43,8 @@ interface AnswerChunk {
   done?: boolean;
   total?: number;
   error?: string;
+  /** 错误码：UPSTREAM_AUTH 表示上游 AI 鉴权失败（apiKey 失效/风控） */
+  errorCode?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -143,7 +145,16 @@ export async function POST(req: NextRequest) {
           send({ questionId: q.id, answer });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          send({ questionId: q.id, answer: "", error: msg });
+          // 上游 AI 鉴权失败：标记 errorCode，让客户端能提示用户检查 apiKey
+          const isUpstreamAuthError = /401|invalid api key|invalid signature|unauthorized/i.test(msg);
+          send({
+            questionId: q.id,
+            answer: "",
+            error: isUpstreamAuthError
+              ? `AI 服务鉴权失败：${msg}。请到「我的」→「AI 模型」检查 apiKey`
+              : msg,
+            errorCode: isUpstreamAuthError ? "UPSTREAM_AUTH" : undefined,
+          });
         }
       };
 

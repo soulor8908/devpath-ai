@@ -51,12 +51,8 @@ import {
   generateCallId,
   parseUsageFromFinishMessage,
 } from "@/lib/ai/quality-tracker";
-import {
-  startAITask,
-  appendAITaskContent,
-  completeAITask,
-  errorAITask,
-} from "@/lib/ai-task-queue";
+// 注：聊天场景不使用全局 AITaskModal（流式输出本身就是反馈），
+// 只用本地 AbortController 控制中止。
 
 // 内置提示词库
 const BUILTIN_PROMPTS = [
@@ -96,6 +92,9 @@ export default function ChatClient() {
   // 预填充来源信息：当通过 URL 参数 prefill 进入新对话时，暂存来源（题目/知识点），
   // 供 handleSend 创建对话时写入 Conversation.source
   const pendingSourceRef = useRef<ChatSource | null>(null);
+  // 当前流式请求的 AbortController：streaming 时用于「中止」按钮
+  // （聊天场景不使用全局 AITaskModal，流式输出本身即用户反馈）
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 刷新对话列表
   const refreshConversations = useCallback(async () => {
@@ -542,7 +541,7 @@ export default function ChatClient() {
       convId: string;
       history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
       label: string;
-    }): Promise<{ content: string; callId: string } | { error: string }> => {
+    }): Promise<{ content: string; callId: string } | { error: string } | { aborted: true }> => {
       // 准备模型配置
       let modelConfig = modelConfigs.find((m) => m.id === selectedModelId);
       if (!modelConfig && modelConfigs.length > 0) {
@@ -583,7 +582,10 @@ export default function ChatClient() {
 
       // session 鉴权由 aiFetch 自动处理（签名头注入）
       // body 不含 modelConfig / userId（服务端从 session 取）
-      const { id: aiTaskId, signal: aiSignal } = startAITask("AI 对话回复");
+      // 聊天场景不使用全局 AITaskModal——流式输出本身就是反馈，
+      // 中止由本地 AbortController + 发送按钮变「中止」控制
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       let res: Response;
       try {
         res = await aiFetch(
@@ -595,13 +597,14 @@ export default function ChatClient() {
               contextSnapshot,
               toolContext,
             }),
-            signal: aiSignal,
+            signal: controller.signal,
           },
           0, // 流式响应不设超时（由用户中止按钮控制）
         );
       } catch (err) {
-        if (!aiSignal.aborted) {
-          errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));
+        // 用户主动中止：静默，不抛错（流式内容已部分展示）
+        if (controller.signal.aborted) {
+          return { aborted: true };
         }
         throw err;
       }
@@ -609,12 +612,10 @@ export default function ChatClient() {
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
         const msg = `请求失败 (${res.status})${errText ? `: ${errText}` : ""}`;
-        errorAITask(aiTaskId, msg);
         return { error: msg };
       }
       if (!res.body) {
         const msg = "响应没有流式内容";
-        errorAITask(aiTaskId, msg);
         return { error: msg };
       }
 
@@ -683,23 +684,23 @@ export default function ChatClient() {
               if (chunk) {
                 acc += chunk;
                 setStreamContent(acc);
-                appendAITaskContent(aiTaskId, chunk);
               }
             } else if (!line.startsWith(":")) {
               const chunk = parseDataLine(line);
               if (chunk) {
                 acc += chunk;
                 setStreamContent(acc);
-                appendAITaskContent(aiTaskId, chunk);
               }
             }
           }
         }
       } catch (err) {
-        if (!aiSignal.aborted) {
-          errorAITask(aiTaskId, err instanceof Error ? err.message : String(err));
+        // 用户主动中止：保留已收到的流式内容作为最终回复
+        if (controller.signal.aborted) {
+          // 落到下面的 finalContent 逻辑，把已收到的部分存为消息
+        } else {
+          throw err;
         }
-        throw err;
       }
 
       const finalContent = acc || "(无响应内容)";
@@ -784,11 +785,25 @@ export default function ChatClient() {
         modelId: responseModelId,
       }).catch(() => {});
 
-      completeAITask(aiTaskId);
+      abortControllerRef.current = null;
       return { content: finalContent, callId };
     },
     [modelConfigs, selectedModelId, executeClientAction],
   );
+
+  // 中止当前流式生成（用户点「中止」按钮时调用）
+  const handleAbort = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      // setStreaming(false) 会在 streamAIResponse 的 finally 路径里触发；
+      // 但中止时 streamAIResponse 可能在 await reader.read() 阻塞，
+      // 这里立即更新 UI 状态，避免按钮卡住
+      setStreaming(false);
+      setStreamContent("");
+      toast.info("已中止生成");
+    }
+  }, []);
 
   // 发送消息
   const handleSend = useCallback(async () => {
@@ -836,6 +851,9 @@ export default function ChatClient() {
       });
       if ("error" in result) {
         setError(result.error);
+      } else if ("aborted" in result) {
+        // 用户中止：不报错，已收到部分作为回复保存
+        await refreshConversations();
       } else {
         await refreshConversations();
       }
@@ -900,6 +918,8 @@ export default function ChatClient() {
         });
         if ("error" in result) {
           setError(result.error);
+        } else if ("aborted" in result) {
+          await refreshConversations();
         } else {
           await refreshConversations();
         }
@@ -985,6 +1005,8 @@ export default function ChatClient() {
         });
         if ("error" in result) {
           setError(result.error);
+        } else if ("aborted" in result) {
+          await refreshConversations();
         } else {
           await refreshConversations();
         }
@@ -1324,7 +1346,7 @@ export default function ChatClient() {
             onSelect={setSelectedModelId}
           />
         </div>
-        {/* 第 2 行：输入框 + 发送按钮 */}
+        {/* 第 2 行：输入框 + 发送/中止按钮（streaming 时切换为中止） */}
         <div className="flex items-end gap-2">
           <Textarea
             ref={inputRef}
@@ -1336,14 +1358,27 @@ export default function ChatClient() {
             className="flex-1 max-h-32"
             disabled={streaming}
           />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || streaming}
-            className="shrink-0 px-3 py-2.5"
-            aria-label="发送"
-          >
-            <Icon name="send" className="w-5 h-5" />
-          </Button>
+          {streaming ? (
+            <Button
+              onClick={handleAbort}
+              variant="danger"
+              className="shrink-0 px-3 py-2.5"
+              aria-label="中止生成"
+              title="中止生成"
+            >
+              <Icon name="x-circle" className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="shrink-0 px-3 py-2.5"
+              aria-label="发送"
+              title="发送"
+            >
+              <Icon name="send" className="w-5 h-5" />
+            </Button>
+          )}
         </div>
       </footer>
 

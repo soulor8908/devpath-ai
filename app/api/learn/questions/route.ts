@@ -55,7 +55,25 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ questions: withoutAnswers });
   } catch (error) {
+    const isUpstreamAuthError =
+      error instanceof Error &&
+      /401|invalid api key|invalid signature|unauthorized/i.test(error.message);
+    if (isUpstreamAuthError) {
+      const message = error instanceof Error ? error.message : "上游 AI 鉴权失败";
+      console.warn("[questions] upstream auth error:", message);
+      return NextResponse.json(
+        {
+          error: `AI 服务鉴权失败：${message}。请到「我的」→「AI 模型」检查 apiKey`,
+          code: "UPSTREAM_AUTH",
+        },
+        { status: 401 },
+      );
+    }
     const message = error instanceof Error ? error.message : "未知错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[questions] internal error:", message);
+    return NextResponse.json(
+      { error: message, code: "INTERNAL_ERROR" },
+      { status: 500 },
+    );
   }
 }
