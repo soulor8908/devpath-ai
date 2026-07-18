@@ -44,6 +44,28 @@ export class SessionExpiredError extends Error {
 }
 
 /**
+ * exchange 失败时抛出。
+ * 携带服务端返回的 code（如 SERVER_MISCONFIG / MISSING_FIELDS）+ HTTP 状态码，
+ * 便于调用方按 code 分桶映射可操作的用户提示文案。
+ *
+ * 当响应体不是 JSON（如 edge runtime 兜底返回的 HTML 错误页）时，
+ * 仍会把响应文本前若干字符塞进 message，避免「真实原因被吞掉」。
+ */
+export class ExchangeError extends Error {
+  /** 服务端错误码（无则为空字符串） */
+  readonly code: string;
+  /** HTTP 状态码 */
+  readonly status: number;
+
+  constructor(message: string, code = "", status = 0) {
+    super(message);
+    this.name = "ExchangeError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/**
  * 调 /api/auth/exchange 用 apiKey + userId 换取 session
  * 成功后将 session 持久化到 IndexedDB
  */
@@ -61,10 +83,20 @@ export async function exchangeSession(modelConfig: {
     body: JSON.stringify(modelConfig),
   });
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: "exchange failed" }))) as {
-      error?: string;
-    };
-    throw new Error(err.error || `exchange failed: ${res.status}`);
+    // 先尝试解析 JSON 拿到结构化 code/error；失败时退回 text()
+    // 避免 edge runtime 兜底返回 HTML 错误页时把真实原因吞掉
+    let err: { error?: string; code?: string } = {};
+    let rawText = "";
+    try {
+      rawText = await res.text();
+      err = JSON.parse(rawText) as { error?: string; code?: string };
+    } catch {
+      // 非 JSON 响应：rawText 仍可用于错误信息
+    }
+    const message =
+      err.error ||
+      (rawText ? rawText.slice(0, 200) : `exchange failed: ${res.status}`);
+    throw new ExchangeError(message, err.code ?? "", res.status);
   }
   const data = (await res.json()) as {
     sessionId: string;

@@ -15,7 +15,7 @@ import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } fro
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { apiFetch, exchangeSession, revokeSession, hasValidSession } from "@/lib/api-client";
+import { apiFetch, exchangeSession, revokeSession, hasValidSession, ExchangeError } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { ShareCardButton } from "@/components/ShareCardButton";
@@ -497,7 +497,10 @@ export default function ProfilePage() {
         console.warn("[profile] exchange session failed:", e);
         setTestResult((prev) => ({
           ...prev,
-          [savedConfig.id]: { ok: false, msg: "模型已保存，但加密会话启用失败，请重试" },
+          [savedConfig.id]: {
+            ok: false,
+            msg: mapExchangeErrorMessage(e),
+          },
         }));
       }
 
@@ -559,7 +562,7 @@ export default function ProfilePage() {
         [config.id]: { ok: true, msg: "连接成功，加密会话已启用" },
       }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "测试失败";
+      const msg = mapExchangeErrorMessage(e);
       setTestResult((prev) => ({
         ...prev,
         [config.id]: { ok: false, msg },
@@ -1461,4 +1464,41 @@ function CollapsibleSection({
       {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
     </section>
   );
+}
+
+// ============ 辅助：exchange 错误 → 可操作用户文案 ============
+
+/**
+ * 把 exchangeSession 抛出的错误映射为「可操作」的用户提示。
+ *
+ * 设计（乔布斯视角）：
+ *   - 旧的提示「加密会话启用失败，请重试」对服务端配置类错误是无效的——
+ *     重试 100 次还是同一个错，用户只会越来越 frustrated
+ *   - 把服务端 code 翻译成具体动作建议（重新部署 / 检查字段 / 联系管理员）
+ *
+ * 技术约束（卡帕西视角）：
+ *   - ExchangeError 携带 code；其它 Error 只有 message
+ *   - 永远返回非空字符串（fallback 兜底）
+ */
+function mapExchangeErrorMessage(e: unknown): string {
+  if (e instanceof ExchangeError) {
+    switch (e.code) {
+      case "SERVER_MISCONFIG":
+        return "服务端未配置 MASTER_KEY，加密会话不可用。请联系管理员或在 Cloudflare Pages secrets 中设置 MASTER_KEY（openssl rand -base64 32 生成）后重新部署";
+      case "ENCRYPT_FAILED":
+        return "加密失败：MASTER_KEY 可能不是 32 字节 base64。请用 `openssl rand -base64 32` 重新生成并更新 Cloudflare Pages secret";
+      case "SESSION_STORE_FAILED":
+        return "会话存储不可用（KV namespace 异常）。请检查 Cloudflare AUTH_SESSIONS KV binding 是否存在且 id 正确";
+      case "MISSING_FIELDS":
+        return `字段缺失：${e.message}。请重新填写表单后保存`;
+      case "INVALID_BODY":
+        return "请求体格式错误，请刷新页面后重试";
+      default:
+        return e.message || `加密会话启用失败（HTTP ${e.status}）`;
+    }
+  }
+  if (e instanceof Error) {
+    return e.message || "加密会话启用失败";
+  }
+  return "加密会话启用失败";
 }

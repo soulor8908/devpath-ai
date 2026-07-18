@@ -85,10 +85,29 @@ export async function POST(req: NextRequest) {
   const sessionSecret = bytesToBase64(sessionSecretBytes);
 
   // 5. 加密 apiKey 和 sessionSecret
-  const encryptedApiKey = await aesGcmEncrypt(body.apiKey!, masterKey);
-  const encryptedSecret = await aesGcmEncrypt(sessionSecret, masterKey);
+  // MASTER_KEY 配错（非 32 字节 base64）或 Web Crypto 内部异常时
+  // aesGcmEncrypt 会抛错，需返回结构化 500，避免 edge runtime 兜底成非 JSON
+  let encryptedApiKey: string;
+  let encryptedSecret: string;
+  try {
+    encryptedApiKey = await aesGcmEncrypt(body.apiKey!, masterKey);
+    encryptedSecret = await aesGcmEncrypt(sessionSecret, masterKey);
+  } catch (e) {
+    console.error(
+      "[auth/exchange] aesGcmEncrypt failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    return NextResponse.json(
+      {
+        error: "encrypt failed (MASTER_KEY may be malformed)",
+        code: "ENCRYPT_FAILED",
+      },
+      { status: 500 },
+    );
+  }
 
   // 6. 构造 SessionRecord 并写入 KV
+  // KV binding 异常（namespace 删了/id 错/账号无权限）时返回结构化 500
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
 
@@ -106,20 +125,42 @@ export async function POST(req: NextRequest) {
   };
 
   const sessionStore = createSessionStore();
-  await sessionStore.createSession(sessionId, record, SESSION_TTL_SECONDS);
+  try {
+    await sessionStore.createSession(sessionId, record, SESSION_TTL_SECONDS);
+  } catch (e) {
+    console.error(
+      "[auth/exchange] sessionStore.createSession failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    return NextResponse.json(
+      {
+        error: "session store unavailable",
+        code: "SESSION_STORE_FAILED",
+      },
+      { status: 500 },
+    );
+  }
 
   // 7. 审计日志（脱敏：不记 apiKey / sessionSecret，只记 userIdHash + IP + UA）
+  // 审计失败不阻塞 exchange 主流程（用户已拿到 session，审计可降级）
   const auditStore = createAuditStore();
-  await auditStore.writeAudit(
-    sessionId,
-    "exchange",
-    {
-      userIdHash: await sha256(body.userId!),
-      ip: req.headers.get("x-forwarded-for") || "unknown",
-      ua: req.headers.get("user-agent") || "unknown",
-    },
-    AUDIT_TTL_SECONDS,
-  );
+  try {
+    await auditStore.writeAudit(
+      sessionId,
+      "exchange",
+      {
+        userIdHash: await sha256(body.userId!),
+        ip: req.headers.get("x-forwarded-for") || "unknown",
+        ua: req.headers.get("user-agent") || "unknown",
+      },
+      AUDIT_TTL_SECONDS,
+    );
+  } catch (e) {
+    console.error(
+      "[auth/exchange] audit write failed (non-blocking):",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
 
   // 8. 返回 sessionId + sessionSecret + expiresAt
   // sessionSecret 只在此次响应中出现，客户端需自行存储
