@@ -1,13 +1,20 @@
 "use client";
 
 // components/PomodoroFull.tsx
-// 全屏专注模式：
-//   - 大号倒计时显示
-//   - 开始专注表单（任务描述 + 时长 select 15/25/50 + 关联 planId/nodeId 可选）
-//   - 恢复未完成 session 的提示 UI（调 recoverInterruptedSession）
-//   - 完成后显示"休息建议"卡片（短休息 / 再来一个番茄）
-//   - 严格/宽松模式 toggle
-//   - dark mode 支持
+// 番茄钟全屏专注页面（v2 重设计）
+//
+// 设计哲学（乔布斯视角）：
+//   - 倒计时是 hero，不是表单的附属品。打开页面立刻看到 25:00
+//   - 一次点击开始。任务描述/计划关联是次要选项，折叠收起
+//   - 圆形进度环 + 大号 MM:SS = 真实番茄钟的物理感
+//   - 底部展示今日已完成番茄列表，给用户即时反馈
+//
+// 技术架构（卡帕西视角）：
+//   - view 状态机 idle | running | completed，session API 不变
+//   - 倒计时计算复用 computeRemainingMs（基于 startedAt + durationMinutes）
+//   - ProgressRing 是纯 SVG 子组件，progress ∈ [0,1]
+//   - 今日列表复用 getRecentSessions(1)，按 status=completed 过滤
+//   - 通知 / 严格模式 / 恢复中断 session / 全屏 均保留
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -27,7 +34,11 @@ import {
   getNextBreakType,
   getRecommendedDuration,
 } from "@/lib/timer/pomodoro-rule";
-import { getTodayCount } from "@/lib/timer/session-tracker";
+import {
+  getTodayCount,
+  getTodayFocusMinutes,
+  getRecentSessions,
+} from "@/lib/timer/session-tracker";
 import {
   startGuard,
   stopGuard,
@@ -44,7 +55,7 @@ import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Checkbox } from "@/components/ui";
 
-type View = "form" | "running" | "completed";
+type View = "idle" | "running" | "completed";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -62,23 +73,35 @@ function computeRemainingMs(session: PomodoroSession): number {
   return endMs - Date.now();
 }
 
+/** 把 ISO 时间格式化为 HH:MM 显示（用于今日列表） */
+function formatStartedAtTime(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function PomodoroFull() {
   // 视图状态
-  const [view, setView] = useState<View>("form");
+  const [view, setView] = useState<View>("idle");
   // 当前 session
   const [session, setSession] = useState<PomodoroSession | null>(null);
   const [remainingMs, setRemainingMs] = useState<number>(0);
-  // 表单状态
+  // 表单状态（任务描述改为可选）
   const [taskDescription, setTaskDescription] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(25);
   const [planId, setPlanId] = useState("");
   const [nodeId, setNodeId] = useState("");
+  // 是否展开「更多选项」（任务描述 / 关联计划 / 严格模式）
+  const [showOptions, setShowOptions] = useState(false);
   // 严格模式 toggle
   const [strictMode, setStrictMode] = useState(false);
   // 打断次数（从 interruption-tracker 同步）
   const [interruptions, setInterruptions] = useState(0);
-  // 今日已完成番茄数（用于休息建议）
+  // 今日已完成番茄数（用于休息建议 + idle 视图底部统计）
   const [todayCount, setTodayCount] = useState(0);
+  // 今日累计专注分钟
+  const [todayMinutes, setTodayMinutes] = useState(0);
+  // 今日已完成 sessions（用于底部列表）
+  const [todaySessions, setTodaySessions] = useState<PomodoroSession[]>([]);
   // 恢复提示
   const [recoveryPrompt, setRecoveryPrompt] = useState<PomodoroSession | null>(null);
   // 错误提示
@@ -105,7 +128,24 @@ export function PomodoroFull() {
   // 防止重复通知
   const notifiedRef = useRef<string | null>(null);
 
-  // 初始化：检查通知权限 + 检查恢复 session + 从画像读取严格模式
+  // 拉取今日番茄列表 + 统计
+  const refreshTodayStats = useCallback(async () => {
+    const [count, minutes, recent] = await Promise.all([
+      getTodayCount(),
+      getTodayFocusMinutes(),
+      getRecentSessions(1),
+    ]);
+    setTodayCount(count);
+    setTodayMinutes(minutes);
+    // 只展示今日 completed 的 focus session
+    setTodaySessions(
+      recent.filter(
+        (s) => s.type === "focus" && s.status === "completed",
+      ),
+    );
+  }, []);
+
+  // 初始化：检查通知权限 + 检查恢复 session + 从画像读取严格模式 + 今日统计
   const init = useCallback(async () => {
     setNotifPermission(hasPermission());
     // 从 UserProfile 读取 strictFocusMode（默认 loose）
@@ -124,8 +164,8 @@ export function PomodoroFull() {
       setView("running");
       setInterruptions(running.interruptions ?? 0);
     }
-    setTodayCount(await getTodayCount());
-  }, []);
+    await refreshTodayStats();
+  }, [refreshTodayStats]);
 
   useEffect(() => {
     void init();
@@ -151,7 +191,7 @@ export function PomodoroFull() {
         notifiedRef.current = session.id;
         void notify(
           "番茄完成 🍅",
-          `「${session.taskDescription}」专注完成，去休息一下吧`,
+          `「${session.taskDescription || "专注"}」专注完成，去休息一下吧`,
         );
       }
     };
@@ -167,10 +207,9 @@ export function PomodoroFull() {
     stopGuard();
     try {
       await abandonSession(session.id, "strict_mode_3_interruptions");
-      // 提示用户（非阻塞式 toast，替代 window.alert）
       toast.warning("严格模式：连续 3 次打断，已自动放弃本次番茄");
       setSession(null);
-      setView("form");
+      setView("idle");
       setInterruptions(0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "自动放弃失败");
@@ -184,13 +223,11 @@ export function PomodoroFull() {
       startGuard(sessionId, mode, {
         onInterrupt: (count) => {
           setInterruptions(count);
-          // 同步到 session 对象（用于完成时持久化 + UI 展示）
           setSession((prev) =>
             prev ? { ...prev, interruptions: count } : prev,
           );
         },
         onAbandon: () => {
-          // 严格模式：3 次打断 → 自动放弃
           void handleAbandonStrict();
         },
       });
@@ -198,16 +235,12 @@ export function PomodoroFull() {
     [strictMode, handleAbandonStrict],
   );
 
-  // 启动一个新 session
+  // 启动一个新 session（任务描述可选）
   async function handleStart() {
     setError("");
-    if (!taskDescription.trim()) {
-      setError("请先填写任务描述");
-      return;
-    }
     try {
       const newSession = await createSession({
-        taskDescription: taskDescription.trim(),
+        taskDescription: taskDescription.trim() || "专注",
         type: "focus",
         durationMinutes,
         planId: planId.trim() || undefined,
@@ -235,7 +268,6 @@ export function PomodoroFull() {
     stopGuard();
     try {
       // 持久化打断次数，确保 completeSession 读取到正确的 interruptions
-      // （completeSession 内部按 durationMinutes - interruptions 计算 actualMinutes）
       if (interruptions > 0) {
         await dbSetItem(KEY_PREFIXES.POMODORO_SESSION + session.id, {
           ...session,
@@ -243,7 +275,7 @@ export function PomodoroFull() {
         });
       }
       await completeSession(session.id);
-      setTodayCount(await getTodayCount());
+      await refreshTodayStats();
       setView("completed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "完成失败");
@@ -285,13 +317,12 @@ export function PomodoroFull() {
     try {
       await abandonSession(session.id, "user_abandon");
       setSession(null);
-      setView("form");
+      setView("idle");
       setInterruptions(0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "放弃失败");
     }
   }
-
 
   // 恢复中断的 session
   async function handleRecoverContinue() {
@@ -319,7 +350,7 @@ export function PomodoroFull() {
   // 完成后：再来一个番茄
   function handleStartAnother() {
     setSession(null);
-    setView("form");
+    setView("idle");
     setInterruptions(0);
   }
 
@@ -358,48 +389,57 @@ export function PomodoroFull() {
     );
   }
 
-  // 表单视图
-  if (view === "form") {
+  // 共用顶部栏：标题 + 全屏 + 返回
+  const TopBar = (
+    <div className="flex items-center justify-between">
+      <h1 className="text-xl font-bold">番茄专注</h1>
+      <div className="flex items-center gap-3">
+        {fullscreen.supported && (
+          <button
+            onClick={handleEnterFullscreen}
+            className={`text-sm flex items-center gap-1 ${
+              fullscreen.isFullscreen
+                ? "text-blue-500"
+                : "text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400"
+            }`}
+            title={fullscreen.isFullscreen ? "当前已全屏" : "进入全屏专注模式"}
+          >
+            <Icon name="monitor" className="w-4 h-4" /> 全屏
+          </button>
+        )}
+        <Link href="/" className="text-sm text-blue-500 hover:underline">
+          ← 返回
+        </Link>
+      </div>
+    </div>
+  );
+
+  // idle 视图：大号倒计时 hero + 时长预设 + 开始按钮 + 可选选项 + 今日列表
+  if (view === "idle") {
+    // idle 视图下，"剩余时间" = 选中的时长（静态展示）
+    const idleMs = durationMinutes * 60_000;
     return (
       <div className="mx-auto max-w-md p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">番茄专注</h1>
-          <div className="flex items-center gap-3">
-            {fullscreen.supported && (
-              <button
-                onClick={handleEnterFullscreen}
-                className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 flex items-center gap-1"
-                title="进入全屏专注模式（默认竖屏）"
-              >
-                <Icon name="monitor" className="w-4 h-4" /> 全屏
-              </button>
-            )}
-            <Link href="/" className="text-sm text-blue-500 hover:underline">
-              ← 返回
-            </Link>
-          </div>
-        </div>
+        {TopBar}
 
         {error && <p className="text-red-500 text-xs">{error}</p>}
 
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              任务描述
-            </label>
-            <Input
-              value={taskDescription}
-              onChange={(e) => setTaskDescription(e.target.value)}
-              placeholder="例如：完成 React Hooks 章节练习"
-              className="w-full"
-              autoFocus
-            />
-          </div>
+        {/* Hero：圆形进度环 + 大号倒计时 */}
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 flex flex-col items-center space-y-5">
+          <ProgressRing progress={0} variant="idle">
+            <div className="flex flex-col items-center">
+              <div className="font-mono text-6xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                {formatCountdown(idleMs)}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">点按下方开始</div>
+            </div>
+          </ProgressRing>
 
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              专注时长（分钟）
-            </label>
+          {/* 时长预设 */}
+          <div className="w-full">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">
+              专注时长
+            </p>
             <div className="flex gap-2">
               {[15, 25, 50].map((m) => (
                 <button
@@ -411,62 +451,96 @@ export function PomodoroFull() {
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
-                  {m}
+                  {m} 分钟
                 </button>
               ))}
             </div>
           </div>
 
-          <details className="text-sm">
-            <summary className="cursor-pointer text-gray-600 dark:text-gray-400">
-              关联学习计划（可选）
-            </summary>
-            <div className="mt-2 space-y-2">
-              <Input
-                value={planId}
-                onChange={(e) => setPlanId(e.target.value)}
-                placeholder="planId"
-                inputSize="sm"
-                className="w-full"
-              />
-              <Input
-                value={nodeId}
-                onChange={(e) => setNodeId(e.target.value)}
-                placeholder="nodeId"
-                inputSize="sm"
-                className="w-full"
-              />
-            </div>
-          </details>
-
-          <Checkbox
-            checked={strictMode}
-            onChange={async (e) => {
-              const next = e.target.checked;
-              setStrictMode(next);
-              // 持久化到 UserProfile.strictFocusMode（下次进入时读取）
-              try {
-                const profile = await getUserProfile();
-                if (profile) {
-                  await saveUserProfile({ ...profile, strictFocusMode: next });
-                }
-              } catch {
-                // 持久化失败不影响当前会话的 toggle
-              }
-            }}
-            label="严格模式（3 次打断自动放弃）"
-          />
-
-          <Button block onClick={handleStart}>
+          {/* 一键开始 */}
+          <Button
+            block
+            size="lg"
+            leftIcon="target"
+            onClick={handleStart}
+            className="text-base"
+          >
             开始专注
           </Button>
+
+          {/* 可选选项（折叠） */}
+          <div className="w-full">
+            <button
+              onClick={() => setShowOptions(!showOptions)}
+              className="w-full flex items-center justify-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-1"
+            >
+              <Icon
+                name="chevron-right"
+                className={`w-3.5 h-3.5 transition-transform ${showOptions ? "rotate-90" : ""}`}
+              />
+              {showOptions ? "收起选项" : "更多选项（任务 / 计划 / 模式）"}
+            </button>
+            {showOptions && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
+                    任务描述（可选）
+                  </label>
+                  <Input
+                    value={taskDescription}
+                    onChange={(e) => setTaskDescription(e.target.value)}
+                    placeholder="例如：完成 React Hooks 章节练习"
+                    className="w-full"
+                  />
+                </div>
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-gray-600 dark:text-gray-400">
+                    关联学习计划（可选）
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    <Input
+                      value={planId}
+                      onChange={(e) => setPlanId(e.target.value)}
+                      placeholder="planId"
+                      inputSize="sm"
+                      className="w-full"
+                    />
+                    <Input
+                      value={nodeId}
+                      onChange={(e) => setNodeId(e.target.value)}
+                      placeholder="nodeId"
+                      inputSize="sm"
+                      className="w-full"
+                    />
+                  </div>
+                </details>
+                <Checkbox
+                  checked={strictMode}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    setStrictMode(next);
+                    try {
+                      const profile = await getUserProfile();
+                      if (profile) {
+                        await saveUserProfile({ ...profile, strictFocusMode: next });
+                      }
+                    } catch {
+                      // 持久化失败不影响当前会话的 toggle
+                    }
+                  }}
+                  label="严格模式（3 次打断自动放弃）"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
-        {todayCount > 0 && (
-          <p className="text-center text-xs text-gray-400">
-            今日已完成 {todayCount} 个番茄 🍅
-          </p>
-        )}
+        {/* 今日统计 + 列表 */}
+        <TodaySummary
+          count={todayCount}
+          minutes={todayMinutes}
+          sessions={todaySessions}
+        />
       </div>
     );
   }
@@ -482,97 +556,99 @@ export function PomodoroFull() {
         1 - remainingMs / (session.durationMinutes * 60_000),
       ),
     );
+    const ringVariant: "running" | "paused" | "overtime" = isOvertime
+      ? "overtime"
+      : isPaused
+        ? "paused"
+        : "running";
 
     return (
       <div className="mx-auto max-w-md p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">
-            {session.type === "focus"
-              ? "专注中"
-              : session.type === "short_break"
-                ? "短休息"
-                : "长休息"}
-          </h1>
-          <div className="flex items-center gap-3">
-            {fullscreen.supported && (
-              <button
-                onClick={handleEnterFullscreen}
-                className={`text-sm flex items-center gap-1 ${
-                  fullscreen.isFullscreen
-                    ? "text-blue-500"
-                    : "text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400"
-                }`}
-                title={fullscreen.isFullscreen ? "当前已全屏" : "进入全屏专注模式（默认竖屏）"}
-              >
-                <Icon name="monitor" className="w-4 h-4" /> 全屏
-              </button>
-            )}
-            <Link href="/" className="text-sm text-blue-500 hover:underline">
-              ← 返回
-            </Link>
-          </div>
-        </div>
+        {TopBar}
 
         {error && <p className="text-red-500 text-xs">{error}</p>}
 
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center space-y-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-            {session.taskDescription || "（未命名任务）"}
-          </p>
-
-          <div
-            className={`font-mono text-7xl font-bold tabular-nums ${
-              isOvertime
-                ? "text-red-600 dark:text-red-400"
-                : isPaused
-                  ? "text-gray-400 dark:text-gray-500"
-                  : "text-gray-900 dark:text-gray-100"
-            }`}
-          >
-            {formatCountdown(remainingMs)}
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 flex flex-col items-center space-y-5">
+          {/* 类型徽章 + 任务描述 */}
+          <div className="text-center w-full">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+              {session.type === "focus"
+                ? "专注中"
+                : session.type === "short_break"
+                  ? "短休息"
+                  : "长休息"}
+              {isPaused && " · 已暂停"}
+              {isOvertime && " · 已超时"}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-full">
+              {session.taskDescription || "（未命名任务）"}
+            </p>
           </div>
 
-          {/* 进度条 */}
-          <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all ${
-                isPaused
-                  ? "bg-gray-400"
-                  : isOvertime
-                    ? "bg-red-500"
-                    : "bg-blue-500"
-              }`}
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
+          {/* Hero：圆环 + 大号倒计时 */}
+          <ProgressRing progress={progress} variant={ringVariant}>
+            <div className="flex flex-col items-center">
+              <div
+                className={`font-mono text-6xl font-bold tabular-nums ${
+                  isOvertime
+                    ? "text-red-600 dark:text-red-400"
+                    : isPaused
+                      ? "text-gray-400 dark:text-gray-500"
+                      : "text-gray-900 dark:text-gray-100"
+                }`}
+              >
+                {formatCountdown(remainingMs)}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {isOvertime
+                  ? "已超时，请尽快完成"
+                  : isPaused
+                    ? "已暂停"
+                    : "保持专注"}
+              </div>
+            </div>
+          </ProgressRing>
 
+          {/* 打断提示 */}
           {interruptions > 0 && (
-            <p className="text-xs text-red-500">
+            <p className="text-xs text-red-500 text-center">
               ⚠️ 已被打断 {interruptions} 次
               {strictMode && `（严格模式：${3 - interruptions} 次后将放弃）`}
             </p>
           )}
 
-          <div className="flex gap-2 pt-2">
+          {/* 控制按钮 */}
+          <div className="w-full flex gap-2">
             {session.type === "focus" && (
               <button
                 onClick={handlePauseResume}
-                className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2 transition-colors"
+                className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2.5 transition-colors"
               >
                 {isPaused ? "恢复" : "暂停"}
               </button>
             )}
-            <Button variant="success" className="flex-1" onClick={handleComplete}>
+            <Button
+              variant="success"
+              className="flex-1"
+              onClick={handleComplete}
+            >
               提前完成
             </Button>
             <button
               onClick={handleAbandon}
-              className="flex-1 rounded-lg bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium py-2 transition-colors"
+              className="flex-1 rounded-lg bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium py-2.5 transition-colors"
             >
               放弃
             </button>
           </div>
         </div>
+
+        {/* 今日统计 + 列表（运行中也可看到进度） */}
+        <TodaySummary
+          count={todayCount}
+          minutes={todayMinutes}
+          sessions={todaySessions}
+        />
       </div>
     );
   }
@@ -583,13 +659,15 @@ export function PomodoroFull() {
     const breakMinutes = getRecommendedDuration(nextBreak, "standard");
     return (
       <div className="mx-auto max-w-md p-4 space-y-4">
+        {TopBar}
+
         <div className="rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-8 text-center space-y-4">
           <div className="text-5xl">🍅</div>
           <h2 className="text-xl font-bold text-green-700 dark:text-green-400">
             番茄完成！
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            今日已完成 {todayCount} 个番茄
+            今日已完成 {todayCount} 个番茄 · 累计 {todayMinutes} 分钟
           </p>
 
           <div className="rounded-lg bg-white dark:bg-gray-800 p-4 space-y-2">
@@ -602,7 +680,10 @@ export function PomodoroFull() {
                 : `建议短休息 ${breakMinutes} 分钟 ☕`}
             </p>
             <div className="flex gap-2 pt-2">
-              <Button className="flex-1" onClick={() => handleStartBreak(nextBreak)}>
+              <Button
+                className="flex-1"
+                onClick={() => handleStartBreak(nextBreak)}
+              >
                 开始休息 {breakMinutes} 分钟
               </Button>
               <button
@@ -614,11 +695,156 @@ export function PomodoroFull() {
             </div>
           </div>
         </div>
+
+        {/* 今日番茄列表 */}
+        <TodaySummary
+          count={todayCount}
+          minutes={todayMinutes}
+          sessions={todaySessions}
+        />
       </div>
     );
   }
 
   return null;
+}
+
+// ============ 子组件：圆形进度环 ============
+
+type RingVariant = "idle" | "running" | "paused" | "overtime";
+
+const RING_COLORS: Record<RingVariant, { track: string; progress: string }> = {
+  idle: { track: "stroke-gray-100 dark:stroke-gray-700", progress: "stroke-gray-300 dark:stroke-gray-600" },
+  running: { track: "stroke-gray-100 dark:stroke-gray-700", progress: "stroke-blue-500" },
+  paused: { track: "stroke-gray-100 dark:stroke-gray-700", progress: "stroke-gray-400" },
+  overtime: { track: "stroke-gray-100 dark:stroke-gray-700", progress: "stroke-red-500" },
+};
+
+function ProgressRing({
+  progress,
+  variant = "running",
+  size = 280,
+  children,
+}: {
+  progress: number;
+  variant?: RingVariant;
+  size?: number;
+  children?: React.ReactNode;
+}) {
+  const stroke = 12;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const offset = circumference * (1 - clamped);
+  const colors = RING_COLORS[variant];
+
+  return (
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90"
+        aria-hidden
+      >
+        {/* 轨道 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          className={colors.track}
+        />
+        {/* 进度 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className={`${colors.progress} transition-[stroke-dashoffset] duration-1000 ease-linear`}
+        />
+      </svg>
+      {/* 中间内容 */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ============ 子组件：今日番茄统计 + 列表 ============
+
+function TodaySummary({
+  count,
+  minutes,
+  sessions,
+}: {
+  count: number;
+  minutes: number;
+  sessions: PomodoroSession[];
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
+      {/* 统计 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+          <span>🍅</span>
+          今日番茄
+        </h3>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-gray-500 dark:text-gray-400">
+            完成 <span className="font-bold text-gray-900 dark:text-gray-100">{count}</span> 个
+          </span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className="text-gray-500 dark:text-gray-400">
+            累计 <span className="font-bold text-gray-900 dark:text-gray-100">{minutes}</span> 分钟
+          </span>
+        </div>
+      </div>
+
+      {/* 列表 */}
+      {sessions.length > 0 ? (
+        <ul className="space-y-1.5">
+          {sessions.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg bg-gray-50 dark:bg-gray-900/40"
+            >
+              <span className="text-gray-400 font-mono shrink-0">
+                {formatStartedAtTime(s.startedAt)}
+              </span>
+              <span className="text-gray-700 dark:text-gray-300 flex-1 truncate">
+                {s.taskDescription || "（未命名任务）"}
+              </span>
+              <span className="text-gray-400 shrink-0">
+                {s.durationMinutes}min
+              </span>
+              {(s.interruptions ?? 0) > 0 && (
+                <span
+                  title={`被打断 ${s.interruptions} 次`}
+                  className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 text-[10px] font-bold"
+                >
+                  {s.interruptions}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-center text-xs text-gray-400 py-2">
+          今天还没有完成番茄，点上方「开始专注」开启第一个 🍅
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ============ 子组件：恢复提示卡片 ============

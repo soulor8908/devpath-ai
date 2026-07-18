@@ -175,6 +175,20 @@ export default function HomeClient() {
             </span>
           </Link>
         )}
+
+        {/* 番茄钟常驻入口（始终可见，一键进入专注） */}
+        <Link
+          href="/timer"
+          className="mt-2 flex items-center justify-between rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300">
+            <span className="text-base leading-none">🍅</span>
+            番茄钟 · 开始一段专注
+          </span>
+          <span className="text-xs text-red-700 dark:text-red-400 flex items-center gap-0.5">
+            25:00 <Icon name="chevron-right" className="w-3.5 h-3.5" />
+          </span>
+        </Link>
       </section>
 
       {/* ============ 2. KPI 三宫格 ============ */}
