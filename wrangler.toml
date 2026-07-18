@@ -13,23 +13,18 @@ id = "086d793456e5425bacb04836da93ad9b"
 # 预览环境使用独立 namespace，避免污染生产数据
 preview_id = "preview-kv-namespace-placeholder"
 
-# apiKey Session 安全架构专用 namespace（tasks.md Task 5）
-# 以下三个 namespace 的 id 暂用 placeholder，部署时需用以下命令创建并替换 id：
-#   npx wrangler kv namespace create AUTH_SESSIONS
-#   npx wrangler kv namespace create AUTH_NONCES
-#   npx wrangler kv namespace create AUTH_AUDIT
-# 预览环境（如有）需另行创建并填入 preview_id 字段
+# apiKey Session 安全架构专用 namespace
 [[kv_namespaces]]
 binding = "AUTH_SESSIONS"
-id = "placeholder_auth_sessions"
+id = "ff753a3ce9664d93a79f2e25c36f3433"
 
 [[kv_namespaces]]
 binding = "AUTH_NONCES"
-id = "placeholder_auth_nonces"
+id = "02684817b6884df4a1eb48416426cf07"
 
 [[kv_namespaces]]
 binding = "AUTH_AUDIT"
-id = "placeholder_auth_audit"
+id = "31f90bc37a644f55902e1a8b4ebce13f"
 
 [vars]
 AI_PROVIDER = "deepseek"
