@@ -4,10 +4,11 @@
 // 统一按钮组件 — 替代散落各页面的 <button className="rounded-lg bg-blue-600 ...">
 //
 // 设计（乔布斯视角）：
-//   - 视觉一致性 > 灵活度。6 种 variant + 3 种 size 覆盖 95% 场景
-//   - 每种 variant 有明确的语义：primary=主操作 / secondary=次操作 / danger=删除 / ghost=弱化 / success=成功 / dark=深色
-//   - loading 态自带 spinner，避免每个调用方各写一遍
-//   - disabled 视觉不只是 opacity，还改 cursor
+//   - 视觉一致性 > 灵活度。8 种 variant + 3 种 size + iconOnly 模式覆盖 99% 场景
+//   - 每种 variant 有明确的语义：primary=主操作 / secondary=次操作 / danger=删除 /
+//     ghost=弱化 / success=成功 / dark=深色 / link=文字链接 / outline=边框
+//   - iconOnly 模式专门承载关闭 X / 工具栏图标 / FAB 等纯图标按钮，padding 自动收窄
+//   - loading 态自带 spinner；disabled 视觉改 cursor
 //
 // 设计（卡帕西视角）：
 //   - forwardRef 让 ref 可转发（聚焦/测距等场景）
@@ -25,7 +26,9 @@ export type ButtonVariant =
   | "ghost"
   | "danger"
   | "success"
-  | "dark";
+  | "dark"
+  | "link"
+  | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -40,12 +43,21 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   success:
     "bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-sm",
   dark: "bg-gray-900 text-white hover:bg-black active:bg-gray-800 shadow-sm dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100",
+  outline:
+    "bg-transparent text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700",
+  link: "bg-transparent text-blue-600 hover:underline dark:text-blue-400 shadow-none border-none px-0 py-0",
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: "px-2.5 py-1 text-xs gap-1",
   md: "px-3.5 py-2 text-sm gap-1.5",
   lg: "px-5 py-2.5 text-base gap-2",
+};
+
+const ICON_ONLY_SIZE_CLASSES: Record<ButtonSize, string> = {
+  sm: "p-1",
+  md: "p-2",
+  lg: "p-2.5",
 };
 
 const LOADING_SPINNER_SIZE: Record<ButtonSize, string> = {
@@ -63,6 +75,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   leftIcon?: React.ComponentProps<typeof Icon>["name"];
   /** 是否占满宽度 */
   block?: boolean;
+  /** 纯图标按钮模式：收窄 padding 为正方形；建议配合 aria-label 使用 */
+  iconOnly?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -73,6 +87,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       leftIcon,
       block = false,
+      iconOnly = false,
       className,
       children,
       disabled,
@@ -93,8 +108,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-0",
           "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
           VARIANT_CLASSES[variant],
-          SIZE_CLASSES[size],
-          block && "w-full",
+          iconOnly ? ICON_ONLY_SIZE_CLASSES[size] : SIZE_CLASSES[size],
+          block && !iconOnly && "w-full",
           className,
         )}
         {...rest}
