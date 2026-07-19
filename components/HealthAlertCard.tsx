@@ -182,7 +182,7 @@ export function HealthAlertCard({
                       {alert.title}
                     </p>
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${style.bg} ${style.iconColor} border ${style.border}`}
+                      className={`text-2xs px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${style.bg} ${style.iconColor} border ${style.border}`}
                     >
                       {alert.severity}
                     </span>

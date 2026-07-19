@@ -139,7 +139,7 @@ export default function AchievementsPage() {
                           </p>
                           {unlocked ? (
                             a.unlockedAt && (
-                              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                              <p className="text-2xs text-amber-600 dark:text-amber-400 mt-1">
                                 解锁于 {formatUnlockedAt(a.unlockedAt)}
                               </p>
                             )
@@ -151,7 +151,7 @@ export default function AchievementsPage() {
                                   style={{ width: `${progress * 100}%` }}
                                 />
                               </div>
-                              <p className="text-[10px] text-gray-400 mt-0.5">
+                              <p className="text-2xs text-gray-400 mt-0.5">
                                 {Math.round(progress * 100)}%
                               </p>
                             </div>

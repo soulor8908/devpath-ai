@@ -103,7 +103,7 @@ export default function ListClient() {
                   {p.knowledgeCount} 知识点 · {p.questionCount} 题 ·{" "}
                   {p.scheduleDays} 天计划 · 每日 {p.dailyMinutes} 分钟
                 </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">
+                <p className="text-2xs text-gray-400 mt-0.5">
                   创建于 {new Date(p.createdAt).toLocaleDateString("zh-CN")}
                 </p>
               </div>

@@ -216,7 +216,7 @@ export function DailyNudge() {
           <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
             {nudge.nudge}
           </p>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+          <div className="mt-1 flex items-center gap-2 text-2xs text-gray-400">
             <span>
               {nudge.source === "ai" ? "AI 生成" : "规则生成"} ·{" "}
               {new Date(nudge.generatedAt).toLocaleTimeString("zh-CN", {

@@ -1327,7 +1327,7 @@ export default function ChatClient({
                     });
                     if (ok) handleDeleteMessage(m.id);
                   }}
-                  className="text-[11px] text-gray-400 hover:text-red-500"
+                  className="text-2xs text-gray-400 hover:text-red-500"
                   aria-label="删除回复"
                   title="删除回复"
                 >
@@ -1340,7 +1340,7 @@ export default function ChatClient({
                     size="sm"
                     iconOnly
                     onClick={() => handleThumbsDown(m.id)}
-                    className="text-[11px] text-gray-400 hover:text-red-500"
+                    className="text-2xs text-gray-400 hover:text-red-500"
                     aria-label="这条回复没帮助"
                     title="这条回复没帮助"
                   >

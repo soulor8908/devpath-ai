@@ -929,7 +929,7 @@ export default function PlanDetailClient() {
                     取消
                   </Button>
                 </div>
-                <p className="text-[11px] text-gray-400 text-center">
+                <p className="text-2xs text-gray-400 text-center">
                   预计 30-90 秒，生成期间请勿关闭页面
                 </p>
               </div>

@@ -345,7 +345,7 @@ export default function PlanEditClient() {
               </Button>
             ))}
           </div>
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-2xs text-gray-400 mt-1">
             {INTENSITY_HINT[routine.intensity]}
           </p>
         </div>
@@ -456,12 +456,12 @@ export default function PlanEditClient() {
                     {node.title}
                   </span>
                   {node.bigTech && (
-                    <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-700 rounded font-medium shrink-0">
+                    <span className="px-1.5 py-0.5 text-2xs bg-red-100 text-red-700 rounded font-medium shrink-0">
                       大厂高频
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-gray-400 mt-0.5">
+                <div className="text-2xs text-gray-400 mt-0.5">
                   难度{node.difficulty} · 频率{node.frequency}
                 </div>
               </div>
@@ -544,7 +544,7 @@ export default function PlanEditClient() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{q.question}</p>
                   {node && (
-                    <p className="text-[11px] text-gray-400 mt-0.5">
+                    <p className="text-2xs text-gray-400 mt-0.5">
                       {node.title}
                     </p>
                   )}

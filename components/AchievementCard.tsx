@@ -79,7 +79,7 @@ export function AchievementCard({ achievements, onClose }: AchievementCardProps)
                   {a.title}
                 </p>
                 {a.unlockedAt && (
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                  <span className="text-2xs text-gray-400 dark:text-gray-500 flex-shrink-0">
                     {formatUnlockedAt(a.unlockedAt)}
                   </span>
                 )}

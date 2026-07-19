@@ -206,7 +206,7 @@ export default function DashboardClient() {
             连续学习
           </div>
           <div className="text-xl font-bold mt-1">{stats.currentStreak} 天</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-2xs text-gray-400 mt-0.5">
             最长 {stats.longestStreak} 天
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function DashboardClient() {
         </h2>
         <div className="flex gap-2">
           {/* 星期标签 */}
-          <div className="flex flex-col gap-1 text-[10px] text-gray-400 pt-0.5">
+          <div className="flex flex-col gap-1 text-2xs text-gray-400 pt-0.5">
             {weekdayLabels.map((w, i) => (
               <div key={i} className="h-3 leading-3">
                 {w}
@@ -272,7 +272,7 @@ export default function DashboardClient() {
           </div>
         </div>
         {/* 日期标签 */}
-        <div className="flex text-[10px] text-gray-400 mt-2 ml-5">
+        <div className="flex text-2xs text-gray-400 mt-2 ml-5">
           <div className="flex-1 flex justify-between">
             <span>
               {dates[0].toLocaleDateString("zh-CN", {
@@ -295,7 +295,7 @@ export default function DashboardClient() {
           </div>
         </div>
         {/* 图例 */}
-        <div className="flex items-center gap-1 text-[10px] text-gray-500 mt-2 ml-5">
+        <div className="flex items-center gap-1 text-2xs text-gray-500 mt-2 ml-5">
           <span>少</span>
           <div className="w-3 h-3 rounded-sm bg-gray-100" />
           <div className="w-3 h-3 rounded-sm bg-green-200" />

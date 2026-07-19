@@ -135,7 +135,7 @@ export function PomodoroWidget() {
       {/* 顶部：任务描述 + 打断徽标 */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-wide text-gray-400">
+          <p className="text-2xs uppercase tracking-wide text-gray-400">
             {session.type === "focus" ? "专注中" : session.type === "short_break" ? "短休息" : "长休息"}
             {isPaused && " · 已暂停"}
             {isOvertime && " · 已超时"}
@@ -147,7 +147,7 @@ export function PomodoroWidget() {
         {session.interruptions > 0 && (
           <span
             title={`被打断 ${session.interruptions} 次`}
-            className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold"
+            className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-2xs font-bold"
           >
             {session.interruptions}
           </span>
@@ -192,7 +192,7 @@ export function PomodoroWidget() {
       {/* 跳转全屏 */}
       <Link
         href="/timer"
-        className="block text-center text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        className="block text-center text-2xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
       >
         全屏专注 →
       </Link>

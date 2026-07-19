@@ -42,7 +42,7 @@ export function Nav() {
             }`}
           >
             <Icon name={item.icon} className="w-[22px] h-[22px]" />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-2xs font-medium">{item.label}</span>
           </Link>
         );
       })}

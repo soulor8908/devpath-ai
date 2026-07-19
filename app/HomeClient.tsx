@@ -348,7 +348,7 @@ export default function HomeClient() {
                 </div>
                 <Link
                   href="/stats/ai-quality"
-                  className="block text-[10px] text-gray-400 hover:text-blue-500 mt-2 text-center"
+                  className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
                 >
                   详情 →
                 </Link>
@@ -420,7 +420,7 @@ export default function HomeClient() {
                           <span className="font-medium text-gray-700 dark:text-gray-300">{entry.tag}</span>
                           <span className="text-gray-400">{entry.time}</span>
                           {entry.dopamine !== "无" && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-orange-100 text-orange-700">
+                            <span className="px-1.5 py-0.5 rounded text-2xs bg-orange-100 text-orange-700">
                               {entry.dopamine}
                             </span>
                           )}
@@ -479,7 +479,7 @@ export default function HomeClient() {
                       className="block bg-white dark:bg-gray-800 rounded-lg p-2.5 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start gap-2">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+                        <span className="text-2xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
                           ×{m.wrongCount}
                         </span>
                         <p className="text-xs text-gray-700 dark:text-gray-300 flex-1 line-clamp-2">

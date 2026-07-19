@@ -568,7 +568,7 @@ export function PomodoroFull() {
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 flex flex-col items-center space-y-5">
           {/* 类型徽章 + 任务描述 */}
           <div className="text-center w-full">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+            <p className="text-2xs uppercase tracking-wide text-gray-400 mb-1">
               {session.type === "focus"
                 ? "专注中"
                 : session.type === "short_break"
@@ -830,7 +830,7 @@ function TodaySummary({
               {(s.interruptions ?? 0) > 0 && (
                 <span
                   title={`被打断 ${s.interruptions} 次`}
-                  className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 text-[10px] font-bold"
+                  className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 text-2xs font-bold"
                 >
                   {s.interruptions}
                 </span>

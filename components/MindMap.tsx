@@ -473,7 +473,7 @@ export function MindMap({
       </div>
 
       {/* 提示 */}
-      <div className="absolute bottom-2 left-2 z-20 text-[10px] text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
+      <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
         双指缩放 · 单指拖拽 · 点击节点展开/收起
       </div>
 

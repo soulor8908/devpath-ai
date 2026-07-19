@@ -303,7 +303,7 @@ export default function ReviewPage() {
             <Icon name="filter" className="w-3.5 h-3.5 text-gray-500" />
             <span className="text-xs text-gray-500">筛选</span>
             {isFiltered && !filterCollapsed && (
-              <span className="text-[10px] text-blue-500">·已筛选</span>
+              <span className="text-2xs text-blue-500">·已筛选</span>
             )}
           </div>
           <Button
@@ -467,7 +467,7 @@ export default function ReviewPage() {
                 计划: {cardPlan?.topic ?? "未知"} · 知识点: {cardNode?.title ?? "未知"} · 难度{" "}
                 {cardNode?.difficulty ?? "?"}
                 {cardNode?.bigTech && (
-                  <span className="ml-1 inline-block px-1 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded">
+                  <span className="ml-1 inline-block px-1 py-0.5 text-2xs bg-orange-100 text-orange-700 rounded">
                     大厂
                   </span>
                 )}
@@ -543,7 +543,7 @@ export default function ReviewPage() {
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-gray-400 w-8 shrink-0">{label}</span>
+      <span className="text-2xs text-gray-400 w-8 shrink-0">{label}</span>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

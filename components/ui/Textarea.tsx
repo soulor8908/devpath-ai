@@ -68,7 +68,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...rest}
         />
         {count && (
-          <span className="pointer-events-none absolute bottom-1.5 right-2 text-[11px] text-gray-400">
+          <span className="pointer-events-none absolute bottom-1.5 right-2 text-2xs text-gray-400">
             {count}
           </span>
         )}

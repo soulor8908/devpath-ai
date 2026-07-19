@@ -399,7 +399,7 @@ export default function LearnNewPage() {
             showCount
           />
           {promptText.trim() && (
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-2xs text-gray-400 mt-1">
               生成时会附加到 AI 请求
             </p>
           )}
@@ -425,12 +425,12 @@ export default function LearnNewPage() {
                       <p className="text-xs font-medium text-gray-800">
                         {p.title}
                         {p.usedCount > 0 && (
-                          <span className="ml-2 text-[10px] text-gray-400">
+                          <span className="ml-2 text-2xs text-gray-400">
                             使用 {p.usedCount} 次
                           </span>
                         )}
                       </p>
-                      <p className="text-[11px] text-gray-500 line-clamp-2">
+                      <p className="text-2xs text-gray-500 line-clamp-2">
                         {p.content}
                       </p>
                     </Button>
@@ -527,13 +527,13 @@ export default function LearnNewPage() {
                 {p.tags.slice(0, 3).map((t) => (
                   <span
                     key={t}
-                    className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded"
+                    className="px-1.5 py-0.5 text-2xs bg-gray-100 text-gray-600 rounded"
                   >
                     {t}
                   </span>
                 ))}
               </div>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-2xs text-gray-400">
                 {p.knowledgeTree.length} 知识点 · {p.questions.length} 题
               </p>
             </Button>
@@ -625,7 +625,7 @@ function PresetMindMapModal({
                   {stats.total} 知识点 · {stats.questions} 题 · {stats.scheduleDays} 天计划 ·
                   高频 {stats.high} 个
                   {source === "ai" && (
-                    <span className="ml-2 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded text-[10px] font-medium">
+                    <span className="ml-2 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded text-2xs font-medium">
                       AI 重生成
                     </span>
                   )}

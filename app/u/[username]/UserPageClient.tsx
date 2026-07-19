@@ -335,7 +335,7 @@ export default function UserPageClient() {
                     <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
                       {a.title}
                     </p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-2xs text-gray-500 dark:text-gray-400 truncate">
                       {a.description}
                     </p>
                   </div>

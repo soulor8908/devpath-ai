@@ -147,7 +147,7 @@ export default function EmotionPage() {
                             <span className="font-medium text-gray-700">{entry.tag}</span>
                             <span className="text-gray-400">{entry.time}</span>
                             {entry.dopamine !== "无" && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-orange-100 text-orange-700">
+                              <span className="px-1.5 py-0.5 rounded text-2xs bg-orange-100 text-orange-700">
                                 {entry.dopamine}
                               </span>
                             )}

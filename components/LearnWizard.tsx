@@ -509,13 +509,13 @@ export function LearnWizard({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-gray-900 dark:text-gray-100">{n.title}</span>
                         {n.bigTech && (
-                          <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 rounded">
+                          <span className="px-1.5 py-0.5 text-2xs bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 rounded">
                             <Icon name="building" className="w-3 h-3 inline-block align-middle" /> 大厂高频
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{n.summary}</p>
-                      <div className="flex items-center gap-2 mt-2 text-[11px]">
+                      <div className="flex items-center gap-2 mt-2 text-2xs">
                         <span className="text-gray-400">难度</span>
                         <span className="text-gray-700 dark:text-gray-300">{"★".repeat(n.difficulty)}{"☆".repeat(5 - n.difficulty)}</span>
                         <span className={`px-1.5 py-0.5 rounded ${FREQUENCY_COLOR[n.frequency] ?? ""}`}>
@@ -604,12 +604,12 @@ export function LearnWizard({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 dark:text-gray-100">{q.question}</p>
                       {q.bigTech && (
-                        <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 rounded">
+                        <span className="inline-block mt-1 px-1.5 py-0.5 text-2xs bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 rounded">
                           <Icon name="building" className="w-3 h-3 inline-block align-middle" /> 大厂高频
                         </span>
                       )}
                       {q.keyPoints && q.keyPoints.length > 0 && (
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-2xs text-gray-500 dark:text-gray-400 mt-1">
                           关键点：{q.keyPoints.join(" / ")}
                         </p>
                       )}
@@ -674,7 +674,7 @@ export function LearnWizard({
               />
             </div>
             {answerErrors > 0 && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+              <p className="text-2xs text-amber-600 dark:text-amber-400 mt-1">
                 {answerErrors} 题生成失败（可保存后逐题重新生成）
               </p>
             )}

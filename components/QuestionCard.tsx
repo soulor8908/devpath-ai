@@ -108,13 +108,13 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           className="flex-1 text-left text-sm hover:text-blue-600"
         >
           {question.bigTech && (
-            <span className="inline-block px-1.5 py-0.5 mr-2 text-[10px] bg-amber-100 text-amber-700 rounded font-medium align-middle">
+            <span className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-amber-100 text-amber-700 rounded font-medium align-middle">
               <Icon name="building" className="w-3 h-3 inline-block align-middle" /> 大厂
             </span>
           )}
           {isUnderstood && (
             <span
-              className="inline-block px-1.5 py-0.5 mr-2 text-[10px] bg-green-100 text-green-700 rounded font-medium align-middle"
+              className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-green-100 text-green-700 rounded font-medium align-middle"
               title="已看懂"
             >
               ✓ 看懂
