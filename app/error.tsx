@@ -4,6 +4,7 @@
 // 全局错误边界：捕获未处理的运行时错误，提供重试入口
 
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 export default function Error({
   error,
@@ -19,12 +20,7 @@ export default function Error({
       <p className="mb-4 text-sm text-gray-500">
         {error.message || "页面加载失败"}
       </p>
-      <button
-        onClick={reset}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-      >
-        重试
-      </button>
+      <Button onClick={reset}>重试</Button>
     </div>
   );
 }

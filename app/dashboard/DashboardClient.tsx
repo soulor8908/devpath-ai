@@ -9,6 +9,7 @@ import { listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type LearnStats } from "@/lib/types";
 import { computeStats } from "@/lib/learn-log";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import { openChatModal } from "@/lib/chat-modal-store";
 
 // 格式化日期为 YYYY-MM-DD（本地时区）
@@ -186,14 +187,15 @@ export default function DashboardClient() {
           </Link>
         ))}
         {/* AI 聊天：通过全局 chat-modal-store 打开弹窗，不再走 /chat 路由 */}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => openChatModal()}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+          leftIcon="chat"
         >
-          <Icon name="chat" className="w-3.5 h-3.5" />
           AI 聊天
-        </button>
+        </Button>
       </div>
 
       {/* 统计卡片 */}

@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo } from "react";
 import { ActivityCalendar } from "react-activity-calendar";
 import { listItems } from "@/lib/storage/db";
 import type { ReviewLog, LearnLog } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 interface DayData {
   date: string; // YYYY-MM-DD
@@ -106,9 +107,9 @@ export function Heatmap({ data, weeks = 12 }: Props) {
         <div className="absolute right-0 top-0 z-10 rounded-lg border bg-white p-3 shadow-lg">
           <div className="text-sm font-medium">{selected.date}</div>
           <div className="text-xs text-gray-600">学习 {selected.count} 分钟</div>
-          <button onClick={() => setSelected(null)} className="mt-1 text-xs text-blue-600">
+          <Button variant="link" size="sm" onClick={() => setSelected(null)} className="mt-1">
             关闭
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -102,12 +102,9 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
           <ul className="space-y-1">
             {history.map((h) => (
               <li key={h.id}>
-                <button
-                  onClick={() => setCurrent(h)}
-                  className="text-sm text-blue-600 hover:underline"
-                >
+                <Button variant="link" size="sm" onClick={() => setCurrent(h)}>
                   {h.weekStart} 起
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

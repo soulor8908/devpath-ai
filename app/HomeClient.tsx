@@ -365,15 +365,16 @@ export default function HomeClient() {
 
       {/* ============ 5. 折叠区：情绪 + 错题 + 7 天热力图 ============ */}
       <section className="mb-5">
-        <button
+        <Button
+          variant="ghost"
           onClick={() => setShowMoreSection(!showMoreSection)}
-          className="w-full flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors py-2"
+          className="w-full flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-2"
         >
           <span className="flex items-center gap-1.5">
             <Icon name="chevron-right" className={`w-4 h-4 transition-transform ${showMoreSection ? "rotate-90" : ""}`} />
             更多
           </span>
-        </button>
+        </Button>
 
         {showMoreSection && (
           <div className="space-y-4 pt-2">
