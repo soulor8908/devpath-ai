@@ -59,6 +59,24 @@ export function getChatModalSnapshot(): ChatModalState {
   return currentState;
 }
 
+/**
+ * 服务端快照：SSR 时返回关闭状态的常量引用。
+ *
+ * 必须提供此函数作为 useSyncExternalStore 的第三个参数（getServerSnapshot），
+ * 否则 Next.js 在 prerender /_not-found 等纯静态页面时会抛出：
+ *   "Missing getServerSnapshot, which is required for server-rendered content"
+ * 因为 FloatingChat 全局挂载在 layout.tsx，/_not-found 也会渲染它。
+ *
+ * 注意：返回的必须是稳定引用（模块级常量），不能每次返回新对象，
+ * 否则 React 会判定 store 变化 → 重渲染 → 无限循环。
+ */
+const SERVER_SNAPSHOT: ChatModalState = { open: false, seq: 0 };
+
+/** useSyncExternalStore 的 getServerSnapshot */
+export function getChatModalServerSnapshot(): ChatModalState {
+  return SERVER_SNAPSHOT;
+}
+
 export interface OpenChatOptions {
   prefill?: string;
   source?: ChatSource;

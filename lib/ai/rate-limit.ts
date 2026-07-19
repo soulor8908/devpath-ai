@@ -4,8 +4,13 @@
 // 设计：
 // - 每个场景有每日配额（chat=20 / plan_generate=5 / weekly_report=1 / daily_nudge=4 / other=5）
 // - KV key 格式：ratelimit:{userId}:{scene}:{YYYY-MM-DD}（中国时区日期）
-// - 仅对 useServerModel=true 生效（用户自带 modelConfig 不限流，判断在调用方做）
 // - 乐观计数：成功调用前先 increment，失败不回滚（可接受，保守计数）
+//
+// ⚠️ 当前状态（session 架构改造后）：
+//   - 所有通过 requireSession 鉴权的请求都使用用户自己加密在 session 中的 apiKey，
+//     由用户自担 AI provider 额度/费用，服务端不再做"今日 N 次"拦截
+//   - 本模块作为基础设施保留（含单测），未来若引入"服务端默认模型 / 匿名免费层"，
+//     可在路由中按 useServerModel === true 条件调用 checkRateLimit / incrementRateLimit
 //
 // 卡帕西视角：限流是"防滥用"的最后一道闸，必须无状态可推导、低延迟。
 // KV 单 key 读+写即可完成判定+计数，无需分布式锁（Cloudflare KV 强一致 put + 最终一致 get，

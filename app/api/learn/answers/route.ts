@@ -6,7 +6,6 @@
 //   - 用 streamText 为每题生成答案，按 questionId 逐题返回
 //   - 返回 NDJSON 流（每行一个 chunk）
 //   - 并发池：3 个 worker 同时跑，避免单题串行阻塞
-//   - KV 限流 scene=answer_generate（5/天，DEFAULT_QUOTA）
 //
 // 流式协议（NDJSON）：
 //   - 每行一个 JSON 对象
@@ -15,6 +14,7 @@
 //   - 结束标记：{"questionId":"","answer":"","done":true,"total":N}
 //
 // 鉴权（apiKey Session 安全架构）：requireSession 注入 session，body 不含客户端凭证 / userId
+//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
 //
 // 为什么不用 Vercel AI SDK 的 data stream protocol？
 //   - data stream 适合"单一对话流"，无法表达"按 questionId 分批完成"的语义
@@ -23,10 +23,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamText } from "ai";
 import { getModelFromSession } from "@/lib/ai/provider";
-import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
-import { createKVStore } from "@/lib/storage/kv";
-import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { KnowledgeNode, Question } from "@/lib/types";
 
@@ -72,28 +70,6 @@ export async function POST(req: NextRequest) {
   }
 
   const model = getModelFromSession(session, "learn");
-
-  // 限流：所有请求都限流
-  const kv = createKVStore(getCloudflareKV());
-  const { allowed, limit } = await checkRateLimit(
-    session.userId,
-    "answer_generate",
-    kv,
-  );
-  if (!allowed) {
-    return NextResponse.json(
-      {
-        error: "今日 AI 调用已达上限",
-        code: "RATE_LIMITED",
-        scene: "answer_generate",
-        remaining: 0,
-        limit,
-      },
-      { status: 429 },
-    );
-  }
-  // 乐观计数：流式响应前先 +1，失败不回滚（保守计数）
-  await incrementRateLimit(session.userId, "answer_generate", kv);
 
   // 构建 nodeId → node 映射，便于按节点上下文生成答案
   const nodeMap = new Map<string, KnowledgeNode>();

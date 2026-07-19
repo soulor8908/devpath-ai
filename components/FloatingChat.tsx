@@ -18,6 +18,7 @@ import ChatClient from "@/components/ChatClient";
 import {
   subscribeChatModal,
   getChatModalSnapshot,
+  getChatModalServerSnapshot,
   closeChatModal,
   consumeChatModalPrefill,
   openChatModal,
@@ -25,7 +26,13 @@ import {
 
 export function FloatingChat() {
   // 订阅全局 chat modal store（与 toast / ai-task-queue 同模式）
-  const state = useSyncExternalStore(subscribeChatModal, getChatModalSnapshot);
+  // 第三个参数 getServerSnapshot 必传：FloatingChat 全局挂载在 layout.tsx，
+  // /_not-found 等静态页面 prerender 时也会渲染本组件，缺此参数会导致构建失败
+  const state = useSyncExternalStore(
+    subscribeChatModal,
+    getChatModalSnapshot,
+    getChatModalServerSnapshot,
+  );
 
   const handleClose = useCallback(() => {
     closeChatModal();

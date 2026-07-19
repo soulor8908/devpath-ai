@@ -13,14 +13,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { streamText } from "ai";
-import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
 import { buildToolSystemSuffix } from "@/lib/ai/tool-registry";
-import { createKVStore } from "@/lib/storage/kv";
-import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 import { PERSONAS, selectPersona, type PersonaContext, type Persona } from "@/lib/ai/persona";
 import type { PersonaId } from "@/lib/types";
 
@@ -67,17 +65,8 @@ export async function POST(req: NextRequest) {
     // 用 session 创建模型
     const model = getModelFromSession(session, "chat");
 
-    // 限流：所有请求都限流（按 session.userId 计数）
-    const kv = createKVStore(getCloudflareKV());
-    const { allowed, limit } = await checkRateLimit(session.userId, "chat", kv);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "chat", remaining: 0, limit },
-        { status: 429 },
-      );
-    }
-    // 乐观计数：流式响应前先 +1，失败不回滚（可接受，保守计数）
-    await incrementRateLimit(session.userId, "chat", kv);
+    // 无服务端限流：session 架构下所有用户都用自己加密在 session 中的 apiKey，
+    // 直接调用上游 AI provider，由用户自担额度/费用。服务端不再做"今日 N 次"拦截。
 
     const safeContext =
       typeof contextSnapshot === "string" && contextSnapshot.length > 0

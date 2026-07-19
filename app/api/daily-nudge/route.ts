@@ -8,15 +8,14 @@
 //   - 客户端按当天缓存（IndexedDB），避免每次进首页都跑 LLM
 //
 // 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
+//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
-import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
-import { createKVStore } from "@/lib/storage/kv";
-import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -39,16 +38,6 @@ export async function POST(req: NextRequest) {
 
   const { contextSnapshot } = body;
   const model = getModelFromSession(session, "daily-nudge");
-
-  // 限流：所有请求都限流
-  const kv = createKVStore(getCloudflareKV());
-  const { allowed } = await checkRateLimit(session.userId, "daily_nudge", kv);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "daily_nudge", remaining: 0 },
-      { status: 429 },
-    );
-  }
 
   try {
     // 安全截断
@@ -81,9 +70,6 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         });
       }
-
-      // 限流计数 +1（AI 成功生成后；规则降级不计数）
-      await incrementRateLimit(session.userId, "daily_nudge", kv);
 
       return NextResponse.json({
         nudge: cleaned.slice(0, 200),

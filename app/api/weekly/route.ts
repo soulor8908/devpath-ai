@@ -4,16 +4,15 @@
 // ⚠️ Edge runtime 无法访问客户端 IndexedDB，报告由客户端自行存储
 //
 // 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
+//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
 
 import { NextResponse } from "next/server";
 import { generateWeeklyReport } from "@/lib/ai/weekly-report";
-import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { nanoid } from "nanoid";
 import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry } from "@/lib/types";
-import { createKVStore } from "@/lib/storage/kv";
-import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -42,16 +41,6 @@ export async function POST(req: Request) {
 
   const model = getModelFromSession(session, "weekly");
 
-  // 限流：所有请求都限流
-  const kv = createKVStore(getCloudflareKV());
-  const { allowed } = await checkRateLimit(session.userId, "weekly_report", kv);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "weekly_report", remaining: 0 },
-      { status: 429 },
-    );
-  }
-
   if (!body.weekStart || !Array.isArray(body.learnLogs)) {
     return NextResponse.json({ error: "缺少必填字段" }, { status: 400 });
   }
@@ -63,9 +52,6 @@ export async function POST(req: Request) {
     emotions: body.emotions,
     weekStart: body.weekStart,
   }, model);
-
-  // 限流计数 +1（成功生成后）
-  await incrementRateLimit(session.userId, "weekly_report", kv);
 
   const id = nanoid();
 

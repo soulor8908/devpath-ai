@@ -4,13 +4,11 @@ import { nanoid } from "nanoid";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { generateQuestions } from "@/lib/ai/question";
 import { getModelFromSession } from "@/lib/ai/provider";
-import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import type { LearningPlan } from "@/lib/types";
-import { createKVStore } from "@/lib/storage/kv";
-import { checkRateLimit, incrementRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -31,15 +29,7 @@ export async function POST(req: NextRequest) {
 
   const model = getModelFromSession(session, "learn");
 
-  // 限流：所有请求都限流（按 session.userId 计数）
-  const kv = createKVStore(getCloudflareKV());
-  const { allowed } = await checkRateLimit(session.userId, "plan_generate", kv);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "今日 AI 调用已达上限", code: "RATE_LIMITED", scene: "plan_generate", remaining: 0 },
-      { status: 429 },
-    );
-  }
+  // 无服务端限流：session 架构下所有用户都用自己加密在 session 中的 apiKey
 
   try {
 
@@ -94,8 +84,6 @@ export async function POST(req: NextRequest) {
     };
 
     // 返回给前端，由前端存 IndexedDB（API route 无法访问客户端 IndexedDB）
-    // 限流计数 +1（成功生成后）
-    await incrementRateLimit(session.userId, "plan_generate", kv);
     return NextResponse.json({ planId: plan.id, plan });
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
