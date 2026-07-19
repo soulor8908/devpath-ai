@@ -10,11 +10,18 @@ import type { LearningPlan, Question, ScheduleItem } from "@/lib/types";
 import { KnowledgeTree } from "@/components/KnowledgeTree";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Textarea, Select } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
 import { logLearning } from "@/lib/learn-log";
 import { createCard, findExistingCard } from "@/lib/fsrs";
+import {
+  markNodeMastered,
+  markNodeNeedsReinforce,
+  markQuestionUnderstood,
+  markQuestionViewed,
+} from "@/lib/node-mastery";
 import {
   recordAICall,
   startTimer,
@@ -122,6 +129,61 @@ export default function PlanDetailClient() {
         questionId,
         type: "question_favorite",
       }).catch(() => {});
+    }
+  }
+
+  // 学习反馈闭环：用户标记题目"看懂了 / 再想想"
+  async function handleMarkUnderstood(questionId: string, understood: boolean) {
+    if (!plan) return;
+    try {
+      const updated = await markQuestionUnderstood(plan, questionId, understood);
+      setPlan(updated);
+      toast.success(understood ? "已记录「看懂了」" : "已取消「看懂了」标记");
+    } catch (e) {
+      toast.error("标记失败：" + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  // 学习反馈闭环：用户首次展开答案 → 隐式记录 viewed
+  async function handleQuestionViewed(questionId: string) {
+    if (!plan) return;
+    try {
+      const updated = await markQuestionViewed(plan, questionId);
+      setPlan(updated);
+    } catch {
+      // 静默失败（隐式反馈不应阻塞用户阅读答案）
+    }
+  }
+
+  // 学习反馈闭环：用户标记知识点"已掌握"
+  async function handleMarkNodeMastered(
+    node: { id: string },
+    mastered: boolean
+  ) {
+    if (!plan) return;
+    try {
+      const updated = await markNodeMastered(plan, node.id, mastered);
+      setPlan(updated);
+      toast.success(mastered ? "已标记为「已掌握」" : "已取消「已掌握」标记");
+    } catch (e) {
+      toast.error("标记失败：" + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  // 学习反馈闭环：用户标记知识点"需要加强"
+  async function handleMarkNodeNeedsReinforce(
+    node: { id: string },
+    needsReinforce: boolean
+  ) {
+    if (!plan) return;
+    try {
+      const updated = await markNodeNeedsReinforce(plan, node.id, needsReinforce);
+      setPlan(updated);
+      toast.success(
+        needsReinforce ? "已标记为「需要加强」" : "已取消「需要加强」标记"
+      );
+    } catch (e) {
+      toast.error("标记失败：" + (e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -571,6 +633,8 @@ export default function PlanDetailClient() {
           nodes={plan.knowledgeTree}
           onSelectNode={handleKnowledgeNodeSelect}
           selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
+          onMarkMastered={handleMarkNodeMastered}
+          onMarkNeedsReinforce={handleMarkNodeNeedsReinforce}
         />
       </div>
 
@@ -642,10 +706,11 @@ export default function PlanDetailClient() {
           </div>
           {/* Row 2: node filter + search */}
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
               value={filterNodeId}
               onChange={(e) => setFilterNodeId(e.target.value)}
-              className="text-xs border rounded px-2 py-1 bg-white"
+              inputSize="sm"
+              className="min-w-[140px]"
             >
               <option value="all">全部知识点</option>
               {plan.knowledgeTree.map((n) => (
@@ -653,13 +718,14 @@ export default function PlanDetailClient() {
                   {n.title}
                 </option>
               ))}
-            </select>
-            <input
+            </Select>
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索题目..."
-              className="text-xs border rounded px-2 py-1 flex-1 min-w-[120px]"
+              inputSize="sm"
+              className="flex-1 min-w-[120px]"
             />
             {(filterBigTech !== "all" ||
               filterDifficulty !== "all" ||
@@ -698,6 +764,8 @@ export default function PlanDetailClient() {
                 onFavoriteToggle={handleQuestionFavorite}
                 onRegenerate={handleRegenerate}
                 regenerating={regeneratingId === q.id}
+                onMarkUnderstood={handleMarkUnderstood}
+                onViewed={handleQuestionViewed}
               />
             </div>
           ))}
@@ -786,37 +854,35 @@ export default function PlanDetailClient() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm text-gray-600 block mb-1">学习主题</label>
-                  <input
+                  <Input
                     type="text"
                     value={regenTopic}
                     onChange={(e) => setRegenTopic(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={regeneratingPlan}
+                    placeholder="例如：React Hooks 深入"
                   />
                 </div>
 
                 <div className="flex gap-3">
                   <label className="flex-1">
                     <span className="text-sm text-gray-600 block mb-1">每日学习时间（分钟）</span>
-                    <input
+                    <Input
                       type="number"
                       value={regenDailyMinutes}
                       onChange={(e) => setRegenDailyMinutes(Number(e.target.value))}
                       min={15}
                       max={120}
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
                       disabled={regeneratingPlan}
                     />
                   </label>
                   <label className="flex-1">
                     <span className="text-sm text-gray-600 block mb-1">每日新内容数</span>
-                    <input
+                    <Input
                       type="number"
                       value={regenMaxNew}
                       onChange={(e) => setRegenMaxNew(Number(e.target.value))}
                       min={1}
                       max={5}
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
                       disabled={regeneratingPlan}
                     />
                   </label>
@@ -826,20 +892,15 @@ export default function PlanDetailClient() {
                   <label className="text-sm text-gray-600 block mb-1">
                     自定义提示词（可选）
                   </label>
-                  <textarea
+                  <Textarea
                     value={regenPrompt}
                     onChange={(e) => setRegenPrompt(e.target.value)}
                     placeholder="例如：请以大厂面试官视角拆解，重点考察高并发场景和源码原理"
                     rows={4}
                     maxLength={2000}
-                    className="w-full px-3 py-2 border rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    showCount
                     disabled={regeneratingPlan}
                   />
-                  {regenPrompt.trim() && (
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      {regenPrompt.length}/2000 字
-                    </p>
-                  )}
                 </div>
 
                 {regenPlanError && (
@@ -849,27 +910,24 @@ export default function PlanDetailClient() {
                 )}
 
                 <div className="flex items-center gap-2 pt-2">
-                  <button
+                  <Button
                     onClick={handleRegenPlan}
                     disabled={regeneratingPlan || !regenTopic.trim()}
-                    className="flex-1 py-2.5 bg-black text-white rounded-lg font-medium text-sm disabled:opacity-50 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                    loading={regeneratingPlan}
+                    leftIcon="refresh-cw"
+                    variant="dark"
+                    className="flex-1 py-2.5"
                   >
-                    {regeneratingPlan ? (
-                      <>
-                        <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        AI 生成中...
-                      </>
-                    ) : (
-                      <><Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 重新生成</>
-                    )}
-                  </button>
-                  <button
+                    {regeneratingPlan ? "AI 生成中..." : "重新生成"}
+                  </Button>
+                  <Button
                     onClick={() => setShowRegenModal(false)}
                     disabled={regeneratingPlan}
-                    className="px-4 py-2.5 text-sm text-gray-500 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    variant="secondary"
+                    className="py-2.5"
                   >
                     取消
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[11px] text-gray-400 text-center">
                   预计 30-90 秒，生成期间请勿关闭页面

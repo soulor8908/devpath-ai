@@ -7,10 +7,12 @@
 //   - fixed bottom-4 right-4 浮动卡片（避免遮挡底部导航，bottom-16 在移动端更安全）
 //   - 倒计时从 running session 的 startedAt + durationMinutes 计算
 //   - 每 1 秒轮询 getRunningSession() 更新倒计时
+//   - 监听 POMODORO_SESSION_CHANGED_EVENT 事件，session 变化时立即刷新（避免 1 秒延迟）
 //   - 暂停/恢复/放弃 三个按钮
 //   - 打断次数 > 0 时显示红色徽标
 //   - 无 running session 时不显示
 //   - dark mode 支持
+//   - z-index 高于 ChatModal（z-[60]），让聊天中启动番茄钟后用户能看到倒计时
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -20,9 +22,11 @@ import {
   pauseSession,
   resumeSession,
   abandonSession,
+  POMODORO_SESSION_CHANGED_EVENT,
 } from "@/lib/timer/pomodoro";
 import { notify } from "@/lib/timer/notification-permission";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { usePathname } from "next/navigation";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -46,6 +50,8 @@ export function PomodoroWidget() {
   const [busy, setBusy] = useState(false);
   // 用于在 session 切换时避免重复通知
   const notifiedRef = useRef<string | null>(null);
+  // 当前路由：在 /timer 页时不显示 widget（PomodoroFull 已接管，避免双重 UI）
+  const pathname = usePathname();
 
   const refresh = useCallback(async () => {
     const running = await getRunningSession();
@@ -69,11 +75,18 @@ export function PomodoroWidget() {
   useEffect(() => {
     // 首次立即拉一次
     void refresh();
-    // 每秒轮询
+    // 每秒轮询（兜底，处理倒计时刷新）
     const timer = setInterval(() => {
       void refresh();
     }, 1000);
-    return () => clearInterval(timer);
+    // 监听 session 变化事件：session 创建/完成/放弃/暂停/恢复时立即刷新
+    // 把响应延迟从 1 秒降到 <100ms，让"AI 启动番茄钟" → "看到倒计时" 体验流畅
+    const onSessionChanged = () => { void refresh(); };
+    window.addEventListener(POMODORO_SESSION_CHANGED_EVENT, onSessionChanged);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(POMODORO_SESSION_CHANGED_EVENT, onSessionChanged);
+    };
   }, [refresh]);
 
   async function handlePauseResume() {
@@ -110,13 +123,14 @@ export function PomodoroWidget() {
     }
   }
 
-  if (!session) return null;
+  // 无 running session 不显示；/timer 页有 PomodoroFull 接管，避免双重 UI
+  if (!session || pathname === "/timer") return null;
 
   const isPaused = session.status === "paused";
   const isOvertime = remainingMs <= 0 && session.status === "running";
 
   return (
-    <div className="fixed bottom-20 right-4 z-40 w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 space-y-2">
+    <div className="fixed bottom-20 right-4 z-[80] w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 space-y-2">
       {/* 顶部：任务描述 + 打断徽标 */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">

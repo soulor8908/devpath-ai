@@ -4,6 +4,7 @@ import { Nav } from "@/components/Nav";
 import { ToastContainer } from "@/components/Toast";
 import { FloatingChat } from "@/components/FloatingChat";
 import { AITaskModal } from "@/components/AITaskModal";
+import { PomodoroWidget } from "@/components/PomodoroWidget";
 
 export const metadata: Metadata = {
   title: "devpath-ai — AI 驱动的开发者成长 OS",
@@ -46,6 +47,9 @@ export default function RootLayout({
         <AITaskModal />
         <Nav />
         <FloatingChat />
+        {/* 全局浮动番茄钟 widget：仅在 running session 存在且不在 /timer 页时显示
+            z-index 高于 FloatingChat/ChatModal（z-[60]），让聊天中启动番茄钟后用户能看到倒计时 */}
+        <PomodoroWidget />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {

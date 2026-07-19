@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import type { Question } from "@/lib/types";
 import { AnswerContent, CodeBlock } from "@/components/CodeBlock";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui";
 import { createCard, findExistingCard } from "@/lib/fsrs";
 import { setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
+import { openChatModal } from "@/lib/chat-modal-store";
 
 // 停留时间阈值（毫秒）
 const DWELL_TOO_SIMPLE_MS = 3_000;   // < 3s → 太简单
@@ -23,12 +23,16 @@ interface Props {
   onRegenerate?: (questionId: string) => void;
   regenerating?: boolean;
   onFollowUpClick?: (followUp: string) => void;
+  /** 用户主动反馈"看懂了 / 再想想"（写回 plan + LearnLog） */
+  onMarkUnderstood?: (questionId: string, understood: boolean) => void;
+  /** 隐式反馈：用户首次展开答案查看（写回 plan.viewed + LearnLog） */
+  onViewed?: (questionId: string) => void;
 }
 
-export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate, regenerating, onFollowUpClick }: Props) {
-  const router = useRouter();
+export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate, regenerating, onFollowUpClick, onMarkUnderstood, onViewed }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isFailed = question.question === "生成失败，点击重试";
+  const isUnderstood = question.understood === true;
 
   // 停留时间追踪：记录答案展开的时间戳
   const expandTimeRef = useRef<number | null>(null);
@@ -69,7 +73,15 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
     if (onFollowUpClick) {
       onFollowUpClick(fu);
     } else {
-      router.push(`/chat?prefill=${encodeURIComponent(fu)}&sourceType=question&sourceId=${question.id}&sourceTitle=${encodeURIComponent(question.question)}`);
+      // 统一通过 chat-modal-store 打开聊天弹窗（不再走 /chat 路由）
+      openChatModal({
+        prefill: fu,
+        source: {
+          type: "question",
+          id: question.id,
+          title: question.question,
+        },
+      });
     }
   };
 
@@ -82,6 +94,10 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               trackImplicit("expanded");
               expandTimeRef.current = Date.now();
               dwellTrackedRef.current = false;
+              // 隐式反馈：首次展开答案 → 通知父组件记录 viewed
+              if (!question.viewed && onViewed) {
+                onViewed(question.id);
+              }
             } else {
               trackDwell();
               expandTimeRef.current = null;
@@ -93,6 +109,14 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           {question.bigTech && (
             <span className="inline-block px-1.5 py-0.5 mr-2 text-[10px] bg-amber-100 text-amber-700 rounded font-medium align-middle">
               <Icon name="building" className="w-3 h-3 inline-block align-middle" /> 大厂
+            </span>
+          )}
+          {isUnderstood && (
+            <span
+              className="inline-block px-1.5 py-0.5 mr-2 text-[10px] bg-green-100 text-green-700 rounded font-medium align-middle"
+              title="已看懂"
+            >
+              ✓ 看懂
             </span>
           )}
           {question.question}
@@ -173,6 +197,46 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               onCopy={() => trackImplicit("copied")}
             />
           )}
+          {/* 学习反馈：看懂了 / 再想想（写回 plan + LearnLog） */}
+          {onMarkUnderstood && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500 mr-1">这篇答案：</span>
+              <button
+                type="button"
+                onClick={() => onMarkUnderstood(question.id, !isUnderstood)}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                  isUnderstood
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-white border border-green-300 text-green-700 hover:bg-green-50"
+                }`}
+                title={isUnderstood ? "取消「看懂了」标记" : "标记为已看懂"}
+              >
+                {isUnderstood ? "✓ 看懂了" : "看懂了"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // 再想想 = 取消看懂 + 提示用户可追问
+                  if (isUnderstood) {
+                    onMarkUnderstood(question.id, false);
+                  }
+                }}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                  !isUnderstood
+                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                }`}
+                title="再想想（取消看懂，可点追问继续问 AI）"
+              >
+                再想想
+              </button>
+              {isUnderstood && (
+                <span className="text-xs text-green-600 ml-1">
+                  · 已记录掌握
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -183,6 +247,10 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
               trackImplicit("expanded");
               expandTimeRef.current = Date.now();
               dwellTrackedRef.current = false;
+              // 隐式反馈：首次展开答案 → 通知父组件记录 viewed
+              if (!question.viewed && onViewed) {
+                onViewed(question.id);
+              }
               setExpanded(true);
             }}
             variant="ghost"

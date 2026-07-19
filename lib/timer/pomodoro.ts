@@ -33,6 +33,19 @@ export interface CreateSessionParams {
   energyBefore?: number;
 }
 
+/** 全局事件名：session 列表发生变化时由 mutation 函数派发，widget 监听后立即刷新 */
+export const POMODORO_SESSION_CHANGED_EVENT = "pomodoro:session-changed";
+
+/** 派发 session 变化事件，让监听方（如 PomodoroWidget）立即刷新，避免 1 秒轮询延迟 */
+function notifySessionChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(POMODORO_SESSION_CHANGED_EVENT));
+  } catch {
+    // window.dispatchEvent 在极端环境下可能抛错，忽略避免影响主流程
+  }
+}
+
 /**
  * 创建并持久化一个新 session
  * - status=running
@@ -58,6 +71,7 @@ export async function createSession(
     pausedMinutes: 0,
   };
   await setItem(KEY_PREFIXES.POMODORO_SESSION + session.id, session);
+  notifySessionChanged();
   return session;
 }
 
@@ -111,6 +125,7 @@ export async function completeSession(
     // fire-and-forget：不阻塞番茄完成主流程，失败由内部 try/catch 静默
     void refreshAverageSessionMinutes();
   }
+  notifySessionChanged();
 }
 
 /**
@@ -141,6 +156,7 @@ export async function abandonSession(
     // 仅记录到控制台，不持久化（避免污染日志数据）
     console.info(`[pomodoro] session ${id} abandoned: ${reason}`);
   }
+  notifySessionChanged();
 }
 
 /**
@@ -157,6 +173,7 @@ export async function pauseSession(id: string): Promise<void> {
     ...session,
     status: "paused",
   });
+  notifySessionChanged();
 }
 
 /**
@@ -173,6 +190,7 @@ export async function resumeSession(id: string): Promise<void> {
     ...session,
     status: "running",
   });
+  notifySessionChanged();
 }
 
 /**

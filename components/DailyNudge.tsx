@@ -8,6 +8,12 @@
 //   2. 检查 IndexedDB 当天缓存，命中直接渲染
 //   3. 未命中 → 调 /api/daily-nudge → 缓存 → 渲染
 //   4. 用户可点刷新按钮强制重新生成（更新缓存）
+//
+// 反馈方式（设计原则：系统默认动作不阻塞用户）：
+//   - 自动触发（首次进入首页 cache miss）：用卡片自身的 inline loader + toast 反馈
+//     不弹 AITaskModal（模态框是"用户主动发起且必须等待"的场景，系统主动建议不该用）
+//   - 手动触发（用户点"换一个"）：也走 inline loader，避免遮挡用户视线
+//   - 失败：toast.error + 卡片内显示重试按钮
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getItem, setItem } from "@/lib/storage/db";
@@ -15,6 +21,7 @@ import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow } from "@/lib/time";
 import { buildChatContext } from "@/lib/ai/chat-context";
 import { aiFetch } from "@/lib/api-client";
+import { toast } from "@/lib/toast";
 import {
   recordAICall,
   trackAIFeedback,
@@ -24,7 +31,6 @@ import {
   generateCallId,
 } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
-import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 interface NudgePayload {
   nudge: string;
@@ -81,13 +87,13 @@ export function DailyNudge() {
       }
 
       // 3. 调 API + AI 质量追踪
-      const { id: aiTaskId, signal: aiSignal } = startAITask("AI 准备今日建议");
+      // 不再使用 startAITask（模态弹框）—— 系统默认动作不应阻塞用户
+      // 进度反馈由卡片自身 inline loader 承担，完成/失败用 toast 提示
       const newCallId = generateCallId();
       const stopTimer = startTimer();
       try {
         const res = await aiFetch("/api/daily-nudge", {
           method: "POST",
-          signal: aiSignal,
           body: JSON.stringify({ contextSnapshot }),
         });
 
@@ -119,11 +125,16 @@ export function DailyNudge() {
         } catch {
           /* 缓存写入失败忽略 */
         }
-        setAITaskContent(aiTaskId, "今日建议已生成");
-        completeAITask(aiTaskId);
+        // 仅强制刷新时弹 toast（让用户知道"换一个"成功）；
+        // 自动触发不弹 toast（卡片本身已显示就是反馈，避免打扰）
+        if (forceRefresh) {
+          toast.success("今日建议已更新");
+        }
       } catch (e) {
-        errorAITask(aiTaskId, e instanceof Error ? e.message : String(e));
-        setError(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        // 失败用 toast 反馈（非阻塞，用户可继续浏览其他内容）
+        toast.error(`AI 提醒加载失败：${msg}`);
       } finally {
         setLoading(false);
       }

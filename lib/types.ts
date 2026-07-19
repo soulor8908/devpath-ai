@@ -50,7 +50,23 @@ export interface KnowledgeNode {
   prerequisites: string[];
   frequency: "高" | "中" | "低";
   summary: string;
+  /**
+   * 掌握度（0-100）。
+   *
+   * 设计变更（学习反馈闭环）：
+   *   - 旧实现：直接存储数值，但创建后从未更新 → 永远 0% 的"数据干尸"
+   *   - 新实现：派生字段，由 computeNodeMastery(node, questions) 计算
+   *     （understood 题目数 / 总题目数 * 100）
+   *   - 此字段保留是为了向后兼容（旧 IndexedDB 数据），但 UI 应优先用 computeNodeMastery
+   *     而非直接读这个字段
+   */
   mastery: number;
+  /** 用户主观标记"已掌握"（与派生 mastery 互补：mastery 是客观题数比，mastered 是用户主观判断） */
+  mastered?: boolean;
+  /** 标记掌握的时间（ISO 字符串） */
+  masteredAt?: string;
+  /** 用户主动标记"需要加强"（薄弱点反馈，影响 AI 上下文与 FSRS 复习调度） */
+  needsReinforce?: boolean;
   customOrder?: number;
   // 大厂高频考点标记（true = 互联网大厂面试重点考察）
   bigTech?: boolean;
@@ -71,6 +87,18 @@ export interface Question {
   bigTech?: boolean;
   // 关联 AI 调用记录 ID（用于反馈归因，仅客户端重新生成时填充）
   aiCallId?: string;
+  /**
+   * 答案生成失败的错误信息（流式生成失败时填充）。
+   * 含此字段表示该题答案未成功生成，不应进入复习卡池，也不应缓存到正式计划。
+   * 用户可在详情页用"继续生成"重试，成功后此字段应被清除。
+   */
+  answerError?: string;
+  /** 用户展开过答案（隐式反馈：用户看过这道题的解答） */
+  viewed?: boolean;
+  viewedAt?: string;
+  /** 用户主动点"看懂了"（显式正向反馈，参与 computeNodeMastery 计算） */
+  understood?: boolean;
+  understoodAt?: string;
 }
 
 // 试题集收藏

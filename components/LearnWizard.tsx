@@ -95,40 +95,48 @@ export function LearnWizard({
   const didInitRef = useRef(false);
 
   // ---- Step 1: 拆知识点 ----
-  const fetchKnowledge = useCallback(async () => {
-    setLoading(true);
-    const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在拆解知识点");
-    try {
-      const res = await aiFetch("/api/learn/knowledge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          prompt: promptText.trim() || undefined,
-        }),
-        signal: aiSignal,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `请求失败 (${res.status})`);
+  // 设计原则：自动触发（首次挂载无草稿）不弹 AITaskModal，避免系统默认动作阻塞用户
+  // 仅手动触发（用户主动点"重新生成"按钮）才弹 AITaskModal
+  const fetchKnowledge = useCallback(
+    async (opts?: { manual?: boolean }): Promise<void> => {
+      setLoading(true);
+      // 手动触发才弹模态框；自动触发用 inline loader + toast 反馈
+      const aiTask = opts?.manual ? startAITask("AI 正在拆解知识点") : null;
+      try {
+        const res = await aiFetch("/api/learn/knowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: topic.trim(),
+            prompt: promptText.trim() || undefined,
+          }),
+          signal: aiTask?.signal,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `请求失败 (${res.status})`);
+        }
+        const data = (await res.json()) as { nodes: KnowledgeNode[] };
+        if (!data.nodes || data.nodes.length === 0) {
+          throw new Error("AI 未返回知识点，请重试或调整提示词");
+        }
+        setNodes(data.nodes);
+        await recordInputHistory(topic.trim()).catch(() => {});
+        toast.success(`已拆解 ${data.nodes.length} 个知识点`);
+        if (aiTask) {
+          setAITaskContent(aiTask.id, `已拆解 ${data.nodes.length} 个知识点`);
+          completeAITask(aiTask.id);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "未知错误";
+        toast.error(`知识点拆解失败：${msg}`);
+        if (aiTask) errorAITask(aiTask.id, msg);
+      } finally {
+        setLoading(false);
       }
-      const data = (await res.json()) as { nodes: KnowledgeNode[] };
-      if (!data.nodes || data.nodes.length === 0) {
-        throw new Error("AI 未返回知识点，请重试或调整提示词");
-      }
-      setNodes(data.nodes);
-      await recordInputHistory(topic.trim()).catch(() => {});
-      toast.success(`已拆解 ${data.nodes.length} 个知识点`);
-      setAITaskContent(aiTaskId, `已拆解 ${data.nodes.length} 个知识点`);
-      completeAITask(aiTaskId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "未知错误";
-      toast.error(`知识点拆解失败：${msg}`);
-      errorAITask(aiTaskId, msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [topic, promptText]);
+    },
+    [topic, promptText],
+  );
 
   // 首次挂载：优先恢复草稿，无草稿才自动开始拆知识点
   useEffect(() => {
@@ -155,6 +163,7 @@ export function LearnWizard({
       } catch {
         // 草稿读取失败：静默回退到自动抓取
       }
+      // 自动触发：不弹模态框
       void fetchKnowledge();
     })();
   // 仅挂载时执行一次：fetchKnowledge 通过 didInitRef 守卫避免 StrictMode 双触发
@@ -251,16 +260,34 @@ export function LearnWizard({
         if (!chunk.questionId) return;
         const idx = updated.findIndex((q) => q.id === chunk.questionId);
         if (idx >= 0) {
-          updated[idx] = {
-            ...updated[idx],
-            answer: chunk.answer ?? "",
-          };
-          if (chunk.error) errors++;
+          // 关键修复：失败 chunk 不写 answer 字段（避免把"失败"和"空成功"混淆）
+          // 旧实现 `answer: chunk.answer ?? ""` 让失败 chunk 的 answer 变成 ""，
+          // 后续 saveAndRedirect 把含空 answer 的题目写入 IndexedDB → "失败数据被缓存"。
+          // 现在：失败只更新 failed/answerError 字段，answer 保持 undefined，
+          // saveAndRedirect 会过滤 failed 题目（不写入正式计划），草稿同理跳过。
+          if (chunk.error) {
+            errors++;
+            updated[idx] = {
+              ...updated[idx],
+              // 标记失败但不写 answer 字段；用户可在详情页用"继续生成"重试
+              answerError: chunk.error,
+            };
+          } else {
+            updated[idx] = {
+              ...updated[idx],
+              answer: chunk.answer ?? "",
+              // 清除可能的失败标记（重试成功场景）
+              answerError: undefined,
+            };
+          }
           done++;
           setAnswerProgress({ done, total: questions.length });
           setAnswerErrors(errors);
           setQuestions([...updated]);
-          appendAITaskContent(aiTaskId, `Q${idx + 1}: ${chunk.answer ?? ""}\n\n`);
+          // 仅成功时把内容追加到 AITask 显示区，失败用 errors 计数器表达
+          if (!chunk.error) {
+            appendAITaskContent(aiTaskId, `Q${idx + 1}: ${chunk.answer ?? ""}\n\n`);
+          }
         }
       };
 
@@ -304,11 +331,15 @@ export function LearnWizard({
       const sorted = topoSort(nodes);
       const schedule = allocateDaily(sorted, dailyMinutes, maxNewPerDay);
       const now = nowISO();
+      // 关键修复：过滤掉答案生成失败的题目（answerError 字段存在 = 失败）
+      // 旧实现把含空 answer 的题目也写入计划 → "失败数据被缓存"
+      // 现在：只保存成功的题目，失败题目不进入正式计划（用户可在详情页重新生成）
+      const validQuestions = questions.filter((q) => !q.answerError);
       const plan: LearningPlan = {
         id: nanoid(),
         topic: topic.trim(),
         knowledgeTree: nodes,
-        questions,
+        questions: validQuestions,
         schedule,
         dailyMinutes,
         maxNewPerDay,
@@ -334,7 +365,15 @@ export function LearnWizard({
         });
         if (ok) await clearDemoData();
       }
-      toast.success("学习计划已创建");
+      // 若有失败题目被过滤，明确告知用户
+      const filteredCount = questions.length - validQuestions.length;
+      if (filteredCount > 0) {
+        toast.success(
+          `学习计划已创建（${filteredCount} 题答案生成失败已跳过，可在详情页重新生成）`,
+        );
+      } else {
+        toast.success("学习计划已创建");
+      }
       router.push(`/learn/${plan.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";
@@ -418,7 +457,7 @@ export function LearnWizard({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">知识点拆解</h2>
             <Button
-              onClick={fetchKnowledge}
+              onClick={() => void fetchKnowledge({ manual: true })}
               variant="ghost"
               size="sm"
               loading={loading}
@@ -669,16 +708,21 @@ export function LearnWizard({
             ))}
           </ul>
 
-          {/* 完成 → 保存（允许部分答案未生成：进入详情页可继续生成） */}
+          {/* 完成 → 保存（失败题目会被自动过滤，不写入正式计划；可在详情页重新生成） */}
           {!loading && answerProgress.total > 0 && (
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex flex-col items-end gap-1 pt-2">
+              {answerErrors > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {answerErrors} 题答案生成失败，保存时将自动跳过（可在详情页重新生成）
+                </p>
+              )}
               <Button
                 onClick={saveAndRedirect}
                 variant="dark"
                 size="md"
               >
-                {answerProgress.done < answerProgress.total ? (
-                  `完成（${answerProgress.total - answerProgress.done} 题未生成答案）`
+                {answerErrors > 0 ? (
+                  `确认完成（跳过 ${answerErrors} 题失败答案）`
                 ) : (
                   <>确认完成 → 创建学习计划 <Icon name="check" className="w-4 h-4 inline-block" /></>
                 )}

@@ -9,6 +9,7 @@ import { listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type LearnStats } from "@/lib/types";
 import { computeStats } from "@/lib/learn-log";
 import { Icon, type IconName } from "@/components/Icon";
+import { openChatModal } from "@/lib/chat-modal-store";
 
 // 格式化日期为 YYYY-MM-DD（本地时区）
 function formatDate(d: Date): string {
@@ -169,7 +170,6 @@ export default function DashboardClient() {
       <div className="flex flex-wrap gap-2 mb-6">
         {([
           { href: "/learn", icon: "book", label: "学习计划" },
-          { href: "/chat", icon: "chat", label: "AI 聊天" },
           { href: "/stats", icon: "trending-up", label: "学习统计" },
           { href: "/stats/ai-quality", icon: "sparkles", label: "AI 质量" },
           { href: "/daily", icon: "calendar", label: "每日日志" },
@@ -185,6 +185,15 @@ export default function DashboardClient() {
             {item.label}
           </Link>
         ))}
+        {/* AI 聊天：通过全局 chat-modal-store 打开弹窗，不再走 /chat 路由 */}
+        <button
+          type="button"
+          onClick={() => openChatModal()}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+        >
+          <Icon name="chat" className="w-3.5 h-3.5" />
+          AI 聊天
+        </button>
       </div>
 
       {/* 统计卡片 */}

@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * E2E 主流程：底部导航栏在核心页面间切换
  * 只测 UI 导航，不测 AI 生成（需 API Key）
  *
- * 流程：首页(今日) → 学习 → 复习 → 聊天(AI) → 我的
+ * 流程：首页(今日) → 学习 → 复习 → 我的（聊天已统一为弹窗，由浮动按钮触发）
  *
  * 环境说明：
  *   - 此测试套件需要 Playwright 浏览器已安装（`npx playwright install chromium`）
@@ -90,16 +90,18 @@ test.describe('主流程：底部导航切换', () => {
     await expect(page.getByText('加载复习卡片...')).toBeHidden({ timeout: 15_000 });
   });
 
-  test('通过底部导航切换到聊天页', async ({ page }) => {
+  test('通过浮动按钮打开 AI 对话弹窗', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: '今日', exact: true })).toBeVisible();
 
-    // 聊天页 nav label 为「AI」
-    await page.getByRole('link', { name: 'AI' }).first().click();
-    await expect(page).toHaveURL(/\/chat$/);
-    // 聊天页默认标题「新对话」（加载完成后）
+    // /chat 路由已删除，统一为弹窗：点击右下角浮动按钮打开
+    await page.getByRole('button', { name: '打开 AI 对话' }).click();
+    // 弹窗 header 显示「AI 对话」
+    await expect(page.getByRole('heading', { name: 'AI 对话' })).toBeVisible();
+    // 加载完成后默认进入空状态或最近对话
     await expect(page.getByText('加载中...')).toBeHidden({ timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: '新对话' })).toBeVisible();
+    // 关闭按钮可见
+    await expect(page.getByRole('button', { name: '关闭对话' })).toBeVisible();
   });
 
   test('通过底部导航切换到我的页', async ({ page }) => {
@@ -111,7 +113,7 @@ test.describe('主流程：底部导航切换', () => {
     await expect(page.getByRole('heading', { name: '我的', exact: true })).toBeVisible();
   });
 
-  test('完整流程：首页 → 学习 → 复习 → 聊天 → 我的', async ({ page }) => {
+  test('完整流程：首页 → 学习 → 复习 → 我的', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: '今日', exact: true })).toBeVisible();
 
@@ -125,11 +127,10 @@ test.describe('主流程：底部导航切换', () => {
     await expect(page).toHaveURL(/\/review$/);
     await expect(page.getByText('加载复习卡片...')).toBeHidden({ timeout: 15_000 });
 
-    // → 聊天
-    await page.getByRole('link', { name: 'AI' }).first().click();
-    await expect(page).toHaveURL(/\/chat$/);
-    await expect(page.getByText('加载中...')).toBeHidden({ timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: '新对话' })).toBeVisible();
+    // /chat 路由已删除，统一为弹窗；这里改为通过浮动按钮验证聊天可用
+    await page.getByRole('button', { name: '打开 AI 对话' }).click();
+    await expect(page.getByRole('heading', { name: 'AI 对话' })).toBeVisible();
+    await page.getByRole('button', { name: '关闭对话' }).click();
 
     // → 我的
     await page.getByRole('link', { name: '我的' }).first().click();

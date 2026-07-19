@@ -101,11 +101,12 @@ export default function DailyPage() {
       {error && <p className="text-red-500 text-xs">{error}</p>}
 
       <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-        <input
+        <Input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="text-sm border rounded px-2 py-1 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+          inputSize="sm"
+          className="max-w-[180px]"
         />
         {!hasData && (
           <span className="ml-2 text-xs text-gray-400">（新日志）</span>

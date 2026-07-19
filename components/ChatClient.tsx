@@ -1,10 +1,16 @@
 "use client";
 
-// app/chat/ChatClient.tsx
+// components/ChatClient.tsx
 // AI 聊天界面：支持多对话管理、流式响应、历史搜索、提示词库、模型选择
+//
+// 路由变更说明：
+//   - 已删除 /chat 路由，统一为聊天弹窗（ChatModal）
+//   - ChatClient 不再使用 useRouter / useSearchParams / router.replace
+//   - prefill / source 等参数通过 props 从父组件（FloatingChat）传入，
+//     父组件消费 lib/chat-modal-store 全局 store
+//   - 任何想"打开聊天 + 预填充"的业务方调用 openChatModal({ prefill, source })
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { aiFetch } from "@/lib/api-client";
 import {
@@ -63,10 +69,27 @@ const BUILTIN_PROMPTS = [
   "常见误区有哪些",
 ];
 
-export default function ChatClient() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export interface ChatClientProps {
+  /** 预填充文本（追问场景：自动塞入输入框，用户编辑后发送）。每次变化触发新一轮 prefill。 */
+  prefill?: string;
+  /** 预填充来源（题目/知识点），写入 Conversation.source 用于归因 */
+  source?: ChatSource;
+  /**
+   * prefill 序号（来自 chat-modal-store 的 seq）。
+   * 父组件每次 openChatModal 调用都递增 seq，ChatClient 通过比较 seq 知道"新一轮 prefill"。
+   * 同一 seq 只消费一次，避免 StrictMode 双调用导致重复 setInput。
+   */
+  prefillSeq?: number;
+  /** ChatClient 消费完 prefill 后通知父组件清空 store（避免关闭重开后重复消费） */
+  onPrefillConsumed?: () => void;
+}
 
+export default function ChatClient({
+  prefill,
+  source,
+  prefillSeq,
+  onPrefillConsumed,
+}: ChatClientProps = {}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -89,9 +112,11 @@ export default function ChatClient() {
   const aiCallIdMap = useRef<Map<string, string>>(new Map());
   // 初始加载守卫：避免在 modal 反复挂载/卸载或 StrictMode 双调用时重复自动选中最近对话
   const initialRestoreDone = useRef(false);
-  // 预填充来源信息：当通过 URL 参数 prefill 进入新对话时，暂存来源（题目/知识点），
+  // 预填充来源信息：当通过 props prefill 进入新对话时，暂存来源（题目/知识点），
   // 供 handleSend 创建对话时写入 Conversation.source
   const pendingSourceRef = useRef<ChatSource | null>(null);
+  // 已消费的 prefillSeq（避免同一 seq 重复 setInput）
+  const consumedSeqRef = useRef<number | undefined>(undefined);
   // 当前流式请求的 AbortController：streaming 时用于「中止」按钮
   // （聊天场景不使用全局 AITaskModal，流式输出本身即用户反馈）
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -140,50 +165,22 @@ export default function ChatClient() {
         setModelConfigs(configs);
         setSelectedModelId(defaultCfg?.id ?? "");
 
-        const convId = searchParams.get("conversationId");
-        const prefill = searchParams.get("prefill");
-        const sourceType = searchParams.get("sourceType");
-        const sourceId = searchParams.get("sourceId");
-        const sourceTitle = searchParams.get("sourceTitle");
-        if (convId) {
-          const conv = await getConversation(convId);
-          if (cancelled) return;
-          if (conv) {
-            await loadConversation(conv);
-            if (conv.modelConfigId) setSelectedModelId(conv.modelConfigId);
-          }
-        } else if (prefill) {
+        // prefill 通过 props 注入（chat-modal-store），不再走 URL searchParams
+        if (prefill) {
           // prefill 存在 → 开启新对话，不恢复最近一条对话（追问场景）
           initialRestoreDone.current = true;
-          if (
-            sourceType === "question" ||
-            sourceType === "knowledge" ||
-            sourceType === "manual"
-          ) {
-            // 暂存来源信息，供 handleSend 创建对话时写入 Conversation.source
-            let decodedTitle = "";
-            try {
-              decodedTitle = sourceTitle ? decodeURIComponent(sourceTitle) : "";
-            } catch {
-              decodedTitle = sourceTitle ?? "";
-            }
-            pendingSourceRef.current = {
-              type: sourceType,
-              id: sourceId ?? "",
-              title: decodedTitle,
-            };
+          if (source) {
+            pendingSourceRef.current = source;
           }
           setActiveConv(null);
           setMessages([]);
-          try {
-            setInput(decodeURIComponent(prefill));
-          } catch {
-            setInput(prefill);
-          }
-          // 清理 URL 参数，避免刷新后重复 prefill
-          router.replace("/chat");
+          setInput(prefill);
+          // 标记 seq 已消费
+          consumedSeqRef.current = prefillSeq;
+          // 通知父组件清空 store 中的 prefill/source（避免重复消费）
+          onPrefillConsumed?.();
         } else if (!initialRestoreDone.current) {
-          // 无显式 conversationId（如模态模式直接打开）：默认恢复最近一条对话
+          // 无 prefill（用户直接点浮动按钮打开）：默认恢复最近一条对话
           initialRestoreDone.current = true;
           if (convs.length > 0) {
             const latest = convs[0]; // listConversations 已按 pinned + lastMessageAt desc 排序
@@ -201,6 +198,23 @@ export default function ChatClient() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 监听 prefillSeq 变化（弹窗已打开时，用户从外部再次"追问"触发 openChatModal）
+  // 同一 seq 只消费一次，避免 StrictMode 双调用导致重复 setInput
+  useEffect(() => {
+    if (prefillSeq === undefined) return;
+    if (consumedSeqRef.current === prefillSeq) return;
+    if (!prefill) return;
+    consumedSeqRef.current = prefillSeq;
+    // 新一轮 prefill：开新对话 + 填入输入框
+    initialRestoreDone.current = true;
+    if (source) pendingSourceRef.current = source;
+    setActiveConv(null);
+    setMessages([]);
+    setInput(prefill);
+    onPrefillConsumed?.();
+    inputRef.current?.focus();
+  }, [prefillSeq, prefill, source, onPrefillConsumed]);
 
   // 实时搜索历史
   const filteredConversations = (() => {
@@ -366,16 +380,21 @@ export default function ChatClient() {
               node_id?: string;
             };
             // 通过 createSession 写入 status=running 的 PomodoroSession，
-            // key 前缀为 KEY_PREFIXES.POMODORO_SESSION，getRunningSession() 可直接扫描到
-            const session = await createSession({
+            // key 前缀为 KEY_PREFIXES.POMODORO_SESSION，getRunningSession() 可直接扫描到。
+            // createSession 内部会派发 POMODORO_SESSION_CHANGED_EVENT 事件，
+            // 全局挂载的 PomodoroWidget 监听该事件后立即显示浮动倒计时（z-index 高于 ChatModal）。
+            // 不再使用 window.location.href 硬跳转 —— 那会销毁聊天模态、中断流式响应，
+            // 与"AI 唤起番茄钟"的体验相悖。
+            await createSession({
               taskDescription: params.task_description,
               type: "focus",
               durationMinutes: params.duration_minutes,
               planId: params.plan_id,
               nodeId: params.node_id,
             });
-            // 跳转到番茄钟页（/timer），由 PomodoroFull 读取 running session 接管
-            window.location.href = `/timer?session=${session.id}`;
+            toast.success(
+              `番茄钟已启动：${params.task_description}（${params.duration_minutes} 分钟）`,
+            );
             success = true;
             break;
           }
@@ -476,11 +495,9 @@ export default function ChatClient() {
       setShowHistory(false);
       await loadConversation(conv);
       if (conv.modelConfigId) setSelectedModelId(conv.modelConfigId);
-      const params = new URLSearchParams();
-      params.set("conversationId", conv.id);
-      router.replace(`/chat?${params.toString()}`);
+      // 路由模式已移除：不再用 router.replace 同步 URL（弹窗模式下用户看不到 URL）
     },
-    [loadConversation, router]
+    [loadConversation]
   );
 
   // 新建对话
@@ -490,9 +507,8 @@ export default function ChatClient() {
     setInput("");
     setShowHistory(false);
     setError(null);
-    router.replace("/chat");
     inputRef.current?.focus();
-  }, [router]);
+  }, []);
 
   // 删除对话
   const handleDelete = useCallback(
@@ -824,9 +840,7 @@ export default function ChatClient() {
         });
         pendingSourceRef.current = null;
         setActiveConv(conv);
-        const params = new URLSearchParams();
-        params.set("conversationId", conv.id);
-        router.replace(`/chat?${params.toString()}`);
+        // 路由模式已移除：不再用 router.replace 同步 conversationId
       }
 
       // 保存用户消息
@@ -871,7 +885,6 @@ export default function ChatClient() {
     selectedModelId,
     refreshConversations,
     streamAIResponse,
-    router,
   ]);
 
   // 重新生成：以 user 消息为锚点，删除其后的 AI 回复及后续消息，用该 user 消息重新请求 AI
