@@ -12,11 +12,9 @@
 //   - <textarea\s 或 <textarea>
 //   - <button\s 或 <button>
 //
-// 当前状态：过渡期。strict 测试 skip 中，先打印遗漏清单。
-// Task 18 启用 strict 模式后，任何遗漏都会让 CI 失败。
-//
 // 卡帕西视角：测试即文档。这个测试告诉所有人"在 ui/ 之外禁止原生表单元素"，
 // 比 100 行代码评审更可靠 — 因为它在每次 CI 都跑。
+// 一旦 strict 启用，任何遗漏都会让 CI 失败，确保不会再次出现"前几次没改干净"的情况。
 
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -119,7 +117,7 @@ function collectViolations(): Violation[] {
 }
 
 describe("no native form elements outside components/ui/", () => {
-  it.skip("【strict，Task 18 启用】不允许在 components/ui/ 之外使用原生 <input>/<select>/<textarea>/<button>", () => {
+  it("不允许在 components/ui/ 之外使用原生 <input>/<select>/<textarea>/<button>", () => {
     const violations = collectViolations();
     if (violations.length > 0) {
       const msg = violations
@@ -136,26 +134,5 @@ describe("no native form elements outside components/ui/", () => {
       );
     }
     expect(violations).toHaveLength(0);
-  });
-
-  it("【过渡】打印当前遗漏清单（Task 18 删除此测试）", () => {
-    const violations = collectViolations();
-    if (violations.length > 0) {
-      // 按 file 分组打印，便于查看
-      const byFile = new Map<string, number>();
-      for (const v of violations) {
-        byFile.set(v.file, (byFile.get(v.file) ?? 0) + 1);
-      }
-      const summary = Array.from(byFile.entries())
-        .map(([f, n]) => `  ${f}  (${n} 处)`)
-        .join("\n");
-      console.log(
-        `📋 当前还有 ${violations.length} 处原生表单元素需要替换，分布：\n${summary}`,
-      );
-    } else {
-      console.log("✅ 无原生表单元素遗漏，可以启用 strict 模式了");
-    }
-    // 不抛错，只打印 — 让后续任务逐步消除
-    expect(true).toBe(true);
   });
 });
