@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface FloatingChatButtonProps {
   onOpen: () => void;
@@ -161,8 +162,10 @@ export function FloatingChatButton({ onOpen }: FloatingChatButtonProps) {
       : undefined;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="dark"
+      size="lg"
+      iconOnly
       aria-label="打开 AI 对话"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -174,6 +177,6 @@ export function FloatingChatButton({ onOpen }: FloatingChatButtonProps) {
       }`}
     >
       <Icon name="chat" className="w-6 h-6" />
-    </button>
+    </Button>
   );
 }
