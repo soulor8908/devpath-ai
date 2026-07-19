@@ -35,11 +35,11 @@ interface KnowledgeTreeProps {
 }
 
 const DIFFICULTY_COLORS: Record<number, string> = {
-  1: "bg-green-100 text-green-700",
-  2: "bg-blue-100 text-blue-700",
-  3: "bg-yellow-100 text-yellow-700",
-  4: "bg-orange-100 text-orange-700",
-  5: "bg-red-100 text-red-700",
+  1: "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300",
+  2: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
+  3: "bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300",
+  4: "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300",
+  5: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300",
 };
 
 const DIFFICULTY_LABELS: Record<number, string> = {
@@ -51,9 +51,9 @@ const DIFFICULTY_LABELS: Record<number, string> = {
 };
 
 const FREQ_COLORS: Record<string, string> = {
-  高: "bg-red-50 text-red-600",
-  中: "bg-yellow-50 text-yellow-600",
-  低: "bg-gray-50 text-gray-500",
+  高: "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400",
+  中: "bg-yellow-50 dark:bg-yellow-950 text-yellow-600 dark:text-yellow-400",
+  低: "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 
 export function KnowledgeTree({
@@ -132,7 +132,7 @@ export function KnowledgeTree({
                     {/* 状态标识：已掌握 / 需加强 */}
                     {isMastered && (
                       <span
-                        className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700"
+                        className="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
                         title="已掌握"
                       >
                         ✓ 掌握
@@ -140,7 +140,7 @@ export function KnowledgeTree({
                     )}
                     {needsReinforce && (
                       <span
-                        className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700"
+                        className="text-xs px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300"
                         title="需要加强"
                       >
                         ⚠ 加强
@@ -152,7 +152,7 @@ export function KnowledgeTree({
                       {node.frequency}频
                     </span>
                     {node.bigTech && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
                         大厂
                       </span>
                     )}
@@ -184,11 +184,18 @@ export function KnowledgeTree({
                     <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800/50 text-sm text-gray-600 dark:text-gray-300">
                       <p>{node.summary}</p>
                       {node.prerequisites.length > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           依赖：{node.prerequisites.join(", ")}
                         </p>
                       )}
-                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        role="progressbar"
+                        aria-valuenow={isMastered ? 100 : node.mastery}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${node.title} 掌握度 ${isMastered ? 100 : node.mastery}%`}
+                        className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"
+                      >
                         <div
                           className={`h-2 rounded-full transition-all ${
                             isMastered
@@ -200,7 +207,7 @@ export function KnowledgeTree({
                           style={{ width: `${isMastered ? 100 : node.mastery}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         掌握度：{isMastered ? 100 : node.mastery}%
                       </p>
                       {/* 学习反馈按钮：标记掌握 / 需要加强 */}

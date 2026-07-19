@@ -86,10 +86,12 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
   };
 
   return (
-    <div className="border rounded-lg p-4 bg-white">
+    <div className="border rounded-lg p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
       <div className="flex items-start gap-2">
         <Button
           variant="ghost"
+          aria-expanded={expanded}
+          aria-controls="question-answer-panel"
           onClick={() => {
             if (!expanded) {
               trackImplicit("expanded");
@@ -105,16 +107,16 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             }
             setExpanded(!expanded);
           }}
-          className="flex-1 text-left text-sm hover:text-blue-600"
+          className="flex-1 text-left text-sm hover:text-blue-600 dark:hover:text-blue-400"
         >
           {question.bigTech && (
-            <span className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-amber-100 text-amber-700 rounded font-medium align-middle">
+            <span className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded font-medium align-middle">
               <Icon name="building" className="w-3 h-3 inline-block align-middle" /> 大厂
             </span>
           )}
           {isUnderstood && (
             <span
-              className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-green-100 text-green-700 rounded font-medium align-middle"
+              className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300 rounded font-medium align-middle"
               title="已看懂"
             >
               ✓ 看懂
@@ -160,12 +162,12 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
       </div>
 
       {expanded && question.answer && (
-        <div className="mt-3 space-y-2">
+        <div id="question-answer-panel" className="mt-3 space-y-2">
           <AnswerContent text={question.answer} />
           {question.keyPoints.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 mt-2">关键点：</p>
-              <ul className="text-xs text-gray-600 list-disc list-inside">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-2">关键点：</p>
+              <ul className="text-xs text-gray-600 dark:text-gray-300 list-disc list-inside">
                 {question.keyPoints.map((kp, i) => (
                   <li key={i}>{kp}</li>
                 ))}
@@ -174,7 +176,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           )}
           {question.followUps.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 mt-2">追问（点击向 AI 提问）：</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-2">追问（点击向 AI 提问）：</p>
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {question.followUps.map((fu, i) => (
                   <Button
@@ -182,7 +184,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
                     onClick={() => handleFollowUpClick(fu)}
                     variant="ghost"
                     size="sm"
-                    className="text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full border border-blue-100"
+                    className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full border border-blue-100 dark:border-blue-800"
                     title="点击进入 AI 聊天"
                   >
                     <Icon name="message-circle" className="w-3.5 h-3.5 inline-block align-middle" /> {fu}
@@ -200,16 +202,16 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           )}
           {/* 学习反馈：看懂了 / 再想想（写回 plan + LearnLog） */}
           {onMarkUnderstood && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-500 mr-1">这篇答案：</span>
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-2 border-t border-gray-100 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">这篇答案：</span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onMarkUnderstood(question.id, !isUnderstood)}
                 className={`rounded-full ${
                   isUnderstood
-                    ? "border-green-500 text-green-700 bg-green-50 hover:bg-green-100"
-                    : "border-green-300 text-green-700 hover:bg-green-50"
+                    ? "border-green-500 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-900/40"
+                    : "border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30"
                 }`}
                 title={isUnderstood ? "取消「看懂了」标记" : "标记为已看懂"}
               >
@@ -226,7 +228,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
                 }}
                 className={`rounded-full ${
                   !isUnderstood
-                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300 border-transparent"
+                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 border-transparent"
                     : ""
                 }`}
                 title="再想想（取消看懂，可点追问继续问 AI）"
@@ -234,7 +236,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
                 再想想
               </Button>
               {isUnderstood && (
-                <span className="text-xs text-green-600 ml-1">
+                <span className="text-xs text-green-600 dark:text-green-400 ml-1">
                   · 已记录掌握
                 </span>
               )}
@@ -258,7 +260,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             }}
             variant="ghost"
             size="sm"
-            className="text-blue-500"
+            className="text-blue-500 dark:text-blue-400"
           >
             展开答案 ▼
           </Button>
@@ -284,8 +286,8 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             leftIcon="refresh-cw"
             className={`ml-auto ${
               isFailed
-                ? "bg-red-100 text-red-600 hover:bg-red-200"
-                : "text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                ? "bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900"
+                : "text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
             }`}
           >
             {regenerating ? "生成中..." : (isFailed ? "重新生成" : "换一题")}

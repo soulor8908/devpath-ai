@@ -78,7 +78,7 @@ export function Heatmap({ data, weeks = 12 }: Props) {
   }, [internal, weeks]);
 
   if (loading) {
-    return <div className="h-32 animate-pulse rounded bg-gray-100" />;
+    return <div className="h-32 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />;
   }
 
   return (
@@ -87,6 +87,7 @@ export function Heatmap({ data, weeks = 12 }: Props) {
         data={calendarData.length > 0 ? calendarData : [{ date: new Date().toISOString().slice(0, 10), count: 0, level: 0 }]}
         theme={{
           light: ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"],
+          dark: ["#1f2937", "#0e4f2c", "#166534", "#15803d", "#22c55e"],
         }}
         labels={{
           totalCount: "{{count}} 分钟学习",
@@ -104,9 +105,12 @@ export function Heatmap({ data, weeks = 12 }: Props) {
         )}
       />
       {selected && (
-        <div className="absolute right-0 top-0 z-10 rounded-lg border bg-white p-3 shadow-lg">
+        <div
+          role="tooltip"
+          className="absolute right-0 top-0 z-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-lg"
+        >
           <div className="text-sm font-medium">{selected.date}</div>
-          <div className="text-xs text-gray-600">学习 {selected.count} 分钟</div>
+          <div className="text-xs text-gray-600 dark:text-gray-300">学习 {selected.count} 分钟</div>
           <Button variant="link" size="sm" onClick={() => setSelected(null)} className="mt-1">
             关闭
           </Button>

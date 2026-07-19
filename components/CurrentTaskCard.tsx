@@ -20,13 +20,13 @@ import type { NextAction, CurrentTask as CurrentTaskType } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 
 const TYPE_COLORS: Record<string, string> = {
-  运动: "bg-orange-50 border-orange-200",
-  学习: "bg-blue-50 border-blue-200",
-  休息: "bg-green-50 border-green-200",
-  家庭: "bg-pink-50 border-pink-200",
-  睡眠: "bg-purple-50 border-purple-200",
-  工作: "bg-gray-50 border-gray-200",
-  其他: "bg-white border-gray-200",
+  运动: "bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800",
+  学习: "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800",
+  休息: "bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800",
+  家庭: "bg-pink-50 border-pink-200 dark:bg-pink-950/40 dark:border-pink-800",
+  睡眠: "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800",
+  工作: "bg-gray-50 border-gray-200 dark:bg-gray-800/60 dark:border-gray-700",
+  其他: "bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700",
 };
 
 export function CurrentTaskCard() {
@@ -80,8 +80,8 @@ export function CurrentTaskCard() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <p className="text-gray-400 text-sm">正在分析你当下的状态...</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+        <p className="text-gray-500 dark:text-gray-400 text-sm">正在分析你当下的状态...</p>
       </div>
     );
   }
@@ -94,9 +94,9 @@ export function CurrentTaskCard() {
   // 兜底：未配置 routine
   if (hasRoutine === false) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <p className="text-sm text-gray-500 mb-2">尚未配置每日时间表</p>
-        <Link href="/profile" className="text-xs text-blue-600 underline">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">尚未配置每日时间表</p>
+        <Link href="/profile" className="text-xs text-blue-600 dark:text-blue-400 underline">
           去个人中心配置 →
         </Link>
       </div>
@@ -108,8 +108,8 @@ export function CurrentTaskCard() {
 
   if (!fallbackTask.current) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <p className="text-gray-500 text-sm">当前无安排</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+        <p className="text-gray-500 dark:text-gray-400 text-sm">当前无安排</p>
         {fallbackTask.next && (
           <p className="text-sm mt-1">
             下一项：<span className="font-medium">{fallbackTask.next.activity}</span>（{fallbackTask.next.start}）
@@ -127,42 +127,42 @@ export function CurrentTaskCard() {
     <div className={`rounded-xl p-4 border-2 ${colorClass}`}>
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs text-gray-500 mb-1">现在该做什么</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">现在该做什么</p>
           <p className="text-lg font-bold">{fallbackTask.current.activity}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {fallbackTask.current.start} - {fallbackTask.current.end}
           </p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold">{fallbackTask.minutesLeft}</p>
-          <p className="text-xs text-gray-500">分钟剩余</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">分钟剩余</p>
         </div>
       </div>
 
       {isLearn && (
         <Link
           href="/review"
-          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 px-3 py-2 hover:bg-white"
+          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900"
         >
           <span className="text-sm">
             <Icon name="book" className="w-4 h-4 inline-block align-middle" /> 学习时段 · 去复习今日卡片
           </span>
-          <span className="text-xs text-blue-600">去复习 →</span>
+          <span className="text-xs text-blue-600 dark:text-blue-400">去复习 →</span>
         </Link>
       )}
 
       {isRest && (
         <Link
           href="/rest"
-          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 px-3 py-2 hover:bg-white"
+          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900"
         >
           <span className="text-sm"><Icon name="moon" className="w-4 h-4 inline-block align-middle" /> 休息时段 · 去呼吸放松</span>
-          <span className="text-xs text-green-600">开始 478 呼吸 →</span>
+          <span className="text-xs text-green-600 dark:text-green-400">开始 478 呼吸 →</span>
         </Link>
       )}
 
       {fallbackTask.next && (
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
           下一项：{fallbackTask.next.activity}（{fallbackTask.next.start}）
         </p>
       )}
@@ -185,16 +185,16 @@ function RhythmActionCard({ action }: { action: NextAction }) {
     <div className={`rounded-xl p-4 border-2 ${cardColor}`}>
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-gray-500 mb-1">现在该做什么</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">现在该做什么</p>
           <p className="text-base font-bold leading-snug">{reason}</p>
         </div>
-        <Icon name={button.icon} className="w-6 h-6 shrink-0 text-gray-400" />
+        <Icon name={button.icon} className="w-6 h-6 shrink-0 text-gray-400 dark:text-gray-500" />
       </div>
 
       {button && (
         <Link
           href={button.href}
-          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 px-3 py-2 hover:bg-white transition-colors"
+          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900 transition-colors"
         >
           <span className="text-sm">
             <Icon name={button.icon} className="w-4 h-4 inline-block align-middle" /> {button.label}
@@ -272,15 +272,15 @@ function pickCardColor(type: NextAction["type"]): string {
   switch (type) {
     case "continue_focus":
     case "start_focus":
-      return "bg-blue-50 border-blue-200";
+      return "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800";
     case "review":
-      return "bg-purple-50 border-purple-200";
+      return "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800";
     case "break":
     case "rest":
-      return "bg-green-50 border-green-200";
+      return "bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800";
     case "plan_next_day":
-      return "bg-orange-50 border-orange-200";
+      return "bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800";
     default:
-      return "bg-white border-gray-200";
+      return "bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700";
   }
 }

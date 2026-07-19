@@ -21,20 +21,25 @@ export function ReviewCardView({ card, onRate }: Props) {
   const [showAnswer, setShowAnswer] = useState(false);
 
   return (
-    <div className="border rounded-lg p-6 bg-white shadow-sm">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-sm">
       <p className="text-lg font-medium mb-4">{card.front}</p>
 
       {!showAnswer ? (
         <Button
           variant="secondary"
           block
+          aria-expanded={showAnswer}
+          aria-controls="review-answer-panel"
           onClick={() => setShowAnswer(true)}
         >
           显示答案
         </Button>
       ) : (
         <>
-          <div className="text-sm text-gray-700 whitespace-pre-wrap mb-4 p-3 bg-gray-50 rounded">
+          <div
+            id="review-answer-panel"
+            className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap mb-4 p-3 bg-gray-50 dark:bg-gray-900/60 rounded"
+          >
             {card.back}
           </div>
           <div className="grid grid-cols-4 gap-2">

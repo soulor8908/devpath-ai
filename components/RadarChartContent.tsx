@@ -25,10 +25,11 @@ interface Props {
 export function RadarChartContent({ data }: Props) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RechartsRadar data={data} outerRadius="75%">
-        <PolarGrid />
-        <PolarAngleAxis dataKey="node" tick={{ fontSize: 12 }} />
-        <PolarRadiusAxis domain={[0, 100]} tick={false} />
+      {/* className + currentColor 让 Recharts 内部 SVG 跟随 Tailwind dark variant */}
+      <RechartsRadar data={data} outerRadius="75%" className="text-gray-300 dark:text-gray-600">
+        <PolarGrid stroke="currentColor" />
+        <PolarAngleAxis dataKey="node" tick={{ fontSize: 12, fill: "currentColor" }} className="text-gray-600 dark:text-gray-300" />
+        <PolarRadiusAxis domain={[0, 100]} tick={false} stroke="currentColor" />
         <Radar dataKey="value" stroke="#2563eb" fill="#2563eb" fillOpacity={0.4} />
       </RechartsRadar>
     </ResponsiveContainer>

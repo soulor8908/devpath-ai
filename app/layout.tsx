@@ -14,10 +14,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#2563eb",
-  // 禁止移动端整体缩放：脑图内部自行处理两指缩放
-  userScalable: false,
-  maximumScale: 1,
-  minimumScale: 1,
+  // 允许用户缩放（WCAG 1.4.4 Resize Text）：低视力用户可放大文字
+  // 脑图内部的双指缩放由组件内 touch-action 处理，不应在 viewport 层禁用整页缩放
   initialScale: 1,
   width: "device-width",
   viewportFit: "cover",
@@ -42,7 +40,8 @@ export default function RootLayout({
         `}} />
       </head>
       <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen pb-16">
-        {children}
+        <a href="#main-content" className="skip-link">跳到主内容</a>
+        <main id="main-content">{children}</main>
         <ToastContainer />
         <AITaskModal />
         <Nav />

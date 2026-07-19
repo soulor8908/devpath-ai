@@ -10,9 +10,9 @@ import { Button } from "@/components/ui";
 type Phase = "idle" | "inhale" | "hold" | "exhale" | "done";
 
 const PHASES: { name: Phase; label: string; duration: number; color: string }[] = [
-  { name: "inhale", label: "吸气", duration: 4, color: "bg-blue-100" },
-  { name: "hold", label: "屏息", duration: 7, color: "bg-yellow-100" },
-  { name: "exhale", label: "呼气", duration: 8, color: "bg-green-100" },
+  { name: "inhale", label: "吸气", duration: 4, color: "bg-blue-100 dark:bg-blue-950/50" },
+  { name: "hold", label: "屏息", duration: 7, color: "bg-yellow-100 dark:bg-yellow-950/50" },
+  { name: "exhale", label: "呼气", duration: 8, color: "bg-green-100 dark:bg-green-950/50" },
 ];
 
 export function BreathTimer() {
@@ -78,19 +78,25 @@ export function BreathTimer() {
     PHASES.find((p) => p.name === phase)?.label || "";
 
   const bgColor =
-    phase === "idle" ? "bg-gray-100" :
-    phase === "done" ? "bg-green-100" :
-    PHASES.find((p) => p.name === phase)?.color || "bg-gray-100";
+    phase === "idle" ? "bg-gray-100 dark:bg-gray-800" :
+    phase === "done" ? "bg-green-100 dark:bg-green-950/50" :
+    PHASES.find((p) => p.name === phase)?.color || "bg-gray-100 dark:bg-gray-800";
 
   return (
-    <div className={`rounded-xl p-6 shadow-sm text-center transition-colors ${bgColor}`}>
-      <p className="text-xs text-gray-500 mb-2">478 呼吸法</p>
+    <div
+      role="timer"
+      aria-live="off"
+      aria-atomic="true"
+      aria-label={`${phaseLabel} ${phase === "idle" || phase === "done" ? "" : `剩余 ${countdown} 秒`}`}
+      className={`rounded-xl p-6 shadow-sm text-center transition-colors ${bgColor}`}
+    >
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">478 呼吸法</p>
       <p className="text-5xl font-bold mb-2">
         {phase === "idle" || phase === "done" ? "—" : countdown}
       </p>
       <p className="text-lg font-medium mb-1">{phaseLabel}</p>
       {running && round > 0 && (
-        <p className="text-xs text-gray-500">第 {round} / 4 轮</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">第 {round} / 4 轮</p>
       )}
       <Button
         onClick={running ? stop : start}

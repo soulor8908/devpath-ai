@@ -32,12 +32,12 @@ export function StatusCard() {
 
   if (selected) {
     return (
-      <div className="bg-white border rounded-lg p-4">
-        <p className="text-sm text-gray-500 mb-1">今日状态</p>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">今日状态</p>
         <p className="text-lg font-medium">
           {selected.energy >= 4 ? <Icon name="smile" className="w-5 h-5 inline-block align-middle" /> : selected.energy >= 3 ? <Icon name="meh" className="w-5 h-5 inline-block align-middle" /> : <Icon name="frown" className="w-5 h-5 inline-block align-middle" />} 精力 {selected.energy}/5
         </p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           可用时间 {selected.availableMinutes}min · 建议负载 {selected.aiAdjustedLoad.toFixed(1)}x
         </p>
       </div>
@@ -45,8 +45,8 @@ export function StatusCard() {
   }
 
   return (
-    <div className="bg-white border rounded-lg p-4">
-      <p className="text-sm text-gray-500 mb-3">今天感觉怎么样？</p>
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">今天感觉怎么样？</p>
       <div className="flex gap-2">
         {QUICK_OPTIONS.map((opt) => (
           <Button
@@ -57,7 +57,7 @@ export function StatusCard() {
             className="flex-1 flex-col py-3"
           >
             <div className="mb-1"><Icon name={opt.icon} className="w-6 h-6 inline-block" /></div>
-            <div className="text-xs text-gray-600">{opt.label}</div>
+            <div className="text-xs text-gray-600 dark:text-gray-300">{opt.label}</div>
           </Button>
         ))}
       </div>

@@ -152,7 +152,11 @@ export default function HomeClient() {
           </Button>
         </div>
         {shareMsg && (
-          <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-2 text-sm text-blue-700 dark:text-blue-300 break-all">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-2 text-sm text-blue-700 dark:text-blue-300 break-all"
+          >
             {shareMsg}
           </div>
         )}
@@ -188,20 +192,23 @@ export default function HomeClient() {
       <section className="mb-5 grid grid-cols-3 gap-3">
         <Link
           href="/learn"
+          aria-label={`今日待学 ${todayLearnCount} 个知识点，进入学习`}
           className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center hover:shadow-md transition-shadow"
         >
           <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{todayLearnCount}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">今日待学</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">今日待学</p>
         </Link>
         <Link
           href="/review"
+          aria-label={`今日待复习 ${dueCount} 张卡片，进入复习`}
           className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center hover:shadow-md transition-shadow"
         >
           <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{dueCount}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">今日待复习</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">今日待复习</p>
         </Link>
         <Link
           href="/learn"
+          aria-label={`连续打卡 ${streak} 天`}
           className={`border rounded-2xl p-4 text-center hover:shadow-md transition-shadow ${streakMeta.color}`}
         >
           <p className="text-3xl font-bold flex items-center justify-center gap-1">
@@ -343,7 +350,9 @@ export default function HomeClient() {
       <section className="mb-5">
         <Button
           variant="ghost"
-          onClick={() => setShowMoreSection(!showMoreSection)}
+          onClick={() => setShowMoreSection((v) => !v)}
+          aria-expanded={showMoreSection}
+          aria-controls="home-more-section"
           className="w-full flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-2"
         >
           <span className="flex items-center gap-1.5">
@@ -353,7 +362,7 @@ export default function HomeClient() {
         </Button>
 
         {showMoreSection && (
-          <div className="space-y-4 pt-2">
+          <div id="home-more-section" className="space-y-4 pt-2">
             {/* 情绪区 */}
             <div>
               <div className="flex items-center justify-between mb-2">

@@ -81,27 +81,27 @@ export function AITaskModal() {
   const statusConfig = {
     running: {
       icon: "loader" as const,
-      iconClass: "animate-spin text-blue-500",
+      iconClass: "animate-spin text-blue-500 dark:text-blue-400",
       label: "AI 思考中",
-      labelClass: "text-blue-600",
+      labelClass: "text-blue-600 dark:text-blue-400",
     },
     done: {
       icon: "check-circle" as const,
-      iconClass: "text-green-500",
+      iconClass: "text-green-500 dark:text-green-400",
       label: "完成",
-      labelClass: "text-green-600",
+      labelClass: "text-green-600 dark:text-green-400",
     },
     error: {
       icon: "x-circle" as const,
-      iconClass: "text-red-500",
+      iconClass: "text-red-500 dark:text-red-400",
       label: "出错",
-      labelClass: "text-red-600",
+      labelClass: "text-red-600 dark:text-red-400",
     },
     aborted: {
       icon: "x-circle" as const,
-      iconClass: "text-gray-400",
+      iconClass: "text-gray-400 dark:text-gray-500",
       label: "已中止",
-      labelClass: "text-gray-500",
+      labelClass: "text-gray-500 dark:text-gray-400",
     },
   };
   const status = statusConfig[task.status];
@@ -144,11 +144,11 @@ export function AITaskModal() {
           {task.content ? (
             task.content
           ) : (
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500">
               <span className="inline-flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse" />
-                <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse" style={{ animationDelay: "0.2s" }} />
-                <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse" style={{ animationDelay: "0.4s" }} />
+                <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" style={{ animationDelay: "0.2s" }} />
+                <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" style={{ animationDelay: "0.4s" }} />
               </span>
               <span className="text-xs">等待 AI 响应...</span>
             </div>
