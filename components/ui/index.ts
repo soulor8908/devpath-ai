@@ -21,3 +21,4 @@ export { Select, type SelectProps } from "./Select";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Switch, type SwitchProps } from "./Switch";
 export { FormField, type FormFieldProps } from "./FormField";
+export { Slider, type SliderProps } from "./Slider";
