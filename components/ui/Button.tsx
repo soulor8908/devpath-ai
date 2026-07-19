@@ -31,7 +31,8 @@ export type ButtonVariant =
   | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 
-const VARIANT_CLASSES: Record<ButtonVariant, string> = {
+// 导出供 LinkButton 复用（DRY：variant/size 字典只此一份定义）
+export const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
     "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-sm",
   secondary:
@@ -48,13 +49,13 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   link: "bg-transparent text-blue-600 hover:underline dark:text-blue-400 shadow-none border-none px-0 py-0",
 };
 
-const SIZE_CLASSES: Record<ButtonSize, string> = {
+export const SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: "px-2.5 py-1 text-xs gap-1",
   md: "px-3.5 py-2 text-sm gap-1.5",
   lg: "px-5 py-2.5 text-base gap-2",
 };
 
-const ICON_ONLY_SIZE_CLASSES: Record<ButtonSize, string> = {
+export const ICON_ONLY_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: "p-1",
   md: "p-2",
   lg: "p-2.5",
