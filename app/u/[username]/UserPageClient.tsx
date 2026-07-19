@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import type { PublicProfile, KnowledgeNode, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
 import { setItem as dbSet, getItem as dbGet } from "@/lib/storage/db";
@@ -220,20 +221,14 @@ export default function UserPageClient() {
 
             {/* CTA 按钮组 */}
             <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                onClick={follow}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white text-purple-700 px-4 py-2 text-sm font-medium hover:bg-white/90 transition-colors shadow-md"
-              >
+              <Button onClick={follow} variant="primary">
                 <Icon name="heart" className="w-4 h-4" />
                 关注 ta
-              </button>
-              <button
-                onClick={copyLink}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur border border-white/30 text-white px-4 py-2 text-sm font-medium hover:bg-white/25 transition-colors"
-              >
+              </Button>
+              <Button onClick={copyLink} variant="secondary">
                 <Icon name={linkCopied ? "check" : "share"} className="w-4 h-4" />
                 {linkCopied ? "链接已复制" : "分享主页"}
-              </button>
+              </Button>
               {followedMsg && (
                 <span className="inline-flex items-center text-sm text-white/90 self-center">
                   {followedMsg}
@@ -314,13 +309,10 @@ export default function UserPageClient() {
         {data.planSnapshot && (
           <Card icon="calendar-check" title="学习计划">
             <p className="mb-3 text-sm text-gray-700 dark:text-gray-300">{data.planSnapshot.topic}</p>
-            <button
-              onClick={copyPlan}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-1.5 text-sm text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-            >
+            <Button onClick={copyPlan} variant="outline" size="sm">
               <Icon name={copied ? "check" : "copy"} className="w-4 h-4" />
               {copied ? "已复制到我的计划" : "复制这个计划"}
-            </button>
+            </Button>
           </Card>
         )}
 

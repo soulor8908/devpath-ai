@@ -20,6 +20,7 @@ import { useToasts } from "@/lib/hooks/use-toast";
 import { dismissToast } from "@/lib/toast";
 import type { ToastItem, ToastType } from "@/lib/toast";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 const TYPE_ICON: Record<ToastType, IconName> = {
   success: "check-circle",
@@ -119,33 +120,34 @@ function ToastCard({ toast: item }: { toast: ToastItem }) {
           </div>
           {item.confirm && (
             <div className="mt-3 flex gap-2 justify-end">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => handleConfirmClick(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 {item.confirm.cancelText}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={item.confirm.danger ? "danger" : "primary"}
+                size="sm"
                 onClick={() => handleConfirmClick(true)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors ${
-                  item.confirm.danger
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "bg-blue-500 hover:bg-blue-600"
-                }`}
               >
                 {item.confirm.confirmText}
-              </button>
+              </Button>
             </div>
           )}
         </div>
         {!item.confirm && (
-          <button
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
             onClick={handleDismiss}
             aria-label="关闭提示"
-            className="flex-shrink-0 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
             <Icon name="x" className="w-4 h-4" />
-          </button>
+          </Button>
         )}
       </div>
     </div>

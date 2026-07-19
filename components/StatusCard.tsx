@@ -6,6 +6,7 @@ import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow } from "@/lib/time";
 import type { DailyStatus } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 const QUICK_OPTIONS = [
   { energy: 2 as const, mood: "bad" as const, label: "不太好", icon: "frown" as const },
@@ -48,14 +49,16 @@ export function StatusCard() {
       <p className="text-sm text-gray-500 mb-3">今天感觉怎么样？</p>
       <div className="flex gap-2">
         {QUICK_OPTIONS.map((opt) => (
-          <button
+          <Button
             key={opt.label}
+            variant="outline"
+            size="sm"
             onClick={() => handleClick(opt.energy, opt.mood)}
-            className="flex-1 py-3 border rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 flex-col py-3"
           >
             <div className="mb-1"><Icon name={opt.icon} className="w-6 h-6 inline-block" /></div>
             <div className="text-xs text-gray-600">{opt.label}</div>
-          </button>
+          </Button>
         ))}
       </div>
     </div>

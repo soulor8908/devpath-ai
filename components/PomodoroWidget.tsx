@@ -27,6 +27,7 @@ import {
 import { notify } from "@/lib/timer/notification-permission";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -168,20 +169,24 @@ export function PomodoroWidget() {
 
       {/* 控制按钮 */}
       <div className="flex gap-2">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handlePauseResume}
           disabled={busy}
-          className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-medium py-1.5 disabled:opacity-50 transition-colors"
+          className="flex-1"
         >
           {isPaused ? "恢复" : "暂停"}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleAbandon}
           disabled={busy}
-          className="flex-1 rounded-lg bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium py-1.5 disabled:opacity-50 transition-colors"
+          className="flex-1"
         >
           放弃
-        </button>
+        </Button>
       </div>
 
       {/* 跳转全屏 */}

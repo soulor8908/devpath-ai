@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 // 本组件使用的内置常用提示词（与 ChatClient 中的 BUILTIN_PROMPTS 内容一致）
 const COMMON_PROMPTS = [
@@ -56,15 +57,17 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
   return (
     <div ref={containerRef} className="relative">
       {/* 触发按钮 */}
-      <button
-        type="button"
+      <Button
+        iconOnly
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen(!open)}
         aria-label="快捷指令"
         aria-expanded={open}
-        className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
       >
         <Icon name="zap" className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-      </button>
+      </Button>
 
       {/* 弹出列表：定位在按钮上方，可滚动 */}
       {open && (
@@ -72,18 +75,19 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
           {/* Section 1: 常用 */}
           <div className="text-xs text-gray-400 font-medium px-2 py-1">常用</div>
           {COMMON_PROMPTS.map((prompt) => (
-            <button
+            <Button
               key={prompt}
-              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => handleSelect(prompt)}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-left text-gray-700 dark:text-gray-200"
+              className="w-full justify-start text-left text-gray-700 dark:text-gray-200"
             >
               <Icon
                 name="message-circle"
                 className="w-4 h-4 text-gray-400 shrink-0"
               />
               <span>{prompt}</span>
-            </button>
+            </Button>
           ))}
 
           {/* 分隔线 */}
@@ -102,18 +106,19 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
                 </div>
                 {tools.map((tool) =>
                   tool.quickPrompts.map((qp, idx) => (
-                    <button
+                    <Button
                       key={`${tool.name}-${idx}`}
-                      type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleSelect(qp)}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-left text-gray-700 dark:text-gray-200"
+                      className="w-full justify-start text-left text-gray-700 dark:text-gray-200"
                     >
                       <Icon
                         name={tool.icon}
                         className="w-4 h-4 text-gray-400 shrink-0"
                       />
                       <span>{qp}</span>
-                    </button>
+                    </Button>
                   ))
                 )}
               </div>

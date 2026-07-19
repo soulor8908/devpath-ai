@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
 import { WeeklyReport } from "@/components/WeeklyReport";
+import { Button } from "@/components/ui";
 import { listItems } from "@/lib/storage/db";
 import type { KnowledgeNode, ReviewCard, ReviewLog, LearnLog, DailyStatus, LearningPlan } from "@/lib/types";
 
@@ -77,17 +78,15 @@ function StatsInner() {
           { id: "radar" as const, label: "雷达图" },
           { id: "weekly" as const, label: "周报" },
         ]).map((t) => (
-          <button
+          <Button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`-mb-px border-b-2 px-4 py-2 ${
-              tab === t.id
-                ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                : "border-transparent text-gray-600 dark:text-gray-300"
-            }`}
+            variant={tab === t.id ? "primary" : "ghost"}
+            size="sm"
+            className="-mb-px"
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 

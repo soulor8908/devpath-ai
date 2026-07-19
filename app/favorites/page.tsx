@@ -141,22 +141,22 @@ export default function FavoritesPage() {
 
       {/* Tab 切换 */}
       <div className="flex gap-2 mb-4">
-        <button
+        <Button
           onClick={() => setTab("decks")}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${
-            tab === "decks" ? "bg-black text-white" : "bg-gray-100 text-gray-600"
-          }`}
+          variant={tab === "decks" ? "primary" : "ghost"}
+          size="sm"
+          className="flex-1"
         >
           试题集（{decks.length}）
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setTab("questions")}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${
-            tab === "questions" ? "bg-black text-white" : "bg-gray-100 text-gray-600"
-          }`}
+          variant={tab === "questions" ? "primary" : "ghost"}
+          size="sm"
+          className="flex-1"
         >
           单题（{questions.length}）
-        </button>
+        </Button>
       </div>
 
       {/* 试题集 Tab */}

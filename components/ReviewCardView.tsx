@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReviewCard, Rating } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 const RATINGS: { value: Rating; label: string; icon: IconName; color: string }[] = [
   { value: 1, label: "Again", icon: "frown", color: "bg-red-500" },
@@ -24,12 +25,13 @@ export function ReviewCardView({ card, onRate }: Props) {
       <p className="text-lg font-medium mb-4">{card.front}</p>
 
       {!showAnswer ? (
-        <button
+        <Button
+          variant="secondary"
+          block
           onClick={() => setShowAnswer(true)}
-          className="w-full py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200"
         >
           显示答案
-        </button>
+        </Button>
       ) : (
         <>
           <div className="text-sm text-gray-700 whitespace-pre-wrap mb-4 p-3 bg-gray-50 rounded">
@@ -37,14 +39,16 @@ export function ReviewCardView({ card, onRate }: Props) {
           </div>
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
-              <button
+              <Button
                 key={r.value}
+                variant="primary"
+                size="sm"
                 onClick={() => onRate(r.value)}
-                className={`flex flex-col items-center py-2 ${r.color} text-white rounded-lg hover:opacity-90`}
+                className={`flex-col ${r.color} hover:opacity-90`}
               >
                 <span className="text-xl"><Icon name={r.icon} className="w-5 h-5 inline-block" /></span>
                 <span className="text-xs">{r.label}</span>
-              </button>
+              </Button>
             ))}
           </div>
         </>

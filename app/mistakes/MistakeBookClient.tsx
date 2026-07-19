@@ -217,15 +217,16 @@ export default function MistakeBookClient() {
       {/* 已掌握的错题（折叠） */}
       {resolved.length > 0 && (
         <div className="mt-6">
-          <button
+          <Button
             onClick={() => setShowResolved((v) => !v)}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
+            variant="ghost"
+            size="sm"
           >
             <span>{showResolved ? "▾" : "▸"}</span>
             <span>
               已掌握的错题（{resolved.length}）
             </span>
-          </button>
+          </Button>
           {showResolved && (
             <div className="mt-3 space-y-2">
               {resolved.map((m) => {

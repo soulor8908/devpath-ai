@@ -18,6 +18,7 @@
 
 import { useState } from "react";
 import type { KnowledgeNode } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 interface KnowledgeTreeProps {
   nodes: KnowledgeNode[];
@@ -120,13 +121,14 @@ export function KnowledgeTree({
                     >
                       D{node.difficulty}
                     </span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggle(node.id)}
-                      className="flex-1 text-sm font-medium text-left"
+                      className="flex-1 justify-start text-sm font-medium text-left"
                     >
                       {node.title}
-                    </button>
+                    </Button>
                     {/* 状态标识：已掌握 / 需加强 */}
                     {isMastered && (
                       <span
@@ -155,26 +157,28 @@ export function KnowledgeTree({
                       </span>
                     )}
                     {onSelectNode && showEnterButton && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectNode(node);
                         }}
-                        className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                         title="筛选该知识点的题目"
                       >
                         进入
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      type="button"
+                    <Button
+                      iconOnly
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggle(node.id)}
-                      className="text-gray-400 text-xs p-1"
                       aria-label={expanded.has(node.id) ? "收起" : "展开"}
+                      className="text-gray-400"
                     >
                       {expanded.has(node.id) ? "▼" : "▶"}
-                    </button>
+                    </Button>
                   </div>
                   {expanded.has(node.id) && (
                     <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800/50 text-sm text-gray-600 dark:text-gray-300">
@@ -202,33 +206,25 @@ export function KnowledgeTree({
                       {/* 学习反馈按钮：标记掌握 / 需要加强 */}
                       {onMarkMastered && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
-                          <button
-                            type="button"
+                          <Button
+                            variant="success"
+                            size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               onMarkMastered(node, !isMastered);
                             }}
-                            className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                              isMastered
-                                ? "bg-green-600 text-white hover:bg-green-700"
-                                : "bg-white border border-green-300 text-green-700 hover:bg-green-50"
-                            }`}
                             title={isMastered ? "取消掌握标记" : "标记为已掌握"}
                           >
                             {isMastered ? "✓ 已掌握" : "标记掌握"}
-                          </button>
+                          </Button>
                           {onMarkNeedsReinforce && (
-                            <button
-                              type="button"
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onMarkNeedsReinforce(node, !needsReinforce);
                               }}
-                              className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                                needsReinforce
-                                  ? "bg-orange-600 text-white hover:bg-orange-700"
-                                  : "bg-white border border-orange-300 text-orange-700 hover:bg-orange-50"
-                              }`}
                               title={
                                 needsReinforce
                                   ? "取消加强标记"
@@ -236,7 +232,7 @@ export function KnowledgeTree({
                               }
                             >
                               {needsReinforce ? "⚠ 加强中" : "需要加强"}
-                            </button>
+                            </Button>
                           )}
                         </div>
                       )}

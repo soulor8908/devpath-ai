@@ -18,6 +18,7 @@ import {
 import { PROMPTS } from "@/lib/ai/prompts";
 import type { AIScene } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 const SCENE_LABELS: Record<AIScene, string> = {
   knowledge_decompose: "知识树拆解",
@@ -133,24 +134,23 @@ export default function AIQualityPage() {
       {/* 时间范围切换 */}
       <div className="flex gap-2">
         {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
-          <button
+          <Button
             key={r}
             onClick={() => setRange(r)}
-            className={`px-3 py-1 text-sm rounded-full transition-colors ${
-              range === r
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-            }`}
+            variant={range === r ? "primary" : "ghost"}
+            size="sm"
           >
             {RANGE_LABELS[r]}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           onClick={() => void load()}
-          className="ml-auto text-sm text-blue-500 hover:underline inline-flex items-center gap-1"
+          variant="link"
+          size="sm"
+          className="ml-auto"
         >
           <Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 刷新
-        </button>
+        </Button>
       </div>
 
       {!hasData ? (

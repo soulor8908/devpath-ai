@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface CodeBlockProps {
   code: string;
@@ -428,16 +429,18 @@ export function CodeBlock({ code, language, filename, collapsible = true, onCopy
         <span className="text-[11px] text-gray-400 font-mono">
           {filename || lang}
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             navigator.clipboard?.writeText(code).catch(() => {});
             onCopy?.();
           }}
-          className="text-[11px] text-gray-400 hover:text-white transition-colors"
           aria-label="复制代码"
+          className="text-[11px] text-gray-400 hover:text-white"
         >
           <Icon name="copy" className="w-3.5 h-3.5 inline-block align-middle" /> 复制
-        </button>
+        </Button>
       </div>
       {/* 代码区 */}
       <div className="overflow-x-auto">
@@ -449,12 +452,15 @@ export function CodeBlock({ code, language, filename, collapsible = true, onCopy
       </div>
       {/* 折叠/展开 */}
       {isLong && collapsible && (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          block
           onClick={() => setExpanded((v) => !v)}
-          className="w-full py-1.5 text-[11px] text-gray-400 bg-[#161b22] hover:bg-[#1f2937] transition-colors border-t border-gray-700"
+          className="text-[11px] text-gray-400 bg-[#161b22] hover:bg-[#1f2937] border-t border-gray-700"
         >
           {expanded ? "▼ 收起" : `▶ 展开剩余 ${lines.length - 25} 行（共 ${lines.length} 行）`}
-        </button>
+        </Button>
       )}
     </div>
   );

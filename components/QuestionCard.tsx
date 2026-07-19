@@ -88,7 +88,8 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
   return (
     <div className="border rounded-lg p-4 bg-white">
       <div className="flex items-start gap-2">
-        <button
+        <Button
+          variant="ghost"
           onClick={() => {
             if (!expanded) {
               trackImplicit("expanded");
@@ -104,7 +105,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             }
             setExpanded(!expanded);
           }}
-          className="flex-1 text-left text-sm font-medium hover:text-blue-600"
+          className="flex-1 text-left text-sm hover:text-blue-600"
         >
           {question.bigTech && (
             <span className="inline-block px-1.5 py-0.5 mr-2 text-[10px] bg-amber-100 text-amber-700 rounded font-medium align-middle">
@@ -120,7 +121,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             </span>
           )}
           {question.question}
-        </button>
+        </Button>
         {onFavoriteToggle && (
           <Button
             onClick={async () => {
@@ -201,35 +202,37 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
           {onMarkUnderstood && (
             <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-2 border-t border-gray-100">
               <span className="text-xs text-gray-500 mr-1">这篇答案：</span>
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => onMarkUnderstood(question.id, !isUnderstood)}
-                className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                className={`rounded-full ${
                   isUnderstood
-                    ? "bg-green-600 text-white hover:bg-green-700"
-                    : "bg-white border border-green-300 text-green-700 hover:bg-green-50"
+                    ? "border-green-500 text-green-700 bg-green-50 hover:bg-green-100"
+                    : "border-green-300 text-green-700 hover:bg-green-50"
                 }`}
                 title={isUnderstood ? "取消「看懂了」标记" : "标记为已看懂"}
               >
                 {isUnderstood ? "✓ 看懂了" : "看懂了"}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   // 再想想 = 取消看懂 + 提示用户可追问
                   if (isUnderstood) {
                     onMarkUnderstood(question.id, false);
                   }
                 }}
-                className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                className={`rounded-full ${
                   !isUnderstood
-                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300 border-transparent"
+                    : ""
                 }`}
                 title="再想想（取消看懂，可点追问继续问 AI）"
               >
                 再想想
-              </button>
+              </Button>
               {isUnderstood && (
                 <span className="text-xs text-green-600 ml-1">
                   · 已记录掌握

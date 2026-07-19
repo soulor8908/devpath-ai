@@ -19,6 +19,7 @@
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { KnowledgeNode } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 interface MindMapProps {
   nodes: KnowledgeNode[];
@@ -400,59 +401,75 @@ export function MindMap({
     >
       {/* 工具栏 */}
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white dark:bg-gray-700 rounded-lg shadow-md p-1 border dark:border-gray-600">
-        <button
+        <Button
+          iconOnly
+          variant="ghost"
+          size="sm"
           onClick={zoomOut}
-          className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-lg font-bold"
+          className="w-8 h-8 text-lg"
           aria-label="缩小"
           title="缩小"
         >
           −
-        </button>
+        </Button>
         <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-center font-mono">
           {Math.round(scale * 100)}%
         </span>
-        <button
+        <Button
+          iconOnly
+          variant="ghost"
+          size="sm"
           onClick={zoomIn}
-          className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-lg font-bold"
+          className="w-8 h-8 text-lg"
           aria-label="放大"
           title="放大"
         >
           +
-        </button>
+        </Button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
-        <button
+        <Button
+          iconOnly
+          variant="ghost"
+          size="sm"
           onClick={fitView}
-          className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-sm"
+          className="w-8 h-8 text-sm"
           aria-label="适配视图"
           title="适配视图"
         >
           ⤢
-        </button>
-        <button
+        </Button>
+        <Button
+          iconOnly
+          variant="ghost"
+          size="sm"
           onClick={resetView}
-          className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-sm"
+          className="w-8 h-8 text-sm"
           aria-label="重置"
           title="重置视图"
         >
           ⟲
-        </button>
+        </Button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={expandAll}
-          className="px-2 h-8 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+          className="h-8"
           aria-label="全部展开"
           title="全部展开"
         >
           展开
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={collapseAll}
-          className="px-2 h-8 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+          className="h-8"
           aria-label="全部收起"
           title="全部收起"
         >
           收起
-        </button>
+        </Button>
       </div>
 
       {/* 提示 */}
@@ -676,25 +693,17 @@ export function MindMap({
                           {p.node.mastery}%
                         </span>
                         {onSelectNode && showEnterButton && (
-                          <button
-                            style={{
-                              fontSize: "10px",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              background: isSelected ? "#3b82f6" : "#1e293b",
-                              color: "#fff",
-                              border: "none",
-                              cursor: "pointer",
-                              pointerEvents: "auto",
-                              fontWeight: 500,
-                            }}
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            style={{ pointerEvents: "auto" }}
                             onClick={(e) => {
                               e.stopPropagation();
                               onSelectNode(p.node);
                             }}
                           >
                             进入
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>

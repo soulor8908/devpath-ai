@@ -224,18 +224,16 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
         <p className="text-xs text-gray-500 mb-2">1. 此刻的情绪</p>
         <div className="flex flex-wrap gap-1.5">
           {EMOTION_OPTIONS.map((opt) => (
-            <button
+            <Button
               key={opt.tag}
+              variant={tag === opt.tag ? "primary" : "ghost"}
+              size="sm"
               onClick={() => setTag(opt.tag)}
-              className={`px-2.5 py-1.5 rounded-full text-xs border transition-colors ${
-                tag === opt.tag
-                  ? "bg-blue-500 text-white border-blue-500"
-                  : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
-              }`}
+              className="rounded-full"
             >
               <span className="mr-0.5">{opt.emoji}</span>
               {opt.tag}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -263,34 +261,34 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
               </span>
             )}
           </p>
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => fetchSuggestions({ manual: true })}
             disabled={!tag || loading}
-            className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             title="AI 会自动生成，也可手动重新生成"
           >
-            <Icon name="sparkles" className="w-3.5 h-3.5 inline-block" />
+            <Icon name="sparkles" className="w-3.5 h-3.5" />
             {suggestions.length > 0 ? "重新生成" : "给我建议"}
-          </button>
+          </Button>
         </div>
 
         {suggestions.length > 0 && (
           <div className="space-y-1.5">
             {suggestions.map((s, i) => (
-              <button
+              <Button
                 key={i}
+                variant={selectedCoping.includes(s) ? "primary" : "ghost"}
+                size="sm"
                 onClick={() => toggleSuggestion(s)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs border transition-colors ${
-                  selectedCoping.includes(s)
-                    ? "bg-green-50 border-green-300 text-green-700"
-                    : "bg-gray-50 border-gray-200 text-gray-700 hover:border-green-200"
-                }`}
+                block
+                className="justify-start"
               >
                 <span className="inline-block w-4">
                   {selectedCoping.includes(s) ? "✓" : ""}
                 </span>
                 {s}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -315,17 +313,15 @@ export function EmotionRecorder({ onSaved, compact = false }: Props) {
         <p className="text-xs text-gray-500 mb-2">4. 多巴胺干扰来源</p>
         <div className="flex flex-wrap gap-1.5">
           {DOPAMINE_OPTIONS.map((opt) => (
-            <button
+            <Button
               key={opt}
+              variant={dopamine === opt ? "primary" : "ghost"}
+              size="sm"
               onClick={() => setDopamine(opt)}
-              className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
-                dopamine === opt
-                  ? "bg-orange-500 text-white border-orange-500"
-                  : "bg-white text-gray-700 border-gray-200 hover:border-orange-300"
-              }`}
+              className="rounded-full"
             >
               {opt}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

@@ -8,6 +8,7 @@
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { KnowledgeNode, ReviewLog, ReviewCard } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 const RadarChartContent = dynamic(
   () => import("./RadarChartContent").then((m) => m.RadarChartContent),
@@ -89,15 +90,15 @@ export function RadarChart({ nodes, cards, logs, stats }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {(Object.keys(DIM_LABELS) as Dimension[]).map((d) => (
-          <button
+          <Button
             key={d}
+            variant={dimension === d ? "primary" : "ghost"}
+            size="sm"
             onClick={() => setDimension(d)}
-            className={`rounded-full px-3 py-1 text-sm ${
-              dimension === d ? "bg-blue-600 text-white" : "border text-gray-700"
-            }`}
+            className="rounded-full"
           >
             {DIM_LABELS[d]}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="h-80 w-full">

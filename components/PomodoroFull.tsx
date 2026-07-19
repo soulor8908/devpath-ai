@@ -395,17 +395,14 @@ export function PomodoroFull() {
       <h1 className="text-xl font-bold">番茄专注</h1>
       <div className="flex items-center gap-3">
         {fullscreen.supported && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleEnterFullscreen}
-            className={`text-sm flex items-center gap-1 ${
-              fullscreen.isFullscreen
-                ? "text-blue-500"
-                : "text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400"
-            }`}
             title={fullscreen.isFullscreen ? "当前已全屏" : "进入全屏专注模式"}
           >
             <Icon name="monitor" className="w-4 h-4" /> 全屏
-          </button>
+          </Button>
         )}
         <Link href="/" className="text-sm text-blue-500 hover:underline">
           ← 返回
@@ -442,17 +439,15 @@ export function PomodoroFull() {
             </p>
             <div className="flex gap-2">
               {[15, 25, 50].map((m) => (
-                <button
+                <Button
                   key={m}
+                  variant={durationMinutes === m ? "primary" : "ghost"}
+                  size="sm"
                   onClick={() => setDurationMinutes(m)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    durationMinutes === m
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  }`}
+                  className="flex-1"
                 >
                   {m} 分钟
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -470,16 +465,18 @@ export function PomodoroFull() {
 
           {/* 可选选项（折叠） */}
           <div className="w-full">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              block
               onClick={() => setShowOptions(!showOptions)}
-              className="w-full flex items-center justify-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-1"
             >
               <Icon
                 name="chevron-right"
                 className={`w-3.5 h-3.5 transition-transform ${showOptions ? "rotate-90" : ""}`}
               />
               {showOptions ? "收起选项" : "更多选项（任务 / 计划 / 模式）"}
-            </button>
+            </Button>
             {showOptions && (
               <div className="mt-3 space-y-3">
                 <div>
@@ -620,12 +617,13 @@ export function PomodoroFull() {
           {/* 控制按钮 */}
           <div className="w-full flex gap-2">
             {session.type === "focus" && (
-              <button
+              <Button
+                variant="secondary"
                 onClick={handlePauseResume}
-                className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2.5 transition-colors"
+                className="flex-1"
               >
                 {isPaused ? "恢复" : "暂停"}
-              </button>
+              </Button>
             )}
             <Button
               variant="success"
@@ -634,12 +632,13 @@ export function PomodoroFull() {
             >
               提前完成
             </Button>
-            <button
+            <Button
+              variant="ghost"
               onClick={handleAbandon}
-              className="flex-1 rounded-lg bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium py-2.5 transition-colors"
+              className="flex-1"
             >
               放弃
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -686,12 +685,13 @@ export function PomodoroFull() {
               >
                 开始休息 {breakMinutes} 分钟
               </Button>
-              <button
+              <Button
+                variant="secondary"
                 onClick={handleStartAnother}
-                className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2 transition-colors"
+                className="flex-1"
               >
                 再来一个番茄
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -876,12 +876,13 @@ function RecoveryCard({
         <Button className="flex-1" onClick={onContinue}>
           继续专注
         </Button>
-        <button
+        <Button
+          variant="ghost"
           onClick={onAbandon}
-          className="flex-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2 transition-colors"
+          className="flex-1"
         >
           放弃
-        </button>
+        </Button>
       </div>
     </div>
   );
