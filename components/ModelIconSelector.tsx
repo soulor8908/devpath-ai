@@ -10,6 +10,7 @@ import Link from "next/link";
 import { listModelConfigs } from "@/lib/model-config";
 import type { ModelConfig } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface ModelIconSelectorProps {
   selectedModelId: string | null;
@@ -99,8 +100,9 @@ export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelect
   return (
     <div ref={containerRef} className="relative">
       {/* 触发按钮：展示当前选中模型图标，未选中则展示 + */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen(!open)}
         aria-label="选择模型"
         aria-expanded={open}
@@ -116,7 +118,7 @@ export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelect
         ) : (
           <Icon name="plus" className="w-4 h-4 text-gray-400" />
         )}
-      </button>
+      </Button>
 
       {/* 弹出列表：定位在按钮上方，可滚动 */}
       {open && (
@@ -126,9 +128,10 @@ export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelect
             const isSelected = model.id === selectedModelId;
             const letter = model.provider.charAt(0).toUpperCase();
             return (
-              <button
+              <Button
                 key={model.id}
-                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => handleSelect(model.id)}
                 aria-label={model.name}
                 aria-pressed={isSelected}
@@ -144,7 +147,7 @@ export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelect
                 {isSelected && (
                   <Icon name="check" className="w-4 h-4 text-blue-500 shrink-0" />
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>

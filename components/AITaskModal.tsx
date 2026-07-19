@@ -123,14 +123,17 @@ export function AITaskModal() {
               {status.label}
             </span>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={handleClose}
             aria-label="关闭"
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0"
           >
             <Icon name="x" className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Content - 流式输出 */}

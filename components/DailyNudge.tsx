@@ -31,6 +31,7 @@ import {
   generateCallId,
 } from "@/lib/ai/quality-tracker";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface NudgePayload {
   nudge: string;
@@ -169,13 +170,14 @@ export function DailyNudge() {
           <span className="text-xs text-gray-400 truncate">
             <Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> AI 提醒加载失败：{error}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="sm"
             onClick={() => void fetchNudge(true)}
             className="text-xs text-blue-500 hover:underline shrink-0"
           >
             重试
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -222,24 +224,27 @@ export function DailyNudge() {
                 minute: "2-digit",
               })}
             </span>
-            <button
-              type="button"
+            <Button
+              variant="link"
+              size="sm"
               onClick={handleRefresh}
               className="text-blue-500 hover:underline"
               aria-label="重新生成今日建议"
             >
               换一个 →
-            </button>
+            </Button>
             {nudge.source === "ai" && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 onClick={handleThumbsDown}
                 className="text-gray-400 hover:text-red-500 transition-colors"
                 aria-label="这条建议没帮助"
                 title="这条建议没帮助"
               >
                 <Icon name="thumbs-down" className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
         </div>

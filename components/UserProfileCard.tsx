@@ -147,7 +147,9 @@ export function UserProfileCard({ profile }: Props) {
           <Icon name="user" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">用户画像</h3>
         </div>
-        <button
+        <Button
+          variant="link"
+          size="sm"
           onClick={() => void handleRebuild()}
           disabled={loading}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
@@ -163,7 +165,7 @@ export function UserProfileCard({ profile }: Props) {
               手动重建画像
             </>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* 技能画像 Top 5 */}

@@ -10,6 +10,7 @@
 //   - dark mode 支持
 
 import { Icon, type IconName } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import type { Achievement } from "@/lib/types";
 
 interface AchievementCardProps {
@@ -47,14 +48,17 @@ export function AchievementCard({ achievements, onClose }: AchievementCardProps)
             </span>
           )}
         </h2>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
           onClick={onClose}
           aria-label="关闭"
           className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
         >
           <Icon name="x" className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-2">

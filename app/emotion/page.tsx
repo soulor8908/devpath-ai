@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 import { listItems, delItem } from "@/lib/storage/db";
 import { KEY_PREFIXES, type EmotionEntry, type LegacyEmotionFields } from "@/lib/types";
 import {
@@ -162,13 +163,17 @@ export default function EmotionPage() {
                             </p>
                           )}
                         </div>
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
                           onClick={() => handleDelete(entry)}
-                          className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label="删除"
+                          className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Icon name="trash" className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ))}

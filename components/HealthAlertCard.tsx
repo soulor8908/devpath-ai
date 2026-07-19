@@ -201,14 +201,17 @@ export function HealthAlertCard({
                   )}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                iconOnly
                 onClick={() => onClose(alert.id)}
                 aria-label="关闭"
                 className={`flex-shrink-0 ${style.iconColor} hover:opacity-70 transition-opacity`}
               >
                 <Icon name="x" className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             {!adopted ? (

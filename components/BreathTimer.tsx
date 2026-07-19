@@ -5,6 +5,7 @@
 // 从主项目迁移，无外部依赖
 
 import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui";
 
 type Phase = "idle" | "inhale" | "hold" | "exhale" | "done";
 
@@ -91,14 +92,13 @@ export function BreathTimer() {
       {running && round > 0 && (
         <p className="text-xs text-gray-500">第 {round} / 4 轮</p>
       )}
-      <button
+      <Button
         onClick={running ? stop : start}
-        className={`mt-4 px-6 py-2 rounded-full text-sm font-medium ${
-          running ? "bg-red-500 text-white" : "bg-black text-white"
-        }`}
+        variant={running ? "danger" : "dark"}
+        className="mt-4 px-6 py-2 rounded-full text-sm font-medium"
       >
         {running ? "停止" : phase === "done" ? "再来" : "开始"}
-      </button>
+      </Button>
     </div>
   );
 }

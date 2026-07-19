@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect } from "react";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 interface ChatModalProps {
   open: boolean;
@@ -38,14 +39,16 @@ export function ChatModal({ open, onClose, children }: ChatModalProps) {
         <h2 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
           AI 对话
         </h2>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="md"
+          iconOnly
           aria-label="关闭对话"
           onClick={onClose}
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
         >
           <Icon name="x" className="w-5 h-5" />
-        </button>
+        </Button>
       </header>
       <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
     </div>
