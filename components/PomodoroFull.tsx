@@ -190,7 +190,7 @@ export function PomodoroFull() {
       if (remaining <= 0 && notifiedRef.current !== session.id) {
         notifiedRef.current = session.id;
         void notify(
-          "番茄完成 🍅",
+          "番茄完成",
           `「${session.taskDescription || "专注"}」专注完成，去休息一下吧`,
         );
       }
@@ -608,8 +608,9 @@ export function PomodoroFull() {
 
           {/* 打断提示 */}
           {interruptions > 0 && (
-            <p className="text-xs text-red-500 text-center">
-              ⚠️ 已被打断 {interruptions} 次
+            <p className="text-xs text-red-500 text-center flex items-center justify-center gap-1">
+              <Icon name="alert" className="w-3.5 h-3.5" />
+              已被打断 {interruptions} 次
               {strictMode && `（严格模式：${3 - interruptions} 次后将放弃）`}
             </p>
           )}
@@ -661,7 +662,7 @@ export function PomodoroFull() {
         {TopBar}
 
         <div className="rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-8 text-center space-y-4">
-          <div className="text-5xl">🍅</div>
+          <Icon name="tomato" className="w-16 h-16 text-red-500 mx-auto" />
           <h2 className="text-xl font-bold text-green-700 dark:text-green-400">
             番茄完成！
           </h2>
@@ -675,8 +676,8 @@ export function PomodoroFull() {
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {nextBreak === "long_break"
-                ? `已经完成 ${todayCount} 个番茄，建议长休息 ${breakMinutes} 分钟 🌿`
-                : `建议短休息 ${breakMinutes} 分钟 ☕`}
+                ? `已经完成 ${todayCount} 个番茄，建议长休息 ${breakMinutes} 分钟`
+                : `建议短休息 ${breakMinutes} 分钟`}
             </p>
             <div className="flex gap-2 pt-2">
               <Button
@@ -796,7 +797,7 @@ function TodaySummary({
       {/* 统计 */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-          <span>🍅</span>
+          <Icon name="tomato" className="w-4 h-4 text-red-500" />
           今日番茄
         </h3>
         <div className="flex items-center gap-3 text-xs">
@@ -840,7 +841,7 @@ function TodaySummary({
         </ul>
       ) : (
         <p className="text-center text-xs text-gray-400 py-2">
-          今天还没有完成番茄，点上方「开始专注」开启第一个 🍅
+          今天还没有完成番茄，点上方「开始专注」开启第一个
         </p>
       )}
     </div>
@@ -862,7 +863,7 @@ function RecoveryCard({
   const mins = Math.max(0, Math.floor(remaining / 60_000));
   return (
     <div className="rounded-2xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-6 space-y-3">
-      <div className="text-center text-4xl">⚠️</div>
+      <Icon name="alert" className="w-12 h-12 text-amber-500 mx-auto" />
       <h2 className="text-center text-lg font-bold text-yellow-700 dark:text-yellow-400">
         发现未完成的番茄
       </h2>

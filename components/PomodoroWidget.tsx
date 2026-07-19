@@ -64,7 +64,7 @@ export function PomodoroWidget() {
       if (remaining <= 0 && notifiedRef.current !== running.id) {
         notifiedRef.current = running.id;
         void notify(
-          "番茄完成 🍅",
+          "番茄完成",
           `「${running.taskDescription}」专注完成，去休息一下吧`,
         );
       }

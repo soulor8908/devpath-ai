@@ -348,7 +348,7 @@ export default function ProfilePage() {
       }
       // 测试通知
       new Notification("devpath 打卡提醒已开启", {
-        body: "我们会在每日学习时段提醒你 📚",
+        body: "我们会在每日学习时段提醒你",
         icon: "/icons/icon-192.png",
       });
     }

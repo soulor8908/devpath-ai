@@ -4,17 +4,18 @@
 // 首页（仪表盘）—— 行动指挥中心
 //
 // 设计（乔布斯视角）：
-//   原首页 9 个区块单列，CurrentTaskCard 被推到第 5 位，3 秒看不到答案。
+//   原首页 12 个区块单列，CurrentTaskCard 被推到第 5 位，3 秒看不到答案。
 //   重构为 5 区结构：
-//     1. Hero 行动区：CurrentTaskCard（80% 视觉权重）—— "现在该做什么 + 为什么"
+//     1. Hero 行动区：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
 //     2. KPI 三宫格：今日待学 / 今日待复习 / 连续打卡
-//     3. AI 教练洞察区：DailyNudge + HealthAlert + Achievement 合并为一张卡
+//     3. AI 教练洞察区：HomeInsightsCard（成就 + 健康提醒）+ 能力画像 + AI 质量摘要
 //     4. 今日学习安排：精简 schedule 列表 + 能量趋势迷你图
 //     5. 折叠区：情绪记录 / 错题 / 7 天热力图
 //
 // 砍掉：
 //   - 与底部热力图重复的 streak 数字（保留在 KPI 三宫格）
-//   - StatusCard 与 DailyNudge 的功能重叠（合并到 AI 教练区）
+//   - StatusCard（功能与 HomeInsightsCard 重叠，已删除导入）
+//   - 继续学习入口（与底部 Nav 重复）
 //   - 三宫格快捷入口（与底部 Nav 重复）
 //
 // 新增：
@@ -27,9 +28,8 @@ import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
-import { StatusCard } from "@/components/StatusCard";
 import { Icon, type IconName } from "@/components/Icon";
-import { Button } from "@/components/ui";
+import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
@@ -44,7 +44,6 @@ export default function HomeClient() {
     todaySchedule,
     heatmapData,
     todayEnergy,
-    latestPlan,
     hasPlans,
     username,
     todayEmotions,
@@ -120,12 +119,13 @@ export default function HomeClient() {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-md">
           AI 驱动的开发者成长 OS。告诉 AI 你想学什么，它帮你拆知识树、排计划、出面试题、按遗忘曲线复习。
         </p>
-        <Link
+        <LinkButton
           href="/learn"
-          className="inline-block rounded-full bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-3 text-white font-medium hover:opacity-90 transition-opacity shadow-lg"
+          size="lg"
+          className="rounded-full px-8 shadow-lg"
         >
           开始第一个学习计划 →
-        </Link>
+        </LinkButton>
       </div>
     );
   }
@@ -160,35 +160,28 @@ export default function HomeClient() {
         {/* CurrentTaskCard 是核心答案 */}
         <CurrentTaskCard />
 
-        {/* 低能量休息提示（紧贴 CurrentTaskCard） */}
-        {lowEnergy && (
-          <Link
-            href="/rest"
-            className="mt-2 flex items-center justify-between rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-          >
-            <span className="flex items-center gap-2 text-sm text-green-800 dark:text-green-300">
-              <Icon name="leaf" className="w-4 h-4" />
-              检测到今天能量偏低，去休息一下？
-            </span>
-            <span className="text-xs text-green-700 dark:text-green-400 flex items-center gap-0.5">
-              478 呼吸 <Icon name="chevron-right" className="w-3.5 h-3.5" />
-            </span>
-          </Link>
-        )}
-
-        {/* 番茄钟常驻入口（始终可见，一键进入专注） */}
+        {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重） */}
         <Link
           href="/timer"
           className="mt-2 flex items-center justify-between rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
         >
           <span className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300">
-            <span className="text-base leading-none">🍅</span>
+            <Icon name="tomato" className="w-4 h-4 text-red-500" />
             番茄钟 · 开始一段专注
           </span>
           <span className="text-xs text-red-700 dark:text-red-400 flex items-center gap-0.5">
             25:00 <Icon name="chevron-right" className="w-3.5 h-3.5" />
           </span>
         </Link>
+        {lowEnergy && (
+          <Link
+            href="/rest"
+            className="mt-1.5 block text-center text-xs text-green-600 dark:text-green-400 hover:underline"
+          >
+            <Icon name="leaf" className="w-3 h-3 inline mr-0.5" />
+            检测到今天能量偏低，去休息一下？
+          </Link>
+        )}
       </section>
 
       {/* ============ 2. KPI 三宫格 ============ */}
@@ -221,83 +214,14 @@ export default function HomeClient() {
         </Link>
       </section>
 
-      {/* ============ 3. AI 教练洞察区（合并 DailyNudge + HealthAlert + Achievement）============ */}
-      <HomeInsightsCard
-        newAchievements={newAchievements}
-        healthAlerts={healthAlerts}
-      />
-
-      {/* ============ 4. 今日学习安排 + 能量趋势 ============ */}
+      {/* ============ 3. AI 教练洞察区（HomeInsights + 能力画像 + AI 质量，合并洞察类信息）============ */}
       <section className="mb-5">
-        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
-          <Icon name="calendar-check" className="w-4 h-4" />
-          今日安排
-        </h2>
+        <HomeInsightsCard
+          newAchievements={newAchievements}
+          healthAlerts={healthAlerts}
+        />
 
-        {todaySchedule.length > 0 ? (
-          <div className="space-y-1.5">
-            {todaySchedule.slice(0, 3).map((item, i) => (
-              <Link
-                key={i}
-                href={`/learn/${item.planId}`}
-                className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-2.5 hover:shadow-md transition-shadow"
-              >
-                <span
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    item.type === "learn"
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                      : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                  }`}
-                >
-                  {item.type === "learn" ? "学" : "复"}
-                </span>
-                <span className="text-sm flex-1 truncate text-gray-800 dark:text-gray-200">{item.topic}</span>
-                <span className="text-xs text-gray-400">{item.estimatedMinutes}min</span>
-                <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400" />
-              </Link>
-            ))}
-            {todaySchedule.length > 3 && (
-              <Link
-                href="/learn"
-                className="block text-center text-xs text-blue-500 hover:underline pt-1"
-              >
-                查看全部 {todaySchedule.length} 项 →
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center">
-            <Icon name="check-circle" className="w-8 h-8 mx-auto text-green-500 mb-1" />
-            <p className="text-xs text-gray-500 dark:text-gray-400">今日无安排</p>
-            <Link
-              href="/learn"
-              className="text-xs text-blue-500 hover:underline mt-2 inline-block"
-            >
-              去学习 →
-            </Link>
-          </div>
-        )}
-
-        {/* 继续学习入口（紧贴 schedule） */}
-        {latestPlan && (
-          <Link
-            href={`/learn/${latestPlan.id}`}
-            className="mt-2 flex items-center justify-between rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-          >
-            <span className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-300">
-              <Icon name="book" className="w-4 h-4" />
-              继续：{latestPlan.topic}
-            </span>
-            <Icon name="chevron-right" className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          </Link>
-        )}
-
-        {/* 能量趋势迷你图 */}
-        <div className="mt-3">
-          <EnergyTrendMini trend={energyTrend} todayEnergy={todayEnergy} />
-        </div>
-
-        {/* 用户画像 + AI 质量摘要（新增数据资产展示） */}
+        {/* 用户画像 + AI 质量摘要（从 section 4 移入，与 HomeInsights 同组） */}
         {(userProfileSummary || aiQualitySummary) && (
           <div className="mt-3 grid grid-cols-2 gap-3">
             {userProfileSummary && (
@@ -356,10 +280,62 @@ export default function HomeClient() {
             )}
           </div>
         )}
+      </section>
 
-        {/* 今日状态记录 */}
+      {/* ============ 4. 今日学习安排 + 能量趋势（精简：移除继续学习入口，能力画像已移入 section 3）============ */}
+      <section className="mb-5">
+        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+          <Icon name="calendar-check" className="w-4 h-4" />
+          今日安排
+        </h2>
+
+        {todaySchedule.length > 0 ? (
+          <div className="space-y-1.5">
+            {todaySchedule.slice(0, 3).map((item, i) => (
+              <Link
+                key={i}
+                href={`/learn/${item.planId}`}
+                className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-2.5 hover:shadow-md transition-shadow"
+              >
+                <span
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    item.type === "learn"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                  }`}
+                >
+                  {item.type === "learn" ? "学" : "复"}
+                </span>
+                <span className="text-sm flex-1 truncate text-gray-800 dark:text-gray-200">{item.topic}</span>
+                <span className="text-xs text-gray-400">{item.estimatedMinutes}min</span>
+                <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400" />
+              </Link>
+            ))}
+            {todaySchedule.length > 3 && (
+              <Link
+                href="/learn"
+                className="block text-center text-xs text-blue-500 hover:underline pt-1"
+              >
+                查看全部 {todaySchedule.length} 项 →
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center">
+            <Icon name="check-circle" className="w-8 h-8 mx-auto text-green-500 mb-1" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">今日无安排</p>
+            <Link
+              href="/learn"
+              className="text-xs text-blue-500 hover:underline mt-2 inline-block"
+            >
+              去学习 →
+            </Link>
+          </div>
+        )}
+
+        {/* 能量趋势迷你图 */}
         <div className="mt-3">
-          <StatusCard />
+          <EnergyTrendMini trend={energyTrend} todayEnergy={todayEnergy} />
         </div>
       </section>
 

@@ -72,7 +72,9 @@ export type IconName =
   | "calendar-check"
   | "tag"
   | "snowflake"
-  | "loader";
+  | "loader"
+  | "tomato"
+  | "coffee";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: (
@@ -450,6 +452,23 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="m4.9 19.1 2.9-2.9" />
       <path d="M2 12h4" />
       <path d="m4.9 4.9 2.9 2.9" />
+    </>
+  ),
+  tomato: (
+    <>
+      <path d="M12 9a8 8 0 1 0 0 12 8 8 0 0 0 0-12Z" transform="translate(0 2)" />
+      <path d="M12 9c-1.5-2-1.5-4 0-6 1.5 2 1.5 4 0 6Z" />
+      <path d="M12 9c2-1.5 4-1.5 6 0-2 1.5-4 1.5-6 0Z" />
+      <path d="M12 9c-2-1.5-4-1.5-6 0 2 1.5 4 1.5 6 0Z" />
+    </>
+  ),
+  coffee: (
+    <>
+      <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+      <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+      <line x1="6" y1="2" x2="6" y2="4" />
+      <line x1="10" y1="2" x2="10" y2="4" />
+      <line x1="14" y1="2" x2="14" y2="4" />
     </>
   ),
 };
