@@ -8,15 +8,17 @@ import { useState } from "react";
 import { BreathTimer } from "@/components/BreathTimer";
 import { REST_METHODS, getMethodsByEnergy, type RestMethod } from "@/lib/rest-methods";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 // 可折叠的方法卡片
 function MethodCard({ method, defaultOpen }: { method: RestMethod; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   return (
     <div className="border rounded-lg overflow-hidden bg-white">
-      <button
+      <Button
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50"
         aria-expanded={open}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -29,7 +31,7 @@ function MethodCard({ method, defaultOpen }: { method: RestMethod; defaultOpen?:
         <span className={`text-gray-400 text-xs transition-transform ${open ? "rotate-90" : ""}`}>
           ▶
         </span>
-      </button>
+      </Button>
       {open && (
         <div className="px-3 pb-3 space-y-2 text-xs">
           <div>
@@ -77,17 +79,16 @@ export default function RestPage() {
         <p className="text-sm font-medium mb-2">当前能量</p>
         <div className="flex gap-2">
           {[1, 2, 3, 4, 5].map((n) => (
-            <button
+            <Button
               key={n}
+              variant={energy === n ? "dark" : "secondary"}
               onClick={() => setEnergy(n)}
-              className={`flex-1 py-2 rounded-lg font-bold transition-colors ${
-                energy === n ? "bg-black text-white" : "bg-gray-100 text-gray-400"
-              }`}
+              className="flex-1 py-2 font-bold"
               aria-label={`能量 ${n} 分`}
               aria-pressed={energy === n}
             >
               {n}
-            </button>
+            </Button>
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">{energyLabel}</p>

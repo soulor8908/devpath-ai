@@ -27,7 +27,7 @@ import { recordMistake } from "@/lib/mistake-book";
 import { listFavoriteDecks } from "@/lib/favorite";
 import { ReviewCardView } from "@/components/ReviewCardView";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, Input, Select, Slider } from "@/components/ui";
 import {
   applyReviewFilters,
   DEFAULT_FILTERS,
@@ -446,13 +446,13 @@ export default function ReviewPage() {
             />
           </div>
           {showJumpSlider && (
-            <input
-              type="range"
+            <Slider
               min={0}
               max={Math.max(0, dueCards.length - 1)}
               value={currentIndex}
-              onChange={(e) => setCurrentIndex(Number(e.target.value))}
-              className="w-full mt-2"
+              onChange={setCurrentIndex}
+              aria-label="跳转到第几张卡片"
+              className="mt-2"
             />
           )}
         </div>
@@ -492,12 +492,14 @@ export default function ReviewPage() {
           <Icon name="check-circle" className="w-10 h-10 inline-block mb-2" />
           <p>当前筛选下没有到期的复习卡片</p>
           {isFiltered && (
-            <button
+            <Button
+              variant="link"
+              size="sm"
               onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="mt-3 text-xs text-blue-500 hover:underline"
+              className="mt-3"
             >
               清除筛选查看全部 →
-            </button>
+            </Button>
           )}
         </div>
       ) : (
@@ -558,16 +560,14 @@ function FilterChip({
   label: string;
 }) {
   return (
-    <button
+    <Button
+      variant={active ? "primary" : "secondary"}
+      size="sm"
       onClick={onClick}
-      className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
-        active
-          ? "bg-black text-white"
-          : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-      }`}
+      className="rounded-full"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

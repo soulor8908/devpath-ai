@@ -164,37 +164,40 @@ export default function DailyPage() {
           <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
             晨
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
+              <Button
                 key={n}
+                variant={log.energy.energyMorning === n ? "primary" : "secondary"}
+                size="sm"
                 onClick={() => setLog({ ...log, energy: { ...log.energy, energyMorning: n } })}
-                className={`w-6 h-6 rounded ${log.energy.energyMorning === n ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700"}`}
               >
                 {n}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
             中
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
+              <Button
                 key={n}
+                variant={log.energy.energyNoon === n ? "primary" : "secondary"}
+                size="sm"
                 onClick={() => setLog({ ...log, energy: { ...log.energy, energyNoon: n } })}
-                className={`w-6 h-6 rounded ${log.energy.energyNoon === n ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700"}`}
               >
                 {n}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
             晚
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
+              <Button
                 key={n}
+                variant={log.energy.energyEvening === n ? "primary" : "secondary"}
+                size="sm"
                 onClick={() => setLog({ ...log, energy: { ...log.energy, energyEvening: n } })}
-                className={`w-6 h-6 rounded ${log.energy.energyEvening === n ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700"}`}
               >
                 {n}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

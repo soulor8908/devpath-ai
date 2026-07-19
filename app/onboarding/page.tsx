@@ -23,7 +23,7 @@ import { KEY_PREFIXES, type LearningPlan } from "@/lib/types";
 import { PRESETS, type PresetMeta } from "@/lib/presets";
 import { MindMap } from "@/components/MindMap";
 import { Icon } from "@/components/Icon";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Slider } from "@/components/ui";
 import { nanoid } from "nanoid";
 
 export default function OnboardingPage() {
@@ -94,10 +94,11 @@ export default function OnboardingPage() {
         {/* 预设卡片网格 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {PRESETS.map((p) => (
-            <button
+            <Button
               key={p.id}
+              variant="outline"
               onClick={() => previewPreset(p)}
-              className="text-left bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-blue-300 transition-all group"
+              className="text-left bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-blue-300 justify-start"
             >
               <div className="flex items-start gap-3">
                 <span className="text-3xl">{p.icon}</span>
@@ -124,7 +125,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
               </div>
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -146,13 +147,15 @@ export default function OnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl p-4 pb-20">
       {/* 顶部返回 */}
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={closePreset}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
+        className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-3"
       >
         <Icon name="chevron-right" className="w-4 h-4 rotate-180" />
         返回选择
-      </button>
+      </Button>
 
       {/* 预设标题 */}
       <div className="flex items-center gap-3 mb-4">
@@ -193,14 +196,14 @@ export default function OnboardingPage() {
           <label className="block text-sm font-medium mb-1">
             每日学习量：{dailyMinutes} 分钟
           </label>
-          <input
-            type="range"
+          <Slider
             min={15}
             max={120}
             step={5}
             value={dailyMinutes}
-            onChange={(e) => setDailyMinutes(Number(e.target.value))}
+            onChange={setDailyMinutes}
             className="w-full"
+            aria-label="每日学习量（分钟）"
           />
           <div className="flex justify-between text-xs text-gray-400">
             <span>15min</span>
@@ -212,14 +215,14 @@ export default function OnboardingPage() {
           <label className="block text-sm font-medium mb-1">
             每日新内容数：{maxNewPerDay} 个
           </label>
-          <input
-            type="range"
+          <Slider
             min={1}
             max={5}
             step={1}
             value={maxNewPerDay}
-            onChange={(e) => setMaxNewPerDay(Number(e.target.value))}
+            onChange={setMaxNewPerDay}
             className="w-full"
+            aria-label="每日新内容数（个）"
           />
           <div className="flex justify-between text-xs text-gray-400">
             <span>1 个</span>
