@@ -192,9 +192,36 @@ export async function hasValidSession(): Promise<boolean> {
 }
 
 /**
+ * 规范化 URL：与 next.config.js 的 trailingSlash: true 对齐。
+ *
+ * 背景：next.config.js 配了 trailingSlash: true，客户端用 /api/ai-test 签名，
+ * fetch 默认 follow 308 重定向到 /api/ai-test/，服务端 req.url 带斜杠，
+ * 用带斜杠的 path 重算签名 → 与客户端签名对不上 → INVALID_SIGNATURE。
+ *
+ * 修复策略（与服务端 session-middleware 的 path 末尾去斜杠配套）：
+ *   1. 签名用的 path：去掉末尾斜杠（与 session-middleware 一致，规范化为无斜杠形式）
+ *      - 服务端收到 /api/ai-test/ → 也去掉末尾斜杠 → 双方一致
+ *      - 兼容旧客户端：旧客户端签 /api/ai-test（无斜杠）→ 服务端去斜杠后也是 /api/ai-test → 仍匹配
+ *   2. fetch 实际请求的 URL：保留/补齐 trailing slash，避免触发 308 重定向
+ *      （308 虽保留 method/body，但重定向后 req.url 已变；直接命中带斜杠 URL 最稳）
+ *
+ * 单点修改覆盖所有调用方（chat/learn/sync/ai-test/revoke 等）。
+ */
+function normalizeUrl(url: string): { path: string; url: string } {
+  const u = new URL(url, window.location.origin);
+  // fetch URL：强制带 trailing slash（避免 308）
+  if (!u.pathname.endsWith("/")) u.pathname += "/";
+  const fetchUrl = u.pathname + u.search;
+  // 签名 path：去掉末尾斜杠（与服务端一致）
+  // 注意：根路径 "/" 去斜杠会变 ""，保留为 "/"
+  const path = u.pathname.length > 1 ? u.pathname.replace(/\/$/, "") : "/";
+  return { path, url: fetchUrl };
+}
+
+/**
  * 生成签名 headers（X-Session-Id / X-Request-Timestamp / X-Request-Nonce / X-Request-Signature）
  * @param method HTTP 方法
- * @param path URL pathname（不含 query）
+ * @param path URL pathname（不含 query，已规范化为无 trailing slash 形式，与服务端一致）
  * @param body 请求体原文（可为空字符串）
  * @param sessionSecret base64 编码的签名密钥
  */
@@ -240,7 +267,8 @@ export async function apiFetch(
   const session = await getValidSession();
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
-  const path = new URL(url, window.location.origin).pathname;
+  // 规范化：path 带 trailing slash（与服务端重定向后 req.url 一致），fetch 直接命中带斜杠 URL 避免 308
+  const { path, url: normalizedUrl } = normalizeUrl(url);
   const body = resolveBodyForSigning(options.body);
   const sigHeaders = await signRequest(
     options.method ?? "GET",
@@ -251,7 +279,7 @@ export async function apiFetch(
   for (const [k, v] of Object.entries(sigHeaders)) {
     headers.set(k, v);
   }
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(normalizedUrl, { ...options, headers });
   // 401 自动清本地 session（避免死 session 永久卡死）
   await handleAuthFailureIfAny(res);
   return res;
@@ -299,7 +327,8 @@ export async function aiFetch(
     const headers = new Headers(options.headers);
     headers.set("Content-Type", "application/json");
     const body = resolveBodyForSigning(options.body);
-    const path = new URL(url, window.location.origin).pathname;
+    // 规范化：path 带 trailing slash，fetch 直接命中带斜杠 URL 避免 308（与 apiFetch 一致）
+    const { path, url: normalizedUrl } = normalizeUrl(url);
     const sigHeaders = await signRequest(
       options.method ?? "POST",
       path,
@@ -317,7 +346,7 @@ export async function aiFetch(
     }
     // 用 then 拦截响应：401 时自动清本地 session（避免死 session 永久卡死）
     // res.clone() 让 handleAuthFailureIfAny 能读 body 而不消费原流
-    return fetch(url, { ...options, headers, signal: controller.signal }).then(
+    return fetch(normalizedUrl, { ...options, headers, signal: controller.signal }).then(
       async (res) => {
         await handleAuthFailureIfAny(res);
         return res;
@@ -345,9 +374,10 @@ export async function aiFetch(
 export async function revokeSession(): Promise<void> {
   try {
     const session = await getValidSession();
-    const path = "/api/auth/revoke";
+    // 规范化：path 带 trailing slash + fetch 直接命中带斜杠 URL（与 apiFetch 一致，避免 308 导致签名失败）
+    const { path, url: normalizedUrl } = normalizeUrl("/api/auth/revoke");
     const sigHeaders = await signRequest("POST", path, "", session.sessionSecret);
-    await fetch("/api/auth/revoke", {
+    await fetch(normalizedUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...sigHeaders },
     });

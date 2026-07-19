@@ -230,7 +230,13 @@ export async function requireSession(
   // g. 签名校验（先读 body，再重算签名）
   // 用 clone 避免消费原 body，下游路由仍可 req.json() / req.text()
   const bodyText = await req.clone().text();
-  const path = new URL(req.url).pathname;
+  // path 规范化：去掉末尾斜杠，与客户端 normalizeUrl 的签名 path 一致
+  // 背景：next.config.js 的 trailingSlash: true 让 /api/ai-test 被 308 重定向到 /api/ai-test/，
+  // 服务端 req.url 拿到带斜杠 path。客户端 normalizeUrl 签名时已去斜杠，
+  // 服务端这里也去斜杠 → 双方一致 → 签名通过。
+  // 根路径 "/" 去斜杠会变 ""，保留为 "/"。
+  const rawPath = new URL(req.url).pathname;
+  const path = rawPath.length > 1 ? rawPath.replace(/\/$/, "") : "/";
   const computedSignature = await signCanonicalRequest(
     req.method,
     path,

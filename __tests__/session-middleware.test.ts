@@ -390,6 +390,48 @@ describe("requireSession: 篡改检测", () => {
     expect(body.code).toBe("INVALID_SIGNATURE");
   });
 
+  it("trailing slash：用 /api/test 签名、发到 /api/test/（Next.js trailingSlash 重定向后场景）→ 通过", async () => {
+    // 背景：next.config.js trailingSlash: true 让客户端 fetch /api/test 触发 308 重定向到 /api/test/，
+    // 服务端 req.url.pathname 拿到带斜杠的 /api/test/。
+    // 客户端 normalizeUrl 签名时去斜杠（/api/test），服务端这里也去斜杠 → 双方一致 → 签名通过。
+    const { sessionId, sessionSecret } = await seedSession();
+    // 用无斜杠 path 签名（与 normalizeUrl 一致）
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      path: "/api/test",
+    });
+    // 但构造带斜杠 URL 的 Request（模拟 308 重定向后服务端收到的请求）
+    const redirected = new Request("https://example.com/api/test/", {
+      method: "POST",
+      headers: req.headers,
+      body: "",
+    });
+    const result = await requireSession(redirected);
+    expect(result).not.toBeInstanceOf(Response);
+  });
+
+  it("trailing slash 反向不兼容：用 /api/test/ 签名、发到 /api/test（无斜杠）→ 401 INVALID_SIGNATURE", async () => {
+    // 验证：服务端只去末尾斜杠，不会自动给客户端"补"斜杠。
+    // 客户端 normalizeUrl 必须也去斜杠，才能与服务端一致。
+    // （此用例锁定契约：客户端签名 path 必须是无斜杠形式）
+    const { sessionId, sessionSecret } = await seedSession();
+    // 用带斜杠 path 签名（违反 normalizeUrl 契约）
+    const req = await makeSignedRequest(sessionId, sessionSecret, {
+      path: "/api/test/",
+    });
+    // 实际请求是无斜杠 URL
+    const directHit = new Request("https://example.com/api/test", {
+      method: "POST",
+      headers: req.headers,
+      body: "",
+    });
+    const result = await requireSession(directHit);
+    expect(result).toBeInstanceOf(Response);
+    const res = result as Response;
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_SIGNATURE");
+  });
+
   it("method 篡改：用 POST 签名、GET 发送 → 401 INVALID_SIGNATURE", async () => {
     const { sessionId, sessionSecret } = await seedSession();
     // 用 POST 签名
