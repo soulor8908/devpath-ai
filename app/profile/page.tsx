@@ -743,32 +743,36 @@ export default function ProfilePage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {!c.isDefault && (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleSetDefault(c.id)}
-                        className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
                       >
                         设为默认
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleTestModel(c)}
                       disabled={testingId === c.id}
-                      className="rounded border border-green-200 px-2 py-1 text-xs text-green-600 hover:bg-green-50 disabled:opacity-50"
                     >
                       {testingId === c.id ? "测试中..." : "测试"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => openEditModelForm(c)}
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
                     >
                       编辑
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDeleteModel(c.id)}
-                      className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                     >
                       删除
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 {testResult[c.id] && (
@@ -822,13 +826,14 @@ export default function ProfilePage() {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {MODEL_PRESETS.map((p) => (
-                  <button
+                  <Button
                     key={p.name}
+                    variant="outline"
+                    size="sm"
                     onClick={() => applyPreset(p)}
-                    className="rounded-full border bg-white px-3 py-1 text-xs hover:border-blue-400 hover:text-blue-600"
                   >
                     {p.name}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -886,13 +891,13 @@ export default function ProfilePage() {
                 showPasswordToggle={false}
                 className="mt-1 font-mono"
                 rightSlot={
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowApiKey((v) => !v)}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-1"
                   >
                     {showApiKey ? "隐藏" : "显示"}
-                  </button>
+                  </Button>
                 }
               />
             </div>
@@ -1157,15 +1162,12 @@ export default function ProfilePage() {
             选择 AI 对话的语气风格。&quot;自动&quot; 会根据你当下的能量、心情、提问内容智能切换。
           </p>
           <div className="space-y-1.5">
-            <button
-              type="button"
+            <Button
+              variant={!userProfile?.preferredPersona ? "primary" : "ghost"}
+              block
               onClick={() => savePersonaPreference(undefined)}
               disabled={personaSaving}
-              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                !userProfile?.preferredPersona
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700"
-                  : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
-              }`}
+              className="flex items-center justify-between text-left"
             >
               <span>
                 <Icon name="sparkles" className="w-3.5 h-3.5 inline-block align-middle mr-1.5" />
@@ -1177,21 +1179,18 @@ export default function ProfilePage() {
               {!userProfile?.preferredPersona && (
                 <Icon name="check" className="w-4 h-4 text-blue-600" />
               )}
-            </button>
+            </Button>
 
             {PERSONA_LIST.map((p) => {
               const selected = userProfile?.preferredPersona === p.id;
               return (
-                <button
+                <Button
                   key={p.id}
-                  type="button"
+                  variant={selected ? "primary" : "ghost"}
+                  block
                   onClick={() => savePersonaPreference(p.id)}
                   disabled={personaSaving}
-                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                    selected
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700"
-                      : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
-                  }`}
+                  className="flex items-center justify-between text-left"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="font-medium">{p.name}</span>
@@ -1202,7 +1201,7 @@ export default function ProfilePage() {
                   {selected && (
                     <Icon name="check" className="w-4 h-4 shrink-0 text-blue-600" />
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -1480,10 +1479,10 @@ function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
         aria-expanded={open}
       >
         <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -1497,7 +1496,7 @@ function CollapsibleSection({
             className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
           />
         </span>
-      </button>
+      </Button>
       {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
     </section>
   );

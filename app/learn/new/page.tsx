@@ -322,14 +322,16 @@ export default function LearnNewPage() {
 
         <div className="flex flex-wrap gap-2">
           {quickInputs.map((ex) => (
-            <button
+            <Button
               key={ex}
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setTopic(ex)}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-1"
             >
               {ex}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -365,24 +367,26 @@ export default function LearnNewPage() {
               <Icon name="target" className="w-4 h-4 inline-block align-middle" /> 自定义提示词（可选）
             </span>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={async () => {
                   await ensurePromptLibrary();
                   setShowPromptLib((v) => !v);
                 }}
-                className="text-xs text-blue-600 hover:text-blue-800"
               >
                 <Icon name="book" className="w-4 h-4 inline-block align-middle" /> 常用 {promptLibraryLoaded ? `(${promptLibrary.length})` : ""}
-              </button>
+              </Button>
               {promptText.trim() && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setShowSavePrompt((v) => !v)}
-                  className="text-xs text-green-600 hover:text-green-800"
                 >
                   💾 存为常用
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -412,10 +416,11 @@ export default function LearnNewPage() {
                     key={p.id}
                     className="flex items-start gap-2 p-2 rounded hover:bg-white border border-transparent hover:border-gray-200 transition-colors"
                   >
-                    <button
+                    <Button
                       type="button"
-                      onClick={() => applyPrompt(p)}
+                      variant="ghost"
                       className="flex-1 text-left"
+                      onClick={() => applyPrompt(p)}
                     >
                       <p className="text-xs font-medium text-gray-800">
                         {p.title}
@@ -428,17 +433,18 @@ export default function LearnNewPage() {
                       <p className="text-[11px] text-gray-500 line-clamp-2">
                         {p.content}
                       </p>
-                    </button>
+                    </Button>
                     {/* 仅用户自定义的可删除 */}
                     {!BUILTIN_PROMPTS.some((b) => b.id === p.id) && (
-                      <button
-                        type="button"
-                        onClick={() => removePrompt(p.id)}
-                        className="text-gray-300 hover:text-red-500 text-xs"
+                      <Button
+                        iconOnly
+                        variant="ghost"
+                        size="sm"
                         aria-label="删除"
+                        onClick={() => removePrompt(p.id)}
                       >
                         <Icon name="x" className="w-3.5 h-3.5 inline-block" />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))
@@ -504,10 +510,11 @@ export default function LearnNewPage() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           {PRESETS.map((p) => (
-            <button
+            <Button
               key={p.id}
+              variant="ghost"
+              className="text-left p-3"
               onClick={() => openPreset(p)}
-              className="text-left p-3 border rounded-lg hover:border-blue-400 hover:shadow-sm transition-all bg-white"
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-2xl">{p.icon}</span>
@@ -529,7 +536,7 @@ export default function LearnNewPage() {
               <p className="text-[11px] text-gray-400">
                 {p.knowledgeTree.length} 知识点 · {p.questions.length} 题
               </p>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -637,13 +644,16 @@ function PresetMindMapModal({
             >
               {regenerating ? "生成中..." : "重新生成"}
             </Button>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            <Button
+              iconOnly
+              variant="ghost"
+              size="sm"
               aria-label="关闭"
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center"
             >
               <Icon name="x" className="w-4 h-4 inline-block" />
-            </button>
+            </Button>
           </div>
         </div>
 

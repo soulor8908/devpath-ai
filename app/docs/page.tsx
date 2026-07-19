@@ -100,14 +100,15 @@ export default function DocsPage() {
         className="w-full mb-4"
         rightSlot={
           search ? (
-            <button
-              type="button"
+            <Button
+              iconOnly
+              variant="ghost"
+              size="sm"
               onClick={() => setSearch("")}
-              className="text-gray-400 hover:text-gray-600"
               aria-label="清除搜索"
             >
               <Icon name="x" className="w-4 h-4" />
-            </button>
+            </Button>
           ) : undefined
         }
       />
@@ -128,20 +129,23 @@ export default function DocsPage() {
                   </p>
                   <div className="space-y-0.5">
                     {sections.map((s) => (
-                      <button
+                      <Button
                         key={s.id}
+                        variant="ghost"
+                        size="sm"
+                        block
                         onClick={() => {
                           setActiveId(s.id);
                           setSidebarOpen(false);
                         }}
-                        className={`block w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                        className={`text-left justify-start ${
                           activeId === s.id
                             ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium"
-                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            : ""
                         }`}
                       >
                         {s.title}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -189,12 +193,14 @@ export default function DocsPage() {
                 {search ? `未找到与"${search}"相关的文档` : "暂无文档"}
               </p>
               {search && (
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   onClick={() => setSearch("")}
-                  className="mt-3 text-sm text-blue-500 hover:underline"
+                  className="mt-3"
                 >
                   清除搜索
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -224,24 +230,28 @@ function DocNavigation({
   return (
     <div className="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between gap-4">
       {prev ? (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => onSelect(prev.id)}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+          className="text-left"
         >
           <Icon name="chevron-right" className="w-4 h-4 rotate-180 shrink-0" />
           <span className="truncate">{prev.title}</span>
-        </button>
+        </Button>
       ) : (
         <span />
       )}
       {next ? (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => onSelect(next.id)}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-right"
+          className="text-left"
         >
           <span className="truncate">{next.title}</span>
           <Icon name="chevron-right" className="w-4 h-4 shrink-0" />
-        </button>
+        </Button>
       ) : (
         <span />
       )}

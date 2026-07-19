@@ -573,12 +573,14 @@ export default function PlanDetailClient() {
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto pb-20">
       <div className="mb-6">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => router.push("/learn")}
-          className="text-sm text-gray-400 mb-2"
+          className="mb-2"
         >
           ← 返回
-        </button>
+        </Button>
         <div className="flex flex-col gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold break-words">{plan.topic}</h1>
@@ -588,13 +590,14 @@ export default function PlanDetailClient() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="dark"
+              size="sm"
               onClick={openRegenModal}
-              className="px-3 py-1.5 text-xs bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors"
               title="重新编辑提示词与计划参数，AI 重新生成"
             >
               <Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 重新生成
-            </button>
+            </Button>
             <Link
               href={`/learn/${plan.id}/edit`}
               className="px-3 py-1.5 text-xs border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -603,7 +606,9 @@ export default function PlanDetailClient() {
               <Icon name="pen" className="w-4 h-4 inline-block align-middle" /> 调整计划
             </Link>
             {fullscreen.supported && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={async () => {
                   const ok = await fullscreen.enterFullscreen();
                   if (ok) {
@@ -612,20 +617,20 @@ export default function PlanDetailClient() {
                     toast.warning("当前浏览器不支持全屏");
                   }
                 }}
-                className="px-3 py-1.5 text-xs border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
                 title="进入全屏专注模式（默认竖屏）"
               >
                 <Icon name="monitor" className="w-4 h-4 inline-block align-middle" /> 全屏
-              </button>
+              </Button>
             )}
           </div>
         </div>
-        <button
+        <Button
+          variant="outline"
           onClick={handleDeckFavorite}
-          className="mt-3 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg text-sm font-medium hover:bg-yellow-200"
+          className="mt-3"
         >
           {deckFavorited ? <><Icon name="star" className="w-3.5 h-3.5 inline-block" /> 已收藏（点击取消）</> : <><Icon name="star" className="w-3.5 h-3.5 inline-block" /> 收藏这份试题</>}
-        </button>
+        </Button>
       </div>
 
       <div className="mb-6">
@@ -642,10 +647,10 @@ export default function PlanDetailClient() {
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h2 className="text-lg font-bold">面试题（{filteredQuestions.length}/{plan.questions.length}）</h2>
           {plan.questions.some((q) => !q.answer) && (
-            <button
+            <Button
+              variant="primary"
               onClick={handleContinueGenerate}
               disabled={generatingAnswers}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1"
               title="对未生成答案的题目批量调用 AI 生成"
             >
               {generatingAnswers ? (
@@ -659,7 +664,7 @@ export default function PlanDetailClient() {
                   继续生成答案（{plan.questions.filter((q) => !q.answer).length} 题缺失）
                 </>
               )}
-            </button>
+            </Button>
           )}
         </div>
         <div className="mb-3 p-3 bg-gray-50 rounded-lg space-y-2">
@@ -667,41 +672,32 @@ export default function PlanDetailClient() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500">大厂:</span>
             {(["all", "big", "normal"] as const).map((v) => (
-              <button
+              <Button
                 key={v}
+                variant={filterBigTech === v ? "primary" : "ghost"}
+                size="sm"
                 onClick={() => setFilterBigTech(v)}
-                className={`text-xs px-2 py-0.5 rounded ${
-                  filterBigTech === v
-                    ? "bg-black text-white"
-                    : "bg-white text-gray-600 border"
-                }`}
               >
                 {v === "all" ? "全部" : v === "big" ? <><Icon name="building" className="w-3 h-3 inline-block" /> 大厂</> : "普通"}
-              </button>
+              </Button>
             ))}
             <span className="text-xs text-gray-500 ml-2">难度:</span>
-            <button
+            <Button
+              variant={filterDifficulty === "all" ? "primary" : "ghost"}
+              size="sm"
               onClick={() => setFilterDifficulty("all")}
-              className={`text-xs px-2 py-0.5 rounded ${
-                filterDifficulty === "all"
-                  ? "bg-black text-white"
-                  : "bg-white border"
-              }`}
             >
               全部
-            </button>
+            </Button>
             {[1, 2, 3, 4, 5].map((d) => (
-              <button
+              <Button
                 key={d}
+                variant={filterDifficulty === d ? "primary" : "ghost"}
+                size="sm"
                 onClick={() => setFilterDifficulty(d)}
-                className={`text-xs px-2 py-0.5 rounded ${
-                  filterDifficulty === d
-                    ? "bg-black text-white"
-                    : "bg-white border"
-                }`}
               >
                 {d}
-              </button>
+              </Button>
             ))}
           </div>
           {/* Row 2: node filter + search */}
@@ -731,17 +727,18 @@ export default function PlanDetailClient() {
               filterDifficulty !== "all" ||
               filterNodeId !== "all" ||
               searchQuery) && (
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 onClick={() => {
                   setFilterBigTech("all");
                   setFilterDifficulty("all");
                   setFilterNodeId("all");
                   setSearchQuery("");
                 }}
-                className="text-xs text-gray-400 hover:text-red-500"
               >
                 清除筛选
-              </button>
+              </Button>
             )}
           </div>
           {/* Result count */}
@@ -839,13 +836,16 @@ export default function PlanDetailClient() {
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold"><Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 重新生成计划</h2>
-                <button
+                <Button
+                  iconOnly
+                  variant="ghost"
+                  size="sm"
                   onClick={() => !regeneratingPlan && setShowRegenModal(false)}
-                  className="text-gray-400 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
                   aria-label="关闭"
+                  className="rounded-full w-8 h-8"
                 >
                   <Icon name="x" className="w-4 h-4 inline-block" />
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-500 mb-4">
                 修改下方参数后点击生成，AI 将重新拆解知识树并生成面试题，当前计划内容会被替换。

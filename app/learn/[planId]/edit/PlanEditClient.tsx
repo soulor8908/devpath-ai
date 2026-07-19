@@ -277,7 +277,8 @@ export default function PlanEditClient() {
 
       {/* Routine 作息 */}
       <section className="border rounded-lg mb-4 overflow-hidden">
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => setOpenSection("routine")}
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -286,7 +287,7 @@ export default function PlanEditClient() {
           <span className="text-gray-400">
             {openSection === "routine" ? "▼" : "▶"}
           </span>
-        </button>
+        </Button>
         {openSection === "routine" && (
           <div className="p-4">
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -424,7 +425,8 @@ export default function PlanEditClient() {
 
       {/* Priority 节点优先级 */}
       <section className="border rounded-lg mb-4 overflow-hidden">
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => setOpenSection("priority")}
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -433,7 +435,7 @@ export default function PlanEditClient() {
           <span className="text-gray-400">
             {openSection === "priority" ? "▼" : "▶"}
           </span>
-        </button>
+        </Button>
         {openSection === "priority" && (
           <div className="p-4">
             <p className="text-xs text-gray-400 mb-3">
@@ -494,7 +496,8 @@ export default function PlanEditClient() {
 
       {/* Question inclusion 题目包含 */}
       <section className="border rounded-lg mb-4 overflow-hidden">
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => setOpenSection("questions")}
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -508,7 +511,7 @@ export default function PlanEditClient() {
           <span className="text-gray-400">
             {openSection === "questions" ? "▼" : "▶"}
           </span>
-        </button>
+        </Button>
         {openSection === "questions" && (
           <div className="p-4">
             <div className="flex gap-2 mb-3">
@@ -559,7 +562,8 @@ export default function PlanEditClient() {
 
       {/* AI 调整 */}
       <section className="border rounded-lg mb-4 overflow-hidden">
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => setOpenSection("ai")}
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -568,7 +572,7 @@ export default function PlanEditClient() {
           <span className="text-gray-400">
             {openSection === "ai" ? "▼" : "▶"}
           </span>
-        </button>
+        </Button>
         {openSection === "ai" && (
           <div className="p-4">
             <p className="text-xs text-gray-400 mb-3">
