@@ -845,6 +845,7 @@ export default function ProfilePage() {
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
                 placeholder="如 我的 GPT"
+                inputSize="sm"
                 className="mt-1"
               />
             </div>
@@ -857,6 +858,7 @@ export default function ProfilePage() {
                 onChange={(e) =>
                   handleProviderChange(e.target.value as ModelConfig["provider"])
                 }
+                inputSize="sm"
                 className="mt-1"
               >
                 <option value="glm">glm（智谱）</option>
