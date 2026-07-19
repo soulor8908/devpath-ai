@@ -188,27 +188,25 @@ export async function requireSession(
     return unauthorized("request timestamp out of window", "TIMESTAMP_OUT_OF_WINDOW");
   }
 
-  // d. nonce 防重放（必须在 session 校验前，否则攻击者可绕过 nonce 复用）
-  const noncesStore = createNoncesStore();
-  const nonceOk = await noncesStore.useNonce(nonce, NONCE_TTL_SECONDS);
-  if (!nonceOk) {
-    return unauthorized("nonce already used", "NONCE_REPLAY");
-  }
-
-  // e. session 查询
+  // d. session 查询（先查 session，再验签，最后才消费 nonce）
+  // 顺序说明（修正历史 bug）：
+  //   旧实现 nonce 在签名校验前消费，导致任何后续步骤失败（SESSION_NOT_FOUND /
+  //   INVALID_SIGNATURE 等）后 nonce 被永久消费，客户端若重试会卡 NONCE_REPLAY。
+  //   正确顺序：先验签通过，证明请求合法且未被篡改，再消费 nonce 防重放。
+  //   攻击者要重放必须先有合法签名（需要 sessionSecret），所以先验签不削弱安全性。
   const sessionStore = createSessionStore();
   const record = await sessionStore.getSession(sessionId);
   if (!record) {
     return unauthorized("session expired or invalid", "SESSION_NOT_FOUND");
   }
 
-  // f. session 过期校验（双保险：KV TTL 应该已经清除，但内存降级模式无自动过期）
+  // e. session 过期校验（双保险：KV TTL 应该已经清除，但内存降级模式无自动过期）
   const expiresAtMs = new Date(record.expiresAt).getTime();
   if (!Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()) {
     return unauthorized("session expired", "SESSION_EXPIRED");
   }
 
-  // g. 解密 sessionSecret
+  // f. 解密 sessionSecret
   let masterKey: string;
   try {
     masterKey = getMasterKey();
@@ -229,7 +227,7 @@ export async function requireSession(
     return unauthorized("session expired or invalid", "SESSION_CORRUPT");
   }
 
-  // h. 签名校验（先读 body，再重算签名）
+  // g. 签名校验（先读 body，再重算签名）
   // 用 clone 避免消费原 body，下游路由仍可 req.json() / req.text()
   const bodyText = await req.clone().text();
   const path = new URL(req.url).pathname;
@@ -243,6 +241,13 @@ export async function requireSession(
   );
   if (!constantTimeEqual(receivedSignature, computedSignature)) {
     return unauthorized("invalid signature", "INVALID_SIGNATURE");
+  }
+
+  // h. nonce 防重放（签名校验通过后才消费，避免失败请求污染 nonce 池）
+  const noncesStore = createNoncesStore();
+  const nonceOk = await noncesStore.useNonce(nonce, NONCE_TTL_SECONDS);
+  if (!nonceOk) {
+    return unauthorized("nonce already used", "NONCE_REPLAY");
   }
 
   // i. 滑动续期：lastUsedAt + expiresAt = now + 7d

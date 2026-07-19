@@ -15,7 +15,7 @@ import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } fro
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { apiFetch, exchangeSession, revokeSession, hasValidSession, ExchangeError } from "@/lib/api-client";
+import { apiFetch, aiFetch, exchangeSession, revokeSession, hasValidSession, ExchangeError } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { ShareCardButton } from "@/components/ShareCardButton";
@@ -541,14 +541,21 @@ export default function ProfilePage() {
   }
 
   /**
-   * 测试模型连接：先 exchange 拿到 session，再调 /api/ai-test（已用 requireSession）
-   * exchange 成功即说明 apiKey/baseURL/model 配置有效（服务端会写入 KV）
+   * 测试模型连接：完整链路验证（exchange → requireSession → 上游 AI）
+   *
+   * 历史问题：旧实现只调 exchange，没调 /api/ai-test，导致「测试通过」是假象——
+   * exchange 路由只写不读 session，即使 KV binding 没生效也会假性成功。
+   * 修复：exchange 后必须调一次 /api/ai-test（走 requireSession），验证：
+   *   1. session 能从 KV 读回（KV binding 生效）
+   *   2. 签名校验通过（客户端/服务端签名算法一致）
+   *   3. 上游 AI provider 接受 apiKey（不是 invalid signature / 401）
    */
   async function handleTestModel(config: ModelConfig) {
     setTestingId(config.id);
     setTestResult((prev) => ({ ...prev, [config.id]: { ok: false, msg: "测试中..." } }));
     try {
       const userId = await getUserId();
+      // 第 1 步：exchange 拿到 session（写入服务端 KV + 本地 IndexedDB）
       await exchangeSession({
         apiKey: config.apiKey,
         userId,
@@ -557,9 +564,39 @@ export default function ProfilePage() {
         model: config.model,
         name: config.name,
       });
+      // 第 2 步：调 /api/ai-test，走完整 requireSession 链路 + 上游 AI 调用
+      // 这一步能通过才证明：KV binding 生效 + 签名一致 + apiKey 有效
+      const res = await aiFetch("/api/ai-test", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        // 区分上游 401（apiKey 失效）vs 本地 401（session 链路问题）
+        let code = "";
+        try {
+          const body = await res.clone().json();
+          code = typeof body.code === "string" ? body.code : "";
+        } catch {
+          /* 非 JSON */
+        }
+        const msg =
+          code === "UPSTREAM_AUTH"
+            ? `apiKey 鉴权失败：${errText || "上游 AI 拒绝"}。请检查 apiKey 是否正确、是否被风控或失效`
+            : `测试失败 (${res.status})${errText ? `: ${errText}` : ""}`;
+        setTestResult((prev) => ({
+          ...prev,
+          [config.id]: { ok: false, msg },
+        }));
+        return;
+      }
+      const data = await res.json();
       setTestResult((prev) => ({
         ...prev,
-        [config.id]: { ok: true, msg: "连接成功，加密会话已启用" },
+        [config.id]: {
+          ok: true,
+          msg: `连接成功${data.reply ? `（AI 回复：${data.reply}）` : ""}，加密会话已启用`,
+        },
       }));
     } catch (e) {
       const msg = mapExchangeErrorMessage(e);

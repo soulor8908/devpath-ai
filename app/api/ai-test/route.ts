@@ -41,12 +41,26 @@ export async function POST(req: NextRequest) {
       model: session.model,
     });
   } catch (error) {
+    // 区分上游 AI 鉴权失败 vs 本地错误（与 chat route 一致）
+    const isUpstreamAuthError =
+      error instanceof Error &&
+      /401|invalid api key|invalid signature|unauthorized/i.test(error.message);
+    if (isUpstreamAuthError) {
+      const message = error instanceof Error ? error.message : "上游 AI 鉴权失败";
+      console.warn("[ai-test] upstream auth error:", message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `AI 服务鉴权失败：${message}。请检查 apiKey 是否正确、是否被风控或失效`,
+          code: "UPSTREAM_AUTH",
+        },
+        { status: 401 },
+      );
+    }
     const message = error instanceof Error ? error.message : "未知错误";
+    console.error("[ai-test] internal error:", message);
     return NextResponse.json(
-      {
-        success: false,
-        error: message,
-      },
+      { success: false, error: message, code: "INTERNAL_ERROR" },
       { status: 500 },
     );
   }

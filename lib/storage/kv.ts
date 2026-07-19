@@ -237,20 +237,41 @@ interface MemoryEntry {
 /**
  * Session 存储封装：管理 session / nonce / audit 三类 KV 数据。
  *
- * 构造时传入 Cloudflare KV namespace binding；传 null 时降级为内存 Map
- * （仅本地开发/测试，与 KVStore 的 mock 风格一致）。
+ * 构造时传入 Cloudflare KV namespace binding；传 null 时降级为**模块级单例内存 Map**
+ * （而非 per-instance Map），原因：
+ *   - exchange 路由只写 session，requireSession 中间件只读 session，两者
+ *     会各自 new 一个 SessionStore。若用 per-instance Map，写入的数据对
+ *     读取方不可见 → SESSION_NOT_FOUND → 401
+ *   - 模块级单例保证同一 isolate 内的 exchange→requireSession 链路可见
+ *   - 跨 isolate 仍不可见（Cloudflare Pages 多 isolate），所以这只是
+ *     「KV binding 没配时的降级兜底」，正确做法还是在 Cloudflare Pages
+ *     dashboard 配置 AUTH_SESSIONS / AUTH_NONCES / AUTH_AUDIT 三个 KV binding
  *
  * KV key 设计：
  * - session: `auth:session:${sessionId}`
  * - nonce:   `auth:nonce:${nonce}`
  * - audit:   `auth:audit:${sessionId}:${timestamp}`
  */
+
+/**
+ * 模块级单例内存 Map：所有「无 KV binding」的 SessionStore 实例共享。
+ * 生产环境 KV binding 正常时不会用到，仅作降级兜底。
+ */
+const SHARED_MEMORY_STORE = new Map<string, MemoryEntry>();
+
 export class SessionStore {
   private memory: Map<string, MemoryEntry> | null;
 
   constructor(private kv: KVNamespace | null) {
-    // kv 为 null → 本地开发/测试，降级为内存 Map
-    this.memory = kv === null ? new Map() : null;
+    // kv 为 null → 降级为模块级单例 Map（所有实例共享，避免 exchange 写 / requireSession 读 不可见）
+    this.memory = kv === null ? SHARED_MEMORY_STORE : null;
+    if (kv === null) {
+      // 一次性日志：帮助诊断生产环境 KV binding 是否生效
+      console.warn(
+        "[SessionStore] MEMORY mode (KV binding is null) — sessions will not persist across isolates. " +
+          "Please configure AUTH_SESSIONS / AUTH_NONCES / AUTH_AUDIT KV bindings in Cloudflare Pages dashboard.",
+      );
+    }
   }
 
   /** 读取原始字符串（带内存 TTL 过期检查） */

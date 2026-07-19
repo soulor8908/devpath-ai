@@ -128,6 +128,59 @@ export async function getValidSession(): Promise<ClientSession> {
   return session;
 }
 
+/**
+ * 清除本地 session（IndexedDB）。
+ *
+ * 服务端返回 401（SESSION_NOT_FOUND / SESSION_EXPIRED / SESSION_CORRUPT 等）时
+ * 自动调用，避免客户端用「服务端已不存在的死 session」反复签名导致永久卡死 401。
+ * 清除后下一次 getValidSession() 会抛 SessionExpiredError，调用方可引导用户
+ * 重新保存模型（触发 exchange）。
+ */
+export async function clearLocalSession(): Promise<void> {
+  try {
+    await delItem(SESSION_KEY);
+  } catch {
+    // IndexedDB 不可用时忽略——下次 getItem 会返回 null，getValidSession 抛错
+  }
+}
+
+/**
+ * 检查响应是否为 session 失效的 401，是则清除本地 session。
+ * 返回 true 表示已处理（调用方应中止后续流程或抛 SessionExpiredError）。
+ *
+ * 识别的服务端 code：
+ *   - SESSION_NOT_FOUND / SESSION_EXPIRED / SESSION_CORRUPT：session 在服务端已不存在
+ *   - INVALID_SIGNATURE：签名对不上（可能本地 sessionSecret 与服务端不一致）
+ *   - NONCE_REPLAY：nonce 已被消费（极端情况下也建议重新 exchange）
+ *
+ * 不处理 UPSTREAM_AUTH（上游 AI provider 的 401，与本地 session 无关）。
+ */
+async function handleAuthFailureIfAny(res: Response): Promise<boolean> {
+  if (res.status !== 401) return false;
+  let code = "";
+  try {
+    const body = await res.clone().json();
+    code = typeof body.code === "string" ? body.code : "";
+  } catch {
+    // 非 JSON 响应：保守起见也清本地 session（可能是中间件异常）
+  }
+  const SESSION_FAILURE_CODES = new Set([
+    "SESSION_NOT_FOUND",
+    "SESSION_EXPIRED",
+    "SESSION_CORRUPT",
+    "INVALID_SIGNATURE",
+    "NONCE_REPLAY",
+  ]);
+  if (code === "" || SESSION_FAILURE_CODES.has(code)) {
+    console.warn(
+      `[api-client] 401 received (code=${code || "empty"}), clearing local session`,
+    );
+    await clearLocalSession();
+    return true;
+  }
+  return false;
+}
+
 /** 检查是否已有有效 session（不抛错，返回 boolean） */
 export async function hasValidSession(): Promise<boolean> {
   try {
@@ -176,6 +229,9 @@ async function signRequest(
  * body 必须是 string（JSON.stringify 后传入）。
  * 若传入非 string body（如 Blob/FormData/URLSearchParams），会抛错——
  * 否则客户端会签空 body 但发真实 body，服务端必然返回 INVALID_SIGNATURE。
+ *
+ * 收到 401（session 失效）时自动清本地 session，下次调用会抛 SessionExpiredError，
+ * 调用方可引导用户重新保存模型。避免用死 session 反复签名永久卡死 401。
  */
 export async function apiFetch(
   url: string,
@@ -195,7 +251,10 @@ export async function apiFetch(
   for (const [k, v] of Object.entries(sigHeaders)) {
     headers.set(k, v);
   }
-  return fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
+  // 401 自动清本地 session（避免死 session 永久卡死）
+  await handleAuthFailureIfAny(res);
+  return res;
 }
 
 /**
@@ -256,7 +315,14 @@ export async function aiFetch(
       if (externalSignal.aborted) controller.abort();
       else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
     }
-    return fetch(url, { ...options, headers, signal: controller.signal });
+    // 用 then 拦截响应：401 时自动清本地 session（避免死 session 永久卡死）
+    // res.clone() 让 handleAuthFailureIfAny 能读 body 而不消费原流
+    return fetch(url, { ...options, headers, signal: controller.signal }).then(
+      async (res) => {
+        await handleAuthFailureIfAny(res);
+        return res;
+      },
+    );
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       if (timeoutMs > 0) {
