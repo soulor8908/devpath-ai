@@ -36,6 +36,17 @@ export interface CreateSessionParams {
 /** 全局事件名：session 列表发生变化时由 mutation 函数派发，widget 监听后立即刷新 */
 export const POMODORO_SESSION_CHANGED_EVENT = "pomodoro:session-changed";
 
+/**
+ * 全局事件名：调用方派发此事件让全局挂载的 PomodoroWidget 进入 large 模式（Modal）。
+ *
+ * 用途：HomeClient 的「番茄钟 · 开始一段专注」入口不再跳转 /timer 路由
+ * （该路由已移除），改为派发此事件唤醒 large Modal。
+ *
+ * 派发：window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT))
+ * 监听：PomodoroWidget useEffect 内 addEventListener，setMode("large")
+ */
+export const POMODORO_OPEN_LARGE_EVENT = "pomodoro:open-large";
+
 /** 派发 session 变化事件，让监听方（如 PomodoroWidget）立即刷新，避免 1 秒轮询延迟 */
 function notifySessionChanged(): void {
   if (typeof window === "undefined") return;

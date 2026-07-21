@@ -21,6 +21,7 @@ import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow } from "@/lib/time";
 import { buildChatContext } from "@/lib/ai/chat-context";
 import { aiFetch } from "@/lib/api-client";
+import { getDefaultModelConfig } from "@/lib/model-config";
 import { toast } from "@/lib/toast";
 import {
   recordAICall,
@@ -90,13 +91,29 @@ export function DailyNudge() {
       // 3. 调 API + AI 质量追踪
       // 不再使用 startAITask（模态弹框）—— 系统默认动作不应阻塞用户
       // 进度反馈由卡片自身 inline loader 承担，完成/失败用 toast 提示
+      //
+      // Trial 模式降级（与 ChatClient 一致）：
+      //   - 用户没配模型 / apiKey 为空 → 走普通 fetch（不带 session 签名头）
+      //   - 服务端检测到无 session 会自动降级到 trial 模式（getModel + IP 限流）
+      //   - 即使服务端没配 AI_API_KEY，也会降级到 rule 模板（不报错）
+      //   - 关键约束：试用用户进首页不能看到"AI 提醒加载失败"
+      const defaultCfg = await getDefaultModelConfig().catch(() => undefined);
+      const useTrialMode = !defaultCfg || !defaultCfg.apiKey;
+
       const newCallId = generateCallId();
       const stopTimer = startTimer();
       try {
-        const res = await aiFetch("/api/daily-nudge", {
-          method: "POST",
-          body: JSON.stringify({ contextSnapshot }),
-        });
+        const requestBody = JSON.stringify({ contextSnapshot });
+        const res = useTrialMode
+          ? await fetch("/api/daily-nudge", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: requestBody,
+            })
+          : await aiFetch("/api/daily-nudge", {
+              method: "POST",
+              body: requestBody,
+            });
 
         if (!res.ok) {
           throw new Error(`请求失败 (${res.status})`);

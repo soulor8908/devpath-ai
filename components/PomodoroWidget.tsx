@@ -9,24 +9,31 @@
 //   - medium：grip 拖动条 + 倒计时 + 任务名 + 进度环 + 控制按钮
 //     点击「展开全屏」→ large modal
 //   - large：Modal 形式渲染 PomodoroFullContent（idle/running/completed 三态视图）
-//     失焦 / ESC / 关闭按钮 → 回到 small（不回 medium，避免遮挡）
+//     失焦 / ESC / 关闭按钮 → 回到 medium（用户要求：缩小时显示中弹窗）
+//     large 出现时隐藏 small/medium（不双重渲染）
 //
 // 拖动优化（卡帕西视角，修卡顿 + 防事件透传）：
 //   - Pointer Events API 替代 mouse + touch 双套监听
 //   - setPointerCapture(e.pointerId)：所有后续指针事件都路由到 handle 元素，
 //     **不会透传到页面**（修拖动快时鼠标飞出 widget 触发底层 hover/click 的问题）
-//   - 拖动时直接操作 ref.style.transform（不 setState），拖动结束才同步 state
+//   - 拖动时直接操作 ref.style.left/top（不 setState），拖动结束才同步 state
 //     → 60fps 平滑拖动，无重渲染开销
 //   - 拖动期间 widget 加 pointer-events-none 到子元素，避免内部按钮 hover 触发
+//
+// 边界 + 吸附（用户需求 3）：
+//   - clampPosition：上下左右不能跑到屏幕外，底部预留 96px 给底部 Nav
+//   - 小弹框拖动结束时，自动吸附到最近边（左/右/上/下）：
+//     计算到 4 个边的距离，取最近的吸附，带 200ms transition 平滑过渡
+//     medium 不吸附（用户只对小弹框要求吸附）
 //
 // 暂停不关闭弹窗（关键约束）：
 //   - small/medium：暂停只切 session.status=paused，widget 仍渲染
 //   - large：Modal onClose 由用户主动触发（关闭按钮/ESC），pauseSession 不调用 onClose
 //
-// 不遮挡学习区：
-//   - small 直径仅 56px，比 medium w-56 更小
-//   - 默认贴右下角，距边缘 16px，避开底部 Nav 96px
-//   - 拖动后位置 localStorage 持久化（同设备记忆）
+// 入口改造（用户需求 2）：
+//   - 移除 /timer 路由，HomeClient 入口派发 POMODORO_OPEN_LARGE_EVENT 全局事件
+//   - widget useEffect 监听该事件 → setMode("large") 唤醒大弹窗
+//   - 即使无 running session 也能打开 large modal（PomodoroFullContent 内有 start form）
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { PomodoroSession } from "@/lib/types";
@@ -36,10 +43,10 @@ import {
   resumeSession,
   abandonSession,
   POMODORO_SESSION_CHANGED_EVENT,
+  POMODORO_OPEN_LARGE_EVENT,
 } from "@/lib/timer/pomodoro";
 import { notify } from "@/lib/timer/notification-permission";
 import { confirmDialog } from "@/lib/confirm-dialog";
-import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Modal } from "@/components/ui";
 import { Icon } from "@/components/Icon";
@@ -134,8 +141,14 @@ function saveModePreference(mode: WidgetMode): void {
 }
 
 /**
+ * 底部 Nav 高度预留（避开底部导航栏，widget 不被遮挡）
+ */
+const BOTTOM_NAV_RESERVE = 96;
+
+/**
  * 把 widget 位置约束在 viewport 内，避免拖到屏幕外找不回来。
  * 用传入的 widgetW/H（不同模式尺寸不同）做精准约束。
+ * 底部预留 BOTTOM_NAV_RESERVE（96px）给底部 Nav。
  */
 function clampPosition(
   pos: WidgetPosition,
@@ -146,8 +159,42 @@ function clampPosition(
 ): WidgetPosition {
   return {
     x: Math.min(Math.max(0, pos.x), Math.max(0, vw - widgetW)),
-    y: Math.min(Math.max(0, pos.y), Math.max(0, vh - widgetH)),
+    y: Math.min(
+      Math.max(0, pos.y),
+      Math.max(0, vh - widgetH - BOTTOM_NAV_RESERVE),
+    ),
   };
+}
+
+/**
+ * 计算小弹框拖动结束时的吸附位置：吸附到最近的边（左/右/上/下）。
+ * 上下边距为 8px，左右边距为 8px；底部需预留 Nav。
+ * 返回吸附后的坐标。
+ */
+function snapToNearestEdge(
+  pos: WidgetPosition,
+  vw: number,
+  vh: number,
+  widgetSize: number,
+): WidgetPosition {
+  const margin = 8;
+  // 到 4 个边的距离
+  const distLeft = pos.x;
+  const distRight = vw - pos.x - widgetSize;
+  const distTop = pos.y;
+  const distBottom = vh - pos.y - widgetSize - BOTTOM_NAV_RESERVE;
+  const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+  if (minDist === distLeft) {
+    return { x: margin, y: pos.y };
+  }
+  if (minDist === distRight) {
+    return { x: vw - widgetSize - margin, y: pos.y };
+  }
+  if (minDist === distTop) {
+    return { x: pos.x, y: margin };
+  }
+  // 吸附到 Nav 上方
+  return { x: pos.x, y: vh - widgetSize - BOTTOM_NAV_RESERVE - margin };
 }
 
 /** small 模式尺寸：直径 56px */
@@ -176,8 +223,6 @@ export function PomodoroWidget() {
   } | null>(null);
   // 用于 session 切换时避免重复通知
   const notifiedRef = useRef<string | null>(null);
-  // 当前路由：在 /timer 页不显示 widget（路由页已接管，避免双重 UI）
-  const pathname = usePathname();
 
   const refresh = useCallback(async () => {
     const running = await getRunningSession();
@@ -224,6 +269,14 @@ export function PomodoroWidget() {
       });
     }
     setMode(loadModePreference());
+  }, []);
+
+  // 监听全局事件：HomeClient 的「番茄钟」入口派发 POMODORO_OPEN_LARGE_EVENT
+  // → 唤醒 large Modal。即使无 running session 也能打开（PomodoroFullContent 内有 start form）
+  useEffect(() => {
+    const openLarge = () => setMode("large");
+    window.addEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
+    return () => window.removeEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
   }, []);
 
   /**
@@ -291,22 +344,50 @@ export function PomodoroWidget() {
       }
       dragStateRef.current = null;
       widgetRef.current?.classList.remove("dragging");
-      // 拖动结束才同步 state（持久化用）
+      // 读取拖动结束时的当前位置
       const left = widgetRef.current?.style.left;
       const top = widgetRef.current?.style.top;
       if (left && top) {
         const x = parseFloat(left);
         const y = parseFloat(top);
         if (Number.isFinite(x) && Number.isFinite(y)) {
-          setPosition({ x, y });
-          savePosition({ x, y });
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          // small 模式：吸附到最近边（带 200ms transition 平滑过渡）
+          // medium 模式：不吸附（用户只要求小弹框吸附），保持当前位置
+          if (mode === "small" && widgetRef.current) {
+            const snapped = snapToNearestEdge(
+              { x, y },
+              vw,
+              vh,
+              SMALL_SIZE,
+            );
+            // 加 transition 让吸附平滑
+            widgetRef.current.style.transition =
+              "left 200ms ease-out, top 200ms ease-out";
+            widgetRef.current.style.left = `${snapped.x}px`;
+            widgetRef.current.style.top = `${snapped.y}px`;
+            // 同步 state + 持久化
+            setPosition(snapped);
+            savePosition(snapped);
+            // 200ms 后清除 transition，避免下次拖动时有延迟
+            window.setTimeout(() => {
+              if (widgetRef.current) {
+                widgetRef.current.style.transition = "";
+              }
+            }, 220);
+          } else {
+            // medium / large：直接同步当前位置（不吸附）
+            setPosition({ x, y });
+            savePosition({ x, y });
+          }
         }
       }
     },
-    [],
+    [mode],
   );
 
-  // 切换模式：large → small（用户主动关闭 modal 时）
+  // 切换模式：large → medium（用户主动关闭 modal 时；用户需求：缩小时显示中弹窗）
   // medium ↔ small 都通过 setMode + saveModePreference 持久化
   const switchMode = useCallback((next: WidgetMode) => {
     setMode(next);
@@ -325,9 +406,10 @@ export function PomodoroWidget() {
     // large 不在此处切换（modal 关闭按钮触发）
   }, [mode, switchMode]);
 
-  // large modal 关闭：回到 small（用户需求：失焦直接变回小弹窗）
+  // large modal 关闭：回到 medium（用户需求：缩小时显示中弹窗，非小弹窗）
+  // 只有 medium 没有 session 时才会被外层守卫拦截，但 modal 已打开过用户可见
   const handleLargeClose = useCallback(() => {
-    switchMode("small");
+    switchMode("medium");
   }, [switchMode]);
 
   // medium 中「展开」按钮：阻止冒泡，避免触发 handleWidgetClick 折叠
@@ -375,9 +457,28 @@ export function PomodoroWidget() {
     }
   }
 
-  // 无 running session 不显示；/timer 页有路由页接管，避免双重 UI；
+  // 无 running session 不显示 small/medium（large modal 即使无 session 也能打开，
+  // 因 large 模式渲染的 PomodoroFullContent 内有 start form）
   // position 未就绪时不显示（避免首帧闪烁在错误位置）
-  if (!session || pathname === "/timer" || !position) return null;
+  if (!position) return null;
+
+  // large 模式：只渲染 Modal，不渲染 small/medium（用户需求：大弹窗出现时隐藏中小弹窗）
+  // 即使无 running session 也要渲染 Modal（用户从入口唤醒时常见此场景）
+  if (mode === "large") {
+    return (
+      <Modal
+        open
+        onClose={handleLargeClose}
+        title="番茄专注"
+        size="lg"
+      >
+        <PomodoroFullContent />
+      </Modal>
+    );
+  }
+
+  // small / medium 模式：必须有 running session 才显示
+  if (!session) return null;
 
   const isPaused = session.status === "paused";
   const isOvertime = remainingMs <= 0 && session.status === "running";
@@ -629,18 +730,6 @@ export function PomodoroWidget() {
           </div>
         </div>
       </div>
-
-      {/* large 模式：Modal 渲染 PomodoroFullContent */}
-      {/* 关键：onClose 由 Modal 内部 ESC / 遮罩点击 / 关闭按钮触发，与 pauseSession 无关， */}
-      {/* 因此暂停状态下弹窗不会自动关闭 */}
-      <Modal
-        open={mode === "large"}
-        onClose={handleLargeClose}
-        title="番茄专注"
-        size="lg"
-      >
-        <PomodoroFullContent />
-      </Modal>
     </>
   );
 }

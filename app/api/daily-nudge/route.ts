@@ -4,57 +4,113 @@
 // 设计：
 //   - 客户端从 IndexedDB 聚合快照后 POST 过来
 //   - 服务端调一次 LLM，返回短文本
-//   - 失败时降级为规则模板（session 中的 apiKey 由 exchange 保证可用，无 key 不会进入此路由）
+//   - 失败时降级为规则模板
 //   - 客户端按当天缓存（IndexedDB），避免每次进首页都跑 LLM
 //
-// 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
-//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
+// 鉴权与试用降级（与 /api/chat 对齐）：
+//   1. 已登录：requireSession 注入 session，用 session.apiKey 调上游（用户自担额度）
+//   2. 未登录：若服务端配了 AI_API_KEY，走 trial 模式（getModel() + IP 限流
+//      daily_nudge=1/天，已用完则降级到 rule 模板，不报错）
+//   3. 未登录且服务端没配 AI_API_KEY：降级到 rule 模板（不报错）
+//   关键约束：试用用户进首页不能看到"AI 提醒加载失败"，必须能正常请求
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
-import { getModelFromSession } from "@/lib/ai/provider";
+import { getModelFromSession, getModel, hasAIKey } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
+import { createKVStore } from "@/lib/storage/kv";
+import { getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
+import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
 // 从 Prompt Registry 读取
 const PROMPT_DEF = getPrompt("daily_nudge");
 
+/**
+ * 从请求头提取客户端真实 IP（与 /api/chat 一致）。
+ * 优先级：
+ *   1. cf-connecting-ip（Cloudflare Pages 注入，最可信）
+ *   2. x-forwarded-for 的第一个值（其他反代场景）
+ *   3. 兜底 "unknown"（限流将以 unknown 维度计数，可接受）
+ */
+function getClientIp(req: NextRequest): string {
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp;
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
+/** 构造规则降级响应（不报错，保证试用用户也能看到内容） */
+function ruleResponse(snapshot: string): NextResponse {
+  return NextResponse.json({
+    nudge: ruleBasedNudge(snapshot),
+    source: "rule",
+    generatedAt: new Date().toISOString(),
+  });
+}
+
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
-  // 先鉴权
-  const sessionResult = await requireSession(req);
-  if (sessionResult instanceof NextResponse) return sessionResult;
-  const { session } = sessionResult;
 
+  // 鉴权：先尝试 requireSession（内部用 req.clone().text() 读 body 签名校验，不消费原 body）
+  // 顺序很关键：requireSession 必须在 req.json() 之前，否则 body 被消费后签名校验会失败
+  const sessionResult = await requireSession(req);
+  const hasSession = !(sessionResult instanceof NextResponse);
+  const session = hasSession ? sessionResult.session : null;
+
+  // 再读 body（requireSession 用 clone 不消费原 body）
   let body: { contextSnapshot?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
-
   const { contextSnapshot } = body;
-  const model = getModelFromSession(session, "daily-nudge");
+
+  // 安全截断
+  const safeSnapshot =
+    typeof contextSnapshot === "string" && contextSnapshot.length > 0
+      ? contextSnapshot.slice(0, 4000)
+      : "";
+
+  // 无 contextSnapshot 时直接走规则模板（不需要 LLM）
+  if (!safeSnapshot) {
+    return ruleResponse(safeSnapshot);
+  }
+
+  // 模型选择
+  // - session 存在 → 用 session.apiKey 调上游
+  // - session 不存在 + 服务端配了 AI_API_KEY → trial 模式（getModel + IP 限流）
+  // - session 不存在 + 服务端没配 AI_API_KEY → 降级到 rule 模板（不报错）
+  let model;
+  let isTrial = false;
+
+  if (session) {
+    model = getModelFromSession(session, "daily-nudge");
+  } else if (hasAIKey()) {
+    // Trial 模式：IP 维度限流（daily_nudge 默认配额 1/天，足够）
+    const ip = getClientIp(req);
+    const kv = createKVStore(getAuthSessionsKV() ?? undefined);
+    const limit = await checkTrialRateLimit(ip, "daily_nudge", kv);
+    if (!limit.allowed) {
+      // 试用额度用完 → 降级到 rule 模板（不报错，保证试用用户能看到内容）
+      return ruleResponse(safeSnapshot);
+    }
+    model = getModel();
+    isTrial = true;
+  } else {
+    // 服务端没配 AI_API_KEY 且用户未登录 → 降级到 rule 模板
+    return ruleResponse(safeSnapshot);
+  }
 
   try {
-    // 安全截断
-    const safeSnapshot =
-      typeof contextSnapshot === "string" && contextSnapshot.length > 0
-        ? contextSnapshot.slice(0, 4000)
-        : "";
-
-    // 无 contextSnapshot 时降级到规则模板
-    if (!safeSnapshot) {
-      return NextResponse.json({
-        nudge: ruleBasedNudge(safeSnapshot),
-        source: "rule",
-        generatedAt: new Date().toISOString(),
-      });
-    }
-
     try {
       const { text } = await generateText({
         model,
@@ -64,11 +120,14 @@ export async function POST(req: NextRequest) {
 
       const cleaned = text.trim().split("\n").filter((s) => s.trim()).join(" ");
       if (cleaned.length === 0) {
-        return NextResponse.json({
-          nudge: ruleBasedNudge(safeSnapshot),
-          source: "rule",
-          generatedAt: new Date().toISOString(),
-        });
+        return ruleResponse(safeSnapshot);
+      }
+
+      // trial 模式计数（异步，失败静默，不阻塞响应）
+      if (isTrial) {
+        const ip = getClientIp(req);
+        const kv = createKVStore(getAuthSessionsKV() ?? undefined);
+        void incrementTrialRateLimit(ip, "daily_nudge", kv).catch(() => {});
       }
 
       return NextResponse.json({
@@ -77,11 +136,8 @@ export async function POST(req: NextRequest) {
         generatedAt: new Date().toISOString(),
       });
     } catch {
-      return NextResponse.json({
-        nudge: ruleBasedNudge(safeSnapshot),
-        source: "rule",
-        generatedAt: new Date().toISOString(),
-      });
+      // LLM 调用失败 → 降级到 rule 模板（不报错）
+      return ruleResponse(safeSnapshot);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";

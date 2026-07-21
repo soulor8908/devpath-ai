@@ -33,6 +33,7 @@ import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
+import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
 import { useEffect } from "react";
 
 export default function HomeClient() {
@@ -164,10 +165,18 @@ export default function HomeClient() {
         {/* CurrentTaskCard 是核心答案 */}
         <CurrentTaskCard />
 
-        {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重） */}
-        <Link
-          href="/timer"
-          className="mt-2 flex items-center justify-between rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+        {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重）
+            入口改造：原 <Link href="/timer"> 跳转路由 → 移除 /timer 路由
+            改为派发 POMODORO_OPEN_LARGE_EVENT 事件，全局 PomodoroWidget 监听后打开 large Modal
+            （路由 → 弹框工具：更符合 AI Native 风格，不离开当前页就能开始专注） */}
+        <Button
+          variant="ghost"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+            }
+          }}
+          className="mt-2 w-full flex items-center justify-between rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors h-auto"
         >
           <span className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300">
             <Icon name="tomato" className="w-4 h-4 text-red-500" />
@@ -176,7 +185,7 @@ export default function HomeClient() {
           <span className="text-xs text-red-700 dark:text-red-400 flex items-center gap-0.5">
             25:00 <Icon name="chevron-right" className="w-3.5 h-3.5" />
           </span>
-        </Link>
+        </Button>
         {lowEnergy && (
           <Link
             href="/rest"
