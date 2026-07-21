@@ -7,14 +7,20 @@
 //   - 用户在聊天中遇到「未配置模型」或 trial 提示时，不跳转 profile 页
 //     而是直接在聊天界面弹框完成添加，3 步内完成（选预设 → 填 API Key → 保存）
 //   - 入口：ChatClient banner CTA / ModelIconSelector + 号 / 错误提示中的「去添加」
+//   - profile 页列表的「编辑/删除/测试」也复用本组件，消除 6 处重复代码
 //
 // 设计（卡帕西视角）：
 //   - 复用 createModelConfig / exchangeSession / MODEL_PRESETS，零新依赖
 //   - 保存成功后 onSuccess(config) 回调，调用方可据此：
 //     - ChatClient：setModelConfigs + setSelectedModelId + 清 trialMode
 //     - profile 页：刷新列表 + 关闭 modal
-//   - 错误码映射复用 profile 同款（ExchangeError.code → 可操作提示文案）
+//   - 错误码映射复用 lib/model-config-form.ts（单一事实源，与 profile 共享）
 //   - 表单状态由本组件自管，避免外部状态污染
+//   - 关闭时统一 resetForm，修掉 API Key 残留隐患
+//   - 编辑模式与新建模式行为差异通过 editingModel prop 区分：
+//     - 保存逻辑：editingModel ? updateModelConfig(id, patch) : createModelConfig(data)
+//     - 标题：编辑模型配置 / 添加 AI 模型
+//     - 底部按钮：编辑模式可加「删除」「测试连接」按钮（需传入对应回调）
 
 import { useEffect, useState } from "react";
 import {
@@ -26,13 +32,21 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { toast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import {
   createModelConfig,
+  updateModelConfig,
   MODEL_PRESETS,
 } from "@/lib/model-config";
-import { exchangeSession, ExchangeError } from "@/lib/api-client";
+import { exchangeSession } from "@/lib/api-client";
 import { getUserId } from "@/lib/sync";
 import { scheduleAutoSync } from "@/lib/sync";
+// applyPreset 由 handleProviderChange 内部调用，组件无需直接导入
+import {
+  handleProviderChange,
+  mapExchangeErrorMessage,
+  validateModelForm,
+} from "@/lib/model-config-form";
 import type { ModelConfig } from "@/lib/types";
 
 export interface ModelConfigModalProps {
@@ -40,39 +54,21 @@ export interface ModelConfigModalProps {
   onClose: () => void;
   /** 保存成功后回调（已 exchange session + 写入 IndexedDB） */
   onSuccess?: (config: ModelConfig) => void;
-}
-
-/**
- * 把 exchangeSession 抛出的错误映射为「可操作」的用户提示文案。
- * 与 profile/page.tsx 同款实现，保持行为一致。
- */
-function mapExchangeErrorMessage(e: unknown): string {
-  if (e instanceof ExchangeError) {
-    switch (e.code) {
-      case "SERVER_MISCONFIG":
-        return "服务端未配置 MASTER_KEY，加密会话不可用。请联系管理员或在 Cloudflare Pages secrets 中设置 MASTER_KEY（openssl rand -base64 32 生成）后重新部署";
-      case "ENCRYPT_FAILED":
-        return "加密失败：MASTER_KEY 可能不是 32 字节 base64。请用 `openssl rand -base64 32` 重新生成并更新 Cloudflare Pages secret";
-      case "SESSION_STORE_FAILED":
-        return "会话存储不可用（KV namespace 异常）。请检查 Cloudflare AUTH_SESSIONS KV binding 是否存在且 id 正确";
-      case "MISSING_FIELDS":
-        return `字段缺失：${e.message}。请重新填写表单后保存`;
-      case "INVALID_BODY":
-        return "请求体格式错误，请刷新页面后重试";
-      default:
-        return e.message || `加密会话启用失败（HTTP ${e.status}）`;
-    }
-  }
-  if (e instanceof Error) {
-    return e.message || "加密会话启用失败";
-  }
-  return "加密会话启用失败";
+  /** 编辑模式：传入已有配置则进入编辑模式，null 或不传为新建 */
+  editingModel?: ModelConfig | null;
+  /** 编辑模式下的删除回调（提供后才显示"删除"按钮） */
+  onDelete?: (id: string) => void | Promise<void>;
+  /** 编辑模式下的"测试连接"回调（提供后才显示"测试连接"按钮） */
+  onTest?: (config: ModelConfig) => void | Promise<void>;
 }
 
 export function ModelConfigModal({
   open,
   onClose,
   onSuccess,
+  editingModel,
+  onDelete,
+  onTest,
 }: ModelConfigModalProps) {
   // 表单字段
   const [modelName, setModelName] = useState("");
@@ -85,28 +81,64 @@ export function ModelConfigModal({
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelError, setModelError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [testing, setTesting] = useState(false);
   // exchange session 失败的提示（与 modelError 区分：前者是创建后启用加密会话失败）
   const [sessionMsg, setSessionMsg] = useState<
     { ok: boolean; msg: string } | null
   >(null);
 
-  // 默认打开时自动应用第一个预设（GLM），减少用户决策
+  // 打开时初始化表单：
+  //   - 编辑模式（editingModel 非空）：用已有配置填充字段
+  //   - 新建模式：保留原"自动应用 GLM 预设"逻辑，减少用户决策
+  // 关闭时统一 resetForm，修掉 API Key 残留隐患
   useEffect(() => {
-    if (!open) return;
-    if (!modelName && !modelBaseURL && !modelModel) {
-      const preset = MODEL_PRESETS.find((p) => p.provider === "glm");
-      if (preset) {
-        setModelName(preset.name);
-        setModelProvider(preset.provider);
-        setModelBaseURL(preset.baseURL);
-        setModelModel(preset.model);
+    if (!open) {
+      // 关闭时清空，避免下次打开残留上次输入（特别是 API Key）
+      resetForm();
+      return;
+    }
+    if (editingModel) {
+      // 编辑模式：用已有配置填充
+      setModelName(editingModel.name);
+      setModelProvider(editingModel.provider);
+      setModelBaseURL(editingModel.baseURL);
+      setModelApiKey(editingModel.apiKey);
+      setModelModel(editingModel.model);
+      setModelIsDefault(editingModel.isDefault);
+      setModelError("");
+      setSessionMsg(null);
+    } else {
+      // 新建模式：首次打开自动应用第一个预设（GLM），减少用户决策
+      // 仅在所有字段为空时回填，避免覆盖用户已填内容（重试场景）
+      if (!modelName && !modelBaseURL && !modelModel) {
+        const preset = MODEL_PRESETS.find((p) => p.provider === "glm");
+        if (preset) {
+          setModelName(preset.name);
+          setModelProvider(preset.provider);
+          setModelBaseURL(preset.baseURL);
+          setModelModel(preset.model);
+        }
       }
     }
-    // 仅在打开时初始化一次（关闭时不清空，下次打开保留已填内容便于重试）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, editingModel]);
 
-  function applyPreset(preset: (typeof MODEL_PRESETS)[number]) {
+  /** 重置表单（关闭时调用，避免 API Key 残留） */
+  function resetForm() {
+    setModelName("");
+    setModelProvider("glm");
+    setModelBaseURL("");
+    setModelApiKey("");
+    setModelModel("");
+    setModelIsDefault(true);
+    setShowApiKey(false);
+    setModelError("");
+    setSessionMsg(null);
+  }
+
+  /** 点击预设模板：填充 name + provider + baseURL + model */
+  function handleApplyPreset(preset: (typeof MODEL_PRESETS)[number]) {
     setModelName(preset.name);
     setModelProvider(preset.provider);
     setModelBaseURL(preset.baseURL);
@@ -115,31 +147,28 @@ export function ModelConfigModal({
     setSessionMsg(null);
   }
 
-  function handleProviderChange(provider: ModelConfig["provider"]) {
-    setModelProvider(provider);
-    const preset = MODEL_PRESETS.find((p) => p.provider === provider);
-    if (
-      preset &&
-      (provider === "glm" ||
-        provider === "deepseek" ||
-        provider === "mimo" ||
-        provider === "kimi")
-    ) {
-      setModelBaseURL(preset.baseURL);
-      setModelModel(preset.model);
-    }
+  /** Provider 改变时，调用共享的 handleProviderChange 计算新 baseURL + model */
+  function handleProviderSelect(provider: ModelConfig["provider"]) {
+    const next = handleProviderChange(provider, modelBaseURL);
+    setModelProvider(next.provider as ModelConfig["provider"]);
+    setModelBaseURL(next.baseURL);
+    setModelModel(next.model);
   }
 
   async function handleSave() {
     setModelError("");
     setSessionMsg(null);
-    if (
-      !modelName.trim() ||
-      !modelBaseURL.trim() ||
-      !modelApiKey.trim() ||
-      !modelModel.trim()
-    ) {
-      setModelError("请填写名称、baseURL、API Key、模型名称");
+    // 调用共享校验：返回 null 表示通过
+    const formError = validateModelForm({
+      name: modelName,
+      provider: modelProvider,
+      baseURL: modelBaseURL,
+      apiKey: modelApiKey,
+      model: modelModel,
+      isDefault: modelIsDefault,
+    });
+    if (formError) {
+      setModelError(formError);
       return;
     }
     setSaving(true);
@@ -153,8 +182,14 @@ export function ModelConfigModal({
         isDefault: modelIsDefault,
       };
 
-      // 1. 写入 IndexedDB（modelConfig 表）
-      const savedConfig = await createModelConfig(payload);
+      // 1. 写入 IndexedDB：编辑模式 update / 新建模式 create
+      let savedConfig: ModelConfig;
+      if (editingModel) {
+        await updateModelConfig(editingModel.id, payload);
+        savedConfig = { ...editingModel, ...payload };
+      } else {
+        savedConfig = await createModelConfig(payload);
+      }
 
       // 2. exchange session：用 apiKey 换取加密 session（服务端 AES-GCM 落 KV）
       // 失败时模型配置已写入，但 session 不可用 → 用户可重试 exchange（profile 页有重试入口）
@@ -174,14 +209,18 @@ export function ModelConfigModal({
         setSessionMsg({ ok: false, msg: mapExchangeErrorMessage(e) });
         // 模型配置已保存，但加密会话未启用 → 视为部分成功
         // 仍触发 onSuccess 让 UI 更新，但 toast 提示用户去 profile 重试 exchange
-        toast.warning("模型已保存，但加密会话启用失败：" + mapExchangeErrorMessage(e));
+        toast.warning(
+          "模型已保存，但加密会话启用失败：" + mapExchangeErrorMessage(e),
+        );
         onSuccess?.(savedConfig);
         onClose();
         return;
       }
 
       // 3. 成功 → toast + onSuccess + 关闭 + 触发云端同步
-      toast.success("模型已添加，可正常使用 AI 聊天");
+      toast.success(
+        editingModel ? "模型配置已更新" : "模型已添加，可正常使用 AI 聊天",
+      );
       scheduleAutoSync();
       onSuccess?.(savedConfig);
       onClose();
@@ -193,12 +232,52 @@ export function ModelConfigModal({
     }
   }
 
+  /** 删除：弹 confirmDialog 二次确认 → 调 onDelete → 关闭 modal */
+  async function handleDelete() {
+    if (!editingModel || !onDelete) return;
+    const ok = await confirmDialog({
+      title: "删除模型配置？",
+      message: `确定删除「${editingModel.name}」吗？此操作不可恢复。`,
+      confirmText: "删除",
+      cancelText: "取消",
+      danger: true,
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await onDelete(editingModel.id);
+      onClose();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setModelError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  /** 测试连接：调 onTest 回调（profile 列表页传入完整链路） */
+  async function handleTest() {
+    if (!editingModel || !onTest) return;
+    setTesting(true);
+    try {
+      await onTest(editingModel);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const isEditMode = !!editingModel;
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="添加 AI 模型"
-      description="选预设 → 填 API Key → 保存，3 步即可使用"
+      title={isEditMode ? "编辑模型配置" : "添加 AI 模型"}
+      description={
+        isEditMode
+          ? "修改后点击保存即可生效"
+          : "选预设 → 填 API Key → 保存，3 步即可使用"
+      }
       size="md"
     >
       <div className="space-y-3">
@@ -216,7 +295,7 @@ export function ModelConfigModal({
                 key={p.name}
                 variant="outline"
                 size="sm"
-                onClick={() => applyPreset(p)}
+                onClick={() => handleApplyPreset(p)}
                 type="button"
               >
                 {p.name}
@@ -247,7 +326,7 @@ export function ModelConfigModal({
           <Select
             value={modelProvider}
             onChange={(e) =>
-              handleProviderChange(
+              handleProviderSelect(
                 e.target.value as ModelConfig["provider"],
               )
             }
@@ -350,13 +429,49 @@ export function ModelConfigModal({
       </div>
 
       {/* 底部按钮 */}
-      <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Button variant="ghost" onClick={onClose} disabled={saving}>
-          取消
-        </Button>
-        <Button onClick={handleSave} loading={saving} disabled={saving}>
-          保存配置
-        </Button>
+      <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+        {/* 左侧：编辑模式 + onDelete 才显示删除按钮 */}
+        {isEditMode && onDelete ? (
+          <Button
+            variant="ghost"
+            onClick={handleDelete}
+            loading={deleting}
+            disabled={deleting || saving || testing}
+            className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+          >
+            删除
+          </Button>
+        ) : (
+          <span />
+        )}
+
+        {/* 右侧：测试连接 + 取消 + 保存 */}
+        <div className="flex items-center gap-2">
+          {isEditMode && onTest && (
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              loading={testing}
+              disabled={testing || saving || deleting}
+            >
+              测试连接
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            disabled={saving || deleting || testing}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={handleSave}
+            loading={saving}
+            disabled={saving || deleting || testing}
+          >
+            {isEditMode ? "更新配置" : "保存配置"}
+          </Button>
+        </div>
       </div>
     </Modal>
   );

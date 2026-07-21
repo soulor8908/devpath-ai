@@ -15,7 +15,7 @@ import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } fro
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
-import { apiFetch, aiFetch, exchangeSession, revokeSession, hasValidSession, ExchangeError } from "@/lib/api-client";
+import { apiFetch, aiFetch, exchangeSession, revokeSession, hasValidSession } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { ShareCardButton } from "@/components/ShareCardButton";
@@ -31,15 +31,15 @@ import {
 import { listFavoriteDecks, listFavoritedQuestions } from "@/lib/favorite";
 import {
   listModelConfigs,
-  createModelConfig,
-  updateModelConfig,
   deleteModelConfig,
   setDefaultModel,
-  MODEL_PRESETS,
 } from "@/lib/model-config";
 import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
-import { Button, Input, Textarea, Select, Checkbox } from "@/components/ui";
+import { Button, Input, Textarea, Checkbox, Modal } from "@/components/ui";
+import { ModelConfigModal } from "@/components/ModelConfigModal";
+import { mapExchangeErrorMessage } from "@/lib/model-config-form";
+import { toast } from "@/lib/toast";
 import { maybeRetrain } from "@/lib/energy-regression";
 import { getUserProfile, saveUserProfile } from "@/lib/ai/memory/user-profile";
 import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
@@ -132,19 +132,14 @@ export default function ProfilePage() {
 
   // AI 模型配置
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
-  const [showModelForm, setShowModelForm] = useState(false);
-  const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
-  const [modelName, setModelName] = useState("");
-  const [modelProvider, setModelProvider] = useState<ModelConfig["provider"]>("custom");
-  const [modelBaseURL, setModelBaseURL] = useState("");
-  const [modelApiKey, setModelApiKey] = useState("");
-  const [modelModel, setModelModel] = useState("");
-  const [modelIsDefault, setModelIsDefault] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [modelSaving, setModelSaving] = useState(false);
-  const [modelError, setModelError] = useState("");
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  // 模型弹框统一状态：open + mode（new/edit）+ 编辑模式下的 model 引用
+  // 整合自原 showModelForm / editingModel + 一堆表单字段 state，
+  // 单一弹框组件 ModelConfigModal 自管表单字段，本组件只控制开关与模式
+  const [modelModal, setModelModal] = useState<{
+    open: boolean;
+    mode: "new" | "edit";
+    model?: ModelConfig | null;
+  }>({ open: false, mode: "new" });
 
   // AI 人格（Persona）设置
   // preferredPersona: undefined = 自动（按用户状态选）；否则为 4 种 PersonaId 之一
@@ -395,6 +390,10 @@ export default function ProfilePage() {
   }
 
   // ============ AI 模型配置 ============
+  // 整合后：表单 UI 与状态都委托给 ModelConfigModal，本组件只保留列表渲染
+  // + 列表按钮（删除/设默认/编辑）+ 弹框回调（onSuccess/onDelete/onTest）。
+  // 原内联表单的 6 处重复代码（字段 UI、applyPreset、handleProviderChange、
+  // mapExchangeErrorMessage、保存流程、表单 state）全部消失。
 
   /** 刷新模型配置列表 */
   async function refreshModelConfigs() {
@@ -402,119 +401,7 @@ export default function ProfilePage() {
     setModelConfigs(configs);
   }
 
-  /** 重置表单（清空字段，退出编辑模式） */
-  function resetModelForm() {
-    setEditingModel(null);
-    setModelName("");
-    setModelProvider("custom");
-    setModelBaseURL("");
-    setModelApiKey("");
-    setModelModel("");
-    setModelIsDefault(false);
-    setModelError("");
-  }
-
-  /** 点击预设模板，填充表单（baseURL + model + name） */
-  function applyPreset(preset: (typeof MODEL_PRESETS)[number]) {
-    setModelName(preset.name);
-    setModelProvider(preset.provider);
-    setModelBaseURL(preset.baseURL);
-    setModelModel(preset.model);
-    setModelError("");
-  }
-
-  /** 打开新建表单 */
-  function openNewModelForm() {
-    resetModelForm();
-    setShowModelForm(true);
-  }
-
-  /** 点击编辑：用已有配置填充表单并展开 */
-  function openEditModelForm(config: ModelConfig) {
-    setEditingModel(config);
-    setModelName(config.name);
-    setModelProvider(config.provider);
-    setModelBaseURL(config.baseURL);
-    setModelApiKey(config.apiKey);
-    setModelModel(config.model);
-    setModelIsDefault(config.isDefault);
-    setModelError("");
-    setShowModelForm(true);
-  }
-
-  /** Provider 改变时，若为 glm/deepseek/mimo/kimi 自动回填 baseURL+model */
-  function handleProviderChange(provider: ModelConfig["provider"]) {
-    setModelProvider(provider);
-    const preset = MODEL_PRESETS.find((p) => p.provider === provider);
-    if (preset && (provider === "glm" || provider === "deepseek" || provider === "mimo" || provider === "kimi")) {
-      setModelBaseURL(preset.baseURL);
-      setModelModel(preset.model);
-    }
-  }
-
-  /** 保存（新建 / 更新）+ 用新配置交换加密 session */
-  async function saveModelConfig() {
-    setModelError("");
-    if (!modelName.trim() || !modelBaseURL.trim() || !modelApiKey.trim() || !modelModel.trim()) {
-      setModelError("请填写名称、baseURL、API Key、模型名称");
-      return;
-    }
-    setModelSaving(true);
-    try {
-      const payload = {
-        name: modelName.trim(),
-        provider: modelProvider,
-        baseURL: modelBaseURL.trim(),
-        apiKey: modelApiKey.trim(),
-        model: modelModel.trim(),
-        isDefault: modelIsDefault,
-      };
-      let savedConfig: ModelConfig;
-      if (editingModel) {
-        await updateModelConfig(editingModel.id, payload);
-        savedConfig = { ...editingModel, ...payload };
-      } else {
-        savedConfig = await createModelConfig(payload);
-      }
-
-      // exchange session：用新配置交换加密 session（apiKey 一次性发送到服务端）
-      try {
-        const userId = await getUserId();
-        await exchangeSession({
-          apiKey: payload.apiKey,
-          userId,
-          provider: payload.provider,
-          baseURL: payload.baseURL,
-          model: payload.model,
-          name: payload.name,
-        });
-        setShowUpgradeModal(false);
-        setTestResult((prev) => ({
-          ...prev,
-          [savedConfig.id]: { ok: true, msg: "已保存并启用加密会话" },
-        }));
-      } catch (e) {
-        console.warn("[profile] exchange session failed:", e);
-        setTestResult((prev) => ({
-          ...prev,
-          [savedConfig.id]: {
-            ok: false,
-            msg: mapExchangeErrorMessage(e),
-          },
-        }));
-      }
-
-      await refreshModelConfigs();
-      resetModelForm();
-      setShowModelForm(false);
-      // 触发云端同步，确保跨设备可用（否则换设备后会报 503）
-      scheduleAutoSync();
-    } finally {
-      setModelSaving(false);
-    }
-  }
-
-  /** 删除模型配置 */
+  /** 删除模型配置（列表级"删除"按钮直接调用，弹框 onDelete 也复用此逻辑） */
   async function handleDeleteModel(id: string) {
     const ok = await confirmDialog({
       title: "删除模型配置？",
@@ -526,11 +413,8 @@ export default function ProfilePage() {
     if (!ok) return;
     await deleteModelConfig(id);
     await refreshModelConfigs();
-    if (editingModel?.id === id) {
-      resetModelForm();
-      setShowModelForm(false);
-    }
     scheduleAutoSync();
+    toast.success("已删除");
   }
 
   /** 设为默认 */
@@ -549,10 +433,11 @@ export default function ProfilePage() {
    *   1. session 能从 KV 读回（KV binding 生效）
    *   2. 签名校验通过（客户端/服务端签名算法一致）
    *   3. 上游 AI provider 接受 apiKey（不是 invalid signature / 401）
+   *
+   * 整合后：本函数由 ModelConfigModal 的 onTest 回调调用，结果显示在 toast
+   * 而非列表（旧实现的 testResult state 已删除）。
    */
-  async function handleTestModel(config: ModelConfig) {
-    setTestingId(config.id);
-    setTestResult((prev) => ({ ...prev, [config.id]: { ok: false, msg: "测试中..." } }));
+  async function runModelTest(config: ModelConfig): Promise<void> {
     try {
       const userId = await getUserId();
       // 第 1 步：exchange 拿到 session（写入服务端 KV + 本地 IndexedDB）
@@ -584,28 +469,15 @@ export default function ProfilePage() {
           code === "UPSTREAM_AUTH"
             ? `apiKey 鉴权失败：${errText || "上游 AI 拒绝"}。请检查 apiKey 是否正确、是否被风控或失效`
             : `测试失败 (${res.status})${errText ? `: ${errText}` : ""}`;
-        setTestResult((prev) => ({
-          ...prev,
-          [config.id]: { ok: false, msg },
-        }));
+        toast.error(msg);
         return;
       }
-      const data = await res.json();
-      setTestResult((prev) => ({
-        ...prev,
-        [config.id]: {
-          ok: true,
-          msg: `连接成功${data.reply ? `（AI 回复：${data.reply}）` : ""}，加密会话已启用`,
-        },
-      }));
+      const data = (await res.json()) as { reply?: string };
+      toast.success(
+        `连接成功${data.reply ? `（AI 回复：${data.reply}）` : ""}，加密会话已启用`,
+      );
     } catch (e) {
-      const msg = mapExchangeErrorMessage(e);
-      setTestResult((prev) => ({
-        ...prev,
-        [config.id]: { ok: false, msg },
-      }));
-    } finally {
-      setTestingId(null);
+      toast.error(mapExchangeErrorMessage(e));
     }
   }
 
@@ -751,18 +623,13 @@ export default function ProfilePage() {
                         设为默认
                       </Button>
                     )}
+                    {/* 编辑：唤起 ModelConfigModal 编辑模式（弹框内含测试/删除） */}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleTestModel(c)}
-                      disabled={testingId === c.id}
-                    >
-                      {testingId === c.id ? "测试中..." : "测试"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditModelForm(c)}
+                      onClick={() =>
+                        setModelModal({ open: true, mode: "edit", model: c })
+                      }
                     >
                       编辑
                     </Button>
@@ -775,175 +642,19 @@ export default function ProfilePage() {
                     </Button>
                   </div>
                 </div>
-                {testResult[c.id] && (
-                  <div
-                    className={`mt-1.5 rounded px-2 py-1 text-xs ${
-                      testResult[c.id].ok
-                        ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-600"
-                    }`}
-                  >
-                    {testResult[c.id].ok ? <Icon name="check-circle" className="w-3.5 h-3.5 inline-block align-middle" /> : <Icon name="x-circle" className="w-3.5 h-3.5 inline-block align-middle" />} {testResult[c.id].msg}
-                  </div>
-                )}
               </div>
             ))
           )}
         </div>
 
-        {/* 新建 / 收起表单按钮 */}
-        <div>
-          {!showModelForm ? (
-            <Button
-              variant="secondary"
-              block
-              onClick={openNewModelForm}
-            >
-              + 新建模型配置
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              block
-              onClick={() => {
-                setShowModelForm(false);
-                resetModelForm();
-              }}
-            >
-              ▲ 收起表单
-            </Button>
-          )}
-        </div>
-
-        {/* 表单 */}
-        {showModelForm && (
-          <div className="space-y-3 rounded-lg border bg-gray-50/50 p-3">
-            {/* 预设模板 */}
-            <div>
-              <label className="block text-sm font-medium">预设模板</label>
-              <p className="text-xs text-gray-500">
-                点击预设可快速填充 baseURL / 模型 / 名称
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {MODEL_PRESETS.map((p) => (
-                  <Button
-                    key={p.name}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => applyPreset(p)}
-                  >
-                    {p.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* 名称 */}
-            <div>
-              <label className="block text-sm font-medium">名称</label>
-              <Input
-                value={modelName}
-                onChange={(e) => setModelName(e.target.value)}
-                placeholder="如 我的 GPT"
-                inputSize="sm"
-                className="mt-1"
-              />
-            </div>
-
-            {/* Provider */}
-            <div>
-              <label className="block text-sm font-medium">Provider</label>
-              <Select
-                value={modelProvider}
-                onChange={(e) =>
-                  handleProviderChange(e.target.value as ModelConfig["provider"])
-                }
-                inputSize="sm"
-                className="mt-1"
-              >
-                <option value="glm">glm（智谱）</option>
-                <option value="deepseek">deepseek</option>
-                <option value="mimo">mimo（小米）</option>
-                <option value="kimi">kimi（Moonshot AI）</option>
-                <option value="custom">custom</option>
-              </Select>
-            </div>
-
-            {/* baseURL */}
-            <div>
-              <label className="block text-sm font-medium">baseURL</label>
-              <Input
-                value={modelBaseURL}
-                onChange={(e) => setModelBaseURL(e.target.value)}
-                placeholder="https://api.openai.com/v1"
-                inputSize="sm"
-                className="mt-1 font-mono"
-              />
-            </div>
-
-            {/* API Key（密码 + 显隐） */}
-            <div>
-              <label className="block text-sm font-medium">API Key</label>
-              <Input
-                type={showApiKey ? "text" : "password"}
-                value={modelApiKey}
-                onChange={(e) => setModelApiKey(e.target.value)}
-                placeholder="sk-..."
-                inputSize="sm"
-                showPasswordToggle={false}
-                className="mt-1 font-mono"
-                rightSlot={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowApiKey((v) => !v)}
-                  >
-                    {showApiKey ? "隐藏" : "显示"}
-                  </Button>
-                }
-              />
-            </div>
-
-            {/* 模型名称 */}
-            <div>
-              <label className="block text-sm font-medium">模型名称</label>
-              <Input
-                value={modelModel}
-                onChange={(e) => setModelModel(e.target.value)}
-                placeholder="如 gpt-4o-mini / deepseek-chat"
-                inputSize="sm"
-                className="mt-1 font-mono"
-              />
-            </div>
-
-            {/* 设为默认 */}
-            <Checkbox
-              checked={modelIsDefault}
-              onChange={(e) => setModelIsDefault(e.target.checked)}
-              className="mt-1"
-            >
-              设为默认模型
-            </Checkbox>
-
-            {/* 错误提示 */}
-            {modelError && (
-              <p className="text-sm text-red-600">{modelError}</p>
-            )}
-
-            {/* 保存按钮 */}
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={saveModelConfig}
-                loading={modelSaving}
-              >
-                {editingModel ? "更新配置" : "保存配置"}
-              </Button>
-              {editingModel && (
-                <span className="text-xs text-gray-500">编辑中：{editingModel.name}</span>
-              )}
-            </div>
-          </div>
-        )}
+        {/* 新建模型配置：唤起 ModelConfigModal 新建模式 */}
+        <Button
+          variant="secondary"
+          block
+          onClick={() => setModelModal({ open: true, mode: "new" })}
+        >
+          + 新建模型配置
+        </Button>
       </Section>
 
       {/* === 折叠：个人信息 === */}
@@ -1397,43 +1108,75 @@ export default function ProfilePage() {
         </div>
       </CollapsibleSection>
 
-      {/* 安全升级提示模态：旧用户首次访问时显示 */}
-      {showUpgradeModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2">
-              <Icon name="alert" className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-semibold">安全升级提示</h2>
-            </div>
+      {/* 安全升级提示模态：旧用户首次访问时显示。
+          修复 AGENTS.md 2.4：原手写 div 模态缺 focus trap + ESC + 焦点恢复，
+          改用统一 <Modal> 组件（内置 a11y 支持） */}
+      <Modal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="安全升级提示"
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowUpgradeModal(false)}
+            >
+              稍后再说
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setShowUpgradeModal(false);
+                // 滚动到 AI 模型配置区
+                const el = document.querySelector('section[class*="rounded-xl"]');
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              去升级
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 py-1">
+          <div className="flex items-center gap-2">
+            <Icon name="alert" className="w-5 h-5 text-amber-500 shrink-0" />
             <p className="text-sm text-gray-600 dark:text-gray-300">
               检测到您已配置过 AI 模型，但尚未启用加密会话。为提升安全性，请重新输入 API Key 启用加密会话：保存时仅一次性发送到服务端加密存储，之后所有请求用 session 签名，不再传输 API Key。
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              操作方式：在上方「AI 模型配置」中点击任意模型的「编辑」按钮，确认 API Key 后点击「更新配置」即可完成升级。
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowUpgradeModal(false)}>
-                稍后再说
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setShowUpgradeModal(false);
-                  // 滚动到 AI 模型配置区
-                  const el = document.querySelector('section[class*="rounded-xl"]');
-                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-              >
-                去升级
-              </Button>
-            </div>
           </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            操作方式：在上方「AI 模型配置」中点击任意模型的「编辑」按钮，确认 API Key 后点击「更新配置」即可完成升级。
+          </p>
         </div>
-      )}
+      </Modal>
+
+      {/* AI 模型配置弹框（新建 / 编辑 / 删除 / 测试 共用此 modal）。
+          整合自原内联表单：profile 列表只控制开关与模式，表单字段由 modal 自管。
+          - onSuccess：保存成功后刷新列表（编辑时若改了 isDefault，列表顺序会自动重排）
+          - onDelete：弹框内"删除"按钮触发，复用 handleDeleteModel 逻辑
+          - onTest：弹框内"测试连接"按钮触发，复用 runModelTest（exchange + /api/ai-test） */}
+      <ModelConfigModal
+        open={modelModal.open}
+        onClose={() => setModelModal({ open: false, mode: "new" })}
+        editingModel={modelModal.mode === "edit" ? modelModal.model : null}
+        onSuccess={async () => {
+          await refreshModelConfigs();
+          // 保存成功后若用户原处于"无 session"状态，新 exchange 已启用 → 关闭升级提示
+          setShowUpgradeModal(false);
+        }}
+        onDelete={async (id) => {
+          await deleteModelConfig(id);
+          await refreshModelConfigs();
+          setModelModal({ open: false, mode: "new" });
+          toast.success("已删除");
+          scheduleAutoSync();
+        }}
+        onTest={async (config) => {
+          await runModelTest(config);
+        }}
+      />
     </div>
   );
 }
@@ -1502,41 +1245,4 @@ function CollapsibleSection({
       {open && <div className="space-y-3 px-4 pb-4">{children}</div>}
     </section>
   );
-}
-
-// ============ 辅助：exchange 错误 → 可操作用户文案 ============
-
-/**
- * 把 exchangeSession 抛出的错误映射为「可操作」的用户提示。
- *
- * 设计（乔布斯视角）：
- *   - 旧的提示「加密会话启用失败，请重试」对服务端配置类错误是无效的——
- *     重试 100 次还是同一个错，用户只会越来越 frustrated
- *   - 把服务端 code 翻译成具体动作建议（重新部署 / 检查字段 / 联系管理员）
- *
- * 技术约束（卡帕西视角）：
- *   - ExchangeError 携带 code；其它 Error 只有 message
- *   - 永远返回非空字符串（fallback 兜底）
- */
-function mapExchangeErrorMessage(e: unknown): string {
-  if (e instanceof ExchangeError) {
-    switch (e.code) {
-      case "SERVER_MISCONFIG":
-        return "服务端未配置 MASTER_KEY，加密会话不可用。请联系管理员或在 Cloudflare Pages secrets 中设置 MASTER_KEY（openssl rand -base64 32 生成）后重新部署";
-      case "ENCRYPT_FAILED":
-        return "加密失败：MASTER_KEY 可能不是 32 字节 base64。请用 `openssl rand -base64 32` 重新生成并更新 Cloudflare Pages secret";
-      case "SESSION_STORE_FAILED":
-        return "会话存储不可用（KV namespace 异常）。请检查 Cloudflare AUTH_SESSIONS KV binding 是否存在且 id 正确";
-      case "MISSING_FIELDS":
-        return `字段缺失：${e.message}。请重新填写表单后保存`;
-      case "INVALID_BODY":
-        return "请求体格式错误，请刷新页面后重试";
-      default:
-        return e.message || `加密会话启用失败（HTTP ${e.status}）`;
-    }
-  }
-  if (e instanceof Error) {
-    return e.message || "加密会话启用失败";
-  }
-  return "加密会话启用失败";
 }
