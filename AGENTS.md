@@ -176,26 +176,9 @@ import { Button, Input, Select, Textarea, Modal } from "@/components/ui";
 
 ---
 
-## 3. 首页 5 区结构（不可破坏）
+## 3. 测试与质量门禁
 
-[app/HomeClient.tsx](file:///workspace/app/HomeClient.tsx) 文件头注释定义了首页 5 区结构：
-
-1. Hero 行动区：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
-2. KPI 三宫格：今日待学 / 今日待复习 / 连续打卡
-3. AI 教练洞察区：HomeInsightsCard + 能力画像 + AI 质量摘要
-4. 今日学习安排：精简 schedule 列表 + 能量趋势迷你图
-5. 折叠区：情绪记录 / 错题 / 7 天热力图
-
-**修改首页前必须先读文件头注释**。禁止：
-- 堆砌 9+ 个并列区块
-- 添加与底部 Nav 重复的快捷入口
-- 添加与 HomeInsightsCard 功能重叠的 StatusCard
-
----
-
-## 4. 测试与质量门禁
-
-### 4.1 提交前必跑
+### 3.1 提交前必跑
 
 ```bash
 npm run typecheck       # TypeScript 类型检查
@@ -203,7 +186,7 @@ npm run lint            # ESLint (--max-warnings 0)
 ./node_modules/.bin/vitest run   # 全量测试（必须 100% 通过）
 ```
 
-### 4.2 守护测试清单
+### 3.2 守护测试清单
 
 | 测试文件 | 守护内容 |
 |---|---|
@@ -212,7 +195,7 @@ npm run lint            # ESLint (--max-warnings 0)
 
 **新增设计规则时，应同时新增对应的守护测试**。规则没有测试守护等于不存在。
 
-### 4.3 测试即文档
+### 3.3 测试即文档
 
 测试名应该描述规则：
 ```tsx
@@ -222,23 +205,23 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 
 ---
 
-## 5. 代码风格
+## 4. 代码风格
 
-### 5.1 TypeScript
+### 4.1 TypeScript
 
 - 严格模式（`strict: true`）
 - 禁止 `any`，用 `unknown` + 类型守卫
 - 优先 `interface`，扩展用 `extends`，联合类型用 `type`
 - 所有公共函数和组件 props 必须有显式类型
 
-### 5.2 React
+### 4.2 React
 
 - 组件用 `forwardRef`（除非是页面级组件）
 - 状态优先用 `useState`，跨组件用 Context
 - 副作用用 `useEffect`，清理函数必须返回
 - 列表 `key` 用稳定 id，不用 index
 
-### 5.3 命名
+### 4.3 命名
 
 - 组件：`PascalCase`（如 `CurrentTaskCard`）
 - 函数/变量：`camelCase`（如 `handleClick`）
@@ -246,18 +229,18 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 - 类型：`PascalCase`（如 `Question`）
 - 文件名：组件文件 `PascalCase.tsx`，工具文件 `kebab-case.ts`
 
-### 5.4 注释
+### 4.4 注释
 
 - 文件头必须有注释，说明组件用途和设计思路
 - 复杂逻辑必须有行内注释
-- 设计决策（如"为什么用 5 区结构"）写在文件头
+- 设计决策（如重大架构选择）写在文件头
 - **禁止**仅复述代码的注释（如 `// 设置 state`）
 
 ---
 
-## 6. Git 规范
+## 5. Git 规范
 
-### 6.1 Commit message
+### 5.1 Commit message
 
 用 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
 
@@ -276,12 +259,12 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 - `test`：测试
 - `chore`：杂项（构建 / 依赖）
 
-### 6.2 分支
+### 5.2 分支
 
 - `main`：生产分支，受保护
 - 功能开发：从 `main` 切出，PR 合回 `main`
 
-### 6.3 提交粒度
+### 5.3 提交粒度
 
 - 一次 commit 解决一个问题
 - 不要在一个 commit 里混合多个无关改动
@@ -289,7 +272,7 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 
 ---
 
-## 7. 安全规范
+## 6. 安全规范
 
 详见 [docs/DEVELOPMENT.md](file:///workspace/docs/DEVELOPMENT.md) 安全配置章节。关键点：
 
@@ -300,7 +283,7 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 
 ---
 
-## 8. 部署
+## 7. 部署
 
 - 平台：Cloudflare Pages
 - 命令：`npm run build`
@@ -308,7 +291,7 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 
 ---
 
-## 9. 违反守则的后果
+## 8. 违反守则的后果
 
 | 违反项 | 后果 |
 |---|---|
@@ -318,11 +301,10 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 | 手写 div 模态 | 代码评审打回（暂无测试守护，未来补） |
 | 折叠按钮缺 aria-expanded | 代码评审打回（暂无测试守护） |
 | emoji 当功能图标 | 代码评审打回（暂无测试守护） |
-| 破坏首页 5 区结构 | 代码评审打回 |
 
 ---
 
-## 10. 更新本文件
+## 9. 更新本文件
 
 本文件是活文档。新增设计规则、组件、令牌时，**必须**同步更新本文件和 [docs/ui-design-system.md](file:///workspace/docs/ui-design-system.md)。
 
