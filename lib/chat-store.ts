@@ -30,13 +30,20 @@ export async function createConversation(params: {
   return conv;
 }
 
-/** 获取所有对话（按最后消息时间倒序，pinned 优先） */
+/**
+ * 获取所有对话（按最后消息时间倒序）
+ *
+ * 设计变更（用户需求 4）：
+ *   - 原版：pinned 优先 → lastMessageAt 倒序（"保存固定"会置顶）
+ *   - 新版：仅按 lastMessageAt 倒序，pinned 不再影响排序
+ *   - pinned 仍然在 UI 中显示图钉标识，仅排序不再特殊处理
+ *   - 这样用户的对话列表严格按时间顺序，符合直觉
+ */
 export async function listConversations(): Promise<Conversation[]> {
   const convs = await listItems<Conversation>(KEY_PREFIXES.CONVERSATION);
-  return convs.sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
-  });
+  return convs.sort(
+    (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+  );
 }
 
 /** 获取单个对话 */

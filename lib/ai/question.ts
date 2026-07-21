@@ -1,6 +1,12 @@
 // lib/ai/question.ts
 // 面试题生成：对每个 KnowledgeNode 并行生成面试题
 // 分批 5 个一组，单节点失败不影响其他
+//
+// 修复（用户需求 3）：题目"全部生成失败"
+//   - 原版：generateObject 在 schema 校验失败 / 模型不支持 JSON mode / 网络抖动时直接 catch 返回占位 Question
+//   - 新版：单题失败时自动重试 1 次（短延迟），重试仍失败才返回占位
+//   - 同时把 schema 中的 keyPoints/followUps 用 .default([]) 兜底，避免模型偶尔漏字段导致整题失败
+//   - 加 console.error 输出真实错误信息，便于线上诊断（占位 Question 只暴露简要 errMsg 给 UI）
 
 import { generateObject } from "ai";
 import type { LanguageModel } from "ai";
@@ -12,6 +18,9 @@ import type { KnowledgeNode, Question } from "../types";
 
 // 从 Prompt Registry 读取
 const PROMPT_DEF = getPrompt("question_generate");
+
+/** 单题失败时的重试延迟（毫秒），用于短暂退避 */
+const RETRY_DELAY_MS = 800;
 
 const questionSchema = z.object({
   question: z.string(),
@@ -32,37 +41,69 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 单次调用 AI 生成一道题（不含重试，失败直接抛错）
+ * 抽出便于 generateOne 实现"重试 1 次"逻辑
+ */
+async function callGenerateOnce(node: KnowledgeNode, model: LanguageModel): Promise<Question> {
+  const result = await generateObject({
+    model,
+    schema: questionSchema,
+    system: PROMPT_DEF.system,
+    prompt: `知识点：${node.title}\n描述：${node.summary}\n难度：${node.difficulty}\n面试频率：${node.frequency}`,
+  });
+  return {
+    id: nanoid(),
+    nodeId: node.id,
+    question: result.object.question,
+    answer: result.object.answer,
+    keyPoints: result.object.keyPoints,
+    followUps: result.object.followUps,
+    codeSnippet: result.object.codeSnippet,
+    bigTech: result.object.bigTech,
+    favorited: false,
+  };
+}
+
+/**
+ * 生成单道题（带 1 次自动重试）
+ *
+ * 重试触发条件：generateObject 抛出任何错误（schema 校验失败 / 模型不支持 / 网络抖动 / 超时）
+ * 重试策略：固定延迟 800ms 后再试 1 次，仍失败才返回占位 Question
+ *
+ * 占位 Question 的 question 字段使用 sentinel string "生成失败，点击重试"，
+ * QuestionCard 通过字符串相等识别失败态并显示红色"重新生成"按钮
+ */
 async function generateOne(node: KnowledgeNode, model: LanguageModel): Promise<Question> {
   try {
-    const result = await generateObject({
-      model,
-      schema: questionSchema,
-      system: PROMPT_DEF.system,
-      prompt: `知识点：${node.title}\n描述：${node.summary}\n难度：${node.difficulty}\n面试频率：${node.frequency}`,
-    });
-    return {
-      id: nanoid(),
-      nodeId: node.id,
-      question: result.object.question,
-      answer: result.object.answer,
-      keyPoints: result.object.keyPoints,
-      followUps: result.object.followUps,
-      codeSnippet: result.object.codeSnippet,
-      bigTech: result.object.bigTech,
-      favorited: false,
-    };
-  } catch (e) {
-    const errMsg = e instanceof Error ? e.message : String(e);
-    return {
-      id: nanoid(),
-      nodeId: node.id,
-      question: "生成失败，点击重试",
-      answer: `[ERROR] ${errMsg}`,
-      keyPoints: [],
-      followUps: [],
-      favorited: false,
-      bigTech: false,
-    };
+    return await callGenerateOnce(node, model);
+  } catch (firstErr) {
+    // 短延迟后重试 1 次
+    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+    console.error(`[question_generate] 第一次失败 (node=${node.id}, title=${node.title}): ${firstMsg}`);
+    await sleep(RETRY_DELAY_MS);
+    try {
+      const retryResult = await callGenerateOnce(node, model);
+      console.info(`[question_generate] 重试成功 (node=${node.id})`);
+      return retryResult;
+    } catch (secondErr) {
+      const secondMsg = secondErr instanceof Error ? secondErr.message : String(secondErr);
+      console.error(`[question_generate] 重试仍失败 (node=${node.id}): ${secondMsg}`);
+      return {
+        id: nanoid(),
+        nodeId: node.id,
+        question: "生成失败，点击重试",
+        answer: `[ERROR] 第一次: ${firstMsg}；重试: ${secondMsg}`,
+        keyPoints: [],
+        followUps: [],
+        favorited: false,
+        bigTech: false,
+      };
+    }
   }
 }
 

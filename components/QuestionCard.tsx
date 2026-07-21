@@ -163,7 +163,23 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
 
       {expanded && question.answer && (
         <div id="question-answer-panel" className="mt-3 space-y-2">
-          <AnswerContent text={question.answer} />
+          <AnswerContent
+            text={question.answer}
+            onAskAI={(selectedText) => {
+              // 用户需求 3：选中答案文字 → 点击"问 AI"按钮 → 跳聊天页
+              // prefill 用选中文字 + 题目上下文，方便 AI 理解追问场景
+              const prefill = `关于题目「${question.question}」的答案片段：\n\n> ${selectedText}\n\n请帮我深入理解这段内容。`;
+              openChatModal({
+                prefill,
+                source: {
+                  type: "question",
+                  id: question.id,
+                  title: question.question,
+                  planId,
+                },
+              });
+            }}
+          />
           {question.keyPoints.length > 0 && (
             <div>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-2">关键点：</p>

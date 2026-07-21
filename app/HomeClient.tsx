@@ -236,80 +236,8 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ============ 3. AI 教练洞察区（需求 4：新账户无数据时整区隐藏）============ */}
-      {(userProfileSummary ||
-        aiQualitySummary ||
-        newAchievements.length > 0 ||
-        healthAlerts.length > 0) && (
-        <section className="mb-5">
-          <HomeInsightsCard
-            newAchievements={newAchievements}
-            healthAlerts={healthAlerts}
-          />
-
-          {/* 用户画像 + AI 质量摘要（从 section 4 移入，与 HomeInsights 同组） */}
-          {(userProfileSummary || aiQualitySummary) && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {userProfileSummary && (
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-xs font-medium text-gray-500">能力画像</span>
-                  </div>
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">入门</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">进阶</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">高级</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
-                    </div>
-                    {userProfileSummary.preferredSlot && (
-                      <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
-                        <span className="text-gray-400">偏好时段</span>
-                        <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {aiQualitySummary && (
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
-                    <span className="text-xs font-medium text-gray-500">AI 质量</span>
-                  </div>
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">今日调用</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">采纳率</span>
-                      <span className="text-green-600 dark:text-green-400 font-medium">
-                        {Math.round(aiQualitySummary.adoptionRate * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <Link
-                    href="/stats/ai-quality"
-                    className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
-                  >
-                    详情 →
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ============ 4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）
+      {/* ============ 3. 今日学习队列（用户需求：移到能力画像+AI 质量前面）
+                              第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序
                               需求 3：header 右侧新增「+ 新建计划」入口，跳 /learn/new ============ */}
       <section className="mb-5">
         <div className="flex items-center justify-between mb-3">
@@ -393,6 +321,80 @@ export default function HomeClient() {
           </div>
         )}
       </section>
+
+      {/* ============ 4. AI 教练洞察区（需求 4：新账户无数据时整区隐藏）
+                          用户需求：移到学习队列之后 ============ */}
+      {(userProfileSummary ||
+        aiQualitySummary ||
+        newAchievements.length > 0 ||
+        healthAlerts.length > 0) && (
+        <section className="mb-5">
+          <HomeInsightsCard
+            newAchievements={newAchievements}
+            healthAlerts={healthAlerts}
+          />
+
+          {/* 用户画像 + AI 质量摘要（从 section 4 移入，与 HomeInsights 同组） */}
+          {(userProfileSummary || aiQualitySummary) && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {userProfileSummary && (
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-xs font-medium text-gray-500">能力画像</span>
+                  </div>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">入门</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">进阶</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">高级</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
+                    </div>
+                    {userProfileSummary.preferredSlot && (
+                      <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
+                        <span className="text-gray-400">偏好时段</span>
+                        <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {aiQualitySummary && (
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-gray-500">AI 质量</span>
+                  </div>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">今日调用</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">采纳率</span>
+                      <span className="text-green-600 dark:text-green-400 font-medium">
+                        {Math.round(aiQualitySummary.adoptionRate * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/stats/ai-quality"
+                    className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
+                  >
+                    详情 →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ============ 5. 7 天热力图（需求 1：移除折叠按钮+今日情绪+错题本，常驻显示；
                                        需求 4：新账户无打卡记录时隐藏）============ */}

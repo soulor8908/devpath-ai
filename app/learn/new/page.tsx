@@ -335,31 +335,6 @@ export default function LearnNewPage() {
           ))}
         </div>
 
-        <div className="flex gap-4">
-          <label className="flex-1">
-            <span className="text-sm text-gray-600">每日学习时间（分钟）</span>
-            <Input
-              type="number"
-              value={dailyMinutes}
-              onChange={(e) => setDailyMinutes(Number(e.target.value))}
-              min={15}
-              max={120}
-              className="mt-1"
-            />
-          </label>
-          <label className="flex-1">
-            <span className="text-sm text-gray-600">每日新内容数</span>
-            <Input
-              type="number"
-              value={maxNewPerDay}
-              onChange={(e) => setMaxNewPerDay(Number(e.target.value))}
-              min={1}
-              max={5}
-              className="mt-1"
-            />
-          </label>
-        </div>
-
         {/* 自定义提示词 */}
         <div className="border rounded-lg p-3 bg-amber-50/50">
           <div className="flex items-center justify-between mb-2">
@@ -503,39 +478,51 @@ export default function LearnNewPage() {
       {/* 预设知识库 */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-gray-500">
-            <Icon name="package" className="w-4 h-4 inline-block align-middle" /> 内置知识库（{PRESETS.length} 个方向）
+          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+            <Icon name="package" className="w-4 h-4" />
+            内置知识库（{PRESETS.length} 个方向）
           </h2>
-          <span className="text-xs text-gray-400">秒级加载 · 可重新生成</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">秒级加载 · 可重新生成</span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {PRESETS.map((p) => (
             <Button
               key={p.id}
               variant="ghost"
-              className="text-left p-3"
               onClick={() => openPreset(p)}
+              className="group text-left p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-md dark:hover:shadow-gray-900/20 hover:bg-white dark:hover:bg-gray-800 rounded-xl transition-all h-auto items-start"
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">{p.icon}</span>
-                <span className="font-bold text-sm">{p.name}</span>
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="text-2xl" aria-hidden="true">{p.icon}</span>
+                <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
+                <Icon
+                  name="chevron-right"
+                  className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 ml-auto group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all"
+                />
               </div>
-              <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3 leading-relaxed">
                 {p.description}
               </p>
-              <div className="flex flex-wrap gap-1 mb-1">
+              <div className="flex flex-wrap gap-1 mb-2.5">
                 {p.tags.slice(0, 3).map((t) => (
                   <span
                     key={t}
-                    className="px-1.5 py-0.5 text-2xs bg-gray-100 text-gray-600 rounded"
+                    className="px-1.5 py-0.5 text-2xs bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 rounded font-medium"
                   >
                     {t}
                   </span>
                 ))}
               </div>
-              <p className="text-2xs text-gray-400">
-                {p.knowledgeTree.length} 知识点 · {p.questions.length} 题
-              </p>
+              <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-50 dark:border-gray-700/50">
+                <span className="flex items-center gap-0.5">
+                  <Icon name="book" className="w-3 h-3" />
+                  {p.knowledgeTree.length} 知识点
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <Icon name="list" className="w-3 h-3" />
+                  {p.questions.length} 题
+                </span>
+              </div>
             </Button>
           ))}
         </div>

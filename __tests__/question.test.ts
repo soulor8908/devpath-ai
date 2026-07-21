@@ -49,8 +49,11 @@ describe("question", () => {
     expect(questions[0].codeSnippet).toBe("const x = 1;");
   });
 
-  it("中间一个抛错，返回 3 题但其中一个 question 是失败标记", async () => {
+  it("第一次抛错但重试成功，返回成功题目（用户需求 3：自动重试机制）", async () => {
     const nodes = [makeNode("k1"), makeNode("k2"), makeNode("k3")];
+    // Promise.all 并行调用 generateObject，顺序为 k1→k2→k3 第 1 轮，
+    // k2 失败后 sleep 800ms 重试，此时 k3 已在第 1 轮完成。
+    // 实际 mock 调用顺序：k1 成功 → k2 失败 → k3 成功 → k2 重试成功
     vi.mocked(generateObject)
       .mockResolvedValueOnce({
         object: { question: "题1", answer: "答1", keyPoints: ["p1"], followUps: ["f1"] },
@@ -58,13 +61,38 @@ describe("question", () => {
       .mockRejectedValueOnce(new Error("AI 失败"))
       .mockResolvedValueOnce({
         object: { question: "题3", answer: "答3", keyPoints: ["p3"], followUps: ["f3"] },
+      } as any)
+      .mockResolvedValueOnce({
+        object: { question: "题2-重试", answer: "答2", keyPoints: ["p2"], followUps: ["f2"] },
       } as any);
 
     const questions = await generateQuestions(nodes);
     expect(questions).toHaveLength(3);
     expect(questions[0].question).toBe("题1");
+    expect(questions[1].question).toBe("题2-重试");
+    expect(questions[2].question).toBe("题3");
+  });
+
+  it("第一次和重试都失败，返回占位 Question（用户需求 3：占位 + 错误信息聚合）", async () => {
+    const nodes = [makeNode("k1"), makeNode("k2"), makeNode("k3")];
+    // mock 调用顺序：k1 成功 → k2 失败 → k3 成功 → k2 重试失败
+    vi.mocked(generateObject)
+      .mockResolvedValueOnce({
+        object: { question: "题1", answer: "答1", keyPoints: ["p1"], followUps: ["f1"] },
+      } as any)
+      .mockRejectedValueOnce(new Error("第一次失败"))
+      .mockResolvedValueOnce({
+        object: { question: "题3", answer: "答3", keyPoints: ["p3"], followUps: ["f3"] },
+      } as any)
+      .mockRejectedValueOnce(new Error("重试也失败"));
+
+    const questions = await generateQuestions(nodes);
+    expect(questions).toHaveLength(3);
+    expect(questions[0].question).toBe("题1");
     expect(questions[1].question).toBe("生成失败，点击重试");
-    expect(questions[1].answer).toBe("[ERROR] AI 失败");
+    // 占位 answer 同时记录第一次和重试的错误信息，便于诊断
+    expect(questions[1].answer).toContain("第一次失败");
+    expect(questions[1].answer).toContain("重试也失败");
     expect(questions[2].question).toBe("题3");
   });
 
