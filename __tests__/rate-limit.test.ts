@@ -5,6 +5,9 @@ import {
   getClientRateLimitEstimate,
   getRateLimitScenes,
   getSceneQuota,
+  checkTrialRateLimit,
+  incrementTrialRateLimit,
+  getTrialSceneQuota,
 } from "../lib/ai/rate-limit";
 import { chinaDateNow } from "../lib/time";
 import type { KVStore } from "../lib/storage/kv";
@@ -209,5 +212,143 @@ describe("rate-limit", () => {
     expect(scenes).toContain("weekly_report");
     expect(scenes).toContain("daily_nudge");
     expect(scenes.length).toBe(4);
+  });
+});
+
+// ============ Trial 模式降级限流测试 ============
+// 验证体验用户（未配置自己的 apiKey，由服务端 AI_API_KEY 兜底）的 IP 维度限流：
+//   - 配额比登录用户更紧（chat=5/天 vs 登录用户 20/天）
+//   - KV key 前缀 `trial:` 与用户配额 `ratelimit:${userId}:` 完全独立，不会撞车
+//   - 超出配额时 allowed=false，由路由返回 429 + TRIAL_LIMIT_REACHED
+
+describe("trial-mode rate-limit（IP 维度，体验用户降级限流）", () => {
+  it("chat 场景 trial 配额为 5（比登录用户 20 更紧）", () => {
+    expect(getTrialSceneQuota("chat")).toBe(5);
+  });
+
+  it("未显式列出的 trial 场景使用默认配额 2", () => {
+    expect(getTrialSceneQuota("plan_generate")).toBe(2);
+    expect(getTrialSceneQuota("weekly_report")).toBe(2);
+    expect(getTrialSceneQuota("daily_nudge")).toBe(2);
+  });
+
+  it("count=0 时 allowed=true, remaining=5", async () => {
+    const kv = createMockKV();
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(5);
+    expect(result.limit).toBe(5);
+  });
+
+  it("count=4 时 allowed=true, remaining=1（最后一次）", async () => {
+    const kv = createMockKV();
+    const date = chinaDateNow();
+    // trial key 前缀：trial:${ip}
+    kv._setCount("trial:1.2.3.4", "chat", date, 4);
+
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(1);
+  });
+
+  it("count=5 时 allowed=false（达上限）", async () => {
+    const kv = createMockKV();
+    const date = chinaDateNow();
+    kv._setCount("trial:1.2.3.4", "chat", date, 5);
+
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.limit).toBe(5);
+  });
+
+  it("count=10（远超上限）时 allowed=false, remaining=0", async () => {
+    const kv = createMockKV();
+    const date = chinaDateNow();
+    kv._setCount("trial:1.2.3.4", "chat", date, 10);
+
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0); // 不出现负数
+  });
+
+  it("incrementTrialRateLimit 计数 +1", async () => {
+    const kv = createMockKV();
+
+    await incrementTrialRateLimit("1.2.3.4", "chat", kv);
+    await incrementTrialRateLimit("1.2.3.4", "chat", kv);
+
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.remaining).toBe(3); // 5 - 2
+  });
+
+  it("increment 到 5 次后 allowed=false", async () => {
+    const kv = createMockKV();
+    for (let i = 0; i < 5; i++) {
+      await incrementTrialRateLimit("1.2.3.4", "chat", kv);
+    }
+    const result = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+
+  it("不同 IP 的 trial 配额互相独立（防滥用隔离）", async () => {
+    const kv = createMockKV();
+    const date = chinaDateNow();
+    // IP A 已用完
+    kv._setCount("trial:1.1.1.1", "chat", date, 5);
+    // IP B 完全没用过
+    const a = await checkTrialRateLimit("1.1.1.1", "chat", kv);
+    const b = await checkTrialRateLimit("2.2.2.2", "chat", kv);
+
+    expect(a.allowed).toBe(false);
+    expect(b.allowed).toBe(true);
+    expect(b.remaining).toBe(5);
+  });
+
+  it("trial 配额与登录用户配额 KV key 独立（不撞车）", async () => {
+    // 模拟同一 KVStore 中两套 key 共存场景：
+    //   - 登录用户 userId="user_abc" 用了 20 次（达上限）
+    //   - 同 IP 1.2.3.4 的 trial 用户用了 0 次（仍可用）
+    // 期望：trial check 不被登录用户的计数影响
+    const kv = createMockKV();
+    const date = chinaDateNow();
+    kv._setCount("user_abc", "chat", date, 20); // 登录用户已满
+
+    const trialResult = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+    expect(trialResult.allowed).toBe(true);
+    expect(trialResult.remaining).toBe(5);
+
+    // 反向：trial 用满了，不影响登录用户
+    kv._setCount("trial:1.2.3.4", "chat", date, 5);
+    const userResult = await checkRateLimit("user_abc", "chat", kv);
+    expect(userResult.allowed).toBe(false); // 用户自己的 20 次仍然满
+    expect(userResult.limit).toBe(20); // 登录用户配额不受 trial 影响
+  });
+
+  it("模拟完整 trial 流程：5 次允许 → 第 6 次拒绝（路由降级路径）", async () => {
+    // 模拟 /api/chat/route.ts 中 trial 模式降级的判定逻辑：
+    //   for (i = 0; i < 6; i++) {
+    //     const limit = await checkTrialRateLimit(ip, "chat", kv);
+    //     if (!limit.allowed) return "REJECT";
+    //     await incrementTrialRateLimit(ip, "chat", kv);
+    //   }
+    //   return "ALLOWED_ALL"
+    const kv = createMockKV();
+    let rejected = false;
+    let callsAllowed = 0;
+
+    for (let i = 0; i < 6; i++) {
+      const limit = await checkTrialRateLimit("1.2.3.4", "chat", kv);
+      if (!limit.allowed) {
+        rejected = true;
+        break;
+      }
+      callsAllowed += 1;
+      await incrementTrialRateLimit("1.2.3.4", "chat", kv);
+    }
+
+    expect(callsAllowed).toBe(5); // 前 5 次允许
+    expect(rejected).toBe(true); // 第 6 次拒绝
   });
 });

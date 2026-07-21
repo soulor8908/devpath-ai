@@ -15,6 +15,13 @@ import { Button } from "@/components/ui";
 interface ModelIconSelectorProps {
   selectedModelId: string | null;
   onSelect: (modelId: string) => void;
+  /**
+   * 点击「添加模型」时触发（无配置时显示 + 按钮的入口）。
+   * 不传则回退为 Link 跳转 /profile（向后兼容 profile 页内嵌使用场景）。
+   * 在 ChatClient 中传入 setModelConfigModalOpen(true) 唤起 ModelConfigModal，
+   * 减少用户操作路径（不必跳页即可添加）。
+   */
+  onAddModel?: () => void;
 }
 
 /** 提供商品牌色映射 */
@@ -26,7 +33,7 @@ const PROVIDER_COLOR: Record<ModelConfig["provider"], string> = {
   custom: "#6b7280",
 };
 
-export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelectorProps) {
+export function ModelIconSelector({ selectedModelId, onSelect, onAddModel }: ModelIconSelectorProps) {
   const [configs, setConfigs] = useState<ModelConfig[] | null>(null);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,8 +82,25 @@ export function ModelIconSelector({ selectedModelId, onSelect }: ModelIconSelect
   // 加载中：渲染空（避免布局抖动）
   if (configs === null) return null;
 
-  // 无配置：渲染单个 + 按钮跳转 /profile
+  // 无配置：渲染单个 + 按钮
+  // - 父组件传了 onAddModel（如 ChatClient）→ 直接唤起 ModelConfigModal
+  // - 没传（如 profile 页内嵌）→ 回退为 Link 跳转 /profile（向后兼容）
   if (configs.length === 0) {
+    if (onAddModel) {
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={onAddModel}
+          aria-label="添加模型配置"
+          title="添加模型配置"
+          className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          <Icon name="plus" className="w-4 h-4" />
+        </Button>
+      );
+    }
     return (
       <Link
         href="/profile"

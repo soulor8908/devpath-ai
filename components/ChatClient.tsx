@@ -38,6 +38,7 @@ import { AnswerContent } from "@/components/CodeBlock";
 import { Icon } from "@/components/Icon";
 import { QuickShortcuts } from "@/components/QuickShortcuts";
 import { ModelIconSelector } from "@/components/ModelIconSelector";
+import { ModelConfigModal } from "@/components/ModelConfigModal";
 import { buildChatContext, buildToolContext } from "@/lib/ai/chat-context";
 import type { ClientAction } from "@/lib/ai/chat-tools";
 import { TOOL_CATEGORIES, getToolsByCategory } from "@/lib/ai/tool-registry";
@@ -98,6 +99,16 @@ export default function ChatClient({
   const [streamContent, setStreamContent] = useState("");
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState("");
+  // Trial 模式状态：服务端通过响应头 X-Trial-Mode: 1 标识。
+  // active=true 时顶部显示 banner 引导用户添加自己的模型；
+  // remaining 是当日剩余次数（undefined 表示服务端未返回）。
+  // 添加模型成功后通过 onClose 事件或显式 setActive(false) 清除。
+  const [trialMode, setTrialMode] = useState<{ active: boolean; remaining?: number }>({
+    active: false,
+  });
+  // ModelConfigModal 开关：banner CTA / ModelIconSelector + 号 / 错误提示中"去添加"
+  // 共用此开关，避免每个入口各自管理状态
+  const [modelConfigModalOpen, setModelConfigModalOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -572,12 +583,10 @@ export default function ChatClient({
           setSelectedModelId(modelConfig.id);
         }
       }
-      if (!modelConfig || !modelConfig.apiKey) {
-        return {
-          error:
-            '未配置 AI 模型。请前往「我的 → AI 模型配置」添加模型（需填写 API Key），或点击下方"去添加"链接。',
-        };
-      }
+      // Trial 模式：用户没配模型（或 apiKey 为空）时走服务端默认模型
+      // 服务端检测到无 session 会自动降级（getModel + IP 限流），
+      // 客户端无需做任何特殊处理，只需用普通 fetch（不带 session 签名）
+      const useTrialMode = !modelConfig || !modelConfig.apiKey;
 
       // 上下文快照 + 工具上下文（失败时静默降级）
       let contextSnapshot = "";
@@ -597,26 +606,34 @@ export default function ChatClient({
       const stopTimer = startTimer();
 
       // session 鉴权由 aiFetch 自动处理（签名头注入）
-      // body 不含 modelConfig / userId（服务端从 session 取）
+      // Trial 模式下用普通 fetch（无 session 头），服务端会自动降级到默认模型 + IP 限流
       // 聊天场景不使用全局 AITaskModal——流式输出本身就是反馈，
       // 中止由本地 AbortController + 发送按钮变「中止」控制
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      const requestBody = JSON.stringify({
+        messages: params.history,
+        contextSnapshot,
+        toolContext,
+      });
       let res: Response;
       try {
-        res = await aiFetch(
-          "/api/chat",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              messages: params.history,
-              contextSnapshot,
-              toolContext,
-            }),
-            signal: controller.signal,
-          },
-          0, // 流式响应不设超时（由用户中止按钮控制）
-        );
+        res = useTrialMode
+          ? await fetch("/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: requestBody,
+              signal: controller.signal,
+            })
+          : await aiFetch(
+              "/api/chat",
+              {
+                method: "POST",
+                body: requestBody,
+                signal: controller.signal,
+              },
+              0, // 流式响应不设超时（由用户中止按钮控制）
+            );
       } catch (err) {
         // 用户主动中止：静默，不抛错（流式内容已部分展示）
         if (controller.signal.aborted) {
@@ -635,8 +652,23 @@ export default function ChatClient({
         return { error: msg };
       }
 
-      // 从响应头读取模型 ID（用于成本估算）
+      // 从响应头读取模型 ID（用于成本估算）+ Trial 模式标识
       const responseModelId = res.headers.get("X-AI-Model-Id") ?? undefined;
+      const isTrialResponse = res.headers.get("X-Trial-Mode") === "1";
+      const trialRemainingHeader = res.headers.get("X-Trial-Remaining");
+      if (isTrialResponse) {
+        const remaining = trialRemainingHeader
+          ? Number(trialRemainingHeader)
+          : undefined;
+        setTrialMode({
+          active: true,
+          remaining: Number.isFinite(remaining) ? remaining : undefined,
+        });
+      } else if (useTrialMode) {
+        // 客户端预期 trial 但服务端没返回 trial 标识 → 可能是服务端未配 AI_API_KEY
+        // 或返回了普通 401（已在 !res.ok 分支处理），这里兜底清 trial state
+        setTrialMode({ active: false });
+      }
 
       setStreaming(true);
       setStreamContent("");
@@ -1108,6 +1140,41 @@ export default function ChatClient({
         </Button>
       </header>
 
+      {/* Trial 模式横幅：用户没配模型时由服务端兜底响应（基础模型），
+          引导用户添加自己的模型以获得更稳定体验 + 提升调用上限。
+          CTA 按钮「添加自己的模型」唤起 ModelConfigModal，关闭后不再显示（同一会话内） */}
+      {trialMode.active && (
+        <div className="shrink-0 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-900 px-3 py-2 text-xs flex items-center gap-2 text-blue-700 dark:text-blue-300">
+          <Icon name="info" className="w-3.5 h-3.5 inline-block shrink-0" />
+          <span className="flex-1 truncate">
+            当前是体验模型（基础版），建议添加自己的模型获得更稳定体验
+            {typeof trialMode.remaining === "number" && (
+              <span className="ml-1 text-blue-500 dark:text-blue-400">
+                · 今日剩余 {trialMode.remaining} 次
+              </span>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setModelConfigModalOpen(true)}
+            className="shrink-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-medium"
+          >
+            添加自己的模型
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => setTrialMode({ active: false })}
+            className="shrink-0 text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
+            aria-label="关闭提示"
+          >
+            <Icon name="x" className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* 来源横幅 */}
       {activeConv?.source && (
         <div className="shrink-0 bg-amber-50 border-b px-3 py-2 text-xs flex items-center gap-2">
@@ -1127,18 +1194,34 @@ export default function ChatClient({
 
       {/* 错误提示 */}
       {error && (
-        <div className="shrink-0 bg-red-50 border-b border-red-200 px-3 py-2 text-xs text-red-600 flex items-center justify-between gap-2">
-          <span className="truncate"><Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> {error}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-600 shrink-0"
-            aria-label="关闭错误"
-          >
-            <Icon name="x" className="w-4 h-4" />
-          </Button>
+        <div className="shrink-0 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900 px-3 py-2 text-xs text-red-700 dark:text-red-300 flex items-center justify-between gap-2">
+          <span className="truncate flex-1">
+            <Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" />
+            {error}
+          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* 错误含模型配置关键词时显示「添加模型」CTA（避免在所有错误中都显示） */}
+            {(error.includes("未配置") || error.includes("AI 模型") || error.includes("体验额度")) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setModelConfigModalOpen(true)}
+                className="text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 font-medium"
+              >
+                添加模型
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600 dark:hover:text-red-200"
+              aria-label="关闭错误"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -1378,6 +1461,7 @@ export default function ChatClient({
           <ModelIconSelector
             selectedModelId={selectedModelId || null}
             onSelect={setSelectedModelId}
+            onAddModel={() => setModelConfigModalOpen(true)}
           />
         </div>
         {/* 第 2 行：输入框 + 发送/中止按钮（streaming 时切换为中止） */}
@@ -1511,6 +1595,19 @@ export default function ChatClient({
           </div>
         </div>
       )}
+
+      {/* 模型配置弹框：trial banner CTA / ModelIconSelector + 号 / 错误提示中的「去添加」
+          共用此 modal。保存成功后刷新模型列表 + 选中新模型 + 清除 trial 状态。 */}
+      <ModelConfigModal
+        open={modelConfigModalOpen}
+        onClose={() => setModelConfigModalOpen(false)}
+        onSuccess={async (config) => {
+          await refreshModelConfigs();
+          setSelectedModelId(config.id);
+          setTrialMode({ active: false });
+          setModelConfigModalOpen(false);
+        }}
+      />
     </div>
   );
 }

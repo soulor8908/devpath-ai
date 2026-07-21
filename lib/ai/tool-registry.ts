@@ -174,6 +174,13 @@ export function buildToolSystemSuffix(): string {
     "1. 优先用工具获取数据，再基于数据给出建议",
     "2. 一个回合可调用多个工具（maxSteps: 5）",
     "3. 调用工具后，用自然语言总结结果并给出建议",
+    "\n## 写入工具调用规则（闭环关键，必须严格遵守）",
+    "调用 adjust_plan / toggle_plan_freeze / set_plan_priority / start_focus_session 等写入工具时：",
+    "1. planId / plan_id 参数**必须**用上面只读工具返回的真实 planId，**禁止编造或猜测**",
+    "2. 若上下文中没有 planId，先调用 get_daily_schedule / get_next_task / get_upcoming_plan / review_today 获取",
+    "3. 若用户描述模糊（如「暂停那个 React 计划」），先用只读工具确认具体 planId 再写入",
+    "4. 写入工具调用后，用自然语言告知用户执行结果（如「已暂停 React 学习计划」）",
+    "5. 同一回合内同一写入工具不要重复调用相同参数（幂等键会去重，但仍应避免无意义重复）",
   );
   return lines.join("\n");
 }

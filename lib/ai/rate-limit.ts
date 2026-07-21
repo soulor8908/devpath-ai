@@ -94,3 +94,65 @@ export function getClientRateLimitEstimate(scene: AIScene): { limit: number } {
 export function getRateLimitScenes(): AIScene[] {
   return [...RATE_LIMITED_SCENES];
 }
+
+// ---------------------------------------------------------------------------
+// Trial 模式限流（IP 维度，针对未配置自己 apiKey 的体验用户）
+// ---------------------------------------------------------------------------
+//
+// 设计（卡帕西视角）：
+//   - 体验用户没添加自己的模型时，服务端用默认模型（AI_API_KEY）兜底响应
+//   - 但必须有 IP 维度的限流闸门防滥用，不能让一个 IP 无限消耗服务端配额
+//   - 配额比登录用户更紧（chat=5/天），且 key 前缀独立（trial:）避免与用户配额撞车
+//   - KV 复用 AUTH_SESSIONS（与 SessionStore 同 namespace），key 前缀区分用途
+
+/**
+ * Trial 模式场景配额表：每日上限（比登录用户更紧）
+ */
+const TRIAL_SCENE_QUOTAS: Partial<Record<AIScene, number>> = {
+  chat: 5,
+};
+
+const TRIAL_DEFAULT_QUOTA = 2;
+
+/** 获取 trial 模式某场景的配额 */
+export function getTrialSceneQuota(scene: AIScene): number {
+  return TRIAL_SCENE_QUOTAS[scene] ?? TRIAL_DEFAULT_QUOTA;
+}
+
+/**
+ * 检查 trial 模式是否允许调用（IP 维度）。
+ *
+ * 实现复用 SessionStore 的 getRateLimitCount，userId 位置传 `trial:${ip}`，
+ * 由此生成的 KV key 为 `ratelimit:trial:${ip}:${scene}:${date}`，
+ * 与登录用户的 `ratelimit:${userId}:${scene}:${date}` 完全独立，不会撞车。
+ *
+ * @param ip 客户端 IP（从 cf-connecting-ip / x-forwarded-for 提取）
+ */
+export async function checkTrialRateLimit(
+  ip: string,
+  scene: AIScene,
+  kv: KVStore,
+): Promise<{ allowed: boolean; remaining: number; limit: number }> {
+  const limit = getTrialSceneQuota(scene);
+  const date = chinaDateNow();
+  const used = await kv.getRateLimitCount(`trial:${ip}`, scene, date);
+  const remaining = Math.max(0, limit - used);
+  return {
+    allowed: used < limit,
+    remaining,
+    limit,
+  };
+}
+
+/**
+ * Trial 模式计数 +1（IP 维度）。
+ * 与 checkTrialRateLimit 共享 key 前缀，配合使用。
+ */
+export async function incrementTrialRateLimit(
+  ip: string,
+  scene: AIScene,
+  kv: KVStore,
+): Promise<void> {
+  const date = chinaDateNow();
+  await kv.incrementRateLimitCount(`trial:${ip}`, scene, date);
+}

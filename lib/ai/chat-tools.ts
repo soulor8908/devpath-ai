@@ -160,7 +160,7 @@ export function createChatTools(ctx: ToolContext) {
     // 1. 获取今日时间表
     get_daily_schedule: tool({
       description:
-        '获取用户今日的完整时间表，包括作息 routine 和学习计划安排。当用户问"今天有什么安排"、"今日时间表"时调用。',
+        '获取用户今日的完整时间表，包括作息 routine 和学习计划安排。当用户问"今天有什么安排"、"今日时间表"时调用。返回的 todayPlanSchedule[].planId 可用于 adjust_plan / toggle_plan_freeze / set_plan_priority 等写入工具的 planId 参数。',
       parameters: z.object({}),
       execute: async () => {
         const now = new Date(ctx.now);
@@ -181,6 +181,9 @@ export function createChatTools(ctx: ToolContext) {
             todayPlanSchedule: ctx.plans
               .filter((p) => !p.frozen)
               .map((p) => ({
+                // 暴露 planId：让 AI 能据此调用 adjust_plan /
+                // toggle_plan_freeze / set_plan_priority 等写入工具，闭环关键
+                planId: p.id,
                 topic: p.topic,
                 priority: p.priority,
                 dailyMinutes: p.dailyMinutes,
@@ -199,7 +202,7 @@ export function createChatTools(ctx: ToolContext) {
     // 2. 接下来该干什么
     get_next_task: tool({
       description:
-        '根据用户当前时间、作息和学习计划，推荐接下来该做什么。当用户问"接下来学什么"、"现在该干什么"、"下一步"时调用。',
+        '根据用户当前时间、作息和学习计划，推荐接下来该做什么。当用户问"接下来学什么"、"现在该干什么"、"下一步"时调用。返回的 recommendedPlan.planId 可用于 start_focus_session / adjust_plan 等工具的 plan_id / planId 参数。',
       parameters: z.object({}),
       execute: async () => {
         const currentTime = formatTime(ctx.now);
@@ -241,6 +244,9 @@ export function createChatTools(ctx: ToolContext) {
             energyLow,
             recommendedPlan: nextPlan
               ? {
+                  // 暴露 planId：让 AI 能据此调用 start_focus_session（plan_id）
+                  // 或后续 adjust_plan（planId），闭环关键
+                  planId: nextPlan.id,
                   topic: nextPlan.topic,
                   priority: nextPlan.priority,
                   currentNode: nextPlan.currentNodeTitle,
@@ -316,7 +322,7 @@ export function createChatTools(ctx: ToolContext) {
     // 4. 复盘今天表现
     review_today: tool({
       description:
-        '获取今天的完整学习表现数据，供 AI 进行复盘分析。当用户说"复盘今天"、"今天表现怎么样"、"总结一下今天"时调用。',
+        '获取今天的完整学习表现数据，供 AI 进行复盘分析。当用户说"复盘今天"、"今天表现怎么样"、"总结一下今天"时调用。返回的 planProgress[].planId 可用于 adjust_plan / toggle_plan_freeze / set_plan_priority 等写入工具的 planId 参数。',
       parameters: z.object({}),
       execute: async () => {
         const todayLogs = ctx.todayLearnLogs;
@@ -326,9 +332,12 @@ export function createChatTools(ctx: ToolContext) {
         const availableMin = ctx.todayStatus?.availableMinutes;
 
         // 统计各计划今日进度
+        // 暴露 planId：让 AI 能据此调用 adjust_plan /
+        // toggle_plan_freeze / set_plan_priority 等写入工具，闭环关键
         const planProgress = ctx.plans
           .filter((p) => !p.frozen)
           .map((p) => ({
+            planId: p.id,
             topic: p.topic,
             todayTasks: p.upcomingSchedule[0]?.tasks ?? [],
             completedToday: (p.upcomingSchedule[0]?.tasks ?? []).filter((t) => t.completed).length,
@@ -357,7 +366,7 @@ export function createChatTools(ctx: ToolContext) {
     // 5. 获取未来几天的计划
     get_upcoming_plan: tool({
       description:
-        '获取未来几天的学习计划安排。当用户问"未来几天有什么计划"、"下周学什么"、"接下来的安排"时调用。',
+        '获取未来几天的学习计划安排。当用户问"未来几天有什么计划"、"下周学什么"、"接下来的安排"时调用。返回的 schedule[].planId 可用于 adjust_plan / toggle_plan_freeze / set_plan_priority 等写入工具的 planId 参数。',
       parameters: z.object({
         days: z
           .number()
@@ -371,6 +380,9 @@ export function createChatTools(ctx: ToolContext) {
           .filter((p) => !p.frozen)
           .flatMap((p) =>
             p.upcomingSchedule.slice(0, days).map((s) => ({
+              // 暴露 planId：让 AI 能据此调用 adjust_plan /
+              // toggle_plan_freeze / set_plan_priority 等写入工具，闭环关键
+              planId: p.id,
               topic: p.topic,
               priority: p.priority,
               day: s.day,

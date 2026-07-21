@@ -7,20 +7,26 @@
 //   - 只读工具在服务端执行，直接返回 toolContext 中的数据
 //   - 写入工具返回 clientAction 描述符，客户端在流结束后解析并执行 IndexedDB 操作
 //
-// 鉴权（apiKey Session 安全架构）：
-//   - requireSession 校验签名 + 注入 session（apiKey / baseURL / model）
-//   - body 不含客户端凭证；模型从 session 构造
+// 鉴权（apiKey Session 安全架构 + Trial 模式降级）：
+//   - 优先走 requireSession（用户已配置自己模型 → 用 session.apiKey）
+//   - requireSession 失败（401）→ 降级到 trial 模式：
+//       a. 服务端用默认模型 getModel()（环境变量配置的 AI_API_KEY）
+//       b. IP 维度限流（chat=5/天，独立 KV key 前缀 trial: 防撞）
+//       c. 响应头 X-Trial-Mode: 1 + X-Trial-Remaining: N
+//   - trial 模式让体验用户第一时间得到 AI 响应（乔布斯视角：API Key 不应是首日门槛）
 
 import { NextRequest, NextResponse } from "next/server";
 import { streamText } from "ai";
-import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv, getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
-import { getModelFromSession } from "@/lib/ai/provider";
+import { getModelFromSession, getModel, hasAIKey, getProviderInfo } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createChatTools, type ToolContext } from "@/lib/ai/chat-tools";
 import { buildToolSystemSuffix } from "@/lib/ai/tool-registry";
 import { PERSONAS, selectPersona, type PersonaContext, type Persona } from "@/lib/ai/persona";
 import type { PersonaId } from "@/lib/types";
+import { createKVStore } from "@/lib/storage/kv";
+import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
 
 export const runtime = "edge";
 
@@ -35,13 +41,31 @@ const PROMPT_DEF = getPrompt("chat");
 // 工具能力说明（从 tool-registry 动态生成，追加到 system prompt）
 const TOOL_SYSTEM_SUFFIX = buildToolSystemSuffix();
 
+/**
+ * 从请求头提取客户端真实 IP。
+ * 优先级：
+ *   1. cf-connecting-ip（Cloudflare Pages 注入，最可信）
+ *   2. x-forwarded-for 的第一个值（其他反代场景）
+ *   3. 兜底 "unknown"（限流将以 unknown 维度计数，可接受）
+ */
+function getClientIp(req: NextRequest): string {
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp;
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   try {
     // 先鉴权（requireSession 内部用 req.clone().text() 读 body 签名校验，不消费原 body）
     const sessionResult = await requireSession(req);
-    if (sessionResult instanceof NextResponse) return sessionResult;
-    const { session } = sessionResult;
+    const hasSession = !(sessionResult instanceof NextResponse);
+    const session = hasSession ? sessionResult.session : null;
 
     // 再读 body（不再含客户端凭证字段）
     const body = await req.json();
@@ -62,11 +86,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 用 session 创建模型
-    const model = getModelFromSession(session, "chat");
+    // 模型选择 + Trial 模式判定
+    // - session 存在 → 用 session.apiKey 调上游（用户自担额度）
+    // - session 不存在 → 尝试 trial 模式（服务端默认模型 + IP 限流）
+    //   - 服务端没配 AI_API_KEY → 返回原 401（requireSession 的错误响应）
+    //     （这种情况说明部署环境未启用 trial，应引导用户自配模型）
+    let model;
+    let currentModelId: string;
+    let isTrial = false;
+    let trialRemaining: number | undefined;
 
-    // 无服务端限流：session 架构下所有用户都用自己加密在 session 中的 apiKey，
-    // 直接调用上游 AI provider，由用户自担额度/费用。服务端不再做"今日 N 次"拦截。
+    if (session) {
+      model = getModelFromSession(session, "chat");
+      currentModelId = session.model;
+    } else {
+      // Trial 模式：先检查服务端是否配了 AI_API_KEY
+      if (!hasAIKey()) {
+        // 服务端没配 trial model → 返回原 401（让用户去配置自己的模型）
+        return sessionResult as NextResponse;
+      }
+      // IP 维度限流
+      const ip = getClientIp(req);
+      const kv = createKVStore(getAuthSessionsKV() ?? undefined);
+      const limit = await checkTrialRateLimit(ip, "chat", kv);
+      if (!limit.allowed) {
+        return NextResponse.json(
+          {
+            error: `今日体验额度已用完（${limit.limit} 次/天）。请添加自己的 AI 模型以继续使用。`,
+            code: "TRIAL_LIMIT_REACHED",
+            limit: limit.limit,
+          },
+          { status: 429 },
+        );
+      }
+      trialRemaining = limit.remaining - 1; // 本次调用后剩余
+      model = getModel();
+      const info = getProviderInfo();
+      currentModelId = info.model;
+      isTrial = true;
+      // 异步计数（不阻塞响应）；即使本次调用失败也计数，避免被滥用刷免费额度
+      void incrementTrialRateLimit(ip, "chat", kv).catch(() => {});
+    }
 
     const safeContext =
       typeof contextSnapshot === "string" && contextSnapshot.length > 0
@@ -98,15 +158,18 @@ export async function POST(req: NextRequest) {
     const parts: string[] = [PROMPT_DEF.system];
     if (safeContext) parts.push(safeContext);
     if (personaSnippet) parts.push(personaSnippet);
+    // Trial 模式追加提示：让 AI 知道当前是体验用户、应建议添加自己的模型
+    if (isTrial) {
+      parts.push(
+        "[体验模式] 当前用户使用服务端默认模型（基础版）。回答末尾可礼貌建议：「当前是体验模型，建议在「我的 → AI 模型」添加自己的模型以获得更稳定的体验」，但每轮最多提示一次，避免打扰。",
+      );
+    }
     parts.push(TOOL_SYSTEM_SUFFIX);
     const systemPrompt = parts.join("\n\n");
 
     // 如果有 toolContext，创建工具并启用多步调用
     const hasTools = toolContext && Array.isArray(toolContext.plans);
     const tools = hasTools ? createChatTools(toolContext!) : undefined;
-
-    // 解析当前使用的模型 ID（用于客户端成本估算）：直接从 session 取
-    const currentModelId = session.model;
 
     const result = await streamText({
       model,
@@ -118,6 +181,7 @@ export async function POST(req: NextRequest) {
       onFinish: ({ usage, finishReason }) => {
         console.info("[chat] usage", {
           modelId: currentModelId,
+          trial: isTrial,
           promptTokens: usage?.promptTokens,
           completionTokens: usage?.completionTokens,
           totalTokens: usage?.totalTokens,
@@ -129,6 +193,13 @@ export async function POST(req: NextRequest) {
     const response = result.toDataStreamResponse();
     // 通过响应头传递 modelId，客户端用于成本估算（与 "d:" 消息中的 usage 配合）
     response.headers.set("X-AI-Model-Id", currentModelId);
+    if (isTrial) {
+      // Trial 模式标识 + 剩余次数：客户端据此显示 banner + 引导添加模型
+      response.headers.set("X-Trial-Mode", "1");
+      if (trialRemaining !== undefined) {
+        response.headers.set("X-Trial-Remaining", String(trialRemaining));
+      }
+    }
     return response;
   } catch (error) {
     // 区分上游 AI provider 错误 vs 本地错误，避免把上游 401 当成 500 吞掉
