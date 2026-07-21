@@ -34,6 +34,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
+import { PathProgressBar } from "@/components/PathProgressBar";
+import { PathCoachInsight } from "@/components/PathCoachInsight";
 import { EmotionQuickPicker } from "@/components/EmotionQuickPicker";
 import { Icon, type IconName } from "@/components/Icon";
 import { Button, LinkButton } from "@/components/ui";
@@ -58,6 +60,8 @@ export default function HomeClient() {
     aiQualitySummary,
     studyQueue,
     todayCompletedCount,
+    careerPath,
+    coachInsight,
     reload,
   } = useHomeData();
 
@@ -166,8 +170,27 @@ export default function HomeClient() {
           </div>
         )}
 
-        {/* CurrentTaskCard 是核心答案 */}
-        <CurrentTaskCard />
+        {/* V2: Path 路径进度（如果有职业路径，作为视觉焦点替代 CurrentTaskCard）
+            设计（乔布斯视角）：用户打开 app 第一眼看到"离 offer 还有多远"
+              - PathProgressBar：进度 + 当前位置 + 预计时间 + 主按钮
+              - PathCoachInsight：AI 教练有温度的每日一句话
+            兼容旧用户：无 careerPath（未走过 onboarding）时保留原 CurrentTaskCard */}
+        {careerPath ? (
+          <>
+            <PathProgressBar
+              careerTitle={careerPath.title}
+              icon={careerPath.icon}
+              progress={careerPath.progress}
+              weeksLeft={careerPath.weeksLeft}
+              currentNodeTitle={careerPath.currentNodeTitle}
+            />
+            <div className="mt-2">
+              <PathCoachInsight insight={coachInsight} />
+            </div>
+          </>
+        ) : (
+          <CurrentTaskCard />
+        )}
 
         {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重）
             入口改造：原 <Link href="/timer"> 跳转路由 → 移除 /timer 路由

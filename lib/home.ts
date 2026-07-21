@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getItem, countDueCards, listDueCards, listRecentItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
+  LearningPlan,
   LearningPlanSummary,
   LearnLog,
   ScheduleItem,
@@ -24,7 +25,10 @@ import type {
   HealthAlert,
   UserProfile,
   ReviewCard,
+  CareerPath,
 } from "@/lib/types";
+import type { IconName } from "@/components/Icon";
+import { getCareerPathById } from "@/lib/onboarding/career-paths";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { getUnresolvedMistakes } from "@/lib/mistake-book";
 import { autoFillTodayActualMinutes } from "@/lib/energy-collector";
@@ -168,6 +172,28 @@ export interface HomeData {
    * 0 表示今日尚未完成任何学习项。
    */
   todayCompletedCount: number;
+  /**
+   * 职业路径信息（V2 乔布斯视角重构）：
+   * 从 onboarding 存储的 pathId 获取职业路径，计算进度和预计时间。
+   * null 表示用户未通过新 onboarding 流程（旧用户兼容）。
+   */
+  careerPath: {
+    title: string;
+    icon: string;
+    progress: number;
+    weeksLeft: number;
+    currentNodeTitle: string;
+  } | null;
+  /**
+   * AI 教练每日洞察（V2）：
+   * 基于昨日答题正确率、今日完成情况、连续天数生成有温度的一句话。
+   * null 表示无足够数据生成洞察。
+   */
+  coachInsight: {
+    tone: "encouraging" | "reminding" | "challenging" | "celebrating";
+    message: string;
+    icon: IconName;
+  } | null;
 }
 
 // ============ 纯函数：从原始数据计算派生状态 ============
@@ -330,6 +356,112 @@ export function computeHeatmap(
   return out;
 }
 
+/**
+ * 派生职业路径信息（V2 乔布斯视角重构）
+ *
+ * 进度计算（卡帕西视角）：
+ *   - 分子：plan.knowledgeTree 中 mastered === true 的节点数
+ *   - 分母：plan.knowledgeTree.length（用户实际计划的节点数，与 CareerPath.nodes 解耦）
+ *   - 这样 plan 与 CareerPath 不需要一一对应，preset 模板可灵活调整
+ *
+ * weeksLeft 计算：
+ *   - 剩余总小时数 = CareerPath.nodes 总 estimatedHours × (1 - progress/100)
+ *     （用进度比例换算剩余时间，避免"哪些节点已完成"的判断难题）
+ *   - weeksLeft = ceil(剩余总小时数 / CareerPath.weeklyHours)
+ *
+ * currentNodeTitle：
+ *   - 假设 CareerPath.nodes 是线性顺序，已完成数 = round(progress% × nodes.length)
+ *   - 取第「已完成数」个节点（即下一个待学节点）的 title
+ *   - 若全部完成，取最后一个节点的 title
+ *
+ * @param pathDef 职业路径定义（来自 CAREER_PATHS）
+ * @param plan 用户的学习计划（含 knowledgeTree 用于 mastered 判断）
+ * @returns 路径信息；任一前置条件不满足时返回 null
+ */
+export function deriveCareerPath(
+  pathDef: CareerPath,
+  plan: LearningPlan,
+): HomeData["careerPath"] {
+  const totalNodes = plan.knowledgeTree.length;
+  if (totalNodes === 0) {
+    // 空知识树：进度 0，weeksLeft 用 pathDef.weeksEstimate 兜底
+    return {
+      title: pathDef.title,
+      icon: pathDef.icon,
+      progress: 0,
+      weeksLeft: pathDef.weeksEstimate,
+      currentNodeTitle: pathDef.nodes[0]?.title ?? pathDef.title,
+    };
+  }
+
+  const masteredCount = plan.knowledgeTree.filter((n) => n.mastered === true).length;
+  const progress = Math.round((masteredCount / totalNodes) * 100);
+
+  // 剩余总小时数 = path 总 hours × (1 - 进度比)
+  const totalHours = pathDef.nodes.reduce((sum, n) => sum + n.estimatedHours, 0);
+  const remainingHours = totalHours * (1 - masteredCount / totalNodes);
+  const weeksLeft = pathDef.weeklyHours > 0
+    ? Math.max(1, Math.ceil(remainingHours / pathDef.weeklyHours))
+    : pathDef.weeksEstimate;
+
+  // 当前节点：第「已完成数」个节点（线性顺序假设）
+  const currentNodeIdx = Math.min(masteredCount, pathDef.nodes.length - 1);
+  const currentNodeTitle = pathDef.nodes[currentNodeIdx]?.title ?? pathDef.title;
+
+  return {
+    title: pathDef.title,
+    icon: pathDef.icon,
+    progress,
+    weeksLeft,
+    currentNodeTitle,
+  };
+}
+
+/**
+ * 派生 AI 教练每日洞察（V2）
+ *
+ * 规则（按优先级，先命中先返回）：
+ *   1. streak >= 7 → celebrating: "连续打卡 X 天，你正在建立习惯！"
+ *   2. todayCompletedCount > 0 → challenging: "今天已完成 X 项，继续推进！"
+ *   3. streak === 0 → reminding: "今天还没开始，从第一个知识点开始吧"
+ *   4. 默认 → encouraging: "每天进步一点点，离 offer 越来越近"
+ *
+ * @returns 洞察对象；输入异常时返回 null
+ */
+export function deriveCoachInsight(params: {
+  streak: number;
+  todayCompletedCount: number;
+}): HomeData["coachInsight"] {
+  const { streak, todayCompletedCount } = params;
+
+  if (streak >= 7) {
+    return {
+      tone: "celebrating",
+      message: `连续打卡 ${streak} 天，你正在建立习惯！`,
+      icon: "star",
+    };
+  }
+  if (todayCompletedCount > 0) {
+    return {
+      tone: "challenging",
+      message: `今天已完成 ${todayCompletedCount} 项，继续推进！`,
+      icon: "zap",
+    };
+  }
+  if (streak === 0) {
+    return {
+      tone: "reminding",
+      message: "今天还没开始，从第一个知识点开始吧",
+      icon: "leaf",
+    };
+  }
+  return {
+    tone: "encouraging",
+    message: "每天进步一点点，离 offer 越来越近",
+    icon: "sparkles",
+  };
+}
+
 /** 从 plans 计算今日学习安排 + 待学数 + 最新 plan
  *  P1 优化：接受 LearningPlanSummary（含 schedule 字段），避免首页加载完整 plan 的 knowledgeTree/questions
  */
@@ -369,6 +501,18 @@ export function computeTodaySchedule(plans: LearningPlanSummary[]): {
 // ============ 首页数据 hook ============
 
 /**
+ * onboarding 存储数据（key = "my:onboarding"）
+ *
+ * 写入位置：app/onboarding/page.tsx → dbSet("my:onboarding", {...})
+ * 读取位置：useHomeData 内并行查询，用于派生 careerPath
+ */
+interface OnboardingData {
+  pathId: string;
+  planId: string;
+  completedAt: string;
+}
+
+/**
  * 加载首页所有数据
  *
  * 性能：用 Promise.all 把 7 次 IndexedDB 查询并行化
@@ -377,6 +521,10 @@ export function computeTodaySchedule(plans: LearningPlanSummary[]): {
  *
  * 数据源之间无依赖：cards/plans/logs/emotions/profile/status 走不同前缀，
  *   mistakes 走 getUnresolvedMistakes() 内部独立查询，均可并行。
+ *
+ * V2 新增：onboarding（"my:onboarding" key）加入 Promise.all 并行查询；
+ *   若有 pathId，再串行读取完整 plan（含 knowledgeTree）以计算 careerPath。
+ *   该串行读取仅在用户走过 onboarding 流程时发生，旧用户路径为 null 不触发。
  */
 export function useHomeData(): HomeData & {
   reload: () => Promise<void>;
@@ -401,6 +549,8 @@ export function useHomeData(): HomeData & {
     aiQualitySummary: null,
     studyQueue: [],
     todayCompletedCount: 0,
+    careerPath: null,
+    coachInsight: null,
   });
 
   const load = useCallback(async () => {
@@ -418,9 +568,10 @@ export function useHomeData(): HomeData & {
     //   - 计划：listPlanSummaries() 加载轻量 summary（含 schedule），避免拉取 knowledgeTree/questions
     //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
     // 第 2 阶段：新增 listDueCards 拉到期卡片数据（用于 studyQueue 渲染）
+    // V2：新增 onboarding 并行读取（无 IO 依赖）
     const now = new Date();
     const [
-      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards,
+      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards, onboarding,
     ] = await Promise.all([
       countDueCards(now),
       listPlanSummaries(),
@@ -432,6 +583,7 @@ export function useHomeData(): HomeData & {
       getUserProfile(),
       getQualityReport(todayStartIso),
       listDueCards<ReviewCard>(now, 50),
+      getItem<OnboardingData>("my:onboarding"),
     ]);
 
     // 内存派生计算（无 IO）
@@ -469,6 +621,26 @@ export function useHomeData(): HomeData & {
     // 派生：AI 质量摘要（从 QualityReport 计算今日调用数 + 整体采纳率）
     const aiQualitySummary = deriveAiQualitySummary(qualityReport);
 
+    // V2 派生：职业路径信息（仅当用户走过 onboarding 流程时计算）
+    // 串行读取完整 plan（含 knowledgeTree）—— 旧用户无 onboarding 时跳过，零开销
+    let careerPath: HomeData["careerPath"] = null;
+    if (onboarding?.pathId) {
+      const pathDef = getCareerPathById(onboarding.pathId);
+      if (pathDef && onboarding.planId) {
+        try {
+          const plan = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + onboarding.planId);
+          if (plan) {
+            careerPath = deriveCareerPath(pathDef, plan);
+          }
+        } catch {
+          // plan 读取失败 → careerPath 保持 null（旧用户兼容，不阻塞首页）
+        }
+      }
+    }
+
+    // V2 派生：AI 教练每日洞察（基于 streak + todayCompletedCount）
+    const coachInsight = deriveCoachInsight({ streak, todayCompletedCount });
+
     setData({
       dueCount,
       todayLearnCount,
@@ -489,6 +661,8 @@ export function useHomeData(): HomeData & {
       aiQualitySummary,
       studyQueue,
       todayCompletedCount,
+      careerPath,
+      coachInsight,
     });
 
     // 后台维护任务：不阻塞 UI，失败静默
