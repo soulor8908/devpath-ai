@@ -238,6 +238,8 @@ export function MindMap({
   }, [allIds]);
 
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  // dragMovedRef：区分点击 vs 拖动。< 5px 视为点击（不应用 translate，让 click 事件正常触发交互）
+  const dragMovedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const touchRef = useRef<{
@@ -273,7 +275,10 @@ export function MindMap({
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget && (e.target as SVGElement).tagName !== "svg") return;
+    // 不再限制 target：让任何元素都能启动拖动（节点/g/path/rect/svg/container）
+    // 交互元素（标题/按钮）的 onClick 会 stopPropagation，不影响拖动期间的 click 行为
+    // dragMovedRef 区分点击 vs 拖动：< 5px 视为点击（不应用 translate）
+    dragMovedRef.current = false;
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -286,10 +291,16 @@ export function MindMap({
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
-    setTranslate({
-      x: dragRef.current.originX + dx,
-      y: dragRef.current.originY + dy,
-    });
+    // 5px 阈值：避免微抖动触发拖动，也保证点击交互元素时不位移
+    if (!dragMovedRef.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      dragMovedRef.current = true;
+    }
+    if (dragMovedRef.current) {
+      setTranslate({
+        x: dragRef.current.originX + dx,
+        y: dragRef.current.originY + dy,
+      });
+    }
   }, []);
 
   const handleMouseUp = useCallback(() => {
@@ -297,7 +308,9 @@ export function MindMap({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+    // 注意：不调用 e.preventDefault()！
+    // touchAction: "none" 已禁用浏览器默认手势（滚动/缩放），不需要 preventDefault
+    // 若调用 preventDefault 会阻断后续 click 事件，导致节点标题点击无反应（移动端 bug 根因）
     if (e.touches.length === 1) {
       const t = e.touches[0];
       touchRef.current = {
@@ -307,6 +320,7 @@ export function MindMap({
         originX: translate.x,
         originY: translate.y,
       };
+      dragMovedRef.current = false;
     } else if (e.touches.length === 2) {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
@@ -320,20 +334,31 @@ export function MindMap({
         initialDist: dist,
         initialScale: scale,
       };
+      // 双指缩放时标记已移动，避免触发 click
+      dragMovedRef.current = true;
     }
   }, [translate.x, translate.y, scale]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
     const t = touchRef.current;
     if (!t) return;
     if (t.mode === "pan" && e.touches.length === 1) {
       const touch = e.touches[0];
-      setTranslate({
-        x: t.originX + (touch.clientX - t.startX),
-        y: t.originY + (touch.clientY - t.startY),
-      });
+      const dx = touch.clientX - t.startX;
+      const dy = touch.clientY - t.startY;
+      if (!dragMovedRef.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        dragMovedRef.current = true;
+      }
+      if (dragMovedRef.current) {
+        // 仅在实际拖动时 preventDefault 阻止页面滚动（touchAction:none 已大部分处理）
+        e.preventDefault();
+        setTranslate({
+          x: t.originX + dx,
+          y: t.originY + dy,
+        });
+      }
     } else if (t.mode === "pinch" && e.touches.length === 2 && t.initialDist && t.initialScale) {
+      e.preventDefault();
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -349,7 +374,7 @@ export function MindMap({
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+    // 不调用 e.preventDefault()，让 click 事件正常触发（节点点击依赖 click）
     if (e.touches.length === 0) {
       touchRef.current = null;
     } else if (e.touches.length === 1 && touchRef.current?.mode === "pinch") {
@@ -504,7 +529,9 @@ export function MindMap({
           height="100%"
           viewBox={`0 0 ${Math.max(width, 100)} ${Math.max(height, 100)}`}
           className="block"
-          style={{ pointerEvents: "none" }}
+          // pointerEvents: "all" — 让 SVG 背景也接收 mousedown/touchstart，支持空白区拖动
+          // （之前 "none" 导致只能从 container div 的非 SVG 区域启动拖动，几乎无法拖）
+          style={{ pointerEvents: "all" }}
         >
           <g transform={`translate(${PADDING + translate.x}, ${PADDING + translate.y}) scale(${scale})`}>
             {/* 边 */}

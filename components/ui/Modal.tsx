@@ -25,12 +25,14 @@ import { cn } from "@/lib/cn";
 import { Icon } from "@/components/Icon";
 import { Button } from "./Button";
 
-export type ModalSize = "sm" | "md" | "lg";
+export type ModalSize = "sm" | "md" | "lg" | "xl";
 
 const SIZE_CLASSES: Record<ModalSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
+  // xl：超宽弹窗（脑图、知识树等需要大画布的场景），桌面端接近视口宽度
+  xl: "max-w-3xl",
 };
 
 const FOCUSABLE_SELECTOR =
@@ -54,6 +56,10 @@ export interface ModalProps {
   /** 隐藏后是否卸载（默认 false，保留 DOM 用于过渡）*/
   forceMount?: boolean;
   className?: string;
+  /** 内容区 className（覆盖默认 px-5 py-2，用于脑图等需要满铺的场景）*/
+  contentClassName?: string;
+  /** 是否撑满视口高度（默认 false，脑图等大画布场景设 true 让内容区高度 = 90vh - header - footer）*/
+  fillHeight?: boolean;
 }
 
 export function Modal({
@@ -69,6 +75,8 @@ export function Modal({
   closeOnEsc = true,
   forceMount = false,
   className,
+  contentClassName,
+  fillHeight = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -164,12 +172,14 @@ export function Modal({
           "max-h-[90vh] overflow-y-auto",
           "animate-slide-up",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+          // fillHeight：用 flex column 让 children 占满剩余高度（脑图等大画布场景）
+          fillHeight && "flex flex-col",
           SIZE_CLASSES[size],
           className,
         )}
       >
         {(title || showCloseButton) && (
-          <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
+          <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3 shrink-0">
             <div className="min-w-0 flex-1">
               {title && (
                 <h2
@@ -204,13 +214,20 @@ export function Modal({
         )}
 
         {children && (
-          <div className="px-5 py-2 text-sm text-gray-700 dark:text-gray-300">
+          <div
+            className={cn(
+              "px-5 py-2 text-sm text-gray-700 dark:text-gray-300",
+              // fillHeight：children 区占满剩余高度，min-h-0 让内部 overflow 生效
+              fillHeight && "flex-1 min-h-0",
+              contentClassName,
+            )}
+          >
             {children}
           </div>
         )}
 
         {footer && (
-          <div className="flex items-center justify-end gap-2 px-5 py-4">
+          <div className="flex items-center justify-end gap-2 px-5 py-4 shrink-0">
             {footer}
           </div>
         )}

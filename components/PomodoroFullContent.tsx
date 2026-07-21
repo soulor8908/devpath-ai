@@ -35,6 +35,7 @@ import {
   resumeSession,
   recoverInterruptedSession,
   getRunningSession,
+  markSessionCurrent,
   POMODORO_SESSION_CHANGED_EVENT,
 } from "@/lib/timer/pomodoro";
 import {
@@ -166,6 +167,9 @@ export function PomodoroFullContent({
       setSession(running);
       setView("running");
       setInterruptions(running.interruptions ?? 0);
+      // 需求 5：标记当前会话已知该 running session
+      // 避免用户关闭 Modal 再打开时误触发"发现未完成的番茄"恢复提示
+      markSessionCurrent(running.id);
     }
     await refreshTodayStats();
   }, [refreshTodayStats]);

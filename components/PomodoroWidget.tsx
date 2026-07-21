@@ -430,43 +430,24 @@ export function PomodoroWidget() {
     }
   }
 
-  // large 模式：渲染 Modal（无论是否有 running session 都渲染——PomodoroFullContent 内有 start form）
-  // 同时也渲染 small widget（隐藏在 Modal 下），保证关闭 Modal 后 small 立即可见
+  // large 模式：只渲染 Modal，不渲染 small widget（需求4：打开大番茄时钟时隐藏小番茄时钟）
+  // 关闭 Modal 后会自然回到 small 模式渲染，无需提前渲染 small widget
   // position 未就绪时不显示（避免首帧闪烁在错误位置）
   if (mode === "large") {
     return (
-      <>
-        <Modal
-          open
-          onClose={handleLargeClose}
-          title="番茄专注"
-          size="lg"
-        >
-          <PomodoroFullContent
-            onComplete={() => {
-              // 完成后关闭 Modal 回到 small widget
-              setMode("small");
-            }}
-          />
-        </Modal>
-        {/* small widget 在 Modal 下保持渲染，关闭 Modal 后立即可见 */}
-        {position && session && (
-          <SmallWidget
-            widgetRef={widgetRef}
-            position={position}
-            session={session}
-            remainingMs={remainingMs}
-            progress={progress}
-            busy={busy}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onPauseResume={handlePauseResume}
-            onAbandon={handleAbandon}
-          />
-        )}
-      </>
+      <Modal
+        open
+        onClose={handleLargeClose}
+        title="番茄专注"
+        size="lg"
+      >
+        <PomodoroFullContent
+          onComplete={() => {
+            // 完成后关闭 Modal 回到 small widget
+            setMode("small");
+          }}
+        />
+      </Modal>
     );
   }
 
@@ -559,7 +540,7 @@ function SmallWidget({
           e.preventDefault();
           setMenuOpen(true);
         }}
-        className="fixed z-[80] touch-none cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-full"
+        className="fixed z-[80] touch-none cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-full shadow-floating"
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,

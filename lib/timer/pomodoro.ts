@@ -82,6 +82,9 @@ export async function createSession(
     pausedMinutes: 0,
   };
   await setItem(KEY_PREFIXES.POMODORO_SESSION + session.id, session);
+  // 需求 5：标记当前浏览会话已知该 running session
+  // 避免"用户关闭 Modal 再打开"时误触发"发现未完成的番茄"恢复提示
+  markSessionCurrent(session.id);
   notifySessionChanged();
   return session;
 }
@@ -136,6 +139,8 @@ export async function completeSession(
     // fire-and-forget：不阻塞番茄完成主流程，失败由内部 try/catch 静默
     void refreshAverageSessionMinutes();
   }
+  // 需求 5：session 完成 → 清除当前会话标记
+  clearCurrentSessionFlag();
   notifySessionChanged();
 }
 
@@ -167,6 +172,8 @@ export async function abandonSession(
     // 仅记录到控制台，不持久化（避免污染日志数据）
     console.info(`[pomodoro] session ${id} abandoned: ${reason}`);
   }
+  // 需求 5：session 放弃 → 清除当前会话标记
+  clearCurrentSessionFlag();
   notifySessionChanged();
 }
 
@@ -240,12 +247,50 @@ export async function getActiveSession(): Promise<PomodoroSession | null> {
 }
 
 /**
+ * 当前浏览会话的标记 key（用于区分"同会话内的 running"和"跨会话的中断"）
+ * 关闭标签页/刷新浏览器会清空 sessionStorage，重新打开后才会触发恢复提示
+ */
+const CURRENT_SESSION_FLAG = "pomodoro-current-session-id";
+
+/**
+ * 标记当前会话已知道某个 running session 的存在（避免重复弹恢复提示）
+ * 应在 createSession 后、resumeSession 后、recoverInterruptedSession 返回 null 后调用
+ */
+export function markSessionCurrent(sessionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(CURRENT_SESSION_FLAG, sessionId);
+  } catch {
+    // sessionStorage 不可用时静默失败
+  }
+}
+
+/**
+ * 清除当前会话标记（session 完成/放弃后调用）
+ */
+export function clearCurrentSessionFlag(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(CURRENT_SESSION_FLAG);
+  } catch {
+    // 静默失败
+  }
+}
+
+/**
  * 恢复中断的 session：
  * 检测 status=running 的 session（可能是浏览器崩溃/刷新前未结束的）：
  *   - 若距 startedAt 已超过 durationMinutes（含 30 秒宽限）→ 自动调 completeSession
+ *   - 若当前浏览会话已知道该 session（sessionStorage 标记）→ 返回 null（同会话内不算中断）
  *   - 否则返回该 session 让 UI 提示用户「是否继续 / 放弃」
  *
- * @returns null 表示无 running session 或已自动完成；PomodoroSession 表示需用户决策
+ * 需求 5 修复：之前任何 running session 都触发恢复提示，
+ *   导致"刚创建第一个就关闭 Modal 再打开"也误报"发现未完成的番茄"。
+ *   现在用 sessionStorage 区分：
+ *   - 同一浏览会话内（未关闭标签页）→ 不弹恢复提示，直接进 running 视图
+ *   - 跨浏览会话（关闭/刷新后重开）→ 弹恢复提示
+ *
+ * @returns null 表示无 running session / 已自动完成 / 同会话内已知；PomodoroSession 表示需用户决策
  */
 export async function recoverInterruptedSession(): Promise<PomodoroSession | null> {
   const running = await getRunningSession();
@@ -260,9 +305,25 @@ export async function recoverInterruptedSession(): Promise<PomodoroSession | nul
   if (elapsedMs >= expectedMs + GRACE_MS) {
     // 已超时，自动完成
     await completeSession(running.id);
+    clearCurrentSessionFlag();
     return null;
   }
-  // 未超时，返回让 UI 提示用户
+
+  // 需求 5：检查当前浏览会话是否已知该 session
+  // 已知 → 同会话内（用户主动关闭 Modal 再打开）→ 不算中断，返回 null
+  // 未知 → 跨会话（浏览器关闭/刷新后重开）→ 返回 session 让 UI 提示
+  if (typeof window !== "undefined") {
+    try {
+      const knownId = window.sessionStorage.getItem(CURRENT_SESSION_FLAG);
+      if (knownId === running.id) {
+        return null;
+      }
+    } catch {
+      // sessionStorage 不可用时按旧逻辑处理
+    }
+  }
+
+  // 跨会话中断，返回让 UI 提示用户
   return running;
 }
 

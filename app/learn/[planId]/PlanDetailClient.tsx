@@ -11,7 +11,7 @@ import { KnowledgeTree } from "@/components/KnowledgeTree";
 import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Textarea, Select } from "@/components/ui";
+import { Button, Input, Textarea, Select, Modal } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
@@ -150,30 +150,11 @@ export default function PlanDetailClient() {
 
   // 需求 5：脑图弹窗「关闭按钮 / 遮罩点击 / ESC」→ 关闭弹窗 + 显示悬浮图标（保留当前 filter 不变）
   // 与「直接进入」的区别：直接进入显式重置 filter，dismiss 保留 filter（用户可能已从 URL ?node= 带 filter 进来）
+  // 注：ESC + body scroll lock + 焦点陷阱已由统一 <Modal> 组件内置，无需手写
   function handleMindMapDismiss() {
     setShowMindMapModal(false);
     setShowMindMapFloat(true);
   }
-
-  // 需求 5：脑图弹窗 ESC 关闭 + body scroll lock（与统一 Modal 组件行为一致）
-  useEffect(() => {
-    if (!showMindMapModal) return;
-    function handleEsc(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        handleMindMapDismiss();
-      }
-    }
-    document.addEventListener("keydown", handleEsc);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handleEsc);
-      document.body.style.overflow = prevOverflow;
-    };
-    // handleMindMapDismiss 是闭包内稳定函数，不作为依赖
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMindMapModal]);
 
   async function handleQuestionFavorite(questionId: string) {
     if (!plan) return;
@@ -884,191 +865,149 @@ export default function PlanDetailClient() {
         </div>
       </div>
 
-      {/* 重新生成弹窗 */}
-      {showRegenModal && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
-          onClick={() => !regeneratingPlan && setShowRegenModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold"><Icon name="refresh-cw" className="w-4 h-4 inline-block align-middle" /> 重新生成计划</h2>
-                <Button
-                  iconOnly
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => !regeneratingPlan && setShowRegenModal(false)}
-                  aria-label="关闭"
-                  className="rounded-full w-8 h-8"
-                >
-                  <Icon name="x" className="w-4 h-4 inline-block" />
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 mb-4">
-                修改下方参数后点击生成，AI 将重新拆解知识树并生成面试题，当前计划内容会被替换。
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">学习主题</label>
-                  <Input
-                    type="text"
-                    value={regenTopic}
-                    onChange={(e) => setRegenTopic(e.target.value)}
-                    disabled={regeneratingPlan}
-                    placeholder="例如：React Hooks 深入"
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <label className="flex-1">
-                    <span className="text-sm text-gray-600 block mb-1">每日学习时间（分钟）</span>
-                    <Input
-                      type="number"
-                      value={regenDailyMinutes}
-                      onChange={(e) => setRegenDailyMinutes(Number(e.target.value))}
-                      min={15}
-                      max={120}
-                      disabled={regeneratingPlan}
-                    />
-                  </label>
-                  <label className="flex-1">
-                    <span className="text-sm text-gray-600 block mb-1">每日新内容数</span>
-                    <Input
-                      type="number"
-                      value={regenMaxNew}
-                      onChange={(e) => setRegenMaxNew(Number(e.target.value))}
-                      min={1}
-                      max={5}
-                      disabled={regeneratingPlan}
-                    />
-                  </label>
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">
-                    自定义提示词（可选）
-                  </label>
-                  <Textarea
-                    value={regenPrompt}
-                    onChange={(e) => setRegenPrompt(e.target.value)}
-                    placeholder="例如：请以大厂面试官视角拆解，重点考察高并发场景和源码原理"
-                    rows={4}
-                    maxLength={2000}
-                    showCount
-                    disabled={regeneratingPlan}
-                  />
-                </div>
-
-                {regenPlanError && (
-                  <div className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">
-                    {regenPlanError}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    onClick={handleRegenPlan}
-                    disabled={regeneratingPlan || !regenTopic.trim()}
-                    loading={regeneratingPlan}
-                    leftIcon="refresh-cw"
-                    variant="dark"
-                    className="flex-1 py-2.5"
-                  >
-                    {regeneratingPlan ? "AI 生成中..." : "重新生成"}
-                  </Button>
-                  <Button
-                    onClick={() => setShowRegenModal(false)}
-                    disabled={regeneratingPlan}
-                    variant="secondary"
-                    className="py-2.5"
-                  >
-                    取消
-                  </Button>
-                </div>
-                <p className="text-2xs text-gray-400 text-center">
-                  预计 30-90 秒，生成期间请勿关闭页面
-                </p>
-              </div>
-            </div>
+      {/* 重新生成弹窗（用统一 Modal 组件）*/}
+      <Modal
+        open={showRegenModal}
+        onClose={() => !regeneratingPlan && setShowRegenModal(false)}
+        size="lg"
+        title={
+          <span className="flex items-center gap-2">
+            <Icon name="refresh-cw" className="w-4 h-4" />
+            重新生成计划
+          </span>
+        }
+        description="修改下方参数后点击生成，AI 将重新拆解知识树并生成面试题，当前计划内容会被替换。"
+        footer={
+          <>
+            <Button
+              onClick={handleRegenPlan}
+              disabled={regeneratingPlan || !regenTopic.trim()}
+              loading={regeneratingPlan}
+              leftIcon="refresh-cw"
+              variant="dark"
+              className="flex-1 py-2.5"
+            >
+              {regeneratingPlan ? "AI 生成中..." : "重新生成"}
+            </Button>
+            <Button
+              onClick={() => setShowRegenModal(false)}
+              disabled={regeneratingPlan}
+              variant="secondary"
+              className="py-2.5"
+            >
+              取消
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-600 dark:text-gray-300 block mb-1">学习主题</label>
+            <Input
+              type="text"
+              value={regenTopic}
+              onChange={(e) => setRegenTopic(e.target.value)}
+              disabled={regeneratingPlan}
+              placeholder="例如：React Hooks 深入"
+            />
           </div>
-        </div>
-      )}
 
-      {/* ============ 需求 5：脑图入口弹窗 ============ */}
+          <div className="flex gap-3">
+            <label className="flex-1">
+              <span className="text-sm text-gray-600 dark:text-gray-300 block mb-1">每日学习时间（分钟）</span>
+              <Input
+                type="number"
+                value={regenDailyMinutes}
+                onChange={(e) => setRegenDailyMinutes(Number(e.target.value))}
+                min={15}
+                max={120}
+                disabled={regeneratingPlan}
+              />
+            </label>
+            <label className="flex-1">
+              <span className="text-sm text-gray-600 dark:text-gray-300 block mb-1">每日新内容数</span>
+              <Input
+                type="number"
+                value={regenMaxNew}
+                onChange={(e) => setRegenMaxNew(Number(e.target.value))}
+                min={1}
+                max={5}
+                disabled={regeneratingPlan}
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-600 dark:text-gray-300 block mb-1">
+              自定义提示词（可选）
+            </label>
+            <Textarea
+              value={regenPrompt}
+              onChange={(e) => setRegenPrompt(e.target.value)}
+              placeholder="例如：请以大厂面试官视角拆解，重点考察高并发场景和源码原理"
+              rows={4}
+              maxLength={2000}
+              showCount
+              disabled={regeneratingPlan}
+            />
+          </div>
+
+          {regenPlanError && (
+            <div className="rounded bg-red-50 dark:bg-red-950 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+              {regenPlanError}
+            </div>
+          )}
+
+          <p className="text-2xs text-gray-400 dark:text-gray-500 text-center">
+            预计 30-90 秒，生成期间请勿关闭页面
+          </p>
+        </div>
+      </Modal>
+
+      {/* ============ 需求 5：脑图入口弹窗（用统一 Modal 组件）============ */}
       {/* 首次进入学习页自动弹出，让用户鸟瞰知识树并选择今日起点。
           点击节点 → 筛选该节点题目；点击「直接进入」→ 查看全部题目。
-          关闭后变为右下角悬浮小图标，点击重新展开。 */}
-      {showMindMapModal && plan && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
-          role="presentation"
+          关闭后变为右下角悬浮小图标，点击重新展开。
+          size="xl" + fillHeight 让脑图画布占满 90vh - header - footer，移动端贴底桌面端居中 */}
+      {plan && (
+        <Modal
+          open={showMindMapModal}
+          onClose={handleMindMapDismiss}
+          size="xl"
+          fillHeight
+          title={
+            <span className="flex items-center gap-2">
+              <Icon name="target" className="w-5 h-5 text-blue-500" />
+              知识点脑图
+            </span>
+          }
+          description="点击节点筛选该知识点题目，绿色节点为已掌握"
+          contentClassName="p-0"
+          footer={
+            <Button
+              variant="primary"
+              onClick={handleMindMapDirectEnter}
+              leftIcon="target"
+            >
+              直接进入（全部题目）
+            </Button>
+          }
         >
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={handleMindMapDismiss}
-            aria-hidden
+          <MindMap
+            nodes={plan.knowledgeTree}
+            onSelectNode={handleMindMapNodeSelect}
+            selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
+            fillHeight
+            showEnterButton
           />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mindmap-title"
-            className="relative w-full max-w-4xl bg-white dark:bg-gray-800 shadow-modal rounded-t-card sm:rounded-card max-h-[90vh] flex flex-col animate-slide-up"
-          >
-            <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
-              <div className="min-w-0 flex-1">
-                <h2
-                  id="mindmap-title"
-                  className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
-                >
-                  <Icon name="target" className="w-5 h-5 text-blue-500" />
-                  知识点脑图
-                </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  点击节点筛选该知识点题目，绿色节点为已掌握
-                </p>
-              </div>
-              <Button
-                iconOnly
-                size="sm"
-                variant="ghost"
-                aria-label="关闭"
-                onClick={handleMindMapDismiss}
-                className="-mr-1 -mt-1 shrink-0"
-              >
-                <Icon name="x" className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0 px-3 pb-3" style={{ height: "60vh" }}>
-              <MindMap
-                nodes={plan.knowledgeTree}
-                onSelectNode={handleMindMapNodeSelect}
-                selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
-                fillHeight
-                showEnterButton
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 dark:border-gray-700">
-              <Button
-                variant="primary"
-                onClick={handleMindMapDirectEnter}
-                leftIcon="target"
-              >
-                直接进入（全部题目）
-              </Button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* ============ 需求 5：脑图悬浮小图标 ============ */}
       {/* 弹窗关闭后显示，点击重新展开脑图。
-          定位：right-4 bottom-36（避开底部 nav ~42px + FloatingChat bottom-20）
-          层级：z-40（低于 Nav/FloatingChat z-50、Modal z-[60]、PomodoroWidget z-[80]） */}
+          样式与 FloatingChatButton / PomodoroWidget 统一：56px 圆形 + shadow-floating
+          定位：right-4 bottom-32（垂直错开 FloatingChat bottom-20，避开底部 nav）
+          层级：z-50（与 FloatingChat 同层，低于 PomodoroWidget z-[80]、Modal z-[60]） */}
       {showMindMapFloat && !showMindMapModal && (
         <Button
           iconOnly
@@ -1076,9 +1015,9 @@ export default function PlanDetailClient() {
           aria-label="打开知识点脑图"
           title="打开知识点脑图"
           onClick={() => setShowMindMapModal(true)}
-          className="fixed right-4 bottom-36 z-40 w-12 h-12 rounded-full shadow-floating"
+          className="fixed right-4 bottom-32 z-50 w-14 h-14 rounded-full shadow-floating flex items-center justify-center"
         >
-          <Icon name="target" className="w-5 h-5" />
+          <Icon name="target" className="w-6 h-6" />
         </Button>
       )}
     </div>

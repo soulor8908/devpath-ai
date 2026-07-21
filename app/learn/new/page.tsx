@@ -486,23 +486,34 @@ export default function LearnNewPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {PRESETS.map((p) => (
-            <Button
+            <div
               key={p.id}
-              variant="ghost"
+              role="button"
+              tabIndex={0}
+              aria-label={`打开内置知识库：${p.name}`}
               onClick={() => openPreset(p)}
-              className="group text-left p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-md dark:hover:shadow-gray-900/20 hover:bg-white dark:hover:bg-gray-800 rounded-xl transition-all h-auto items-start"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openPreset(p);
+                }
+              }}
+              className="group cursor-pointer text-left p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-card dark:hover:shadow-gray-900/30 rounded-card transition-all flex flex-col w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
+              {/* 标题行：图标 + 名称 + 右侧箭头 */}
               <div className="flex items-center gap-2.5 mb-2">
-                <span className="text-2xl" aria-hidden="true">{p.icon}</span>
-                <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
+                <span className="text-2xl shrink-0" aria-hidden="true">{p.icon}</span>
+                <span className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate flex-1">{p.name}</span>
                 <Icon
                   name="chevron-right"
-                  className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 ml-auto group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all"
+                  className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0"
                 />
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3 leading-relaxed">
+              {/* 描述：2 行省略 */}
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3 leading-relaxed min-h-[2rem]">
                 {p.description}
               </p>
+              {/* tags */}
               <div className="flex flex-wrap gap-1 mb-2.5">
                 {p.tags.slice(0, 3).map((t) => (
                   <span
@@ -513,7 +524,8 @@ export default function LearnNewPage() {
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-50 dark:border-gray-700/50">
+              {/* 统计：知识点 / 题目数 */}
+              <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
                 <span className="flex items-center gap-0.5">
                   <Icon name="book" className="w-3 h-3" />
                   {p.knowledgeTree.length} 知识点
@@ -523,7 +535,7 @@ export default function LearnNewPage() {
                   {p.questions.length} 题
                 </span>
               </div>
-            </Button>
+            </div>
           ))}
         </div>
       </div>
