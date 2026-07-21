@@ -77,7 +77,8 @@ export type IconName =
   | "coffee"
   | "grip"
   | "chevron-left"
-  | "maximize";
+  | "maximize"
+  | "map";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: (
@@ -497,6 +498,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
       <path d="M3 16v3a2 2 0 0 0 2 2h3" />
       <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </>
+  ),
+  map: (
+    <>
+      <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Z" />
+      <path d="M9 4v13" />
+      <path d="M15 6.5v13" />
     </>
   ),
 };
