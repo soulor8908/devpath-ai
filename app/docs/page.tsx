@@ -2,12 +2,17 @@
 
 // app/docs/page.tsx
 // 产品使用文档：支持分类浏览、关键词搜索、Markdown 渲染
+//
+// 选文字问 AI（用户需求）：
+//   - 文档内容支持选中文字后弹"问 AI"按钮，方便对文档内容进行追问
+//   - 通过 AnswerContent 的 onAskAI prop 触发 openChatModal
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { AnswerContent } from "@/components/CodeBlock";
 import { Button, Input } from "@/components/ui";
+import { openChatModal } from "@/lib/chat-modal-store";
 import { DOC_CATEGORIES, DOC_SECTIONS, type DocSection } from "@/lib/docs-content";
 
 export default function DocsPage() {
@@ -46,6 +51,20 @@ export default function DocsPage() {
   }, [filteredSections]);
 
   const activeSection = DOC_SECTIONS.find((s) => s.id === activeId) ?? null;
+
+  // 文档内容选文字问 AI：用 useCallback 保持引用稳定，避免 AnswerContent 重渲染
+  const handleDocAskAI = useCallback((selectedText: string) => {
+    const title = activeSection?.title ?? "使用文档";
+    const prefill = `关于文档「${title}」的内容片段：\n\n> ${selectedText}\n\n请帮我进一步解释。`;
+    openChatModal({
+      prefill,
+      source: {
+        type: "manual",
+        id: activeSection?.id ?? "docs",
+        title,
+      },
+    });
+  }, [activeSection]);
 
   // 搜索时自动选中第一个结果
   useEffect(() => {
@@ -177,6 +196,7 @@ export default function DocsPage() {
               <AnswerContent
                 text={activeSection.content}
                 className="text-sm text-gray-700 dark:text-gray-300"
+                onAskAI={handleDocAskAI}
               />
 
               {/* 上下篇导航 */}

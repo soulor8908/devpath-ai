@@ -1,5 +1,14 @@
 "use client";
 
+// components/QuestionCard.tsx
+// 学习题目卡片：展示题目 + 展开答案 + 收藏 / 换题 / 反馈
+//
+// 选文字问 AI（用户需求）：
+//   - 题目（question.question）和答案（question.answer）都支持选文字问 AI
+//   - 题目用 useAskAI<HTMLButtonElement> 绑到题目 Button（Button 加 select-text 让文字可选）
+//   - 答案用 AnswerContent 的 onAskAI prop（内部已用 useAskAI hook）
+//   - 题目 Button onClick 时检查 selection：若用户正在选中文字，不触发展开/折叠
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { Question } from "@/lib/types";
 import { AnswerContent, CodeBlock } from "@/components/CodeBlock";
@@ -10,6 +19,7 @@ import { createCard, findExistingCard } from "@/lib/fsrs";
 import { setItem } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import { openChatModal } from "@/lib/chat-modal-store";
+import { useAskAI } from "@/lib/hooks/use-ask-ai";
 
 // 停留时间阈值（毫秒）
 const DWELL_TOO_SIMPLE_MS = 3_000;   // < 3s → 太简单
@@ -33,6 +43,24 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
   const [expanded, setExpanded] = useState(false);
   const isFailed = question.question === "生成失败，点击重试";
   const isUnderstood = question.understood === true;
+
+  // 题目区域：选文字问 AI（绑到题目 Button，Button 加 select-text 让文字可选）
+  // 失败态题目（"生成失败，点击重试"）不启用，避免无意义追问
+  const titleAsk = useAskAI<HTMLButtonElement>({
+    onAskAI: (selectedText) => {
+      const prefill = `关于题目「${question.question}」的问题片段：\n\n> ${selectedText}\n\n请帮我深入理解这段内容。`;
+      openChatModal({
+        prefill,
+        source: {
+          type: "question",
+          id: question.id,
+          title: question.question,
+          planId,
+        },
+      });
+    },
+    enabled: !isFailed,
+  });
 
   // 停留时间追踪：记录答案展开的时间戳
   const expandTimeRef = useRef<number | null>(null);
@@ -87,12 +115,19 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
 
   return (
     <div className="border rounded-lg p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
+      {/* 题目选文字问 AI 浮动按钮（fixed 定位，挂在根 div 内即可） */}
+      {titleAsk.floatingButton}
       <div className="flex items-start gap-2">
         <Button
+          ref={titleAsk.containerRef}
           variant="ghost"
           aria-expanded={expanded}
           aria-controls="question-answer-panel"
           onClick={() => {
+            // 用户正在选中文字时（如拖拽选择题目文字）不触发展开/折叠，
+            // 避免选完文字一松手答案意外展开/收起
+            const sel = window.getSelection?.();
+            if (sel && !sel.isCollapsed) return;
             if (!expanded) {
               trackImplicit("expanded");
               expandTimeRef.current = Date.now();
@@ -107,7 +142,9 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             }
             setExpanded(!expanded);
           }}
-          className="flex-1 text-left text-sm hover:text-blue-600 dark:hover:text-blue-400"
+          // select-text 让 Button 内文字可被选中（button 默认 user-select: none）
+          // 配合 useAskAI hook，选中题目文字后弹出"问 AI"按钮
+          className="flex-1 text-left text-sm hover:text-blue-600 dark:hover:text-blue-400 select-text"
         >
           {question.bigTech && (
             <span className="inline-block px-1.5 py-0.5 mr-2 text-2xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded font-medium align-middle">

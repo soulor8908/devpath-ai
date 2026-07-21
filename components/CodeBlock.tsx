@@ -6,13 +6,15 @@
 // 采用 token 流式扫描，避免正则回溯灾难
 //
 // AnswerContent 扩展（用户需求 3）：
-//   - 答案文字被选中时，在选中范围上方显示悬浮"问 AI"按钮
+//   - 答案文字被选中时，在选中范围附近显示悬浮"问 AI"按钮
 //   - 点击按钮把选中文字 + 题目上下文通过 onAskAI 回调传给父组件（QuestionCard）
 //   - 父组件调 openChatModal({ prefill, source }) 跳到聊天页
+//   - 选文字问 AI 的核心逻辑已提取到 lib/hooks/use-ask-ai.ts，可跨组件复用
 
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
+import { useAskAI } from "@/lib/hooks/use-ask-ai";
 
 interface CodeBlockProps {
   code: string;
@@ -360,6 +362,9 @@ interface AnswerContentProps {
    * - 回调参数：选中的纯文本内容
    * - 不传此 prop 时不显示"问 AI"按钮（保持原有渲染）
    * - 父组件（QuestionCard）传入此回调后调用 openChatModal({ prefill, source })
+   *
+   * 实现说明：选文字问 AI 的核心逻辑已提取到 lib/hooks/use-ask-ai.ts，
+   * 这里只负责把 containerRef 绑定到答案容器，并渲染 floatingButton。
    */
   onAskAI?: (selectedText: string) => void;
 }
@@ -388,110 +393,19 @@ function parseAnswer(text: string): Array<{ type: "text" | "code"; content: stri
 }
 
 /**
- * 悬浮"问 AI"按钮（用户需求 3）
+ * 答案内容渲染：支持代码块 + 行内 markdown，可选"选文字问 AI"按钮。
  *
- * 监听 document selectionchange 事件，当选中文字位于 AnswerContent 容器内时，
- * 在选中范围的上方显示一个固定定位的"问 AI"按钮，点击后通过 onAskAI 回调传出选中文本。
- *
- * 设计要点（卡帕西视角）：
- *   - 监听 document 而非容器：selectionchange 是 document 级事件，浏览器不会在元素上派发
- *   - 检查 anchorNode 是否在容器内：用 contains() 而非比较 range，更稳健
- *   - 用 fixed 定位 + selection.rect 计算坐标：滚动时跟随选中范围
- *   - 点击按钮后清空 selection：避免按钮残留遮挡视线
- *   - SSR 安全：useEffect 内才注册监听，render 阶段不访问 window/document
+ * 选文字问 AI 的实现已迁移到 lib/hooks/use-ask-ai.ts（useAskAI），
+ * 这里只负责把 hook 返回的 containerRef 绑到答案容器，并渲染 floatingButton。
+ * - 不传 onAskAI 时 hook 仍会调用（enabled=false），但 floatingButton 始终为 null
+ * - 传 onAskAI 时，用户选中容器内文字 → 出现"问 AI"按钮 → 点击触发回调
  */
-function AskAIFloatingButton({
-  containerRef,
-  onAskAI,
-}: {
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  onAskAI: (selectedText: string) => void;
-}) {
-  // 按钮位置（相对 viewport）+ 是否显示
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const updatePosition = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-        setPosition(null);
-        return;
-      }
-      // 选中范围必须在容器内才显示按钮
-      const container = containerRef.current;
-      if (!container) {
-        setPosition(null);
-        return;
-      }
-      const range = sel.getRangeAt(0);
-      if (!container.contains(range.commonAncestorContainer)) {
-        setPosition(null);
-        return;
-      }
-      const rect = range.getBoundingClientRect();
-      // 选中范围过小（< 5px 宽）不显示，避免误触
-      if (rect.width < 5 || rect.height < 5) {
-        setPosition(null);
-        return;
-      }
-      // 按钮放在选中范围上方（按钮高 28px + 间距 6px = 34px 上偏移）
-      // 水平居中于选中范围
-      const x = rect.left + rect.width / 2;
-      const y = rect.top - 6;
-      setPosition({ x, y });
-    };
-    // selectionchange 是 document 级事件
-    document.addEventListener("selectionchange", updatePosition);
-    // 滚动 / 窗口尺寸变化时也要更新位置（选中范围相对 viewport 改变）
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      document.removeEventListener("selectionchange", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [containerRef]);
-
-  const handleClick = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    const text = sel.toString();
-    if (!text.trim()) return;
-    onAskAI(text);
-    // 清空选中，按钮自然消失
-    sel.removeAllRanges();
-  }, [onAskAI]);
-
-  if (!position) return null;
-
-  return (
-    <div
-      // fixed 定位跟随 viewport，transform translate -50% 实现水平居中
-      // z-index 50 避免被答案内容遮挡，但不抢 modal (z-70) 焦点
-      style={{
-        position: "fixed",
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: "translate(-50%, -100%)",
-        zIndex: 50,
-      }}
-    >
-      <Button
-        size="sm"
-        onClick={handleClick}
-        className="shadow-md rounded-full px-2.5 py-1 h-7 text-2xs bg-blue-600 hover:bg-blue-700 text-white"
-        aria-label="把选中内容发送给 AI"
-      >
-        <Icon name="sparkles" className="w-3 h-3" />
-        问 AI
-      </Button>
-    </div>
-  );
-}
-
 export function AnswerContent({ text, className, onAskAI }: AnswerContentProps) {
   const parts = useMemo(() => parseAnswer(text), [text]);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const { containerRef, floatingButton } = useAskAI({
+    onAskAI: onAskAI ?? (() => {}),
+    enabled: !!onAskAI,
+  });
 
   return (
     <div
@@ -505,7 +419,7 @@ export function AnswerContent({ text, className, onAskAI }: AnswerContentProps) 
           <CodeBlock key={i} code={p.content} language={p.lang} />
         )
       )}
-      {onAskAI && <AskAIFloatingButton containerRef={containerRef} onAskAI={onAskAI} />}
+      {floatingButton}
     </div>
   );
 }

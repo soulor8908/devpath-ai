@@ -1403,7 +1403,16 @@ export default function ChatClient({
               key={m.id}
               className="mr-auto max-w-[80%] bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-sm px-3 py-2 text-sm group"
             >
-              <AnswerContent text={m.content} />
+              <AnswerContent
+                text={m.content}
+                onAskAI={(selectedText) => {
+                  // 聊天框内选文字问 AI：直接把选中文字塞入输入框作为追问，
+                  // 不走 openChatModal（避免触发新对话丢失上下文）
+                  const prefill = `关于上面回复中的这段内容：\n\n> ${selectedText}\n\n请帮我进一步解释。`;
+                  setInput(prefill);
+                  inputRef.current?.focus();
+                }}
+              />
               {/* 操作工具栏：删除 / 反馈（hover 显示）
                   注：重新生成入口已迁移到"最新 user 消息下方的刷新按钮"，此处不再重复 */}
               <div className="mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
