@@ -134,7 +134,10 @@ export function Modal({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center p-4",
+        // z-[60]：高于底部 Nav (z-50) 与 FloatingChat (z-50)，低于 PomodoroWidget (z-[80])
+        // 移动端 items-end：modal 从底部滑入，避免键盘弹出时顶部留白
+        // sm+ items-center：桌面端居中
+        "fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4",
         open ? "animate-fade-in" : "opacity-0 pointer-events-none",
       )}
       role="presentation"
@@ -155,7 +158,10 @@ export function Modal({
         aria-describedby={description ? "modal-desc" : undefined}
         tabIndex={-1}
         className={cn(
-          "relative w-full bg-white dark:bg-gray-800 rounded-card shadow-modal",
+          "relative w-full bg-white dark:bg-gray-800 shadow-modal",
+          // 移动端：贴底显示，顶部大圆角，无底部圆角，最大高度 90vh 防溢出
+          "rounded-t-card sm:rounded-card",
+          "max-h-[90vh] overflow-y-auto",
           "animate-slide-up",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
           SIZE_CLASSES[size],

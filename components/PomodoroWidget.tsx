@@ -1,16 +1,13 @@
 "use client";
 
 // components/PomodoroWidget.tsx
-// 番茄钟三态 widget：small ↔ medium ↔ large
+// 番茄钟两态 widget：small ↔ large
 //
-// 三态设计（乔布斯视角：克制即设计）：
+// 两态设计（乔布斯视角：克制即设计，移除冗余的 medium 半步）：
 //   - small：圆形进度条（直径 56px）+ 中间显示剩余分钟数 + 可拖动
-//     点击 → 展开 medium（不丢失当前 session 状态）
-//   - medium：grip 拖动条 + 倒计时 + 任务名 + 进度环 + 控制按钮
-//     点击「展开全屏」→ large modal
+//     点击 → 展开 large Modal（不丢失当前 session 状态）
 //   - large：Modal 形式渲染 PomodoroFullContent（idle/running/completed 三态视图）
-//     失焦 / ESC / 关闭按钮 → 回到 medium（用户要求：缩小时显示中弹窗）
-//     large 出现时隐藏 small/medium（不双重渲染）
+//     失焦 / ESC / 关闭按钮 → 回到 small
 //
 // 拖动优化（卡帕西视角，修卡顿 + 防事件透传）：
 //   - Pointer Events API 替代 mouse + touch 双套监听
@@ -18,20 +15,18 @@
 //     **不会透传到页面**（修拖动快时鼠标飞出 widget 触发底层 hover/click 的问题）
 //   - 拖动时直接操作 ref.style.left/top（不 setState），拖动结束才同步 state
 //     → 60fps 平滑拖动，无重渲染开销
-//   - 拖动期间 widget 加 pointer-events-none 到子元素，避免内部按钮 hover 触发
 //
-// 边界 + 吸附（用户需求 3）：
+// 边界 + 吸附：
 //   - clampPosition：上下左右不能跑到屏幕外，底部预留 96px 给底部 Nav
 //   - 小弹框拖动结束时，自动吸附到最近边（左/右/上/下）：
 //     计算到 4 个边的距离，取最近的吸附，带 200ms transition 平滑过渡
-//     medium 不吸附（用户只对小弹框要求吸附）
 //
 // 暂停不关闭弹窗（关键约束）：
-//   - small/medium：暂停只切 session.status=paused，widget 仍渲染
+//   - small：暂停只切 session.status=paused，widget 仍渲染
 //   - large：Modal onClose 由用户主动触发（关闭按钮/ESC），pauseSession 不调用 onClose
 //
-// 入口改造（用户需求 2）：
-//   - 移除 /timer 路由，HomeClient 入口派发 POMODORO_OPEN_LARGE_EVENT 全局事件
+// 入口改造：
+//   - HomeClient 入口派发 POMODORO_OPEN_LARGE_EVENT 全局事件
 //   - widget useEffect 监听该事件 → setMode("large") 唤醒大弹窗
 //   - 即使无 running session 也能打开 large modal（PomodoroFullContent 内有 start form）
 
@@ -52,8 +47,8 @@ import { Modal } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { PomodoroFullContent } from "@/components/PomodoroFullContent";
 
-/** Widget 三态：small（圆环）/ medium（卡片）/ large（Modal） */
-type WidgetMode = "small" | "medium" | "large";
+/** Widget 两态：small（圆环）/ large（Modal） */
+type WidgetMode = "small" | "large";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -80,8 +75,6 @@ function computeProgress(session: PomodoroSession): number {
 
 /** localStorage key：持久化 widget 位置（同设备记忆） */
 const POSITION_STORAGE_KEY = "pomodoro-widget-position";
-/** localStorage key：持久化 widget 模式（用户偏好 small/medium，下次默认该模式） */
-const MODE_STORAGE_KEY = "pomodoro-widget-mode";
 
 interface WidgetPosition {
   x: number;
@@ -117,29 +110,6 @@ function savePosition(pos: WidgetPosition): void {
   }
 }
 
-/** 加载上次模式偏好（默认 small，最小遮挡） */
-function loadModePreference(): WidgetMode {
-  if (typeof window === "undefined") return "small";
-  try {
-    const raw = localStorage.getItem(MODE_STORAGE_KEY);
-    if (raw === "small" || raw === "medium") return raw;
-  } catch {
-    /* ignore */
-  }
-  return "small";
-}
-
-function saveModePreference(mode: WidgetMode): void {
-  if (typeof window === "undefined") return;
-  // large 不持久化（modal 默认不开），下次仍用 small/medium
-  if (mode === "large") return;
-  try {
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
  * 底部 Nav 高度预留（避开底部导航栏，widget 不被遮挡）
  */
@@ -147,7 +117,6 @@ const BOTTOM_NAV_RESERVE = 96;
 
 /**
  * 把 widget 位置约束在 viewport 内，避免拖到屏幕外找不回来。
- * 用传入的 widgetW/H（不同模式尺寸不同）做精准约束。
  * 底部预留 BOTTOM_NAV_RESERVE（96px）给底部 Nav。
  */
 function clampPosition(
@@ -199,16 +168,13 @@ function snapToNearestEdge(
 
 /** small 模式尺寸：直径 56px */
 const SMALL_SIZE = 56;
-/** medium 模式尺寸：宽 224px / 折叠态高 ~88px */
-const MEDIUM_W = 224;
-const MEDIUM_H_COLLAPSED = 88;
 
 export function PomodoroWidget() {
   const [session, setSession] = useState<PomodoroSession | null>(null);
   const [remainingMs, setRemainingMs] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [busy, setBusy] = useState(false);
-  // 三态模式：small（默认）/ medium / large
+  // 两态模式：small（默认）/ large
   const [mode, setMode] = useState<WidgetMode>("small");
   // widget 位置（相对 viewport 左上角像素）
   const [position, setPosition] = useState<WidgetPosition | null>(null);
@@ -223,6 +189,8 @@ export function PomodoroWidget() {
   } | null>(null);
   // 用于 session 切换时避免重复通知
   const notifiedRef = useRef<string | null>(null);
+  // 拖动 vs 点击判定：移动距离 < 5px 视为点击
+  const dragMovedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     // 用 getActiveSession（running 或 paused 都算活跃）：
@@ -257,7 +225,7 @@ export function PomodoroWidget() {
     };
   }, [refresh]);
 
-  // 首次挂载：恢复位置 + 模式偏好
+  // 首次挂载：恢复位置（默认 small 模式，不持久化模式偏好——只有 small 一种常态）
   useEffect(() => {
     const savedPos = loadPosition();
     if (savedPos) {
@@ -271,7 +239,6 @@ export function PomodoroWidget() {
         y: Math.max(0, vh - SMALL_SIZE - 96),
       });
     }
-    setMode(loadModePreference());
   }, []);
 
   // 监听全局事件：HomeClient 的「番茄钟」入口派发 POMODORO_OPEN_LARGE_EVENT
@@ -282,14 +249,8 @@ export function PomodoroWidget() {
     return () => window.removeEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
   }, []);
 
-  // 模式切换时重新吸附（用户需求 1）：
-  // medium → small 时，small 弹框默认吸附到最近边（避免在 medium 卡片中间位置悬空）
-  // large → medium 时不吸附（medium 较大，当前位置可能仍合理）
-  //
-  // 修复（用户需求 2）：原版直接在 effect 内同步写 style.transition + style.left/top，
-  // 与 React 首次渲染写入的 inline style 在同一浏览器帧内，浏览器看不到中间状态，
-  // transition 无法触发，用户感知"吸附没生效"。
-  // 解决：用 requestAnimationFrame 延后一帧再设置 transition，让浏览器先绘制 small
+  // 模式切换时重新吸附（small 模式下，从 large 关闭回来时重新吸附到最近边）：
+  // 用 requestAnimationFrame 延后一帧再设置 transition，让浏览器先绘制 small
   // 在旧 position 的初始位置，然后再启动过渡到吸附位置。
   useEffect(() => {
     if (mode !== "small") return;
@@ -300,9 +261,6 @@ export function PomodoroWidget() {
     // 仅当位置变化时才更新（避免不必要的 transition）
     if (snapped.x === position.x && snapped.y === position.y) return;
 
-    // 双重 raf：第一帧让浏览器绘制 small 在旧 position，第二帧再启动 transition
-    // 关键修复点：第一帧让 React 19 的 inline style "left: position.x" 被浏览器绘制一帧，
-    // 第二帧再改 left/top 到吸附位置——浏览器看到"从旧位置到新位置"的变化，transition 才会触发。
     const rafId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!widgetRef.current) return;
@@ -321,15 +279,15 @@ export function PomodoroWidget() {
       cancelAnimationFrame(rafId);
       window.clearTimeout(t);
     };
-    // 故意不依赖 position：拖动结束后 position 已 setState，若再依赖会立即重新触发吸附，
-    // 形成循环（拖→吸附→position 变→再吸附）。仅 mode 变化时才需要重新吸附。
+    // 故意不依赖 position：仅 mode 变化时才需要重新吸附
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   /**
    * Pointer Events 拖动：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素，
    * 即使鼠标飞出 widget 也不会触发底层元素的 click/hover（修事件透传）。
-   * 拖动时直接操作 ref.style.transform，不 setState → 60fps 平滑无重渲染。
+   * 拖动时直接操作 ref.style.left/top，不 setState → 60fps 平滑无重渲染。
+   * 拖动距离 < 5px 视为点击（触发 large Modal）。
    */
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -338,6 +296,7 @@ export function PomodoroWidget() {
       if (e.button !== 0 && e.pointerType === "mouse") return;
       // 捕获指针：后续所有 pointer 事件都路由到当前元素，不会透传
       e.currentTarget.setPointerCapture(e.pointerId);
+      dragMovedRef.current = false;
       dragStateRef.current = {
         pointerId: e.pointerId,
         startClientX: e.clientX,
@@ -345,8 +304,6 @@ export function PomodoroWidget() {
         startWidgetX: position.x,
         startWidgetY: position.y,
       };
-      // 拖动期间给 widget 加 dragging 类，子元素 pointer-events-none
-      widgetRef.current?.classList.add("dragging");
     },
     [position],
   );
@@ -357,26 +314,26 @@ export function PomodoroWidget() {
       if (!drag || drag.pointerId !== e.pointerId) return;
       const dx = e.clientX - drag.startClientX;
       const dy = e.clientY - drag.startClientY;
+      // 标记是否发生过移动（> 5px 视为拖动，否则视为点击）
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        dragMovedRef.current = true;
+      }
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // 用当前模式的尺寸做约束
-      const [w, h] = mode === "small"
-        ? [SMALL_SIZE, SMALL_SIZE]
-        : [MEDIUM_W, MEDIUM_H_COLLAPSED];
       const next = clampPosition(
         { x: drag.startWidgetX + dx, y: drag.startWidgetY + dy },
         vw,
         vh,
-        w,
-        h,
+        SMALL_SIZE,
+        SMALL_SIZE,
       );
-      // 直接操作 DOM transform（不 setState，避免重渲染抖动）
+      // 直接操作 DOM（不 setState，避免重渲染抖动）
       if (widgetRef.current) {
         widgetRef.current.style.left = `${next.x}px`;
         widgetRef.current.style.top = `${next.y}px`;
       }
     },
-    [mode],
+    [],
   );
 
   const handlePointerUp = useCallback(
@@ -390,7 +347,13 @@ export function PomodoroWidget() {
         /* ignore */
       }
       dragStateRef.current = null;
-      widgetRef.current?.classList.remove("dragging");
+
+      // 若拖动距离 < 5px，视为点击 → 打开 large Modal
+      if (!dragMovedRef.current) {
+        setMode("large");
+        return;
+      }
+
       // 读取拖动结束时的当前位置
       const left = widgetRef.current?.style.left;
       const top = widgetRef.current?.style.top;
@@ -401,72 +364,35 @@ export function PomodoroWidget() {
           const vw = window.innerWidth;
           const vh = window.innerHeight;
           // small 模式：吸附到最近边（带 200ms transition 平滑过渡）
-          // medium 模式：不吸附（用户只要求小弹框吸附），保持当前位置
-          if (mode === "small" && widgetRef.current) {
+          if (widgetRef.current) {
             const snapped = snapToNearestEdge(
               { x, y },
               vw,
               vh,
               SMALL_SIZE,
             );
-            // 加 transition 让吸附平滑
             widgetRef.current.style.transition =
               "left 200ms ease-out, top 200ms ease-out";
             widgetRef.current.style.left = `${snapped.x}px`;
             widgetRef.current.style.top = `${snapped.y}px`;
-            // 同步 state + 持久化
             setPosition(snapped);
             savePosition(snapped);
-            // 200ms 后清除 transition，避免下次拖动时有延迟
             window.setTimeout(() => {
               if (widgetRef.current) {
                 widgetRef.current.style.transition = "";
               }
             }, 220);
-          } else {
-            // medium / large：直接同步当前位置（不吸附）
-            setPosition({ x, y });
-            savePosition({ x, y });
           }
         }
       }
     },
-    [mode],
+    [],
   );
 
-  // 切换模式：large → medium（用户主动关闭 modal 时；用户需求：缩小时显示中弹窗）
-  // medium ↔ small 都通过 setMode + saveModePreference 持久化
-  const switchMode = useCallback((next: WidgetMode) => {
-    setMode(next);
-    saveModePreference(next);
-  }, []);
-
-  // small → medium：点击展开
-  // medium → small：点击折叠
-  // medium → large：点击「展开全屏」按钮（不在拖动 handle 上）
-  const handleWidgetClick = useCallback(() => {
-    if (mode === "small") {
-      switchMode("medium");
-    } else if (mode === "medium") {
-      switchMode("small");
-    }
-    // large 不在此处切换（modal 关闭按钮触发）
-  }, [mode, switchMode]);
-
-  // large modal 关闭：回到 medium（用户需求：缩小时显示中弹窗，非小弹窗）
-  // 只有 medium 没有 session 时才会被外层守卫拦截，但 modal 已打开过用户可见
+  // large modal 关闭：回到 small
   const handleLargeClose = useCallback(() => {
-    switchMode("medium");
-  }, [switchMode]);
-
-  // medium 中「展开」按钮：阻止冒泡，避免触发 handleWidgetClick 折叠
-  const handleExpandToLarge = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      switchMode("large");
-    },
-    [switchMode],
-  );
+    setMode("small");
+  }, []);
 
   async function handlePauseResume(e?: React.MouseEvent) {
     e?.stopPropagation();
@@ -504,60 +430,135 @@ export function PomodoroWidget() {
     }
   }
 
-  // 无 running session 不显示 small/medium（large modal 即使无 session 也能打开，
-  // 因 large 模式渲染的 PomodoroFullContent 内有 start form）
+  // large 模式：渲染 Modal（无论是否有 running session 都渲染——PomodoroFullContent 内有 start form）
+  // 同时也渲染 small widget（隐藏在 Modal 下），保证关闭 Modal 后 small 立即可见
   // position 未就绪时不显示（避免首帧闪烁在错误位置）
-  if (!position) return null;
-
-  // large 模式：只渲染 Modal，不渲染 small/medium（用户需求：大弹窗出现时隐藏中小弹窗）
-  // 即使无 running session 也要渲染 Modal（用户从入口唤醒时常见此场景）
   if (mode === "large") {
     return (
-      <Modal
-        open
-        onClose={handleLargeClose}
-        title="番茄专注"
-        size="lg"
-      >
-        <PomodoroFullContent />
-      </Modal>
+      <>
+        <Modal
+          open
+          onClose={handleLargeClose}
+          title="番茄专注"
+          size="lg"
+        >
+          <PomodoroFullContent
+            onComplete={() => {
+              // 完成后关闭 Modal 回到 small widget
+              setMode("small");
+            }}
+          />
+        </Modal>
+        {/* small widget 在 Modal 下保持渲染，关闭 Modal 后立即可见 */}
+        {position && session && (
+          <SmallWidget
+            widgetRef={widgetRef}
+            position={position}
+            session={session}
+            remainingMs={remainingMs}
+            progress={progress}
+            busy={busy}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onPauseResume={handlePauseResume}
+            onAbandon={handleAbandon}
+          />
+        )}
+      </>
     );
   }
 
-  // small / medium 模式：必须有 running session 才显示
-  if (!session) return null;
+  // small 模式：必须有 running session 才显示
+  if (!session || !position) return null;
 
+  return (
+    <SmallWidget
+      widgetRef={widgetRef}
+      position={position}
+      session={session}
+      remainingMs={remainingMs}
+      progress={progress}
+      busy={busy}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onPauseResume={handlePauseResume}
+      onAbandon={handleAbandon}
+    />
+  );
+}
+
+/** 小弹框组件：圆形进度条 + 中间显示剩余分钟数 + 长按弹出控制菜单 */
+interface SmallWidgetProps {
+  widgetRef: React.RefObject<HTMLDivElement | null>;
+  position: WidgetPosition;
+  session: PomodoroSession;
+  remainingMs: number;
+  progress: number;
+  busy: boolean;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPauseResume: (e?: React.MouseEvent) => void;
+  onAbandon: (e?: React.MouseEvent) => void;
+}
+
+function SmallWidget({
+  widgetRef,
+  position,
+  session,
+  remainingMs,
+  progress,
+  busy,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onPauseResume,
+  onAbandon,
+}: SmallWidgetProps) {
   const isPaused = session.status === "paused";
   const isOvertime = remainingMs <= 0 && session.status === "running";
 
-  // ============ small 模式：圆形进度条 + 中间显示剩余分钟数 ============
-  if (mode === "small") {
-    // 圆环参数：直径 56px，stroke 4
-    const SIZE = SMALL_SIZE;
-    const STROKE = 4;
-    const RADIUS = (SIZE - STROKE) / 2;
-    const CIRC = 2 * Math.PI * RADIUS;
-    const dashOffset = CIRC * (1 - progress / 100);
-    const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
+  // 圆环参数：直径 56px，stroke 4
+  const SIZE = SMALL_SIZE;
+  const STROKE = 4;
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * RADIUS;
+  const dashOffset = CIRC * (1 - progress / 100);
+  const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
 
-    return (
+  // 控制菜单（长按或右键唤起）
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <>
       <div
         ref={widgetRef}
         role="button"
         tabIndex={0}
         aria-label={`番茄钟 剩余 ${remainingMinutes} 分钟，点击展开`}
         aria-live="polite"
-        onClick={handleWidgetClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            handleWidgetClick();
+            // 键盘点击：打开控制菜单（不拖动）
+            setMenuOpen((v) => !v);
           }
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onContextMenu={(e) => {
+          // 右键唤起菜单（桌面端补充）
+          e.preventDefault();
+          setMenuOpen(true);
+        }}
         className="fixed z-[80] touch-none cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 rounded-full"
         style={{
           left: `${position.x}px`,
@@ -565,7 +566,7 @@ export function PomodoroWidget() {
           width: `${SIZE}px`,
           height: `${SIZE}px`,
         }}
-        title="点击展开 / 拖动移动位置"
+        title="点击打开 / 拖动移动 / 长按控制"
       >
         <svg
           width={SIZE}
@@ -612,7 +613,7 @@ export function PomodoroWidget() {
         >
           {remainingMinutes}
         </div>
-        {/* 暂停标记：左上角小点 */}
+        {/* 暂停标记：右上角小点 */}
         {isPaused && (
           <div
             aria-hidden
@@ -620,163 +621,61 @@ export function PomodoroWidget() {
           />
         )}
       </div>
-    );
-  }
 
-  // ============ medium 模式：卡片式 ============
-  // 适配 medium 宽度的进度环：直径 32px
-  const M_RING_SIZE = 32;
-  const M_STROKE = 3;
-  const M_RADIUS = (M_RING_SIZE - M_STROKE) / 2;
-  const M_CIRC = 2 * Math.PI * M_RADIUS;
-  const mDashOffset = M_CIRC * (1 - progress / 100);
-
-  return (
-    <>
-      <div
-        ref={widgetRef}
-        role="region"
-        aria-label={`番茄钟 ${formatCountdown(remainingMs)} 剩余`}
-        className="fixed z-[80] w-56 bg-white dark:bg-gray-800 rounded-card shadow-floating border border-gray-200 dark:border-gray-700 select-none"
-        style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-        }}
-      >
-        {/* 拖动把手区：整个 header 可拖动 */}
-        <div
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="拖动番茄钟"
-          className="flex items-center justify-center h-5 cursor-move text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 border-b border-gray-100 dark:border-gray-700 touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-        >
-          <Icon name="grip" className="w-3 h-3" />
-        </div>
-
-        {/* 主体：点击折叠回 small，控制按钮不冒泡 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleWidgetClick}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleWidgetClick();
-            }
-          }}
-          aria-label="点击折叠为小弹窗"
-          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-        >
-          {/* 进度环 */}
-          <svg
-            width={M_RING_SIZE}
-            height={M_RING_SIZE}
-            viewBox={`0 0 ${M_RING_SIZE} ${M_RING_SIZE}`}
-            className="shrink-0"
-            aria-hidden="true"
-          >
-            <circle
-              cx={M_RING_SIZE / 2}
-              cy={M_RING_SIZE / 2}
-              r={M_RADIUS}
-              fill="none"
-              className="stroke-gray-200 dark:stroke-gray-700"
-              strokeWidth={M_STROKE}
-            />
-            <circle
-              cx={M_RING_SIZE / 2}
-              cy={M_RING_SIZE / 2}
-              r={M_RADIUS}
-              fill="none"
-              className={
-                isOvertime
-                  ? "stroke-danger"
-                  : isPaused
-                    ? "stroke-gray-400 dark:stroke-gray-500"
-                    : "stroke-brand-500"
-              }
-              strokeWidth={M_STROKE}
-              strokeLinecap="round"
-              strokeDasharray={M_CIRC}
-              strokeDashoffset={mDashOffset}
-              transform={`rotate(-90 ${M_RING_SIZE / 2} ${M_RING_SIZE / 2})`}
-            />
-          </svg>
-
-          {/* 倒计时 + 任务名 */}
-          <div className="min-w-0 flex-1">
-            <div
-              className={`font-mono text-xl font-bold tabular-nums leading-tight ${
-                isOvertime
-                  ? "text-danger"
-                  : isPaused
-                    ? "text-gray-400 dark:text-gray-500"
-                    : "text-gray-900 dark:text-gray-100"
-              }`}
-            >
-              {formatCountdown(remainingMs)}
-            </div>
-            <div className="text-2xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1">
-              {session.type === "focus" ? null : session.type === "short_break" ? "短休 · " : "长休 · "}
-              {session.taskDescription || "（未命名）"}
-              {session.interruptions > 0 && (
-                <span
-                  title={`被打断 ${session.interruptions} 次`}
-                  className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-2xs font-bold"
-                >
-                  {session.interruptions}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 展开指示符 */}
-          <Icon
-            name="chevron-down"
-            className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0"
+      {/* 控制菜单：长按或右键唤起，pause/resume/abandon */}
+      {menuOpen && (
+        <>
+          {/* 全屏点击关闭 */}
+          <div
+            className="fixed inset-0 z-[90]"
+            onClick={() => setMenuOpen(false)}
             aria-hidden
           />
-        </div>
-
-        {/* 控制按钮区：每个按钮 stopPropagation，避免点击触发折叠 */}
-        <div className="px-3 pb-3 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex gap-1.5">
+          {/* 菜单本体：定位在 widget 上方 */}
+          <div
+            role="menu"
+            aria-label="番茄钟控制"
+            className="fixed z-[100] bg-white dark:bg-gray-800 rounded-card shadow-floating border border-gray-200 dark:border-gray-700 py-1 min-w-[140px]"
+            style={{
+              left: `${Math.max(8, Math.min(position.x - 42, window.innerWidth - 156))}px`,
+              top: `${Math.max(8, position.y - 96)}px`,
+            }}
+          >
+            <div className="px-3 py-1.5 text-2xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700 font-mono">
+              {formatCountdown(remainingMs)}
+            </div>
             <Button
-              variant="secondary"
-              size="sm"
-              onClick={(e) => void handlePauseResume(e)}
+              variant="ghost"
+              role="menuitem"
               disabled={busy}
-              className="flex-1"
+              onClick={(e) => {
+                onPauseResume(e);
+                setMenuOpen(false);
+              }}
+              className="w-full justify-start px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50"
             >
+              <Icon name={isPaused ? "rotate" : "clock"} className="w-3.5 h-3.5" />
               {isPaused ? "恢复" : "暂停"}
             </Button>
             <Button
               variant="ghost"
-              size="sm"
-              onClick={(e) => void handleAbandon(e)}
+              role="menuitem"
               disabled={busy}
-              className="flex-1"
+              onClick={(e) => {
+                onAbandon(e);
+                setMenuOpen(false);
+              }}
+              className="w-full justify-start px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
             >
+              <Icon name="x" className="w-3.5 h-3.5" />
               放弃
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={handleExpandToLarge}
-              aria-label="展开为大弹窗"
-              title="展开为大弹窗"
-              disabled={busy}
-            >
-              <Icon name="maximize" className="w-3.5 h-3.5" />
-            </Button>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </>
   );
 }
+
+// 注：原 medium 模式（224px 卡片）已移除，简化为 small + large 两态。
+// 暂停/放弃等控制操作通过 small widget 长按/右键唤起的菜单完成。
