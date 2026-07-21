@@ -11,13 +11,17 @@
 //        （第 2 阶段：学习+复习合并——第 1 格从「今日待学/今日待复习」合并为单一队列）
 //     3. AI 教练洞察区：HomeInsightsCard（成就 + 健康提醒）+ 能力画像 + AI 质量摘要
 //     4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）
-//     5. 折叠区：情绪记录 / 错题 / 7 天热力图
+//     5. 7 天热力图（常驻，无需展开）
 //
-// 砍掉：
-//   - 与底部热力图重复的 streak 数字（保留在 KPI 三宫格）
-//   - StatusCard（功能与 HomeInsightsCard 重叠，已删除导入）
-//   - 继续学习入口（与底部 Nav 重复）
-//   - 三宫格快捷入口（与底部 Nav 重复）
+// 第 5 轮简化：
+//   - 折叠区里的「今日情绪」「错题本」与 EmotionQuickPicker / /mistakes 重复 → 删除
+//   - 「更多」折叠按钮无存在意义 → 移除折叠逻辑，7 天热力图常驻
+//
+// 新账户隐藏空数据区块（需求 4）：
+//   - 第 3 区（AI 教练洞察）：仅在 userProfileSummary || aiQualitySummary || newAchievements.length || healthAlerts.length 时渲染
+//   - 第 4 区能量趋势迷你图：仅在 energyTrend 有非 null 值时渲染
+//   - 第 5 区 7 天热力图：仅在 heatmapData 有非 0 分钟数据时渲染
+//   - KPI 三宫格第 2 格「已完成」：todayCompletedCount > 0 时才着色突出
 //
 // 新增：
 //   - 用户画像摘要（beginner/intermediate/advanced 节点数 + 偏好时段）
@@ -29,7 +33,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
-import { EmotionRecorder } from "@/components/EmotionRecorder";
 import { EmotionQuickPicker } from "@/components/EmotionQuickPicker";
 import { Icon, type IconName } from "@/components/Icon";
 import { Button, LinkButton } from "@/components/ui";
@@ -47,8 +50,6 @@ export default function HomeClient() {
     todayEnergy,
     hasPlans,
     username,
-    todayEmotions,
-    recentMistakes,
     newAchievements,
     healthAlerts,
     userProfileSummary,
@@ -60,8 +61,6 @@ export default function HomeClient() {
   } = useHomeData();
 
   const [shareMsg, setShareMsg] = useState<string>("");
-  const [showEmotionRecorder, setShowEmotionRecorder] = useState(false);
-  const [showMoreSection, setShowMoreSection] = useState(false);
 
   // Demo 数据注入
   useEffect(() => {
@@ -110,6 +109,8 @@ export default function HomeClient() {
 
   const streakMeta = getStreakMeta(streak, lastStreak);
   const lowEnergy = todayEnergy !== null && todayEnergy <= 2;
+  // 需求 4：7 天热力图仅在至少 1 天有打卡数据时才显示（新账户隐藏）
+  const heatmapHasData = heatmapData.some((d) => d.minutes > 0);
 
   // ============ 新用户引导 ============
   if (hasPlans === false) {
@@ -123,7 +124,7 @@ export default function HomeClient() {
           AI 驱动的开发者成长 OS。告诉 AI 你想学什么，它帮你拆知识树、排计划、出面试题、按遗忘曲线复习。
         </p>
         <LinkButton
-          href="/learn"
+          href="/learn/new"
           size="lg"
           className="rounded-full px-8 shadow-lg"
         >
@@ -235,80 +236,96 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ============ 3. AI 教练洞察区（HomeInsights + 能力画像 + AI 质量，合并洞察类信息）============ */}
-      <section className="mb-5">
-        <HomeInsightsCard
-          newAchievements={newAchievements}
-          healthAlerts={healthAlerts}
-        />
+      {/* ============ 3. AI 教练洞察区（需求 4：新账户无数据时整区隐藏）============ */}
+      {(userProfileSummary ||
+        aiQualitySummary ||
+        newAchievements.length > 0 ||
+        healthAlerts.length > 0) && (
+        <section className="mb-5">
+          <HomeInsightsCard
+            newAchievements={newAchievements}
+            healthAlerts={healthAlerts}
+          />
 
-        {/* 用户画像 + AI 质量摘要（从 section 4 移入，与 HomeInsights 同组） */}
-        {(userProfileSummary || aiQualitySummary) && (
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            {userProfileSummary && (
-              <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
-                  <span className="text-xs font-medium text-gray-500">能力画像</span>
-                </div>
-                <div className="space-y-0.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">入门</span>
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
+          {/* 用户画像 + AI 质量摘要（从 section 4 移入，与 HomeInsights 同组） */}
+          {(userProfileSummary || aiQualitySummary) && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {userProfileSummary && (
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-xs font-medium text-gray-500">能力画像</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">进阶</span>
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">高级</span>
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
-                  </div>
-                  {userProfileSummary.preferredSlot && (
-                    <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
-                      <span className="text-gray-400">偏好时段</span>
-                      <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">入门</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-            {aiQualitySummary && (
-              <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-xs font-medium text-gray-500">AI 质量</span>
-                </div>
-                <div className="space-y-0.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">今日调用</span>
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">采纳率</span>
-                    <span className="text-green-600 dark:text-green-400 font-medium">
-                      {Math.round(aiQualitySummary.adoptionRate * 100)}%
-                    </span>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">进阶</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">高级</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
+                    </div>
+                    {userProfileSummary.preferredSlot && (
+                      <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
+                        <span className="text-gray-400">偏好时段</span>
+                        <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <Link
-                  href="/stats/ai-quality"
-                  className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
-                >
-                  详情 →
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+              )}
+              {aiQualitySummary && (
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-gray-500">AI 质量</span>
+                  </div>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">今日调用</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">采纳率</span>
+                      <span className="text-green-600 dark:text-green-400 font-medium">
+                        {Math.round(aiQualitySummary.adoptionRate * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/stats/ai-quality"
+                    className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
+                  >
+                    详情 →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
-      {/* ============ 4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）============ */}
+      {/* ============ 4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）
+                              需求 3：header 右侧新增「+ 新建计划」入口，跳 /learn/new ============ */}
       <section className="mb-5">
-        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
-          <Icon name="calendar-check" className="w-4 h-4" />
-          今日学习队列
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+            <Icon name="calendar-check" className="w-4 h-4" />
+            今日学习队列
+          </h2>
+          <Link
+            href="/learn/new"
+            aria-label="新建学习计划"
+            className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
+          >
+            <Icon name="plus" className="w-3.5 h-3.5" />
+            新建计划
+          </Link>
+        </div>
 
         {studyQueue.length > 0 ? (
           <div className="space-y-1.5">
@@ -361,172 +378,46 @@ export default function HomeClient() {
               {todayCompletedCount > 0 ? "今日清单已清空" : "今日暂无待办"}
             </p>
             <Link
-              href="/learn"
+              href="/learn/new"
               className="text-xs text-blue-500 hover:underline mt-2 inline-block"
             >
-              去学习 →
+              建一个学习计划 →
             </Link>
           </div>
         )}
 
-        {/* 能量趋势迷你图 */}
-        <div className="mt-3">
-          <EnergyTrendMini trend={energyTrend} todayEnergy={todayEnergy} />
-        </div>
-      </section>
-
-      {/* ============ 5. 折叠区：情绪 + 错题 + 7 天热力图 ============ */}
-      <section className="mb-5">
-        <Button
-          variant="ghost"
-          onClick={() => setShowMoreSection((v) => !v)}
-          aria-expanded={showMoreSection}
-          aria-controls="home-more-section"
-          className="w-full flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-2"
-        >
-          <span className="flex items-center gap-1.5">
-            <Icon name="chevron-right" className={`w-4 h-4 transition-transform ${showMoreSection ? "rotate-90" : ""}`} />
-            更多
-          </span>
-        </Button>
-
-        {showMoreSection && (
-          <div id="home-more-section" className="space-y-4 pt-2">
-            {/* 情绪区 */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                  <Icon name="heart" className="w-4 h-4 text-pink-500" />
-                  今日情绪
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon="plus"
-                  onClick={() => setShowEmotionRecorder(!showEmotionRecorder)}
-                >
-                  {showEmotionRecorder ? "收起" : "记一次"}
-                </Button>
-              </div>
-
-              {showEmotionRecorder && (
-                <div className="mb-3">
-                  <EmotionRecorder
-                    compact
-                    onSaved={() => {
-                      setShowEmotionRecorder(false);
-                      void reload();
-                    }}
-                  />
-                </div>
-              )}
-
-              {todayEmotions.length > 0 ? (
-                <div className="space-y-1.5">
-                  {todayEmotions.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="bg-white dark:bg-gray-800 rounded-lg p-2.5 flex items-start gap-2"
-                    >
-                      <span className="text-lg">{entry.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">{entry.tag}</span>
-                          <span className="text-gray-400">{entry.time}</span>
-                          {entry.dopamine !== "无" && (
-                            <span className="px-1.5 py-0.5 rounded text-2xs bg-orange-100 text-orange-700">
-                              {entry.dopamine}
-                            </span>
-                          )}
-                        </div>
-                        {entry.reason && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{entry.reason}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                !showEmotionRecorder && (
-                  <p className="text-xs text-gray-400 text-center py-3">
-                    今天还没记录情绪
-                  </p>
-                )
-              )}
-
-              <Link
-                href="/emotion"
-                className="mt-2 block text-center text-xs text-gray-500 hover:text-blue-500"
-              >
-                查看全部历史 →
-              </Link>
-            </div>
-
-            {/* 错题区 */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                  <Icon name="x-circle" className="w-4 h-4 text-red-500" />
-                  错题回顾
-                </h3>
-                {recentMistakes.length > 0 && (
-                  <Link
-                    href="/mistakes"
-                    className="text-xs text-blue-600 hover:text-blue-700"
-                  >
-                    全部 →
-                  </Link>
-                )}
-              </div>
-
-              {recentMistakes.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-                  <Icon name="check-circle" className="w-8 h-8 mx-auto text-green-500 mb-1" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">还没有未解决的错题</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {recentMistakes.map((m) => (
-                    <Link
-                      key={m.id}
-                      href="/review"
-                      className="block bg-white dark:bg-gray-800 rounded-lg p-2.5 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="text-2xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
-                          ×{m.wrongCount}
-                        </span>
-                        <p className="text-xs text-gray-700 dark:text-gray-300 flex-1 line-clamp-2">
-                          {m.questionText}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 7 天热力图 */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">最近 7 天</h3>
-              <div className="flex gap-1">
-                {heatmapData.map((d) => (
-                  <div key={d.date} className="flex-1 text-center">
-                    <div
-                      className={`h-12 rounded ${heatColor(d.minutes)} flex items-end justify-center pb-1`}
-                    >
-                      {d.minutes > 0 && (
-                        <span className="text-xs text-white font-medium">{d.minutes}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">{d.date.slice(5)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* 能量趋势迷你图（需求 4：新账户无能量数据时隐藏） */}
+        {energyTrend.some((v) => v !== null) && (
+          <div className="mt-3">
+            <EnergyTrendMini trend={energyTrend} todayEnergy={todayEnergy} />
           </div>
         )}
       </section>
+
+      {/* ============ 5. 7 天热力图（需求 1：移除折叠按钮+今日情绪+错题本，常驻显示；
+                                       需求 4：新账户无打卡记录时隐藏）============ */}
+      {heatmapHasData && (
+        <section className="mb-5">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5">
+            <Icon name="calendar" className="w-4 h-4" />
+            最近 7 天
+          </h3>
+          <div className="flex gap-1">
+            {heatmapData.map((d) => (
+              <div key={d.date} className="flex-1 text-center">
+                <div
+                  className={`h-12 rounded ${heatColor(d.minutes)} flex items-end justify-center pb-1`}
+                >
+                  {d.minutes > 0 && (
+                    <span className="text-xs text-white font-medium">{d.minutes}</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">{d.date.slice(5)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

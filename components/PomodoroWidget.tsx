@@ -285,6 +285,12 @@ export function PomodoroWidget() {
   // 模式切换时重新吸附（用户需求 1）：
   // medium → small 时，small 弹框默认吸附到最近边（避免在 medium 卡片中间位置悬空）
   // large → medium 时不吸附（medium 较大，当前位置可能仍合理）
+  //
+  // 修复（用户需求 2）：原版直接在 effect 内同步写 style.transition + style.left/top，
+  // 与 React 首次渲染写入的 inline style 在同一浏览器帧内，浏览器看不到中间状态，
+  // transition 无法触发，用户感知"吸附没生效"。
+  // 解决：用 requestAnimationFrame 延后一帧再设置 transition，让浏览器先绘制 small
+  // 在旧 position 的初始位置，然后再启动过渡到吸附位置。
   useEffect(() => {
     if (mode !== "small") return;
     if (!widgetRef.current || !position) return;
@@ -293,16 +299,28 @@ export function PomodoroWidget() {
     const snapped = snapToNearestEdge(position, vw, vh, SMALL_SIZE);
     // 仅当位置变化时才更新（避免不必要的 transition）
     if (snapped.x === position.x && snapped.y === position.y) return;
-    widgetRef.current.style.transition =
-      "left 200ms ease-out, top 200ms ease-out";
-    widgetRef.current.style.left = `${snapped.x}px`;
-    widgetRef.current.style.top = `${snapped.y}px`;
+
+    // 双重 raf：第一帧让浏览器绘制 small 在旧 position，第二帧再启动 transition
+    // 关键修复点：第一帧让 React 19 的 inline style "left: position.x" 被浏览器绘制一帧，
+    // 第二帧再改 left/top 到吸附位置——浏览器看到"从旧位置到新位置"的变化，transition 才会触发。
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!widgetRef.current) return;
+        widgetRef.current.style.transition =
+          "left 200ms ease-out, top 200ms ease-out";
+        widgetRef.current.style.left = `${snapped.x}px`;
+        widgetRef.current.style.top = `${snapped.y}px`;
+      });
+    });
     setPosition(snapped);
     savePosition(snapped);
     const t = window.setTimeout(() => {
       if (widgetRef.current) widgetRef.current.style.transition = "";
-    }, 220);
-    return () => window.clearTimeout(t);
+    }, 320);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.clearTimeout(t);
+    };
     // 故意不依赖 position：拖动结束后 position 已 setState，若再依赖会立即重新触发吸附，
     // 形成循环（拖→吸附→position 变→再吸附）。仅 mode 变化时才需要重新吸附。
     // eslint-disable-next-line react-hooks/exhaustive-deps
