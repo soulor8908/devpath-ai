@@ -138,6 +138,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
       {state.phase === "learning" && currentNode && (
         <KnowledgeBrief
           node={currentNode}
+          question={currentQuestion}
           onLearned={() => dispatch({ type: "LEARN_COMPLETE" })}
         />
       )}
@@ -151,6 +152,31 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
           </div>
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
             {currentQuestion.question}
+          </p>
+
+          {/* 答案参考（默认展开，让用户对照答案自评） */}
+          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-3 mb-4 border border-blue-100 dark:border-blue-900">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Icon name="lightbulb" className="w-3.5 h-3.5 text-blue-500" />
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400">参考答案</p>
+            </div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
+              {currentQuestion.answer}
+            </div>
+            {currentQuestion.keyPoints && currentQuestion.keyPoints.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-blue-100 dark:border-blue-900">
+                <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">💡 关键点</p>
+                <ul className="space-y-0.5">
+                  {currentQuestion.keyPoints.map((kp, i) => (
+                    <li key={i} className="text-xs text-gray-600 dark:text-gray-400">• {kp}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
+            对照答案，你答对了吗？
           </p>
           <div className="flex gap-2">
             <Button
@@ -175,18 +201,9 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
               }}
               leftIcon="x"
             >
-              不太确定
+              没答对
             </Button>
           </div>
-          {/* 显示答案参考 */}
-          <details className="mt-3">
-            <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer">
-              查看参考答案
-            </summary>
-            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-700/50 rounded">
-              {currentQuestion.answer}
-            </div>
-          </details>
         </div>
       )}
 

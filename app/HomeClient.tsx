@@ -172,9 +172,8 @@ export default function HomeClient() {
 
         {/* V2: Path 路径进度（如果有职业路径，作为视觉焦点替代 CurrentTaskCard）
             设计（乔布斯视角）：用户打开 app 第一眼看到"离 offer 还有多远"
-              - PathProgressBar：进度 + 当前位置 + 预计时间 + 主按钮
-              - PathCoachInsight：AI 教练有温度的每日一句话
-            兼容旧用户：无 careerPath（未走过 onboarding）时保留原 CurrentTaskCard */}
+              - 有 careerPath：PathProgressBar + PathCoachInsight
+              - 无 careerPath（旧用户）：显示"选择职业路径"引导卡片 + CurrentTaskCard */}
         {careerPath ? (
           <>
             <PathProgressBar
@@ -189,7 +188,28 @@ export default function HomeClient() {
             </div>
           </>
         ) : (
-          <CurrentTaskCard />
+          <>
+            {/* 旧用户引导：选择职业路径，获得专属学习路径图 */}
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg mb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="map" className="w-5 h-5" />
+                <h2 className="text-base font-bold">选择你的 AI 职业路径</h2>
+              </div>
+              <p className="text-sm opacity-90 mb-3">
+                选一个方向，获得专属学习路径图——从入门到拿 offer，全程陪练。
+              </p>
+              <LinkButton
+                href="/onboarding"
+                variant="secondary"
+                size="sm"
+                className="bg-white text-blue-600 hover:bg-gray-50 font-bold"
+                leftIcon="zap"
+              >
+                选择职业路径 →
+              </LinkButton>
+            </div>
+            <CurrentTaskCard />
+          </>
         )}
 
         {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重）
