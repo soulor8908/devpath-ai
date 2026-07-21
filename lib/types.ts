@@ -902,3 +902,30 @@ export interface Achievement {
   /** 进度 0-1（未解锁时显示进度，已解锁时为 1） */
   progress?: number;
 }
+
+// ============ 职业路径（V2 乔布斯视角重构） ============
+
+export interface CareerPathNode {
+  id: string;
+  title: string;
+  description: string;
+  estimatedHours: number;
+  isMilestone: boolean;
+  interviewFrequency: "高" | "中" | "低";
+}
+
+export interface CareerPath {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  description: string;
+  weeksEstimate: number;
+  weeklyHours: number;
+  dailyMinutesDefault: number;
+  maxNewPerDayDefault: number;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  cta: string;
+  linkedPresetId: string;
+  nodes: CareerPathNode[];
+}

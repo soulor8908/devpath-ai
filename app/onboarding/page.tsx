@@ -1,265 +1,215 @@
 "use client";
 
 // app/onboarding/page.tsx
-// P1 Onboarding 重做 — 10 秒 Aha Moment（乔布斯视角）
+// V2 极简化：3 选 1 → 路径预览 → 一键开始（零配置）
 //
-// 旧版问题：3 步表单（主题→学习量→API Key），用户填完仍然不知道产品能给他什么
-// 新版设计：
-//   第 1 步：展示 5 个预设知识库卡片，点击任一卡片立即弹出 MindMap 脑图预览
-//           —— 用户 10 秒内看到"这就是我想要的知识树"（Aha Moment）
-//   第 2 步：弹窗内确认 + 合并学习量+API Key 配置（一屏搞定）
-//   第 3 步：基于预设创建 plan + 跳转 /learn/{planId}
-//
-// 关键改动：
-//   - 取消"输入主题"前置步骤，改为"先看预设脑图，再决定"
-//   - 自定义主题用户可点底部"输入自定义主题"链接跳转 /learn
-//   - 复用 PRESETS + MindMap 组件，零新增数据源
+// 设计（乔布斯视角）：
+//   - 用户目标是"拿到 offer"，不是"配置学习参数"
+//   - 默认值从路径定义取，不让用户选
+//   - API Key 在第一次需要 AI 生成时再提示，不堵在门口
+//   - 跳转 /train 而不是 /learn，立即进入沉浸式训练
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setItem, set as dbSet } from "@/lib/storage/db";
-import { KEY_PREFIXES, type LearningPlan } from "@/lib/types";
-import { PRESETS, type PresetMeta } from "@/lib/presets";
-import { MindMap } from "@/components/MindMap";
+import { KEY_PREFIXES, type LearningPlan, type CareerPath as CareerPathType } from "@/lib/types";
+import { CAREER_PATHS } from "@/lib/onboarding/career-paths";
+import { getPresetById } from "@/lib/presets";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Slider } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { nanoid } from "nanoid";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [activePreset, setActivePreset] = useState<PresetMeta | null>(null);
-  const [dailyMinutes, setDailyMinutes] = useState(30);
-  const [maxNewPerDay, setMaxNewPerDay] = useState(2);
-  const [aiKey, setAiKey] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [selectedPath, setSelectedPath] = useState<CareerPathType | null>(null);
+  const [starting, setStarting] = useState(false);
 
-  // 点击预设卡片 → 立即弹出 MindMap 预览（Aha Moment）
-  function previewPreset(p: PresetMeta) {
-    setActivePreset(p);
-  }
-
-  function closePreset() {
-    setActivePreset(null);
-  }
-
-  // 确认使用此预设 → 创建 plan + 跳转学习页
-  async function confirmAndStart() {
-    if (!activePreset) return;
-    setSaving(true);
+  async function handleStart() {
+    if (!selectedPath) return;
+    setStarting(true);
     try {
       const now = new Date().toISOString();
+      const preset = getPresetById(selectedPath.linkedPresetId);
       const plan: LearningPlan = {
         id: nanoid(),
-        topic: activePreset.topic,
-        knowledgeTree: activePreset.knowledgeTree,
-        questions: activePreset.questions,
-        schedule: activePreset.schedule,
-        dailyMinutes,
-        maxNewPerDay,
+        topic: selectedPath.title,
+        knowledgeTree: preset?.knowledgeTree ?? [],
+        questions: preset?.questions ?? [],
+        schedule: preset?.schedule ?? [],
+        dailyMinutes: selectedPath.dailyMinutesDefault,
+        maxNewPerDay: selectedPath.maxNewPerDayDefault,
         fsrsMode: "standard",
         createdAt: now,
         updatedAt: now,
       };
       await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
-
-      // 标记 onboarding 完成
       await dbSet("my:onboarding", {
-        topic: activePreset.topic,
-        presetId: activePreset.id,
-        dailyMinutes,
-        maxNewPerDay,
-        fsrsMode: "standard",
-        hasAIKey: aiKey.length > 0,
+        pathId: selectedPath.id,
+        planId: plan.id,
         completedAt: now,
       });
-
-      router.push(`/learn/${plan.id}`);
+      // 立即开始第一个训练会话
+      router.push(`/train?planId=${plan.id}`);
     } finally {
-      setSaving(false);
+      setStarting(false);
     }
   }
 
-  // ============ 第 1 步：预设卡片选择 ============
-  if (!activePreset) {
+  // 第一步：3 选 1
+  if (!selectedPath) {
     return (
-      <div className="mx-auto max-w-2xl p-4 pb-20">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">欢迎使用 devpath</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            选一个方向，10 秒看到你的知识树 →
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-lg mx-auto pb-20 dark:bg-gray-900">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold mb-3">你想成为哪种 AI 人才？</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            选一个方向，我们立即为你定制学习路径
           </p>
         </div>
 
-        {/* 预设卡片网格 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-          {PRESETS.map((p) => (
+        <div className="w-full space-y-3">
+          {CAREER_PATHS.map((path) => (
             <Button
-              key={p.id}
+              key={path.id}
               variant="outline"
-              onClick={() => previewPreset(p)}
-              className="text-left bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-blue-300 justify-start"
+              onClick={() => setSelectedPath(path)}
+              className="w-full bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-2xl p-5 text-left hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-lg transition-all group justify-start h-auto items-start"
             >
-              <div className="flex items-start gap-3">
-                <span className="text-3xl">{p.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold mb-1 flex items-center gap-1">
-                    {p.name}
-                    <Icon
-                      name="chevron-right"
-                      className="w-4 h-4 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all"
-                    />
+              <div className="flex items-start gap-4">
+                <span className="text-4xl" aria-hidden="true">{path.icon}</span>
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {path.title}
+                  </h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">
+                    {path.subtitle}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                    {p.description}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {path.description}
                   </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {p.tags.slice(0, 3).map((t) => (
-                      <span
-                        key={t}
-                        className="text-2xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                  <div className="flex gap-3 text-xs text-gray-400 dark:text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Icon name="clock" className="w-3 h-3" />
+                      约 {path.weeksEstimate} 周
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Icon name="target" className="w-3 h-3" />
+                      {path.nodes.length} 个阶段
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Icon name="calendar" className="w-3 h-3" />
+                      每天 {path.dailyMinutesDefault} 分钟
+                    </span>
                   </div>
                 </div>
+                <Icon
+                  name="chevron-right"
+                  className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 group-hover:translate-x-1 transition-all mt-2"
+                />
               </div>
             </Button>
           ))}
         </div>
 
-        {/* 自定义主题入口 */}
-        <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-          没找到想要的方向？{" "}
-          <Link
-            href="/learn"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            输入自定义主题 →
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-8 text-center">
+          已经知道自己要学什么？{" "}
+          <Link href="/learn/new" className="text-blue-500 hover:underline">
+            自定义学习主题 →
           </Link>
-        </div>
+        </p>
       </div>
     );
   }
 
-  // ============ 第 2 步：MindMap 预览 + 合并配置 ============
+  // 第二步：路径预览 + 一键开始（零配置）
   return (
-    <div className="mx-auto max-w-2xl p-4 pb-20">
-      {/* 顶部返回 */}
+    <div className="min-h-screen flex flex-col p-4 max-w-lg mx-auto pb-20 dark:bg-gray-900">
       <Button
         variant="ghost"
         size="sm"
-        onClick={closePreset}
-        className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-3"
+        onClick={() => setSelectedPath(null)}
+        className="self-start mb-4"
       >
-        <Icon name="chevron-right" className="w-4 h-4 rotate-180" />
-        返回选择
+        <Icon name="chevron-right" className="w-4 h-4 rotate-180 mr-1" />
+        重选
       </Button>
 
-      {/* 预设标题 */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-4xl">{activePreset.icon}</span>
-        <div>
-          <h1 className="text-xl font-bold">{activePreset.name}</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {activePreset.knowledgeTree.length} 个知识点 ·{" "}
-            {activePreset.questions.length} 道题 ·{" "}
-            {activePreset.schedule.length} 天计划
-          </p>
-        </div>
+      <div className="text-center mb-6">
+        <span className="text-6xl mb-4 block" aria-hidden="true">{selectedPath.icon}</span>
+        <h1 className="text-2xl font-bold mb-2">{selectedPath.title}</h1>
+        <p className="text-gray-500 dark:text-gray-400">{selectedPath.subtitle}</p>
       </div>
 
-      {/* Aha Moment：MindMap 脑图预览 */}
-      <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden mb-4">
-        <div className="px-4 py-2 border-b dark:border-gray-700 flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            知识树脑图预览
-          </span>
-          <span className="text-xs text-green-600 dark:text-green-400 inline-flex items-center gap-1">
-            <Icon name="check" className="w-3 h-3" />
-            即点即用
-          </span>
-        </div>
-        <div className="h-[360px]">
-          <MindMap
-            nodes={activePreset.knowledgeTree}
-            topic={activePreset.topic}
-            fillHeight
-          />
-        </div>
+      {/* Aha Moment 卡片 */}
+      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white mb-6 shadow-xl">
+        <p className="text-sm opacity-80 mb-1">看到了。</p>
+        <p className="text-xl font-bold mb-2">
+          每天投入 {selectedPath.dailyMinutesDefault} 分钟，预计
+          <span className="text-yellow-300"> {selectedPath.weeksEstimate} 周 </span>
+          可以准备好面试。
+        </p>
+        <p className="text-sm opacity-80">我们从今天开始。</p>
       </div>
 
-      {/* 合并配置：学习量 + API Key（一屏） */}
-      <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-4 space-y-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            每日学习量：{dailyMinutes} 分钟
-          </label>
-          <Slider
-            min={15}
-            max={120}
-            step={5}
-            value={dailyMinutes}
-            onChange={setDailyMinutes}
-            className="w-full"
-            aria-label="每日学习量（分钟）"
-          />
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>15min</span>
-            <span>120min</span>
+      {/* 路径节点预览 */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 mb-6 border dark:border-gray-700">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+          你的学习路径
+        </p>
+        <div className="space-y-0">
+          {selectedPath.nodes.map((node, i) => (
+            <div key={node.id} className="flex items-start gap-3">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    node.isMilestone
+                      ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {node.isMilestone ? (
+                    <Icon name="star" className="w-4 h-4" />
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                {i < selectedPath.nodes.length - 1 && (
+                  <div className="w-0.5 h-6 bg-gray-200 dark:bg-gray-600" />
+                )}
+              </div>
+              <div className="flex-1 pb-3">
+                <p className="font-medium text-sm">{node.title}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  {node.description} · {node.estimatedHours}h
+                </p>
+              </div>
+            </div>
+          ))}
+          {/* 终点线 */}
+          <div className="flex items-center gap-3 mt-1">
+            <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+              <Icon name="check" className="w-4 h-4 text-white" />
+            </div>
+            <p className="font-medium text-green-600 dark:text-green-400">
+              拿到 offer <span aria-hidden="true">🏆</span>
+            </p>
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            每日新内容数：{maxNewPerDay} 个
-          </label>
-          <Slider
-            min={1}
-            max={5}
-            step={1}
-            value={maxNewPerDay}
-            onChange={setMaxNewPerDay}
-            className="w-full"
-            aria-label="每日新内容数（个）"
-          />
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>1 个</span>
-            <span>5 个</span>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            AI API Key（可选）
-          </label>
-          <Input
-            value={aiKey}
-            onChange={(e) => setAiKey(e.target.value)}
-            placeholder="sk-... 留空则用预设数据"
-            type="password"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            填入可解锁 AI 重新生成知识树 + 面试题生成（支持 GLM/DeepSeek/MiMo）
-          </p>
-        </div>
       </div>
 
-      {/* 开始按钮 */}
       <Button
         variant="success"
         size="lg"
         block
-        onClick={confirmAndStart}
-        loading={saving}
-        leftIcon={saving ? undefined : "zap"}
+        onClick={handleStart}
+        loading={starting}
+        className="text-lg py-4 rounded-full shadow-lg"
+        leftIcon={starting ? undefined : "zap"}
       >
-        {saving ? "创建计划中..." : "开始学习 →"}
+        {starting ? "准备中..." : "开始第一次训练 →"}
       </Button>
-      <p className="text-center text-xs text-gray-400 mt-2">
-        计划创建后可随时在「学习」页用 AI 重新生成
-      </p>
+
+      <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-3">{selectedPath.cta}</p>
     </div>
   );
 }
