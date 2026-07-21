@@ -38,7 +38,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { PomodoroSession } from "@/lib/types";
 import {
-  getRunningSession,
+  getActiveSession,
   pauseSession,
   resumeSession,
   abandonSession,
@@ -225,17 +225,20 @@ export function PomodoroWidget() {
   const notifiedRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const running = await getRunningSession();
-    setSession(running);
-    if (running) {
-      const remaining = computeRemainingMs(running);
+    // 用 getActiveSession（running 或 paused 都算活跃）：
+    // 修 bug：用户点暂停后 session.status=paused，原 getRunningSession 返回 null
+    // → setSession(null) → widget 守卫隐藏整个 widget，看起来像"点暂停关闭了弹窗"
+    const active = await getActiveSession();
+    setSession(active);
+    if (active) {
+      const remaining = computeRemainingMs(active);
       setRemainingMs(remaining);
-      setProgress(computeProgress(running));
-      if (remaining <= 0 && notifiedRef.current !== running.id) {
-        notifiedRef.current = running.id;
+      setProgress(computeProgress(active));
+      if (remaining <= 0 && notifiedRef.current !== active.id) {
+        notifiedRef.current = active.id;
         void notify(
           "番茄完成",
-          `「${running.taskDescription}」专注完成，去休息一下吧`,
+          `「${active.taskDescription}」专注完成，去休息一下吧`,
         );
       }
     } else {
@@ -278,6 +281,32 @@ export function PomodoroWidget() {
     window.addEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
     return () => window.removeEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
   }, []);
+
+  // 模式切换时重新吸附（用户需求 1）：
+  // medium → small 时，small 弹框默认吸附到最近边（避免在 medium 卡片中间位置悬空）
+  // large → medium 时不吸附（medium 较大，当前位置可能仍合理）
+  useEffect(() => {
+    if (mode !== "small") return;
+    if (!widgetRef.current || !position) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const snapped = snapToNearestEdge(position, vw, vh, SMALL_SIZE);
+    // 仅当位置变化时才更新（避免不必要的 transition）
+    if (snapped.x === position.x && snapped.y === position.y) return;
+    widgetRef.current.style.transition =
+      "left 200ms ease-out, top 200ms ease-out";
+    widgetRef.current.style.left = `${snapped.x}px`;
+    widgetRef.current.style.top = `${snapped.y}px`;
+    setPosition(snapped);
+    savePosition(snapped);
+    const t = window.setTimeout(() => {
+      if (widgetRef.current) widgetRef.current.style.transition = "";
+    }, 220);
+    return () => window.clearTimeout(t);
+    // 故意不依赖 position：拖动结束后 position 已 setState，若再依赖会立即重新触发吸附，
+    // 形成循环（拖→吸附→position 变→再吸附）。仅 mode 变化时才需要重新吸附。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   /**
    * Pointer Events 拖动：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素，

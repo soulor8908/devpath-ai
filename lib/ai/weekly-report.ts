@@ -7,7 +7,7 @@ import { hasAIKey, getModel } from "./provider";
 import { generateText } from "ai";
 import type { LanguageModel } from "ai";
 import { getPrompt } from "./prompts";
-import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, DopamineTrigger, EmotionTag } from "../types";
+import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, DopamineTrigger, EmotionTag, TokenUsage } from "../types";
 
 // 从 Prompt Registry 读取（基础模板含 {emotion_section} 占位符，运行时替换）
 const PROMPT_DEF = getPrompt("weekly_report");
@@ -22,6 +22,20 @@ export interface WeeklyInput {
   /** 情绪觉察条目（来自 IndexedDB emotion: 前缀，可选） */
   emotions?: EmotionEntry[];
   weekStart: string; // YYYY-MM-DD 周一
+}
+
+/**
+ * 周报生成结果
+ * - content：四段式 markdown 周报文本
+ * - usage / modelId：成本追踪用（来自 generateText 的 result.usage）
+ *   未调用 LLM（降级路径）时为 undefined
+ */
+export interface WeeklyReportResult {
+  content: string;
+  /** LLM 调用返回的 token 用量，仅在走 AI 路径时存在 */
+  usage?: TokenUsage;
+  /** 实际使用的模型 ID（如 glm-4-flash），用于客户端成本估算 */
+  modelId?: string;
 }
 
 const EMOTION_EMOJI: Record<EmotionTag, string> = {
@@ -41,8 +55,13 @@ const EMOTION_EMOJI: Record<EmotionTag, string> = {
  * ## 模式识别
  * ## 情绪与多巴胺模式（有情绪数据时）
  * ## 下周建议
+ *
+ * 返回值改为对象 { content, usage?, modelId? }：
+ *   - content：四段式 markdown 文本（与原字符串兼容）
+ *   - usage / modelId：用于客户端成本追踪（_meta 字段）
+ *   - 走 AI 路径时附 usage；降级路径（无 AI key / 失败兜底）usage 为 undefined
  */
-export async function generateWeeklyReport(input: WeeklyInput, model?: LanguageModel): Promise<string> {
+export async function generateWeeklyReport(input: WeeklyInput, model?: LanguageModel): Promise<WeeklyReportResult> {
   const totalMinutes = input.learnLogs.reduce((sum, l) => sum + (l.duration ?? 0), 0);
   const learnCount = input.learnLogs.filter((l) => l.type === "learn").length;
   const reviewCount = input.reviewLogs.length;
@@ -142,7 +161,8 @@ export async function generateWeeklyReport(input: WeeklyInput, model?: LanguageM
     if (avgEnergy < 3) recs.push("安排 1 天零学习日恢复");
     if (highDopamineDates.size >= 3) recs.push("高干扰日增多，建议提前规划专注时段（如番茄钟 + 手机远离）");
 
-    return `${statsSection}
+    return {
+      content: `${statsSection}
 
 ## 模式识别
 
@@ -151,7 +171,8 @@ ${emotionSection}
 
 ## 下周建议
 
-${recs.map((s) => `- ${s}`).join("\n")}`;
+${recs.map((s) => `- ${s}`).join("\n")}`,
+    };
   }
 
   try {
@@ -173,7 +194,7 @@ ${recs.map((s) => `- ${s}`).join("\n")}`;
       highDopamineLearnMinutes,
       noDopamineLearnMinutes,
     });
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: aiModel,
       system: PROMPT_DEF.system.replace(
         "{emotion_section}",
@@ -189,9 +210,25 @@ ${recs.map((s) => `- ${s}`).join("\n")}`;
       report = report.replace("## 下周建议", emotionSection.trimStart() + "\n\n## 下周建议");
     }
     if (!report.includes("## 下周建议")) report += "\n\n## 下周建议\n\n- 维持当前节奏";
-    return report;
+
+    // 提取 token 用量（generateText 返回 usage.promptTokens/completionTokens/totalTokens）
+    let tokenUsage: TokenUsage | undefined;
+    if (usage) {
+      const prompt = usage.promptTokens ?? 0;
+      const completion = usage.completionTokens ?? 0;
+      const total = usage.totalTokens ?? prompt + completion;
+      if (prompt > 0 || completion > 0) {
+        tokenUsage = { prompt, completion, total };
+      }
+    }
+
+    return {
+      content: report,
+      usage: tokenUsage,
+      // modelId 由路由层从 session.model 或 getProviderInfo() 注入更准确（这里不直接拿 model.modelId）
+    };
   } catch {
-    // 失败降级
-    return generateWeeklyReport({ ...input, learnLogs: [] }).then((r) => r);
+    // 失败降级（递归调用走降级路径，不附带 usage）
+    return generateWeeklyReport({ ...input, learnLogs: [] });
   }
 }

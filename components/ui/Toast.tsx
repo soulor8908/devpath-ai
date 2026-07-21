@@ -1,5 +1,5 @@
-// components/Toast.tsx
-// 全局 Toast 渲染容器
+// components/ui/Toast.tsx
+// 全局 Toast 渲染容器（统一组件库成员）
 //
 // 设计考量（乔布斯视角）：
 //   - 顶部居中堆叠：移动端友好的可视区，不遮挡底部 Nav
@@ -12,6 +12,12 @@
 //   - 单组件订阅 store，避免每个使用点都订阅
 //   - 自动消失定时器在 hover 时暂停
 //   - confirm 按钮点击后 resolve + dismiss，幂等保护
+//
+// 与其他统一组件的关系：
+//   - 与 lib/toast.ts（store + API）解耦：组件只负责渲染
+//   - 与 lib/hooks/use-toast.ts（订阅 hook）解耦：组件只负责呈现
+//   - 调用方使用 pushToast/toast.success 等 API，无需关心渲染细节
+//   - 全局挂载在 app/layout.tsx 的 ToastContainer 自动渲染所有 toast
 
 "use client";
 

@@ -13,16 +13,28 @@
 //      daily_nudge=1/天，已用完则降级到 rule 模板，不报错）
 //   3. 未登录且服务端没配 AI_API_KEY：降级到 rule 模板（不报错）
 //   关键约束：试用用户进首页不能看到"AI 提醒加载失败"，必须能正常请求
+//
+// 成本追踪（t7）：
+//   - 从 generateText result.usage 提取 token 用量
+//   - 通过响应体 _meta.tokenUsage 字段返回客户端
+//   - 通过响应头 X-AI-Model-Id 返回 modelId
+//   - 客户端 DailyNudge 读取 _meta 后传给 recordAICall 估成本
+//
+// Trace 链路（t8）：
+//   - 服务端从 X-Trace-Id header 读取 traceId（不存在则自生成）
+//   - 通过响应头 X-Trace-Id 回传，客户端可用于日志关联
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
-import { getModelFromSession, getModel, hasAIKey } from "@/lib/ai/provider";
+import { getModelFromSession, getModel, hasAIKey, getProviderInfo } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createKVStore } from "@/lib/storage/kv";
 import { getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
+import { getOrCreateTraceIdFromRequest, TRACE_ID_HEADER } from "@/lib/ai/trace";
+import type { TokenUsage } from "@/lib/types";
 
 export const runtime = "edge";
 
@@ -47,17 +59,37 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
+/** 从 generateText 返回的 usage 提取 TokenUsage（无数据时返回 undefined） */
+function extractTokenUsage(usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined): TokenUsage | undefined {
+  if (!usage) return undefined;
+  const prompt = usage.promptTokens ?? 0;
+  const completion = usage.completionTokens ?? 0;
+  const total = usage.totalTokens ?? prompt + completion;
+  if (prompt === 0 && completion === 0) return undefined;
+  return { prompt, completion, total };
+}
+
+interface DailyNudgeMeta {
+  tokenUsage?: TokenUsage;
+  modelId?: string;
+  traceId: string;
+}
+
 /** 构造规则降级响应（不报错，保证试用用户也能看到内容） */
-function ruleResponse(snapshot: string): NextResponse {
+function ruleResponse(snapshot: string, traceId: string): NextResponse {
   return NextResponse.json({
     nudge: ruleBasedNudge(snapshot),
     source: "rule",
     generatedAt: new Date().toISOString(),
+    _meta: { traceId } satisfies DailyNudgeMeta,
   });
 }
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+
+  // traceId：从客户端 header 读取，不存在则自生成（贯穿本次请求的所有 AI 调用）
+  const traceId = getOrCreateTraceIdFromRequest(req);
 
   // 鉴权：先尝试 requireSession（内部用 req.clone().text() 读 body 签名校验，不消费原 body）
   // 顺序很关键：requireSession 必须在 req.json() 之前，否则 body 被消费后签名校验会失败
@@ -68,7 +100,7 @@ export async function POST(req: NextRequest) {
   // 再读 body（requireSession 用 clone 不消费原 body）
   let body: { contextSnapshot?: string };
   try {
-    body = await req.json();
+    body = await req.json() as { contextSnapshot?: string };
   } catch {
     return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
   }
@@ -82,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   // 无 contextSnapshot 时直接走规则模板（不需要 LLM）
   if (!safeSnapshot) {
-    return ruleResponse(safeSnapshot);
+    return ruleResponse(safeSnapshot, traceId);
   }
 
   // 模型选择
@@ -91,9 +123,11 @@ export async function POST(req: NextRequest) {
   // - session 不存在 + 服务端没配 AI_API_KEY → 降级到 rule 模板（不报错）
   let model;
   let isTrial = false;
+  let modelId: string | undefined;
 
   if (session) {
     model = getModelFromSession(session, "daily-nudge");
+    modelId = session.model;
   } else if (hasAIKey()) {
     // Trial 模式：IP 维度限流（daily_nudge 默认配额 1/天，足够）
     const ip = getClientIp(req);
@@ -101,18 +135,19 @@ export async function POST(req: NextRequest) {
     const limit = await checkTrialRateLimit(ip, "daily_nudge", kv);
     if (!limit.allowed) {
       // 试用额度用完 → 降级到 rule 模板（不报错，保证试用用户能看到内容）
-      return ruleResponse(safeSnapshot);
+      return ruleResponse(safeSnapshot, traceId);
     }
     model = getModel();
+    modelId = getProviderInfo().model;
     isTrial = true;
   } else {
     // 服务端没配 AI_API_KEY 且用户未登录 → 降级到 rule 模板
-    return ruleResponse(safeSnapshot);
+    return ruleResponse(safeSnapshot, traceId);
   }
 
   try {
     try {
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model,
         system: PROMPT_DEF.system,
         prompt: `用户上下文：\n${safeSnapshot}\n\n请生成今日建议：`,
@@ -120,7 +155,7 @@ export async function POST(req: NextRequest) {
 
       const cleaned = text.trim().split("\n").filter((s) => s.trim()).join(" ");
       if (cleaned.length === 0) {
-        return ruleResponse(safeSnapshot);
+        return ruleResponse(safeSnapshot, traceId);
       }
 
       // trial 模式计数（异步，失败静默，不阻塞响应）
@@ -130,14 +165,27 @@ export async function POST(req: NextRequest) {
         void incrementTrialRateLimit(ip, "daily_nudge", kv).catch(() => {});
       }
 
-      return NextResponse.json({
+      const meta: DailyNudgeMeta = {
+        tokenUsage: extractTokenUsage(usage),
+        modelId,
+        traceId,
+      };
+
+      const response = NextResponse.json({
         nudge: cleaned.slice(0, 200),
         source: "ai",
         generatedAt: new Date().toISOString(),
+        _meta: meta,
       });
+      // 通过响应头同步暴露 traceId + modelId（与 /api/chat 一致）
+      response.headers.set(TRACE_ID_HEADER, traceId);
+      if (modelId) {
+        response.headers.set("X-AI-Model-Id", modelId);
+      }
+      return response;
     } catch {
       // LLM 调用失败 → 降级到 rule 模板（不报错）
-      return ruleResponse(safeSnapshot);
+      return ruleResponse(safeSnapshot, traceId);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";

@@ -220,6 +220,26 @@ export async function getRunningSession(): Promise<PomodoroSession | null> {
 }
 
 /**
+ * 查询当前"活跃"的 session：running 或 paused 都算。
+ *
+ * 区别于 getRunningSession（仅 running），用于 widget / UI 展示场景：
+ *   - 用户点暂停后 session.status=paused，但 widget 仍要显示进度环变灰 + "已暂停" 标记
+ *   - 如果用 getRunningSession，paused 状态返回 null，widget 守卫会隐藏整个 widget
+ *     → 看起来像"点暂停把弹窗关了"，实际是状态被丢失
+ *
+ * @returns 最新 startedAt 的 running 或 paused session；都没有则返回 null
+ */
+export async function getActiveSession(): Promise<PomodoroSession | null> {
+  const sessions = await listItems<PomodoroSession>(
+    KEY_PREFIXES.POMODORO_SESSION,
+  );
+  const active = sessions
+    .filter((s) => s.status === "running" || s.status === "paused")
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  return active[0] ?? null;
+}
+
+/**
  * 恢复中断的 session：
  * 检测 status=running 的 session（可能是浏览器崩溃/刷新前未结束的）：
  *   - 若距 startedAt 已超过 durationMinutes（含 30 秒宽限）→ 自动调 completeSession

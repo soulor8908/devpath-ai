@@ -28,6 +28,7 @@ import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { EmotionRecorder } from "@/components/EmotionRecorder";
+import { EmotionQuickPicker } from "@/components/EmotionQuickPicker";
 import { Icon, type IconName } from "@/components/Icon";
 import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
@@ -196,6 +197,12 @@ export default function HomeClient() {
           </Link>
         )}
       </section>
+
+      {/* ============ 1.5 情绪快捷选择 ============ */}
+      {/* 极简 3 emoji 一行（兴奋 / 平静 / 疲惫），点击即记录，无需展开折叠区。
+          情绪觉察是核心差异化功能，从折叠区提到 Hero 区下方，3 秒内可触发自我觉察。
+          深度记录（原因+影响+AI 建议）仍走折叠区 EmotionRecorder 或 /emotion 页。 */}
+      <EmotionQuickPicker onRecorded={reload} />
 
       {/* ============ 2. KPI 三宫格 ============ */}
       <section className="mb-5 grid grid-cols-3 gap-3">

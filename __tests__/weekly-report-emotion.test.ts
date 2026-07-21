@@ -77,14 +77,14 @@ describe("weekly-report: 情绪 + 多巴胺章节", () => {
       weekStart: start,
     });
 
-    expect(report).toContain("## 本周统计");
-    expect(report).toContain("## 模式识别");
-    expect(report).toContain("## 情绪与多巴胺模式");
-    expect(report).toContain("## 下周建议");
-    expect(report).toContain("焦虑");
-    expect(report).toContain("刷手机");
+    expect(report.content).toContain("## 本周统计");
+    expect(report.content).toContain("## 模式识别");
+    expect(report.content).toContain("## 情绪与多巴胺模式");
+    expect(report.content).toContain("## 下周建议");
+    expect(report.content).toContain("焦虑");
+    expect(report.content).toContain("刷手机");
     // 高干扰日学习时长下降提示
-    expect(report).toContain("⚠️");
+    expect(report.content).toContain("⚠️");
   });
 
   it("无情绪数据 → 周报不输出「情绪与多巴胺模式」章节（保持三段式）", async () => {
@@ -94,10 +94,10 @@ describe("weekly-report: 情绪 + 多巴胺章节", () => {
       statuses: [],
       weekStart: "2026-07-06",
     });
-    expect(report).toContain("## 本周统计");
-    expect(report).toContain("## 模式识别");
-    expect(report).not.toContain("## 情绪与多巴胺模式");
-    expect(report).toContain("## 下周建议");
+    expect(report.content).toContain("## 本周统计");
+    expect(report.content).toContain("## 模式识别");
+    expect(report.content).not.toContain("## 情绪与多巴胺模式");
+    expect(report.content).toContain("## 下周建议");
   });
 
   it("DailyStatus 含 dopamineTrigger 即可触发多巴胺章节（不需 EmotionEntry）", async () => {
@@ -107,7 +107,7 @@ describe("weekly-report: 情绪 + 多巴胺章节", () => {
       statuses: [makeStatus("2026-07-06", "游戏")],
       weekStart: "2026-07-06",
     });
-    expect(report).toContain("## 情绪与多巴胺模式");
-    expect(report).toContain("游戏");
+    expect(report.content).toContain("## 情绪与多巴胺模式");
+    expect(report.content).toContain("游戏");
   });
 });

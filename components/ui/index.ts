@@ -41,3 +41,6 @@ export {
 } from "./Skeleton";
 // Kbd：统一键盘按键样式（m8 修复）
 export { Kbd, type KbdProps, type KbdSize } from "./Kbd";
+// Toast：统一 Toast 渲染容器（success/error/warning/info + confirm 浮层）
+// 配套：lib/toast.ts 提供 toast.success/error 等 API；lib/hooks/use-toast.ts 订阅 hook
+export { ToastContainer } from "./Toast";

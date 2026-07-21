@@ -17,6 +17,8 @@
 import { getItem, setItem, delItem } from "@/lib/storage/db";
 import { randomBytes } from "@/lib/ai/crypto";
 import { signCanonicalRequest } from "@/lib/ai/session-middleware";
+import { retryWithBackoff } from "@/lib/ai/retry";
+import { getOrCreateTraceId, TRACE_ID_HEADER } from "@/lib/ai/trace";
 
 const SESSION_KEY = "auth:session";
 
@@ -308,60 +310,103 @@ function resolveBodyForSigning(body: BodyInit | null | undefined): string {
 }
 
 /**
- * AI API 专用 fetch（带超时）
+ * AI API 专用 fetch（带超时 + 重试 + traceId）
  *
  * 与 apiFetch 区别：
  *   - 默认 180s 超时（AI 调用较慢）
  *   - 支持外部 signal 合并（用户点"中止"按钮时取消）
  *   - body 不再注入 modelConfig.apiKey 和 userId（服务端从 session 取）
+ *   - **重试**：默认重试 2 次（指数退避 1s/2s），网络错误/超时自动重试
+ *     AbortError（用户中止）/ SessionExpiredError（session 失效）不重试
+ *   - **traceId**：自动加 X-Trace-Id header，便于服务端日志关联同一次用户操作
+ *
+ * 卡帕西视角：
+ *   - 每次 attempt 重新创建 controller + 重新签名（session 可能切换）
+ *   - 超时按"单次 attempt"计算，不累积（避免 3 次重试变成 540s）
+ *   - 外部 signal 触发时立刻 abort 当前 attempt，并不再重试
  */
 export async function aiFetch(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = 180000,
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const externalSignal = options.signal;
+  const body = resolveBodyForSigning(options.body);
+
+  // 单次 attempt：包含签名 + fetch + 401 处理
+  const attempt = async (): Promise<Response> => {
+    // 每次重试都新建 controller，避免一次超时影响所有重试
+    const controller = new AbortController();
+    const timeoutId =
+      timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    try {
+      const session = await getValidSession();
+      const headers = new Headers(options.headers);
+      headers.set("Content-Type", "application/json");
+      // 注入 trace ID，便于服务端日志关联
+      headers.set(TRACE_ID_HEADER, getOrCreateTraceId());
+      // 规范化：path 带 trailing slash，fetch 直接命中带斜杠 URL 避免 308
+      const { path, url: normalizedUrl } = normalizeUrl(url);
+      const sigHeaders = await signRequest(
+        options.method ?? "POST",
+        path,
+        body,
+        session.sessionSecret,
+      );
+      for (const [k, v] of Object.entries(sigHeaders)) {
+        headers.set(k, v);
+      }
+      // 合并外部 signal：任一触发即中止当前 attempt
+      if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else
+          externalSignal.addEventListener(
+            "abort",
+            () => controller.abort(),
+            { once: true },
+          );
+      }
+      // fetch + 401 自动清本地 session（避免死 session 永久卡死）
+      const res = await fetch(normalizedUrl, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      await handleAuthFailureIfAny(res);
+      return res;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  };
+
   try {
-    const session = await getValidSession();
-    const headers = new Headers(options.headers);
-    headers.set("Content-Type", "application/json");
-    const body = resolveBodyForSigning(options.body);
-    // 规范化：path 带 trailing slash，fetch 直接命中带斜杠 URL 避免 308（与 apiFetch 一致）
-    const { path, url: normalizedUrl } = normalizeUrl(url);
-    const sigHeaders = await signRequest(
-      options.method ?? "POST",
-      path,
-      body,
-      session.sessionSecret,
-    );
-    for (const [k, v] of Object.entries(sigHeaders)) {
-      headers.set(k, v);
-    }
-    // 合并外部 signal：任一触发即中止
-    const externalSignal = options.signal;
-    if (externalSignal) {
-      if (externalSignal.aborted) controller.abort();
-      else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
-    }
-    // 用 then 拦截响应：401 时自动清本地 session（避免死 session 永久卡死）
-    // res.clone() 让 handleAuthFailureIfAny 能读 body 而不消费原流
-    return fetch(normalizedUrl, { ...options, headers, signal: controller.signal }).then(
-      async (res) => {
-        await handleAuthFailureIfAny(res);
-        return res;
+    // 包装重试：默认 maxRetries=2，避免 aiFetch 默认 180s 超时累积
+    // 重试条件由 retryWithBackoff 默认策略判定（AbortError/SessionExpired 不重试）
+    return await retryWithBackoff(attempt, {
+      maxRetries: 2,
+      baseDelay: 1000,
+      maxDelay: 4000,
+      onRetry: ({ attempt: n, delay, error }) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[aiFetch] retry attempt ${n} after ${delay}ms (last error: ${msg})`,
+        );
       },
-    );
+    });
   } catch (err) {
+    // 区分超时 vs 用户中止
     if (err instanceof Error && err.name === "AbortError") {
+      // 外部 signal 触发 = 用户主动中止
+      if (externalSignal?.aborted) {
+        throw new Error("请求已中止");
+      }
       if (timeoutMs > 0) {
         throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}秒），请重试`);
       }
       throw new Error("请求已中止");
     }
     throw err;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 

@@ -50,10 +50,10 @@ describe("weekly-report", () => {
   it("generateWeeklyReport 返回包含模式识别的 markdown", async () => {
     const { learnLogs, reviewLogs, statuses } = makeWeekData();
     const report = await generateWeeklyReport({ learnLogs, reviewLogs, statuses, weekStart: "2026-07-06" });
-    expect(typeof report).toBe("string");
-    expect(report).toContain("模式识别");
-    expect(report).toContain("统计");
-    expect(report).toContain("下周建议");
+    expect(typeof report.content).toBe("string");
+    expect(report.content).toContain("模式识别");
+    expect(report.content).toContain("统计");
+    expect(report.content).toContain("下周建议");
   });
 
   it("空数据 → 返回仍包含三段式标题", async () => {
@@ -63,8 +63,8 @@ describe("weekly-report", () => {
       statuses: [],
       weekStart: "2026-07-06",
     });
-    expect(report).toContain("统计");
-    expect(report).toContain("模式识别");
-    expect(report).toContain("下周建议");
+    expect(report.content).toContain("统计");
+    expect(report.content).toContain("模式识别");
+    expect(report.content).toContain("下周建议");
   });
 });

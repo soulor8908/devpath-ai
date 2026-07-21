@@ -37,7 +37,7 @@ export function AchievementCard({ achievements, onClose }: AchievementCardProps)
   if (achievements.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+    <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3 animate-slide-up">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
           <Icon name="party" className="w-4 h-4" />

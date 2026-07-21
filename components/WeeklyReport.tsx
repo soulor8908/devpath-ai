@@ -3,21 +3,38 @@
 // components/WeeklyReport.tsx
 // 周报展示 + 生成按钮 + 历史列表
 // 扩展：从 IndexedDB 加载 EmotionEntry 一并提交给 API（用于情绪+多巴胺章节）
+// 成本追踪（t7）：从 /api/weekly 响应 _meta 读取 tokenUsage + modelId，写入 recordAICall
 
 import { useState, useEffect } from "react";
 import { listItems, setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
-import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry } from "@/lib/types";
+import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, TokenUsage } from "@/lib/types";
 import { KEY_PREFIXES } from "@/lib/types";
 import { Button } from "@/components/ui";
 import { toast } from "@/lib/toast";
 import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
+import {
+  recordAICall,
+  startTimer,
+  makeInputDigest,
+  makeOutputDigest,
+  generateCallId,
+} from "@/lib/ai/quality-tracker";
 
 interface WeeklyEntry {
   id: string;
   weekStart: string;
   content: string;
   createdAt: string;
+}
+
+/** /api/weekly 响应体类型（含 _meta 成本追踪字段） */
+interface WeeklyApiResponse extends WeeklyEntry {
+  _meta?: {
+    tokenUsage?: TokenUsage;
+    modelId?: string;
+    traceId?: string;
+  };
 }
 
 interface Props {
@@ -50,6 +67,8 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
   async function generate() {
     setLoading(true);
     const { id: aiTaskId, signal: aiSignal } = startAITask("AI 生成本周周报");
+    const newCallId = generateCallId();
+    const stopTimer = startTimer();
     try {
       const weekStart = getMondayStr();
       // 加载本周 EmotionEntry（用于情绪+多巴胺章节）
@@ -60,6 +79,8 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
       const weekEndStr = weekEnd.toISOString().slice(0, 10);
       const emotions = allEmotions.filter((e) => e.date >= weekStart && e.date < weekEndStr);
 
+      const inputDigest = makeInputDigest({ weekStart, learnLogs, reviewLogs, statuses, emotions });
+
       const res = await aiFetch("/api/weekly", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,13 +88,29 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
         body: JSON.stringify({ weekStart, learnLogs, reviewLogs, statuses, emotions }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as WeeklyEntry;
+      const data = (await res.json()) as WeeklyApiResponse;
       // 客户端存储周报到 IndexedDB（edge runtime 无法写入）
-      await setItem(KEY_PREFIXES.WEEKLY + data.id, data);
-      setCurrent(data);
-      setHistory((h) => [data, ...h.filter((x) => x.id !== data.id)]);
+      // 注意：存储时剥离 _meta（成本追踪用，不需要持久化）
+      const { _meta, ...entry } = data;
+      await setItem(KEY_PREFIXES.WEEKLY + entry.id, entry);
+      setCurrent(entry);
+      setHistory((h) => [entry, ...h.filter((x) => x.id !== entry.id)]);
       setAITaskContent(aiTaskId, "周报已生成");
       completeAITask(aiTaskId);
+
+      // 成本追踪（t7）：从 _meta 读取 tokenUsage + modelId
+      void recordAICall({
+        callId: newCallId,
+        scene: "weekly_report",
+        promptId: "weekly_report",
+        inputDigest,
+        outputDigest: makeOutputDigest(entry.content),
+        schemaValid: true,
+        durationMs: stopTimer(),
+        source: "ai",
+        tokenUsage: _meta?.tokenUsage,
+        modelId: _meta?.modelId,
+      }).catch(() => {});
     } catch (err) {
       errorAITask(aiTaskId, err instanceof Error ? err.message : "生成失败");
       toast.error(err instanceof Error ? err.message : "周报生成失败");

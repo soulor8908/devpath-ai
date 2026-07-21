@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
-import { ToastContainer } from "@/components/Toast";
+import { ToastContainer } from "@/components/ui";
 import { FloatingChat } from "@/components/FloatingChat";
 import { AITaskModal } from "@/components/AITaskModal";
 import { PomodoroWidget } from "@/components/PomodoroWidget";

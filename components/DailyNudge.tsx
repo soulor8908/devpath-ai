@@ -17,7 +17,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getItem, setItem } from "@/lib/storage/db";
-import { KEY_PREFIXES } from "@/lib/types";
+import { KEY_PREFIXES, type TokenUsage } from "@/lib/types";
 import { chinaDateNow } from "@/lib/time";
 import { buildChatContext } from "@/lib/ai/chat-context";
 import { aiFetch } from "@/lib/api-client";
@@ -38,6 +38,12 @@ interface NudgePayload {
   nudge: string;
   source: "ai" | "rule";
   generatedAt: string;
+  /** 服务端返回的成本追踪元信息（t7）；走 AI 路径时含 tokenUsage/modelId */
+  _meta?: {
+    tokenUsage?: TokenUsage;
+    modelId?: string;
+    traceId?: string;
+  };
 }
 
 interface CachedNudge extends NudgePayload {
@@ -125,6 +131,7 @@ export function DailyNudge() {
         callIdRef.current = newCallId;
 
         // AI 质量追踪：记录调用（异步，失败静默）
+        // 成本追踪（t7）：从服务端 _meta 字段读取 tokenUsage + modelId
         void recordAICall({
           callId: newCallId,
           scene: "daily_nudge",
@@ -134,6 +141,8 @@ export function DailyNudge() {
           schemaValid: true,
           durationMs,
           source: data.source === "ai" ? "ai" : "rule",
+          tokenUsage: data._meta?.tokenUsage,
+          modelId: data._meta?.modelId,
         }).catch(() => {});
 
         // 4. 写入缓存（带 callId，便于刷新后仍可归因）

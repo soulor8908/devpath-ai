@@ -672,12 +672,13 @@ export function PomodoroFullContent({
   }
 
   // 完成视图：显示休息建议
+  // 微交互（用户需求）：番茄完成的"胜利时刻"加 animate-fade-in 庆祝状态
   if (view === "completed") {
     const nextBreak = getNextBreakType(todayCount);
     const breakMinutes = getRecommendedDuration(nextBreak, "standard");
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-8 text-center space-y-4">
+        <div className="rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-8 text-center space-y-4 animate-fade-in">
           <Icon name="tomato" className="w-16 h-16 text-red-500 mx-auto" />
           <h2 className="text-xl font-bold text-green-700 dark:text-green-400">
             番茄完成！
