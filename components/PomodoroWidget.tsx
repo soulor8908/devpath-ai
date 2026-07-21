@@ -191,12 +191,31 @@ export function PomodoroWidget() {
   const notifiedRef = useRef<string | null>(null);
   // 拖动 vs 点击判定：移动距离 < 5px 视为点击
   const dragMovedRef = useRef(false);
+  // 上一次 refresh 时的 session 快照：用于检测 focus session 从 running → completed 的转变
+  // 检测到完成时自动展开 large modal 显示 completed 视图（需求2：番茄结束后提醒进入休息）
+  const prevSessionRef = useRef<PomodoroSession | null>(null);
 
   const refresh = useCallback(async () => {
     // 用 getActiveSession（running 或 paused 都算活跃）：
     // 修 bug：用户点暂停后 session.status=paused，原 getRunningSession 返回 null
     // → setSession(null) → widget 守卫隐藏整个 widget，看起来像"点暂停关闭了弹窗"
     const active = await getActiveSession();
+    const prev = prevSessionRef.current;
+
+    // 检测 focus session 刚刚完成（prev 是 running focus session，当前已无 active 或换了新 session）
+    // → 自动展开 large modal 显示 completed 视图（休息建议）
+    // 仅在 small 模式下触发（large 模式下 PomodoroFullContent 内部已 setView("completed")）
+    if (
+      prev &&
+      prev.type === "focus" &&
+      prev.status === "running" &&
+      (!active || active.id !== prev.id) &&
+      mode === "small"
+    ) {
+      setMode("large");
+    }
+    prevSessionRef.current = active;
+
     setSession(active);
     if (active) {
       const remaining = computeRemainingMs(active);
@@ -212,7 +231,7 @@ export function PomodoroWidget() {
     } else {
       notifiedRef.current = null;
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     void refresh();
@@ -433,6 +452,8 @@ export function PomodoroWidget() {
   // large 模式：只渲染 Modal，不渲染 small widget（需求4：打开大番茄时钟时隐藏小番茄时钟）
   // 关闭 Modal 后会自然回到 small 模式渲染，无需提前渲染 small widget
   // position 未就绪时不显示（避免首帧闪烁在错误位置）
+  // 需求2：onComplete 不再关闭 modal —— 番茄完成是"胜利时刻"，应保持 modal 打开
+  // 显示 completed 视图（休息建议 + 再来一个番茄）。用户主动关闭或开始休息后才回到 small。
   if (mode === "large") {
     return (
       <Modal
@@ -441,12 +462,7 @@ export function PomodoroWidget() {
         title="番茄专注"
         size="lg"
       >
-        <PomodoroFullContent
-          onComplete={() => {
-            // 完成后关闭 Modal 回到 small widget
-            setMode("small");
-          }}
-        />
+        <PomodoroFullContent />
       </Modal>
     );
   }

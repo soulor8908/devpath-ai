@@ -150,6 +150,9 @@ export function PomodoroFullContent({
   }, []);
 
   // 初始化：检查通知权限 + 检查恢复 session + 从画像读取严格模式 + 今日统计
+  // 需求2：检测"刚刚完成的 focus session"（10 秒内 completed）→ 直接进入 completed 视图
+  // 场景：small 模式下番茄跑完，PomodoroWidget 自动展开 large modal，
+  //       PomodoroFullContent 重新挂载，需要识别"刚刚完成"并显示休息建议
   const init = useCallback(async () => {
     setNotifPermission(hasPermission());
     // 从 UserProfile 读取 strictFocusMode（默认 loose）
@@ -170,6 +173,19 @@ export function PomodoroFullContent({
       // 需求 5：标记当前会话已知该 running session
       // 避免用户关闭 Modal 再打开时误触发"发现未完成的番茄"恢复提示
       markSessionCurrent(running.id);
+    } else if (!recovered) {
+      // 无 running session：检查是否有"刚刚完成的 focus session"（10 秒内）
+      // 若有 → 进入 completed 视图显示休息建议（需求2）
+      const recent = await getRecentSessions(1);
+      const justCompleted = recent.find((s) => {
+        if (s.type !== "focus" || s.status !== "completed" || !s.completedAt) return false;
+        const elapsedMs = Date.now() - new Date(s.completedAt).getTime();
+        return elapsedMs >= 0 && elapsedMs <= 10_000; // 10 秒内完成
+      });
+      if (justCompleted) {
+        setSession(justCompleted);
+        setView("completed");
+      }
     }
     await refreshTodayStats();
   }, [refreshTodayStats]);

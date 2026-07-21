@@ -241,6 +241,11 @@ export function MindMap({
   // dragMovedRef：区分点击 vs 拖动。< 5px 视为点击（不应用 translate，让 click 事件正常触发交互）
   const dragMovedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // svgToClientRatio：SVG viewBox 坐标 → 浏览器像素的比例
+  // 需求3：SVG viewBox={0 0 width height} + width="100%" 导致 SVG 坐标空间被压缩到容器尺寸
+  // 鼠标移动 100px 只在 SVG 中移动 100*ratio 单位 → "拖了很远才动一点点"
+  // 修复：拖动时 dx_svg = dx_client / ratio，让 1 浏览器像素 = 1 SVG 单位 * ratio（完美跟手）
+  const svgToClientRatioRef = useRef(1);
 
   const touchRef = useRef<{
     mode: "pan" | "pinch" | null;
@@ -263,6 +268,24 @@ export function MindMap({
       height: maxY + PADDING * 2,
     };
   }, [treeRoots, expanded]);
+
+  // 监听容器尺寸 + viewBox 变化，更新 svgToClientRatio
+  // 必须放在 width 定义之后（依赖 width 作为 viewBox 宽度）
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const update = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && width > 0) {
+        // ratio = 浏览器像素 / SVG 单位 = rect.width / viewBox.width
+        svgToClientRatioRef.current = rect.width / width;
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [width]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -296,9 +319,12 @@ export function MindMap({
       dragMovedRef.current = true;
     }
     if (dragMovedRef.current) {
+      // 需求3：除以 svgToClientRatio 把浏览器像素差换算回 SVG 坐标单位
+      // 之前不除导致 SVG 坐标空间被压缩时拖动不跟手（拖很远才动一点）
+      const ratio = svgToClientRatioRef.current || 1;
       setTranslate({
-        x: dragRef.current.originX + dx,
-        y: dragRef.current.originY + dy,
+        x: dragRef.current.originX + dx / ratio,
+        y: dragRef.current.originY + dy / ratio,
       });
     }
   }, []);
@@ -352,9 +378,11 @@ export function MindMap({
       if (dragMovedRef.current) {
         // 仅在实际拖动时 preventDefault 阻止页面滚动（touchAction:none 已大部分处理）
         e.preventDefault();
+        // 需求3：除以 svgToClientRatio 把浏览器像素差换算回 SVG 坐标单位（跟手）
+        const ratio = svgToClientRatioRef.current || 1;
         setTranslate({
-          x: t.originX + dx,
-          y: t.originY + dy,
+          x: t.originX + dx / ratio,
+          y: t.originY + dy / ratio,
         });
       }
     } else if (t.mode === "pinch" && e.touches.length === 2 && t.initialDist && t.initialScale) {
@@ -364,11 +392,13 @@ export function MindMap({
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const ratio = dist / t.initialDist;
       setScale(Math.max(0.3, Math.min(2.5, t.initialScale * ratio)));
+      // pinch 的 translate 也需要除以 svgToClientRatio（与 pan 一致）
+      const svgRatio = svgToClientRatioRef.current || 1;
       const midX = (t1.clientX + t2.clientX) / 2;
       const midY = (t1.clientY + t2.clientY) / 2;
       setTranslate({
-        x: t.originX + (midX - t.startX),
-        y: t.originY + (midY - t.startY),
+        x: t.originX + (midX - t.startX) / svgRatio,
+        y: t.originY + (midY - t.startY) / svgRatio,
       });
     }
   }, []);
@@ -429,7 +459,7 @@ export function MindMap({
   return (
     <div
       className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden ${fillHeight ? "h-full" : ""}`}
-      style={{ minHeight: fillHeight ? "100%" : "400px" }}
+      style={{ minHeight: fillHeight ? "100%" : "600px" }}
     >
       {/* 工具栏 */}
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white dark:bg-gray-700 rounded-lg shadow-md p-1 border dark:border-gray-600">
@@ -522,7 +552,7 @@ export function MindMap({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
-        style={{ minHeight: fillHeight ? "100%" : "400px", touchAction: "none" }}
+        style={{ minHeight: fillHeight ? "100%" : "600px", touchAction: "none" }}
       >
         <svg
           width="100%"

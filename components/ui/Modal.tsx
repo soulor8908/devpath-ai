@@ -32,7 +32,8 @@ const SIZE_CLASSES: Record<ModalSize, string> = {
   md: "max-w-md",
   lg: "max-w-lg",
   // xl：超宽弹窗（脑图、知识树等需要大画布的场景），桌面端接近视口宽度
-  xl: "max-w-3xl",
+  // 需求3：从 max-w-3xl (768px) 加大到 max-w-5xl (1024px)，让宽脑图有更大画布
+  xl: "max-w-5xl",
 };
 
 const FOCUSABLE_SELECTOR =

@@ -73,8 +73,7 @@ app/                    Next.js App Router 路由
   ├── docs/             应用内使用文档
   └── api/              Edge API 路由（聊天 / 学习 / 复习 / 节奏 / 限流 / 同步 / 周报 等）
 components/              React 组件
-  ├── PomodoroWidget.tsx    番茄时钟浮动组件
-  ├── PomodoroFull.tsx      全屏专注模式
+  ├── PomodoroWidget.tsx    番茄时钟浮动组件（small ↔ large Modal 两态）
   ├── CurrentTaskCard.tsx   节奏引擎驱动的"现在该做什么"
   ├── HealthAlertCard.tsx   健康告警 + 一键采纳
   ├── AchievementCard.tsx   新成就通知

@@ -91,7 +91,6 @@ const LEGACY_FILES = new Set<string>([
   "components/LearnWizard.tsx",
   "components/MindMap.tsx",
   "components/ModelIconSelector.tsx",
-  "components/PomodoroFull.tsx",
   "components/PomodoroWidget.tsx",
   "components/QuickShortcuts.tsx",
   "components/RadarChart.tsx",
