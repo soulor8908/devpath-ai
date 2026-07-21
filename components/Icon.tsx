@@ -74,7 +74,8 @@ export type IconName =
   | "snowflake"
   | "loader"
   | "tomato"
-  | "coffee";
+  | "coffee"
+  | "grip";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: (
@@ -469,6 +470,17 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <line x1="6" y1="2" x2="6" y2="4" />
       <line x1="10" y1="2" x2="10" y2="4" />
       <line x1="14" y1="2" x2="14" y2="4" />
+    </>
+  ),
+  // grip：拖动把手（6 个点，2 列 3 行），用于可拖拽 widget 的 drag handle
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
     </>
   ),
 };

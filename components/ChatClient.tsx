@@ -694,7 +694,18 @@ export default function ChatClient({
             return "";
           }
         }
-        if (type === "6") {
+        // Vercel AI SDK v3.x Data Stream Protocol：
+        //   "a:" 前缀 = tool_result，payload 形状 {toolCallId, result}
+        //   result.clientAction 是写入工具返回的动作描述符（create_reminder /
+        //   start_focus_session / adjust_plan / toggle_plan_freeze /
+        //   set_plan_priority / reorder_schedule / generate_plan）
+        //
+        // 注意："6:" 是 data_message（{role:"data", data:...}），
+        //       "9:" 是 tool_call（{toolCallId, toolName, args}），
+        //       都不是工具结果，不能从这里提取 clientAction。
+        //       此前用 "6:" 是错的，导致 pendingActions 永远为空、
+        //       工具调用永远不闭环。
+        if (type === "a") {
           try {
             const parsed = JSON.parse(payload) as {
               result?: { clientAction?: ClientAction };
@@ -703,7 +714,7 @@ export default function ChatClient({
               pendingActions.push(parsed.result.clientAction);
             }
           } catch {
-            /* ignore */
+            /* ignore — 畸形行不崩溃 */
           }
         }
         // data stream protocol v3+: "d:" 是 finish 消息，包含 usage 信息

@@ -2,10 +2,13 @@
 // AI 工具执行链端到端测试
 //
 // 验证 Vercel AI SDK Data Stream Protocol 的流解析逻辑：
-//   - "6:" 前缀行携带 {toolCallId, toolName, result}，result.clientAction 是动作描述符
+//   - "a:" 前缀行携带 {toolCallId, result}，result.clientAction 是动作描述符
+//     （AI SDK v3.x：tool_result stream part code = "a"）
 //   - "0:" 前缀行是文本 delta（JSON 编码的字符串）
 //   - "d:" 前缀行是 finish 消息（含 usage）
-//   - 畸形的 "6:" 行不应导致崩溃
+//   - "9:" 前缀行是 tool_call（仅含 args，不含 result）— 不应被误识为 tool_result
+//   - "6:" 前缀行是 data_message（{role:"data", data:...}）— 不应被误识为 tool_result
+//   - 畸形的 "a:" 行不应导致崩溃
 //
 // parseDataLine 是 ChatClient.tsx 中 streamAIResponse 内部的闭包（未导出），
 // 因此此处复制其核心解析逻辑进行等价性验证，确保数据格式可被正确解析。
@@ -15,6 +18,11 @@
 //   - 4 个只读工具（get_daily_schedule / get_next_task / get_upcoming_plan / review_today）
 //     返回的数据中必须暴露 planId，让 AI 能据此调用写入工具（adjust_plan /
 //     toggle_plan_freeze / set_plan_priority），闭环关键
+//
+// 历史教训：
+//   此前 parseDataLine 错误地用 "6:" 作为 tool_result 前缀（实际是 data_message），
+//   导致 pendingActions 永远为空、所有写入工具（含 start_focus_session）永远不闭环。
+//   现已修正为 "a:"，本测试套件锁死该正确行为，防止再次回退。
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "fake-indexeddb/auto";
@@ -39,13 +47,13 @@ import { createChatTools } from "../lib/ai/chat-tools";
 interface ParseResult {
   /** 文本 chunk（"0:" 行提取的内容） */
   text: string;
-  /** 从 "6:" 行提取的 clientAction 列表 */
+  /** 从 "a:" 行提取的 clientAction 列表 */
   actions: ClientAction[];
 }
 
 /**
  * 等价于 ChatClient.tsx 中 parseDataLine 的解析逻辑。
- * 输入是去掉 "data:" 前缀后的单行（如 `6:{...}` 或 `0:"hello"`）。
+ * 输入是去掉 "data:" 前缀后的单行（如 `a:{...}` 或 `0:"hello"`）。
  */
 function parseDataLine(line: string, actions: ClientAction[]): string {
   const idx = line.indexOf(":");
@@ -63,9 +71,10 @@ function parseDataLine(line: string, actions: ClientAction[]): string {
     }
   }
 
-  // "6:" 工具结果 — Vercel AI SDK Data Stream Protocol
-  // 携带 {toolCallId, toolName, result}，result.clientAction 是动作描述符
-  if (type === "6") {
+  // "a:" 工具结果 — Vercel AI SDK v3.x Data Stream Protocol
+  // 携带 {toolCallId, result}，result.clientAction 是动作描述符
+  // 注意：6: 是 data_message，9: 是 tool_call（仅 args），都不是 tool_result
+  if (type === "a") {
     try {
       const parsed = JSON.parse(payload) as {
         result?: { clientAction?: ClientAction };
@@ -100,7 +109,7 @@ function processStream(lines: string[]): ParseResult {
 // ============ 流解析测试 ============
 
 describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
-  it("应从 '6:' 行提取 clientAction 到 pendingActions", () => {
+  it("应从 'a:' 行提取 clientAction 到 pendingActions（tool_result 前缀）", () => {
     const clientAction: ClientAction = {
       type: "start_focus_session",
       params: {
@@ -109,10 +118,9 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
       },
       idempotencyKey: "idem:abc123",
     };
-    // 模拟 Vercel AI SDK 的 ToolResult 行格式
-    const line = `6:${JSON.stringify({
+    // 模拟 Vercel AI SDK v3.x 的 tool_result 行格式：a:{toolCallId, result}
+    const line = `a:${JSON.stringify({
       toolCallId: "call_xyz",
-      toolName: "start_focus_session",
       result: {
         success: true,
         message: "已启动番茄钟",
@@ -127,7 +135,7 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
     expect(actions[0].idempotencyKey).toBe("idem:abc123");
   });
 
-  it("应从多个 '6:' 行提取多个 clientAction", () => {
+  it("应从多个 'a:' 行提取多个 clientAction", () => {
     const action1: ClientAction = {
       type: "create_reminder",
       params: { title: "该学习了", scheduledFor: "2025-01-01T10:00:00Z" },
@@ -140,8 +148,8 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
     };
 
     const lines = [
-      `6:${JSON.stringify({ toolCallId: "c1", toolName: "set_reminder", result: { clientAction: action1 } })}`,
-      `6:${JSON.stringify({ toolCallId: "c2", toolName: "set_plan_priority", result: { clientAction: action2 } })}`,
+      `a:${JSON.stringify({ toolCallId: "c1", result: { clientAction: action1 } })}`,
+      `a:${JSON.stringify({ toolCallId: "c2", result: { clientAction: action2 } })}`,
     ];
 
     const { actions } = processStream(lines);
@@ -159,7 +167,7 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
     expect(text).toBe("Hello World");
   });
 
-  it("应同时处理 '0:' 文本和 '6:' 工具结果", () => {
+  it("应同时处理 '0:' 文本和 'a:' 工具结果", () => {
     const action: ClientAction = {
       type: "toggle_plan_freeze",
       params: { planId: "p1", freeze: true },
@@ -167,7 +175,7 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
     };
     const lines = [
       `0:${JSON.stringify("正在冻结计划...")}`,
-      `6:${JSON.stringify({ toolCallId: "c1", toolName: "toggle_plan_freeze", result: { clientAction: action } })}`,
+      `a:${JSON.stringify({ toolCallId: "c1", result: { clientAction: action } })}`,
       `0:${JSON.stringify("已完成")}`,
     ];
     const { text, actions } = processStream(lines);
@@ -190,39 +198,63 @@ describe("AI 工具流解析 — Vercel AI SDK Data Stream Protocol", () => {
     expect(actions).toHaveLength(0);
   });
 
-  it("畸形的 '6:' 行不应导致崩溃", () => {
+  it("畸形的 'a:' 行不应导致崩溃", () => {
     const malformedLines = [
-      "6:{invalid json",
-      "6:",
-      "6:not json at all",
-      "6:null",
-      "6:{}",
-      `6:${JSON.stringify({ result: {} })}`,
-      `6:${JSON.stringify({ noResult: true })}`,
+      "a:{invalid json",
+      "a:",
+      "a:not json at all",
+      "a:null",
+      "a:{}",
+      `a:${JSON.stringify({ result: {} })}`,
+      `a:${JSON.stringify({ noResult: true })}`,
     ];
     const { actions } = processStream(malformedLines);
     // 所有畸形行都应被静默跳过，actions 为空
     expect(actions).toHaveLength(0);
   });
 
-  it("'6:' 行 result 中无 clientAction 时不提取", () => {
-    const line = `6:${JSON.stringify({
+  it("'a:' 行 result 中无 clientAction 时不提取（如 get_daily_schedule 等只读工具）", () => {
+    const line = `a:${JSON.stringify({
       toolCallId: "c1",
-      toolName: "get_daily_schedule",
       result: { success: true, message: "今日时间表", data: { date: "2025-01-01" } },
     })}`;
     const { actions } = processStream([line]);
     expect(actions).toHaveLength(0);
   });
 
-  it("不应从旧版 'a:' 前缀行提取 clientAction（回归测试）", () => {
-    // 修复前用 "a" 前缀，修复后用 "6"。"a:" 行不应再被识别为工具结果
+  it("不应从 '9:' tool_call 前缀行提取 clientAction（仅含 args，无 result）", () => {
+    // AI SDK v3.x：9:tool_call 是「工具调用开始」，payload 是
+    // {toolCallId, toolName, args}，不含 result，不能误识为 tool_result
     const action: ClientAction = {
       type: "create_reminder",
       params: { title: "test", scheduledFor: "2025-01-01T10:00:00Z" },
-      idempotencyKey: "idem:a",
+      idempotencyKey: "idem:9",
     };
-    const line = `a:${JSON.stringify({ result: { clientAction: action } })}`;
+    const line = `9:${JSON.stringify({
+      toolCallId: "c1",
+      toolName: "set_reminder",
+      args: { title: "test" },
+      result: { clientAction: action }, // 即使错误塞了 result，9: 也不应提取
+    })}`;
+    const { actions } = processStream([line]);
+    expect(actions).toHaveLength(0);
+  });
+
+  it("不应从 '6:' data_message 前缀行提取 clientAction（回归测试）", () => {
+    // AI SDK v3.x：6:data_message 是 StreamData 主动 append 的数据，
+    // 形状 {role:"data", data:...}，与 tool_result 完全不同。
+    // 此前 parseDataLine 错误地用 "6:" 当 tool_result 前缀，导致工具永远不闭环。
+    // 该测试锁死正确行为：6: 行绝不应被识别为 tool_result。
+    const action: ClientAction = {
+      type: "create_reminder",
+      params: { title: "test", scheduledFor: "2025-01-01T10:00:00Z" },
+      idempotencyKey: "idem:6",
+    };
+    // 即使错误地把 clientAction 塞进 6: 行的 data 中，也不应提取
+    const line = `6:${JSON.stringify({
+      role: "data",
+      data: [{ clientAction: action }],
+    })}`;
     const { actions } = processStream([line]);
     expect(actions).toHaveLength(0);
   });
