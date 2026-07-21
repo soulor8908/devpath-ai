@@ -9,6 +9,7 @@
 //   - 节点右侧有"进入学习"小按钮，点击触发 onSelectNode（与展开区分）
 //   - 节点内显示：title（多行）/ 难度星级 / 频率 / 大厂标记 / 掌握度进度条
 //   - 工具栏：放大 + 缩小 + 重置 + 全部展开 + 全部收起 + 适配视图
+//   - 已掌握节点变绿（node.mastered === true）：bg 绿色 + 边框绿 + 进度条满绿 + ✓ 标识
 //
 // 设计（卡帕西视角）：
 //   - DAG → Tree 转换保留（每节点挂到最深 prereq 下）
@@ -16,6 +17,7 @@
 //   - foreignObject 用于 HTML 节点（比纯 SVG text 更易实现多行 + 样式）
 //   - 拖拽 + 缩放交互保留（桌面滚轮 + 移动端 pinch）
 //   - 节点点击分两个区域：标题区 = 切换展开，"进入"按钮 = onSelectNode
+//   - mastered 优先级高于 bigTech/difficulty：先看用户主观反馈，再看难度配色
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { KnowledgeNode } from "@/lib/types";
@@ -209,6 +211,11 @@ function layout(
 const DIFF_BG = ["#dbeafe", "#bfdbfe", "#fde68a", "#fdba74", "#fca5a5"];
 const DIFF_BORDER = ["#3b82f6", "#60a5fa", "#f59e0b", "#f97316", "#ef4444"];
 const DIFF_LABEL = ["入门", "基础", "进阶", "高级", "专家"];
+
+// 已掌握节点的绿色配色（node.mastered === true 时使用，优先级高于 difficulty/bigTech）
+const MASTERED_BG = "#dcfce7"; // green-100
+const MASTERED_BORDER = "#22c55e"; // green-500
+const MASTERED_BAR = "#16a34a"; // green-600
 
 export function MindMap({
   nodes,
@@ -520,21 +527,32 @@ export function MindMap({
               const isHover = hoverId === p.id;
               const diff = p.node.difficulty;
               const isBigTech = p.node.bigTech === true;
+              const isMastered = p.node.mastered === true;
               const isExpanded = expanded.has(p.id);
+              // mastered 优先级最高（用户主观已掌握 → 绿色，覆盖难度/大厂配色）
               const bg = isSelected
                 ? "#0f172a"
-                : isBigTech
-                  ? "#fef3c7"
-                  : DIFF_BG[diff - 1] || "#e2e8f0";
+                : isMastered
+                  ? MASTERED_BG
+                  : isBigTech
+                    ? "#fef3c7"
+                    : DIFF_BG[diff - 1] || "#e2e8f0";
               const border = isSelected
                 ? "#3b82f6"
-                : isBigTech
-                  ? "#f59e0b"
-                  : isHover
-                    ? DIFF_BORDER[diff - 1] || "#475569"
-                    : "#cbd5e1";
+                : isMastered
+                  ? MASTERED_BORDER
+                  : isBigTech
+                    ? "#f59e0b"
+                    : isHover
+                      ? DIFF_BORDER[diff - 1] || "#475569"
+                      : "#cbd5e1";
               const fg = isSelected ? "#fff" : "#1e293b";
-              const subFg = isSelected ? "#cbd5e1" : "#64748b";
+              const subFg = isSelected ? "#cbd5e1" : isMastered ? "#15803d" : "#64748b";
+              const barColor = isSelected
+                ? "#60a5fa"
+                : isMastered
+                  ? MASTERED_BAR
+                  : "#3b82f6";
 
               // foreignObject 用于渲染 HTML 节点（多行文本 + 按钮）
               return (
@@ -551,7 +569,7 @@ export function MindMap({
                     rx={12}
                     fill={bg}
                     stroke={border}
-                    strokeWidth={isSelected ? 2.5 : isBigTech ? 2 : isHover ? 2 : 1}
+                    strokeWidth={isSelected ? 2.5 : isMastered ? 2.5 : isBigTech ? 2 : isHover ? 2 : 1}
                   />
                   <foreignObject x={0} y={0} width={NODE_W} height={NODE_H} style={{ pointerEvents: "none" }}>
                     <div
@@ -645,8 +663,14 @@ export function MindMap({
                           flexWrap: "wrap",
                         }}
                       >
-                        <span>{DIFF_LABEL[diff - 1] || `D${diff}`}</span>
-                        <span>{"★".repeat(diff)}</span>
+                        {isMastered ? (
+                          <span style={{ color: isSelected ? "#86efac" : "#15803d", fontWeight: 600 }}>
+                            ✓ 已掌握
+                          </span>
+                        ) : (
+                          <span>{DIFF_LABEL[diff - 1] || `D${diff}`}</span>
+                        )}
+                        {!isMastered && <span>{"★".repeat(diff)}</span>}
                         <span>·</span>
                         <span>{p.node.frequency}频</span>
                         {isBigTech && (
@@ -682,19 +706,19 @@ export function MindMap({
                         >
                           <div
                             style={{
-                              width: `${p.node.mastery}%`,
+                              width: `${isMastered ? 100 : p.node.mastery}%`,
                               height: "100%",
-                              background: isSelected ? "#60a5fa" : "#3b82f6",
+                              background: barColor,
                               borderRadius: "2px",
                             }}
                           />
                         </div>
                         <span style={{ fontSize: "10px", color: subFg, minWidth: "28px" }}>
-                          {p.node.mastery}%
+                          {isMastered ? "100%" : `${p.node.mastery}%`}
                         </span>
                         {onSelectNode && showEnterButton && (
                           <Button
-                            variant="primary"
+                            variant={isMastered ? "success" : "primary"}
                             size="sm"
                             style={{ pointerEvents: "auto" }}
                             onClick={(e) => {

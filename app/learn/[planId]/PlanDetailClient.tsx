@@ -6,8 +6,9 @@ import Link from "next/link";
 import { getItem, setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES } from "@/lib/types";
-import type { LearningPlan, Question, ScheduleItem } from "@/lib/types";
+import type { LearningPlan, Question, ScheduleItem, KnowledgeNode } from "@/lib/types";
 import { KnowledgeTree } from "@/components/KnowledgeTree";
+import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Select } from "@/components/ui";
@@ -72,6 +73,13 @@ export default function PlanDetailClient() {
   const [filterNodeId, setFilterNodeId] = useState<string | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // 需求 5：脑图入口弹窗 + 悬浮脑图按钮
+  // showMindMapModal: 显示全屏脑图弹窗（首次进入自动弹出，可被悬浮按钮重新打开）
+  // showMindMapFloat: 显示悬浮脑图小图标（弹窗关闭后变为可见，点击重新打开弹窗）
+  // 脑图组件已封装为可复用的 MindMap，本页通过 onSelectNode 回调将节点点击映射到 filterNodeId
+  const [showMindMapModal, setShowMindMapModal] = useState(false);
+  const [showMindMapFloat, setShowMindMapFloat] = useState(false);
+
   const fullscreen = useAutoFullscreen();
 
   useEffect(() => {
@@ -108,11 +116,64 @@ export default function PlanDetailClient() {
             block: "start",
           });
         }, 100);
+      } else {
+        // 需求 5：首次进入学习页（无 ?node= 参数）→ 自动弹出脑图入口弹窗
+        // 让用户鸟瞰整个知识树，主动选择今天从哪个知识点开始
+        setShowMindMapModal(true);
       }
     })();
   // router/searchParams 引用稳定（App Router），不作为 effect 依赖避免重渲染
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
+
+  // 需求 5：脑图节点点击 → 过滤该节点题目 + 关闭弹窗 + 显示悬浮图标 + 滚动到题目区
+  function handleMindMapNodeSelect(node: KnowledgeNode) {
+    setFilterNodeId(node.id);
+    setShowMindMapModal(false);
+    setShowMindMapFloat(true);
+    setTimeout(() => {
+      const q = plan?.questions.find((x) => x.nodeId === node.id);
+      if (q && questionRefs.current[q.id]) {
+        questionRefs.current[q.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        questionsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  }
+
+  // 需求 5：脑图弹窗底部「直接进入」按钮 → 不过滤 + 关闭弹窗 + 显示悬浮图标
+  function handleMindMapDirectEnter() {
+    setFilterNodeId("all");
+    setShowMindMapModal(false);
+    setShowMindMapFloat(true);
+  }
+
+  // 需求 5：脑图弹窗「关闭按钮 / 遮罩点击 / ESC」→ 关闭弹窗 + 显示悬浮图标（保留当前 filter 不变）
+  // 与「直接进入」的区别：直接进入显式重置 filter，dismiss 保留 filter（用户可能已从 URL ?node= 带 filter 进来）
+  function handleMindMapDismiss() {
+    setShowMindMapModal(false);
+    setShowMindMapFloat(true);
+  }
+
+  // 需求 5：脑图弹窗 ESC 关闭 + body scroll lock（与统一 Modal 组件行为一致）
+  useEffect(() => {
+    if (!showMindMapModal) return;
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleMindMapDismiss();
+      }
+    }
+    document.addEventListener("keydown", handleEsc);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = prevOverflow;
+    };
+    // handleMindMapDismiss 是闭包内稳定函数，不作为依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMindMapModal]);
 
   async function handleQuestionFavorite(questionId: string) {
     if (!plan) return;
@@ -936,6 +997,89 @@ export default function PlanDetailClient() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ============ 需求 5：脑图入口弹窗 ============ */}
+      {/* 首次进入学习页自动弹出，让用户鸟瞰知识树并选择今日起点。
+          点击节点 → 筛选该节点题目；点击「直接进入」→ 查看全部题目。
+          关闭后变为右下角悬浮小图标，点击重新展开。 */}
+      {showMindMapModal && plan && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+          role="presentation"
+        >
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={handleMindMapDismiss}
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mindmap-title"
+            className="relative w-full max-w-4xl bg-white dark:bg-gray-800 shadow-modal rounded-t-card sm:rounded-card max-h-[90vh] flex flex-col animate-slide-up"
+          >
+            <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="mindmap-title"
+                  className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                >
+                  <Icon name="target" className="w-5 h-5 text-blue-500" />
+                  知识点脑图
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  点击节点筛选该知识点题目，绿色节点为已掌握
+                </p>
+              </div>
+              <Button
+                iconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="关闭"
+                onClick={handleMindMapDismiss}
+                className="-mr-1 -mt-1 shrink-0"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0 px-3 pb-3" style={{ height: "60vh" }}>
+              <MindMap
+                nodes={plan.knowledgeTree}
+                onSelectNode={handleMindMapNodeSelect}
+                selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
+                fillHeight
+                showEnterButton
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 dark:border-gray-700">
+              <Button
+                variant="primary"
+                onClick={handleMindMapDirectEnter}
+                leftIcon="target"
+              >
+                直接进入（全部题目）
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ 需求 5：脑图悬浮小图标 ============ */}
+      {/* 弹窗关闭后显示，点击重新展开脑图。
+          定位：right-4 bottom-36（避开底部 nav ~42px + FloatingChat bottom-20）
+          层级：z-40（低于 Nav/FloatingChat z-50、Modal z-[60]、PomodoroWidget z-[80]） */}
+      {showMindMapFloat && !showMindMapModal && (
+        <Button
+          iconOnly
+          variant="dark"
+          aria-label="打开知识点脑图"
+          title="打开知识点脑图"
+          onClick={() => setShowMindMapModal(true)}
+          className="fixed right-4 bottom-36 z-40 w-12 h-12 rounded-full shadow-floating"
+        >
+          <Icon name="target" className="w-5 h-5" />
+        </Button>
       )}
     </div>
   );
