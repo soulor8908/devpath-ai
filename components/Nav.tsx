@@ -4,16 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 
-// 底部导航：8→5 Tab 减法（乔布斯焦点原则）
-// 移除的 3 个 Tab 折叠到「今日」：
-//   - 错题 → 今日「错题回顾」卡片（首页内联）
-//   - 情绪 → 今日「情绪快捷记录」（首页内联）
-//   - 仪表盘 → 今日底部「统计 + 热力图」（首页内联）
-// 原 /mistakes /emotion /dashboard 路由保留（直接访问 URL 仍可用）
+// 底部导航：8→4→2 Tab 减法（乔布斯焦点原则）
+// 第 3 阶段：学习/复习合并到「今日」首页（studyQueue 智能排序），不再单独占 Tab。
+//   - 学习/复习入口改为首页"今日学习队列"项内联点击 → 跳 /learn /review 子页面
+//   - 「今日」Tab 承担：当前任务 / 学习队列 / 情绪 / 错题 / 热力图
+//   - 「我的」Tab 承担：个人设置 / 模型配置 / 同步
+// 原 /learn /review /mistakes /emotion /dashboard 路由保留（直接访问 URL 仍可用）
 const items: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/", label: "今日", icon: "home" },
-  { href: "/learn", label: "学习", icon: "book" },
-  { href: "/review", label: "复习", icon: "repeat" },
   { href: "/profile", label: "我的", icon: "user" },
 ];
 

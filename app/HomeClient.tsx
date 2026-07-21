@@ -7,9 +7,10 @@
 //   原首页 12 个区块单列，CurrentTaskCard 被推到第 5 位，3 秒看不到答案。
 //   重构为 5 区结构：
 //     1. Hero 行动区：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
-//     2. KPI 三宫格：今日待学 / 今日待复习 / 连续打卡
+//     2. KPI 三宫格：今日学习清单 N 项 / 已完成 X 项 / 连续打卡 N 天
+//        （第 2 阶段：学习+复习合并——第 1 格从「今日待学/今日待复习」合并为单一队列）
 //     3. AI 教练洞察区：HomeInsightsCard（成就 + 健康提醒）+ 能力画像 + AI 质量摘要
-//     4. 今日学习安排：精简 schedule 列表 + 能量趋势迷你图
+//     4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）
 //     5. 折叠区：情绪记录 / 错题 / 7 天热力图
 //
 // 砍掉：
@@ -22,6 +23,7 @@
 //   - 用户画像摘要（beginner/intermediate/advanced 节点数 + 偏好时段）
 //   - 能量趋势迷你图
 //   - AI 质量摘要（今日调用数 + 采纳率）
+//   - 第 2 阶段：studyQueue 智能排序学习队列（合并 learn + review 单一待办流）
 
 import { useState } from "react";
 import Link from "next/link";
@@ -39,11 +41,8 @@ import { useEffect } from "react";
 
 export default function HomeClient() {
   const {
-    dueCount,
-    todayLearnCount,
     streak,
     lastStreak,
-    todaySchedule,
     heatmapData,
     todayEnergy,
     hasPlans,
@@ -55,6 +54,8 @@ export default function HomeClient() {
     userProfileSummary,
     energyTrend,
     aiQualitySummary,
+    studyQueue,
+    todayCompletedCount,
     reload,
   } = useHomeData();
 
@@ -204,28 +205,25 @@ export default function HomeClient() {
           深度记录（原因+影响+AI 建议）仍走折叠区 EmotionRecorder 或 /emotion 页。 */}
       <EmotionQuickPicker onRecorded={reload} />
 
-      {/* ============ 2. KPI 三宫格 ============ */}
+      {/* ============ 2. KPI 三宫格（第 2 阶段：学习+复习合并为单一队列）============ */}
       <section className="mb-5 grid grid-cols-3 gap-3">
-        <Link
-          href="/learn"
-          aria-label={`今日待学 ${todayLearnCount} 个知识点，进入学习`}
-          className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center hover:shadow-md transition-shadow"
+        <div
+          aria-label={`今日学习清单 ${studyQueue.length} 项`}
+          className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center"
         >
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{todayLearnCount}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">今日待学</p>
-        </Link>
-        <Link
-          href="/review"
-          aria-label={`今日待复习 ${dueCount} 张卡片，进入复习`}
-          className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center hover:shadow-md transition-shadow"
+          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{studyQueue.length}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">今日学习清单</p>
+        </div>
+        <div
+          aria-label={`今日已完成 ${todayCompletedCount} 项`}
+          className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center"
         >
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{dueCount}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">今日待复习</p>
-        </Link>
-        <Link
-          href="/learn"
+          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{todayCompletedCount}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">已完成</p>
+        </div>
+        <div
           aria-label={`连续打卡 ${streak} 天`}
-          className={`border rounded-2xl p-4 text-center hover:shadow-md transition-shadow ${streakMeta.color}`}
+          className={`border rounded-2xl p-4 text-center ${streakMeta.color}`}
         >
           <p className="text-3xl font-bold flex items-center justify-center gap-1">
             {streakMeta.emoji ? (
@@ -234,7 +232,7 @@ export default function HomeClient() {
             {streak}
           </p>
           <p className="text-xs mt-1">{streak === 0 ? "去打卡" : streakMeta.sub}</p>
-        </Link>
+        </div>
       </section>
 
       {/* ============ 3. AI 教练洞察区（HomeInsights + 能力画像 + AI 质量，合并洞察类信息）============ */}
@@ -305,48 +303,63 @@ export default function HomeClient() {
         )}
       </section>
 
-      {/* ============ 4. 今日学习安排 + 能量趋势（精简：移除继续学习入口，能力画像已移入 section 3）============ */}
+      {/* ============ 4. 今日学习队列（第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序）============ */}
       <section className="mb-5">
         <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
           <Icon name="calendar-check" className="w-4 h-4" />
-          今日安排
+          今日学习队列
         </h2>
 
-        {todaySchedule.length > 0 ? (
+        {studyQueue.length > 0 ? (
           <div className="space-y-1.5">
-            {todaySchedule.slice(0, 3).map((item, i) => (
-              <Link
-                key={i}
-                href={`/learn/${item.planId}`}
-                className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-2.5 hover:shadow-md transition-shadow"
-              >
-                <span
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    item.type === "learn"
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                      : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                  }`}
+            {studyQueue.slice(0, 5).map((task) => {
+              const href = task.type === "review" ? "/review" : `/learn/${task.planId ?? ""}`;
+              return (
+                <Link
+                  key={task.id}
+                  href={href}
+                  aria-label={`${task.type === "review" ? "复习" : "新学"}：${task.title}，优先级 ${task.priority}`}
+                  className="flex items-start gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-2.5 hover:shadow-md transition-shadow"
                 >
-                  {item.type === "learn" ? "学" : "复"}
-                </span>
-                <span className="text-sm flex-1 truncate text-gray-800 dark:text-gray-200">{item.topic}</span>
-                <span className="text-xs text-gray-400">{item.estimatedMinutes}min</span>
-                <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400" />
-              </Link>
-            ))}
-            {todaySchedule.length > 3 && (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded shrink-0 ${
+                      task.type === "review"
+                        ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                    }`}
+                  >
+                    {task.type === "review" ? "复" : "学"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate text-gray-800 dark:text-gray-200">{task.title}</p>
+                    {task.reason && (
+                      <p className="text-2xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                        {task.reason}
+                      </p>
+                    )}
+                  </div>
+                  {task.estimatedMinutes && (
+                    <span className="text-xs text-gray-400 shrink-0">{task.estimatedMinutes}min</span>
+                  )}
+                  <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-1" />
+                </Link>
+              );
+            })}
+            {studyQueue.length > 5 && (
               <Link
-                href="/learn"
+                href="/review"
                 className="block text-center text-xs text-blue-500 hover:underline pt-1"
               >
-                查看全部 {todaySchedule.length} 项 →
+                查看全部 {studyQueue.length} 项 →
               </Link>
             )}
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center">
             <Icon name="check-circle" className="w-8 h-8 mx-auto text-green-500 mb-1" />
-            <p className="text-xs text-gray-500 dark:text-gray-400">今日无安排</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {todayCompletedCount > 0 ? "今日清单已清空" : "今日暂无待办"}
+            </p>
             <Link
               href="/learn"
               className="text-xs text-blue-500 hover:underline mt-2 inline-block"

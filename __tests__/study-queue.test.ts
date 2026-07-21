@@ -1,21 +1,18 @@
 // __tests__/study-queue.test.ts
-// 「学习+复习合并」第 1 阶段测试
+// 「学习+复习合并」第 1 阶段 + 第 2 阶段测试
 //
 // 覆盖：
 //   - compute-priority：所有评分规则（基础分 / 稳定性 / 连续 new / 能量 / 多巴胺 / clamp）
 //   - explainPriority：返回 reasons 数组（非空 / 中文可读）
-//   - buildStudyQueue：从 IndexedDB 读 + 转换 + 排序；IndexedDB 不可用时返回空数组
+//   - buildStudyQueueFromData：从 plans + dueCards 构建 + 排序（第 2 阶段纯函数，不读 IndexedDB）
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import "fake-indexeddb/auto";
-import { setItem, delItem, listKeys } from "../lib/storage/db";
-import * as dbModule from "../lib/storage/db";
-import { KEY_PREFIXES, type LearnLog, type ReviewLog } from "../lib/types";
+import { describe, it, expect } from "vitest";
+import type { LearningPlanSummary, ReviewCard } from "../lib/types";
 import {
   computePriority,
   explainPriority,
 } from "../lib/study-queue/compute-priority";
-import { buildStudyQueue } from "../lib/study-queue/build-study-queue";
+import { buildStudyQueueFromData } from "../lib/study-queue/build-study-queue";
 import type { StudyTask, StudyQueueContext } from "../lib/study-queue/types";
 
 // 固定基准时间（UTC 中午 12 点，避免跨日边界），保证过期天数计算确定性
@@ -228,41 +225,56 @@ describe("explainPriority", () => {
   });
 });
 
-describe("buildStudyQueue", () => {
-  beforeEach(async () => {
-    // 清空 learn_log / review_log 前缀下的所有 key，避免用例间污染
-    const learnKeys = await listKeys(KEY_PREFIXES.LEARN_LOG);
-    for (const k of learnKeys) await delItem(k);
-    const reviewKeys = await listKeys(KEY_PREFIXES.REVIEW_LOG);
-    for (const k of reviewKeys) await delItem(k);
-  });
+describe("buildStudyQueueFromData", () => {
+  // 第 2 阶段：纯函数测试，不依赖 IndexedDB
+  // 数据构造器
+  function makePlan(over: Partial<LearningPlanSummary> = {}): LearningPlanSummary {
+    return {
+      id: "p1",
+      topic: "k1",
+      knowledgeCount: 1,
+      questionCount: 0,
+      scheduleDays: 1,
+      dailyMinutes: 30,
+      maxNewPerDay: 5,
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+      schedule: [
+        { day: 1, type: "learn", nodeId: "k1", estimatedMinutes: 30, completed: false },
+      ],
+      ...over,
+    };
+  }
 
-  it("返回 StudyTask 数组（合并 learn + review 并按 priority 降序）", async () => {
-    // 注入 1 条今日 LearnLog(type=learn) + 1 条今日 ReviewLog
-    const log: LearnLog = {
-      id: "l1",
+  function makeCard(over: Partial<ReviewCard> = {}): ReviewCard {
+    return {
+      id: "c1",
       planId: "p1",
       nodeId: "k1",
-      date: TODAY,
-      timestamp: NOW.toISOString(),
-      type: "learn",
+      questionId: "q1",
+      front: "测试卡正面",
+      back: "测试卡背面",
+      due: TODAY_ISO,
+      stability: 21,
+      difficulty: 3,
+      elapsedDays: 0,
+      scheduledDays: 1,
+      reps: 1,
+      lapses: 0,
+      state: 2,
+      lastReview: TODAY_ISO,
+      ...over,
     };
-    await setItem(KEY_PREFIXES.LEARN_LOG + "l1", log);
+  }
 
-    const rev: ReviewLog = {
-      id: "r1",
-      cardId: "c1",
-      date: TODAY,
-      rating: 3,
-      elapsedDays: 1,
-      stateBefore: 2,
-      stateAfter: 2,
-    };
-    await setItem(KEY_PREFIXES.REVIEW_LOG + "r1", rev);
+  it("返回 StudyTask 数组（合并 learn + review 并按 priority 降序）", () => {
+    const plans: LearningPlanSummary[] = [makePlan()];
+    const cards: ReviewCard[] = [makeCard()];
 
-    const queue = await buildStudyQueue({
+    const queue = buildStudyQueueFromData(plans, cards, {
       date: TODAY,
       context: { energy: 3, dopamine: "无" },
+      now: NOW,
     });
 
     expect(Array.isArray(queue)).toBe(true);
@@ -284,85 +296,51 @@ describe("buildStudyQueue", () => {
     // review task 字段
     expect(queue[0].cardId).toBe("c1");
     expect(queue[0].dueDate).toBeDefined();
-    // new task 字段
+    // new task 字段（第 2 阶段：planId 填充用于跳转 /learn/{planId}）
+    expect(queue[1].planId).toBe("p1");
     expect(queue[1].nodeId).toBe("k1");
     expect(queue[1].topic).toBe("k1");
     expect(queue[1].title).toContain("新学");
   });
 
-  it("只取今日 LearnLog（type=learn），过滤其他日期/类型", async () => {
-    // 今日 learn
-    await setItem(KEY_PREFIXES.LEARN_LOG + "today", {
-      id: "today",
-      planId: "p1",
-      nodeId: "k-today",
-      date: TODAY,
-      timestamp: NOW.toISOString(),
-      type: "learn",
-    } satisfies LearnLog);
-    // 昨日 learn（应被过滤）
-    await setItem(KEY_PREFIXES.LEARN_LOG + "yesterday", {
-      id: "yesterday",
-      planId: "p1",
-      nodeId: "k-yesterday",
-      date: "2026-07-15",
-      timestamp: NOW.toISOString(),
-      type: "learn",
-    } satisfies LearnLog);
-    // 今日但 type=learn_complete（应被过滤）
-    await setItem(KEY_PREFIXES.LEARN_LOG + "complete", {
-      id: "complete",
-      planId: "p1",
-      nodeId: "k-complete",
-      date: TODAY,
-      timestamp: NOW.toISOString(),
-      type: "learn_complete",
-    } satisfies LearnLog);
+  it("只取今日待学 schedule（day === 1 && !completed && type === \"learn\"）", () => {
+    const plans: LearningPlanSummary[] = [
+      makePlan({
+        schedule: [
+          // 今日待学（应保留）
+          { day: 1, type: "learn", nodeId: "k-today", estimatedMinutes: 30, completed: false },
+          // 昨日 schedule（day=0 应被过滤）
+          { day: 0, type: "learn", nodeId: "k-yesterday", estimatedMinutes: 30, completed: false },
+          // 今日但已完成（应被过滤）
+          { day: 1, type: "learn", nodeId: "k-complete", estimatedMinutes: 30, completed: true },
+          // 今日但 type=review（应被过滤——new 任务只取 type=learn）
+          { day: 1, type: "review", nodeId: "k-other", estimatedMinutes: 30, completed: false },
+        ],
+      }),
+    ];
 
-    const queue = await buildStudyQueue({ date: TODAY });
+    const queue = buildStudyQueueFromData(plans, [], {
+      date: TODAY,
+      now: NOW,
+    });
     expect(queue).toHaveLength(1);
     expect(queue[0].nodeId).toBe("k-today");
   });
 
-  it("空 IndexedDB 返回空数组", async () => {
-    const queue = await buildStudyQueue({ date: TODAY });
+  it("空 plans + 空 dueCards 返回空数组", () => {
+    const queue = buildStudyQueueFromData([], [], { date: TODAY, now: NOW });
     expect(queue).toEqual([]);
   });
 
-  it("IndexedDB 不可用时返回空数组（不抛错）", async () => {
-    // 通过 spy 让 listItems 抛错，模拟 IndexedDB 异常关闭
-    const spy = vi
-      .spyOn(dbModule, "listItems")
-      .mockRejectedValue(new Error("IndexedDB closed"));
-    const queue = await buildStudyQueue({ date: TODAY });
-    expect(queue).toEqual([]);
-    spy.mockRestore();
-  });
-
-  it("低能量上下文下 review 排在 new 前面（认知负担小优先）", async () => {
-    await setItem(KEY_PREFIXES.LEARN_LOG + "n1", {
-      id: "n1",
-      planId: "p1",
-      nodeId: "k-new",
-      date: TODAY,
-      timestamp: NOW.toISOString(),
-      type: "learn",
-    } satisfies LearnLog);
-
-    await setItem(KEY_PREFIXES.REVIEW_LOG + "r1", {
-      id: "r1",
-      cardId: "c-review",
-      date: TODAY,
-      rating: 3,
-      elapsedDays: 1,
-      stateBefore: 2,
-      stateAfter: 2,
-    } satisfies ReviewLog);
+  it("低能量上下文下 review 排在 new 前面（认知负担小优先）", () => {
+    const plans: LearningPlanSummary[] = [makePlan()];
+    const cards: ReviewCard[] = [makeCard()];
 
     // 低能量：review 加分 15 / new 扣分 15，差距进一步拉大
-    const queue = await buildStudyQueue({
+    const queue = buildStudyQueueFromData(plans, cards, {
       date: TODAY,
       context: { energy: 2, dopamine: "无" },
+      now: NOW,
     });
     expect(queue[0].type).toBe("review");
     expect(queue[1].type).toBe("new");

@@ -10,7 +10,7 @@
 //   便于单测、复用、且使 page.tsx 渲染层保持"纯展示"。
 
 import { useState, useEffect, useCallback } from "react";
-import { getItem, countDueCards, listRecentItems } from "@/lib/storage/db";
+import { getItem, countDueCards, listDueCards, listRecentItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
   LearningPlanSummary,
@@ -23,6 +23,7 @@ import type {
   Achievement,
   HealthAlert,
   UserProfile,
+  ReviewCard,
 } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { getUnresolvedMistakes } from "@/lib/mistake-book";
@@ -36,6 +37,8 @@ import {
 } from "@/lib/ai/plan-health";
 import { getQualityReport } from "@/lib/ai/quality-tracker";
 import { listPlanSummaries, migrateSummaries } from "@/lib/plan-summary";
+import { buildStudyQueueFromData } from "@/lib/study-queue/build-study-queue";
+import type { StudyTask } from "@/lib/study-queue/types";
 
 // ============ 打卡可视化元数据 ============
 
@@ -152,6 +155,19 @@ export interface HomeData {
     todayCalls: number;
     adoptionRate: number;
   } | null;
+  /**
+   * 今日学习队列（第 2 阶段：学习+复习合并）：
+   * - 合并 plans 中的待学 schedule 项 + dueCards 中的待复习卡片
+   * - 按智能优先级排序（review 紧迫度 + new 承接性 + 能量/多巴胺补偿）
+   * - 空数组表示今日无待办（已完成或无计划）
+   */
+  studyQueue: StudyTask[];
+  /**
+   * 今日已完成学习/复习项数（第 2 阶段：KPI 三宫格第 2 格）
+   * 来自 LearnLog 中今日 type 为 learn_complete / review_complete 的条数。
+   * 0 表示今日尚未完成任何学习项。
+   */
+  todayCompletedCount: number;
 }
 
 // ============ 纯函数：从原始数据计算派生状态 ============
@@ -179,6 +195,29 @@ export function computeStreaks(
     }
   }
   return { streak, lastStreak };
+}
+
+/**
+ * 派生今日已完成学习/复习项数（第 2 阶段：KPI 三宫格第 2 格）
+ *
+ * LearnLog 的 type 字段：
+ *   - learn_complete / review_complete 表示今日完成的学习/复习动作
+ *   - learn / review 表示学习/复习中（非完成）
+ *   - question_view / question_favorite / focus_session 表示其他动作
+ *
+ * @param logs 最近 7 天 LearnLog 列表
+ * @param today 今日日期（YYYY-MM-DD 中国时区）
+ * @returns 今日完成的学习/复习项数
+ */
+export function deriveTodayCompletedCount(
+  logs: LearnLog[],
+  today: string,
+): number {
+  return logs.filter(
+    (l) =>
+      l.date === today &&
+      (l.type === "learn_complete" || l.type === "review_complete"),
+  ).length;
 }
 
 /**
@@ -360,6 +399,8 @@ export function useHomeData(): HomeData & {
     userProfileSummary: null,
     energyTrend: [null, null, null, null, null, null, null],
     aiQualitySummary: null,
+    studyQueue: [],
+    todayCompletedCount: 0,
   });
 
   const load = useCallback(async () => {
@@ -376,10 +417,12 @@ export function useHomeData(): HomeData & {
     //     （首页只需要 dueCount，不需要卡片数据本身）
     //   - 计划：listPlanSummaries() 加载轻量 summary（含 schedule），避免拉取 knowledgeTree/questions
     //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
+    // 第 2 阶段：新增 listDueCards 拉到期卡片数据（用于 studyQueue 渲染）
+    const now = new Date();
     const [
-      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport,
+      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards,
     ] = await Promise.all([
-      countDueCards(new Date()),
+      countDueCards(now),
       listPlanSummaries(),
       listRecentItems<LearnLog>(KEY_PREFIXES.LEARN_LOG, 7),
       getItem<DailyStatus>(todayStatusKey),
@@ -388,17 +431,31 @@ export function useHomeData(): HomeData & {
       getUnresolvedMistakes(),
       getUserProfile(),
       getQualityReport(todayStartIso),
+      listDueCards<ReviewCard>(now, 50),
     ]);
 
     // 内存派生计算（无 IO）
     const { streak, lastStreak } = computeStreaks(logs);
     const heatmapData = computeHeatmap(logs);
+    const todayCompletedCount = deriveTodayCompletedCount(logs, today);
     const {
       todaySchedule,
       todayLearnCount,
       latestPlan,
       hasPlans,
     } = computeTodaySchedule(plans);
+
+    // 第 2 阶段：构建今日学习队列（合并 plans 待学 + dueCards 待复习，按 priority 排序）
+    // 排序上下文：用今日能量 + 今日多巴胺状态（来自 todayStatus）
+    const studyQueueContext = {
+      energy: todayStatus?.energy ?? 3,
+      dopamine: todayStatus?.dopamineTrigger ?? ("无" as const),
+    };
+    const studyQueue = buildStudyQueueFromData(plans, dueCards, {
+      date: today,
+      context: studyQueueContext,
+      now,
+    });
 
     // 派生：用户画像摘要（从 UserProfile 计算三档节点数）
     const userProfileSummary = deriveUserProfileSummary(userProfile);
@@ -430,6 +487,8 @@ export function useHomeData(): HomeData & {
       userProfileSummary,
       energyTrend,
       aiQualitySummary,
+      studyQueue,
+      todayCompletedCount,
     });
 
     // 后台维护任务：不阻塞 UI，失败静默

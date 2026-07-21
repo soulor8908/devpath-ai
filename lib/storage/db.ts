@@ -227,6 +227,29 @@ export async function countDueCards(now: Date): Promise<number> {
 }
 
 /**
+ * 列出到期待复习的卡片列表（走 dueAt 索引，O(due) 而非 O(n)）。
+ *
+ * 与 countDueCards 的区别：返回卡片数据本身（含 front / stability / due 等），
+ * 用于首页"今日学习队列"渲染（第 2 阶段：学习+复习合并）。
+ *
+ * @param now 当前时间，到期日 ≤ now 的卡片视为待复习
+ * @param limit 最大返回数量（避免一次拉过多；首页只展示前 N 项），默认 50
+ */
+export async function listDueCards<T = unknown>(now: Date, limit = 50): Promise<T[]> {
+  if (typeof window === "undefined") return [];
+  await ensureDBReady();
+  const db = await getDB();
+  if (!db) return [];
+  const nowIso = now.toISOString();
+  const records = await db.kv
+    .where("dueAt")
+    .belowOrEqual(nowIso)
+    .limit(limit)
+    .toArray();
+  return records.map((r) => r.value as T);
+}
+
+/**
  * 按前缀查最近 N 天的记录（走 updatedAt 索引 + prefix 过滤）。
  * 用于首页 logs/emotions 等只需近期数据的场景，替代全量加载。
  * @param prefix key 前缀（如 KEY_PREFIXES.LEARN_LOG）

@@ -40,6 +40,8 @@ export interface StudyTask {
   type: StudyTaskType;
 
   // ---- new 类型专属字段（type === "new" 时填）----
+  /** 关联的计划 id（LearningPlan.id），用于跳转到 /learn/{planId} */
+  planId?: string;
   /** 关联的知识点 id（对应 KnowledgeNode.id） */
   nodeId?: string;
   /** 主题（LearnLog 没有直接字段，从计划 topic 或节点 title 衍生） */
