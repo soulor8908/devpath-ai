@@ -9,7 +9,7 @@ import { useHomeData } from "@/lib/home";
 import { TrainSessionFlow } from "@/components/TrainSessionFlow";
 import { Icon } from "@/components/Icon";
 import { LinkButton } from "@/components/ui";
-import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
+import { POMODORO_OPEN_LARGE_EVENT, getRunningSession } from "@/lib/timer/pomodoro";
 
 export default function TrainClient() {
   const { studyQueue, reload } = useHomeData();
@@ -38,8 +38,23 @@ export default function TrainClient() {
   }, [sessionStartTime]);
 
   // 进入训练会话时自动唤起番茄钟（沉浸专注的氛围感）
+  // 仅当番茄钟未在运行时才唤起——避免打断用户已经开始的专注会话
   useEffect(() => {
-    if (orderedQueue.length > 0 && !pomodoroTriggeredRef.current) {
+    let cancelled = false;
+    async function maybeOpenPomodoro() {
+      if (orderedQueue.length === 0 || pomodoroTriggeredRef.current) return;
+      // 先检测番茄钟是否正在运行（status="running"），运行中则不打扰
+      try {
+        const running = await getRunningSession();
+        if (running) {
+          // 已有番茄钟在跑，不重复唤起（小 widget 已在右下角可见）
+          pomodoroTriggeredRef.current = true;
+          return;
+        }
+      } catch {
+        // 读取失败时降级为唤起（宁可重复唤起也不漏唤起）
+      }
+      if (cancelled) return;
       pomodoroTriggeredRef.current = true;
       try {
         window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
@@ -47,6 +62,10 @@ export default function TrainClient() {
         // 极端环境下 dispatchEvent 可能抛错，忽略
       }
     }
+    void maybeOpenPomodoro();
+    return () => {
+      cancelled = true;
+    };
   }, [orderedQueue.length]);
 
   if (orderedQueue.length === 0) {
