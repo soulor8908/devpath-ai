@@ -8,19 +8,25 @@
 //   - 新版：显示知识点摘要 + 关联题目的答案作为学习材料
 //   - 让用户先看答案学习，再进入测试
 //   - 关键记忆点高亮
+//
+// V3：学习材料用 AnswerContent 渲染（代码编辑器样式 + 代码高亮 + 选中文字问 AI）
+//   - 选中题目/答案中的文字可触发 onAskAI 回调，打开 AI 对话弹窗
 
 import type { KnowledgeNode, Question } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
+import { AnswerContent } from "@/components/CodeBlock";
 
 interface KnowledgeBriefProps {
   node: KnowledgeNode;
   /** 关联题目（可选）——其答案作为学习材料展示 */
   question?: Question | null;
   onLearned: () => void;
+  /** 选中文字问 AI 回调（不传则不启用选文问 AI）*/
+  onAskAI?: (selectedText: string) => void;
 }
 
-export function KnowledgeBrief({ node, question, onLearned }: KnowledgeBriefProps) {
+export function KnowledgeBrief({ node, question, onLearned, onAskAI }: KnowledgeBriefProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
       {/* 标题 */}
@@ -62,18 +68,25 @@ export function KnowledgeBrief({ node, question, onLearned }: KnowledgeBriefProp
             <Icon name="lightbulb" className="w-4 h-4 text-blue-500" />
             <p className="text-xs font-medium text-blue-600 dark:text-blue-400">学习材料</p>
           </div>
-          {/* 题目 */}
-          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
-            {question.question}
-          </p>
-          {/* 答案（完整展示作为学习内容） */}
-          <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-            {question.answer}
-          </div>
+          {/* 题目（选中文字可问 AI） */}
+          <AnswerContent
+            text={question.question}
+            className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2 select-text"
+            onAskAI={onAskAI}
+          />
+          {/* 答案（完整展示作为学习内容，代码编辑器样式 + 代码高亮 + 选中文字问 AI） */}
+          <AnswerContent
+            text={question.answer}
+            className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed"
+            onAskAI={onAskAI}
+          />
           {/* 关键点 */}
           {question.keyPoints && question.keyPoints.length > 0 && (
             <div className="mt-3 pt-3 border-t border-blue-100 dark:border-blue-900">
-              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">💡 关键记忆点</p>
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+                <Icon name="zap" className="w-3 h-3 inline-block align-middle mr-0.5" />
+                关键记忆点
+              </p>
               <ul className="space-y-1">
                 {question.keyPoints.map((point, i) => (
                   <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1.5">

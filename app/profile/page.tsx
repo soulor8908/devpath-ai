@@ -36,7 +36,7 @@ import {
 } from "@/lib/model-config";
 import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
-import { Button, Input, Textarea, Checkbox, Modal } from "@/components/ui";
+import { Button, Textarea, Checkbox, Modal } from "@/components/ui";
 import { ModelConfigModal } from "@/components/ModelConfigModal";
 import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import { mapExchangeErrorMessage } from "@/lib/model-config-form";
@@ -214,11 +214,6 @@ export default function ProfilePage() {
       void maybeRetrain();
     })();
   }, []);
-
-  function update<K extends keyof PublicProfile>(key: K, value: PublicProfile[K]) {
-    setProfile((p) => ({ ...p, [key]: value }));
-    setSaved(false);
-  }
 
   function toggleVisibility(key: keyof PublicProfile["visibility"]) {
     setProfile((p) => ({
@@ -717,7 +712,7 @@ export default function ProfilePage() {
         <Button
           variant="secondary"
           block
-          leftIcon="edit"
+          leftIcon="pen"
           onClick={() => setEditOpen(true)}
         >
           编辑个人信息

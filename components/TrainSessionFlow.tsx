@@ -2,9 +2,17 @@
 
 // components/TrainSessionFlow.tsx
 // 训练会话流程组件——学→练→反馈→休息 状态机
+//
+// 测试设计修正（用户反馈：学习材料和测试答案一样，测试失去意义）：
+//   - 学习阶段：完整展示答案作为"学习材料"（用户先学习）
+//   - 测试阶段：先隐藏答案，强制用户回忆 → 点击"查看答案"才揭示
+//     这样测试才有意义——从"对照答案自评"变成"先回忆再对照"
+//   - 答案用 AnswerContent 渲染（代码编辑器样式 + 代码高亮）
+//   - 答案和题目支持选中文字问 AI
+//   - 题目支持收藏（收藏时自动造 FSRS 复习卡）
 
 import { useReducer, useEffect, useState, useCallback } from "react";
-import { getItem } from "@/lib/storage/db";
+import { getItem, setItem } from "@/lib/storage/db";
 import {
   KEY_PREFIXES,
   type LearningPlan,
@@ -21,8 +29,13 @@ import {
 } from "@/lib/ai/train-scheduler";
 import { KnowledgeBrief } from "@/components/KnowledgeBrief";
 import { SocraticFeedback } from "@/components/SocraticFeedback";
+import { AnswerContent } from "@/components/CodeBlock";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
+import { openChatModal } from "@/lib/chat-modal-store";
+import { createCard, findExistingCard } from "@/lib/fsrs";
+import { toggleQuestionInPlan } from "@/lib/favorite";
+import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 
 interface TrainSessionFlowProps {
   studyQueue: StudyTask[];
@@ -33,9 +46,12 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
   const [state, dispatch] = useReducer(trainSessionReducer, undefined, createInitialTrainState);
   const [currentNode, setCurrentNode] = useState<KnowledgeNode | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<LearningPlan | null>(null);
   const [feedback, setFeedback] = useState("");
   const [isCorrect, setIsCorrect] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 测试阶段答案是否已揭示（默认隐藏，强制用户先回忆）
+  const [answerRevealed, setAnswerRevealed] = useState(false);
 
   const currentTask = studyQueue[state.currentIndex];
 
@@ -54,6 +70,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
       return;
     }
     setLoading(true);
+    setAnswerRevealed(false);
     try {
       if (currentTask.type === "new" && currentTask.planId) {
         // 加载计划中的知识点
@@ -63,6 +80,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
           const question = plan.questions.find((q) => q.nodeId === node?.id) || null;
           setCurrentNode(node ?? null);
           setCurrentQuestion(question);
+          setCurrentPlan(plan);
         }
       } else if (currentTask.type === "review" && currentTask.cardId) {
         // 复习卡片：从 ReviewCard 加载
@@ -78,6 +96,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
             mastery: 0,
           });
           setCurrentQuestion(null);
+          setCurrentPlan(null);
         }
       }
     } finally {
@@ -90,6 +109,63 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
       void loadCurrentTask();
     }
   }, [state.phase, currentTask, loadCurrentTask]);
+
+  // 选中文字问 AI（题目/答案通用回调）
+  const handleAskAI = useCallback((selectedText: string, sourceLabel: string) => {
+    openChatModal({
+      prefill: `关于「${sourceLabel}」的问题片段：\n\n> ${selectedText}\n\n请帮我深入理解这段内容。`,
+      source: currentQuestion
+        ? {
+            type: "question",
+            id: currentQuestion.id,
+            title: currentQuestion.question,
+            planId: currentPlan?.id,
+          }
+        : undefined,
+    });
+  }, [currentQuestion, currentPlan]);
+
+  // 收藏当前题目（收藏时自动造 FSRS 复习卡，与 QuestionCard 逻辑一致）
+  const handleFavorite = useCallback(async () => {
+    if (!currentQuestion || !currentPlan) return;
+    const wasFavorited = currentQuestion.favorited;
+    // 先更新 plan 中的 question.favorited
+    const updatedPlan = toggleQuestionInPlan(currentPlan, currentQuestion.id);
+    setCurrentPlan(updatedPlan);
+    const updatedQ = updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
+    setCurrentQuestion(updatedQ);
+    try {
+      await setItem(KEY_PREFIXES.PLAN + updatedPlan.id, updatedPlan);
+    } catch {
+      // 持久化失败不影响 UI
+    }
+    if (!wasFavorited) {
+      // 隐式反馈：仅当题目有 aiCallId 时记录（老题目静默跳过）
+      if (currentQuestion.aiCallId) {
+        void trackAIFeedback({
+          callRecordId: currentQuestion.aiCallId,
+          scene: "question_generate",
+          implicitAction: "favorited",
+        });
+      }
+      try {
+        const existing = await findExistingCard({ planId: currentPlan.id, questionId: currentQuestion.id });
+        if (!existing) {
+          const card = createCard(
+            currentPlan.id,
+            currentQuestion.nodeId,
+            currentQuestion.id,
+            currentQuestion.question,
+            currentQuestion.answer || "",
+            "standard",
+          );
+          await setItem(KEY_PREFIXES.CARD + card.id, card);
+        }
+      } catch {
+        // 造卡失败不影响收藏本身
+      }
+    }
+  }, [currentQuestion, currentPlan]);
 
   // 会话完成
   useEffect(() => {
@@ -140,70 +216,120 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
           node={currentNode}
           question={currentQuestion}
           onLearned={() => dispatch({ type: "LEARN_COMPLETE" })}
+          onAskAI={(text) => handleAskAI(text, "学习材料")}
         />
       )}
 
       {/* questioning phase */}
       {state.phase === "questioning" && currentQuestion && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2 mb-3">
-            <Icon name="help-circle" className="w-4 h-4 text-blue-500" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">检测题</h2>
-          </div>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-            {currentQuestion.question}
-          </p>
-
-          {/* 答案参考（默认展开，让用户对照答案自评） */}
-          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-3 mb-4 border border-blue-100 dark:border-blue-900">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Icon name="lightbulb" className="w-3.5 h-3.5 text-blue-500" />
-              <p className="text-xs font-medium text-blue-600 dark:text-blue-400">参考答案</p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Icon name="help-circle" className="w-4 h-4 text-blue-500" />
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">检测题</h2>
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
-              {currentQuestion.answer}
-            </div>
-            {currentQuestion.keyPoints && currentQuestion.keyPoints.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-blue-100 dark:border-blue-900">
-                <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">💡 关键点</p>
-                <ul className="space-y-0.5">
-                  {currentQuestion.keyPoints.map((kp, i) => (
-                    <li key={i} className="text-xs text-gray-600 dark:text-gray-400">• {kp}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
-            对照答案，你答对了吗？
-          </p>
-          <div className="flex gap-2">
+            {/* 收藏按钮：收藏后进入 FSRS 复习轮换 */}
             <Button
-              variant="success"
-              block
-              onClick={() => {
-                setIsCorrect(true);
-                setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
-                dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
-              }}
-              leftIcon="check"
-            >
-              我答对了
-            </Button>
-            <Button
+              onClick={handleFavorite}
               variant="ghost"
-              block
-              onClick={() => {
-                setIsCorrect(false);
-                setFeedback(generateSocraticFeedback(false, currentQuestion.keyPoints?.[0]));
-                dispatch({ type: "ANSWER_SUBMIT", isCorrect: false });
-              }}
-              leftIcon="x"
+              size="sm"
+              iconOnly
+              aria-label={currentQuestion.favorited ? "取消收藏" : "收藏题目"}
+              className={currentQuestion.favorited ? "text-yellow-500" : "text-gray-300 dark:text-gray-600"}
             >
-              没答对
+              <Icon name="star" className="w-5 h-5" />
             </Button>
           </div>
+
+          {/* 题目（选中文字可问 AI） */}
+          <AnswerContent
+            text={currentQuestion.question}
+            className="text-sm text-gray-700 dark:text-gray-300 mb-4 leading-relaxed select-text"
+            onAskAI={(selectedText) => handleAskAI(selectedText, currentQuestion.question.slice(0, 30))}
+          />
+
+          {/* 答案揭示机制：默认隐藏，强制用户先回忆再查看
+              设计修正：原版默认展开答案 = 把答案直接给用户看，测试失去意义
+              新版：先让用户回忆，点击"查看答案"才揭示，再自评对错 */}
+          {!answerRevealed ? (
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mb-4 border border-dashed border-gray-200 dark:border-gray-600 text-center">
+              <Icon name="lightbulb" className="w-6 h-6 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                先在脑中回忆你的答案，准备好后查看参考答案
+              </p>
+              <Button
+                variant="secondary"
+                onClick={() => setAnswerRevealed(true)}
+                leftIcon="chevron-down"
+              >
+                查看答案
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4 mb-4 border border-blue-100 dark:border-blue-900">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Icon name="lightbulb" className="w-3.5 h-3.5 text-blue-500" />
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400">参考答案</p>
+              </div>
+              {/* 答案用 AnswerContent 渲染：代码编辑器样式 + 代码高亮 + 选中文字问 AI */}
+              <AnswerContent
+                text={currentQuestion.answer}
+                className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed"
+                onAskAI={(selectedText) => handleAskAI(selectedText, "参考答案")}
+              />
+              {currentQuestion.keyPoints && currentQuestion.keyPoints.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-blue-100 dark:border-blue-900">
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1.5">
+                    <Icon name="zap" className="w-3 h-3 inline-block align-middle mr-0.5" />
+                    关键点
+                  </p>
+                  <ul className="space-y-1">
+                    {currentQuestion.keyPoints.map((kp, i) => (
+                      <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1.5">
+                        <span className="text-blue-400 mt-0.5">•</span>
+                        <span>{kp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 自评按钮：只有揭示答案后才显示 */}
+          {answerRevealed && (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
+                对照答案，你答对了吗？
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="success"
+                  block
+                  onClick={() => {
+                    setIsCorrect(true);
+                    setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
+                    dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
+                  }}
+                  leftIcon="check"
+                >
+                  我答对了
+                </Button>
+                <Button
+                  variant="ghost"
+                  block
+                  onClick={() => {
+                    setIsCorrect(false);
+                    setFeedback(generateSocraticFeedback(false, currentQuestion.keyPoints?.[0]));
+                    dispatch({ type: "ANSWER_SUBMIT", isCorrect: false });
+                  }}
+                  leftIcon="x"
+                >
+                  没答对
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
