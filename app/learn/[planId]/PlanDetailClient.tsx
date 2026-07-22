@@ -998,7 +998,8 @@ export default function PlanDetailClient() {
             onSelectNode={handleMindMapNodeSelect}
             selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
             fillHeight
-            showEnterButton
+            showEnterButton={false}
+            titleClickMode="select"
           />
         </Modal>
       )}

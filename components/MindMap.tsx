@@ -32,6 +32,12 @@ interface MindMapProps {
   fillHeight?: boolean;
   /** 是否显示"进入学习"按钮（仅在传了 onSelectNode 时生效） */
   showEnterButton?: boolean;
+  /**
+   * 标题点击行为模式：
+   * - "expand"（默认）：标题点击 = 展开/收起子节点（新增学习页用）
+   * - "select"：标题点击 = 触发 onSelectNode 跳转/筛选（学习详情页用）
+   */
+  titleClickMode?: "expand" | "select";
 }
 
 interface TreeNode {
@@ -223,6 +229,7 @@ export function MindMap({
   onSelectNode,
   fillHeight = false,
   showEnterButton = true,
+  titleClickMode = "expand",
 }: MindMapProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -664,20 +671,24 @@ export function MindMap({
                             WebkitBoxOrient: "vertical",
                             overflow: "hidden",
                             wordBreak: "break-word",
-                            cursor: p.hasChildren ? "pointer" : "default",
+                            cursor: titleClickMode === "select" && onSelectNode ? "pointer" : (p.hasChildren ? "pointer" : "default"),
                             pointerEvents: "auto",
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (p.hasChildren) {
+                            if (titleClickMode === "select" && onSelectNode) {
+                              // 详情页模式：标题点击 = 跳转/筛选（不展开）
+                              onSelectNode(p.node);
+                            } else if (p.hasChildren) {
+                              // 新增学习页模式：标题点击 = 展开/收起
                               setExpanded((prev) => {
                                 const next = new Set(prev);
                                 if (next.has(p.id)) next.delete(p.id);
                                 else next.add(p.id);
                                 return next;
                               });
-                            } else if (onSelectNode) {
-                              // 叶子节点直接触发 onSelectNode
+                            } else if (onSelectNode && titleClickMode === "expand") {
+                              // expand 模式下叶子节点也可触发 onSelectNode
                               onSelectNode(p.node);
                             }
                           }}

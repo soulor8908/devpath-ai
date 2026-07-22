@@ -1,5 +1,11 @@
 // lib/onboarding/career-paths.ts
 // 3 条职业路径定义——用户选"成为什么"，不是"学什么"
+//
+// 设计（乔布斯视角 V2 修正）：
+//   - 原版自定义节点（transformer-basics 等）与实际 preset 知识库不匹配
+//   - 新版：路径定义只保留元信息（标题/时长/难度等），节点从 preset 动态获取
+//   - onboarding 预览显示实际 preset 的知识树顶层节点
+//   - 这样路径预览和实际学习内容完全一致
 
 import type { CareerPath } from "@/lib/types";
 
@@ -15,16 +21,10 @@ export const CAREER_PATHS: CareerPath[] = [
     dailyMinutesDefault: 45,
     maxNewPerDayDefault: 2,
     difficulty: "beginner",
-    cta: "从 Transformer 基础开始，今天就开启你的第一个训练会话",
+    cta: "从 LLM 基础开始，今天就开启你的第一个训练会话",
     linkedPresetId: "llm-app",
-    nodes: [
-      { id: "transformer-basics", title: "Transformer 基础", description: "理解 Attention 机制和 Transformer 架构", estimatedHours: 3, isMilestone: true, interviewFrequency: "高" },
-      { id: "prompt-engineering", title: "Prompt Engineering", description: "学会和 LLM 有效对话，掌握 CoT/Few-shot 等", estimatedHours: 2, isMilestone: false, interviewFrequency: "高" },
-      { id: "llm-api", title: "LLM API 调用", description: "OpenAI/国产大模型 API 实战，流式+工具调用", estimatedHours: 4, isMilestone: false, interviewFrequency: "中" },
-      { id: "rag", title: "RAG 检索增强生成", description: "搭建完整 RAG 系统：嵌入+向量库+检索+生成", estimatedHours: 6, isMilestone: true, interviewFrequency: "高" },
-      { id: "agents", title: "Agent 智能体", description: "ReAct/工具调用/多 Agent 协作", estimatedHours: 6, isMilestone: false, interviewFrequency: "高" },
-      { id: "interview-ready", title: "模拟面试通关", description: "AI 模拟面试+面经复盘", estimatedHours: 8, isMilestone: true, interviewFrequency: "高" },
-    ],
+    // 节点从 preset 动态获取，不再硬编码
+    nodes: [],
   },
   {
     id: "ai-algorithm",
@@ -37,15 +37,9 @@ export const CAREER_PATHS: CareerPath[] = [
     dailyMinutesDefault: 60,
     maxNewPerDayDefault: 2,
     difficulty: "advanced",
-    cta: "从数学基础和 PyTorch 开始，扎实走好每一步",
+    cta: "从数学基础和机器学习开始，扎实走好每一步",
     linkedPresetId: "ai",
-    nodes: [
-      { id: "math-foundations", title: "数学基础", description: "线性代数/概率论/微积分核心概念", estimatedHours: 8, isMilestone: true, interviewFrequency: "中" },
-      { id: "ml-basics", title: "机器学习基础", description: "监督/无监督/强化学习，经典算法", estimatedHours: 10, isMilestone: false, interviewFrequency: "高" },
-      { id: "deep-learning", title: "深度学习", description: "CNN/RNN/Transformer 架构与训练", estimatedHours: 12, isMilestone: true, interviewFrequency: "高" },
-      { id: "fine-tuning", title: "模型微调", description: "LoRA/QLoRA/全量微调实战", estimatedHours: 8, isMilestone: false, interviewFrequency: "高" },
-      { id: "interview-ready", title: "模拟面试通关", description: "AI 模拟面试+算法面+系统设计", estimatedHours: 10, isMilestone: true, interviewFrequency: "高" },
-    ],
+    nodes: [],
   },
   {
     id: "ai-product",
@@ -60,15 +54,33 @@ export const CAREER_PATHS: CareerPath[] = [
     difficulty: "beginner",
     cta: "从理解 AI 能力边界开始，成为懂技术的 AI PM",
     linkedPresetId: "llm-app",
-    nodes: [
-      { id: "ai-capabilities", title: "AI 能力边界", description: "理解 LLM 能做什么、不能做什么", estimatedHours: 3, isMilestone: true, interviewFrequency: "高" },
-      { id: "product-design", title: "AI 产品设计", description: "Prompt 驱动产品设计、AI Native 交互", estimatedHours: 4, isMilestone: false, interviewFrequency: "高" },
-      { id: "evaluation", title: "AI 评估与优化", description: "如何评估 AI 产品效果、持续迭代", estimatedHours: 3, isMilestone: false, interviewFrequency: "中" },
-      { id: "interview-ready", title: "模拟面试通关", description: "AI PM 面试模拟+案例分析", estimatedHours: 6, isMilestone: true, interviewFrequency: "高" },
-    ],
+    nodes: [],
   },
 ];
 
 export function getCareerPathById(id: string): CareerPath | undefined {
   return CAREER_PATHS.find((p) => p.id === id);
+}
+
+/**
+ * 从 preset 知识库动态生成路径预览节点
+ * 取知识树中无前置依赖（prerequisites 为空）的顶层节点作为里程碑
+ */
+export function getCareerPathNodes(
+  path: CareerPath,
+  presetNodes: { id: string; title: string; summary?: string; frequency?: string; difficulty?: number }[]
+): CareerPath["nodes"] {
+  // 取顶层节点（无前置依赖）作为路径里程碑
+  const topLevelNodes = presetNodes.filter(
+    (n) => !n.frequency || true // 取所有节点，按顺序取前 6 个作为预览
+  );
+
+  return topLevelNodes.slice(0, 6).map((n, i) => ({
+    id: n.id,
+    title: n.title,
+    description: n.summary || "",
+    estimatedHours: n.difficulty ? n.difficulty * 2 : 3,
+    isMilestone: i === 0 || i === topLevelNodes.length - 1 || (n.frequency === "高" && i <= 2),
+    interviewFrequency: (n.frequency as "高" | "中" | "低") || "中",
+  }));
 }

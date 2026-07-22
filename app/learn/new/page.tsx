@@ -682,6 +682,8 @@ function PresetMindMapModal({
               selectedNodeId={selectedNodeId}
               onSelectNode={onSelectNode}
               fillHeight
+              showEnterButton={false}
+              titleClickMode="expand"
             />
           )}
         </div>
@@ -692,7 +694,7 @@ function PresetMindMapModal({
           style={{ touchAction: "manipulation" }}
         >
           <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 hidden sm:block">
-            <Icon name="lightbulb" className="w-4 h-4 inline-block align-middle" /> 点击任意知识点可立即开始学习该节点 · <Icon name="building" className="w-4 h-4 inline-block align-middle" /> 标记为大厂高频考点
+            <Icon name="lightbulb" className="w-4 h-4 inline-block align-middle" /> 点击节点标题可展开/收起子节点 · <Icon name="building" className="w-4 h-4 inline-block align-middle" /> 标记为大厂高频考点
           </p>
           <Button
             onClick={onImportAll}

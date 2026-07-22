@@ -41,9 +41,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
-import { shouldInjectDemo, injectDemoData } from "@/lib/demo/preset-data";
 import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
-import { useEffect } from "react";
 
 export default function HomeClient() {
   const {
@@ -66,17 +64,6 @@ export default function HomeClient() {
   } = useHomeData();
 
   const [shareMsg, setShareMsg] = useState<string>("");
-
-  // Demo 数据注入
-  useEffect(() => {
-    void Promise.resolve().then(async () => {
-      const needInject = await shouldInjectDemo();
-      if (!needInject) return;
-      await injectDemoData();
-      await reload();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handleShare() {
     if (!username) {

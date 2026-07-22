@@ -9,12 +9,12 @@
 //   - API Key 在第一次需要 AI 生成时再提示，不堵在门口
 //   - 跳转 /train 而不是 /learn，立即进入沉浸式训练
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setItem, set as dbSet } from "@/lib/storage/db";
-import { KEY_PREFIXES, type LearningPlan, type CareerPath as CareerPathType } from "@/lib/types";
-import { CAREER_PATHS } from "@/lib/onboarding/career-paths";
+import { KEY_PREFIXES, type LearningPlan, type CareerPath as CareerPathType, type CareerPathNode } from "@/lib/types";
+import { CAREER_PATHS, getCareerPathNodes } from "@/lib/onboarding/career-paths";
 import { getPresetById } from "@/lib/presets";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
@@ -56,6 +56,14 @@ export default function OnboardingPage() {
     }
   }
 
+  // 从 preset 动态获取路径预览节点（必须在条件 return 之前调用 hooks）
+  const previewNodes: CareerPathNode[] = useMemo(() => {
+    if (!selectedPath) return [];
+    const preset = getPresetById(selectedPath.linkedPresetId);
+    if (!preset) return [];
+    return getCareerPathNodes(selectedPath, preset.knowledgeTree);
+  }, [selectedPath]);
+
   // 第一步：3 选 1
   if (!selectedPath) {
     return (
@@ -94,7 +102,7 @@ export default function OnboardingPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Icon name="target" className="w-3 h-3" />
-                      {path.nodes.length} 个阶段
+                      {getPresetById(path.linkedPresetId)?.knowledgeTree.length ?? 0} 个知识点
                     </span>
                     <span className="flex items-center gap-1">
                       <Icon name="calendar" className="w-3 h-3" />
@@ -151,51 +159,55 @@ export default function OnboardingPage() {
         <p className="text-sm opacity-80">我们从今天开始。</p>
       </div>
 
-      {/* 路径节点预览 */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 mb-6 border dark:border-gray-700">
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
-          你的学习路径
-        </p>
-        <div className="space-y-0">
-          {selectedPath.nodes.map((node, i) => (
-            <div key={node.id} className="flex items-start gap-3">
-              <div className="flex flex-col items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    node.isMilestone
-                      ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {node.isMilestone ? (
-                    <Icon name="star" className="w-4 h-4" />
-                  ) : (
-                    i + 1
+      {/* 路径节点预览——从 preset 知识库动态获取 */}
+      {previewNodes.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 mb-6 border dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+            你的学习路径（前 {previewNodes.length} 个知识点预览）
+          </p>
+          <div className="space-y-0">
+            {previewNodes.map((node, i) => (
+              <div key={node.id} className="flex items-start gap-3">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      node.isMilestone
+                        ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {node.isMilestone ? (
+                      <Icon name="star" className="w-4 h-4" />
+                    ) : (
+                      i + 1
+                    )}
+                  </div>
+                  {i < previewNodes.length - 1 && (
+                    <div className="w-0.5 h-6 bg-gray-200 dark:bg-gray-600" />
                   )}
                 </div>
-                {i < selectedPath.nodes.length - 1 && (
-                  <div className="w-0.5 h-6 bg-gray-200 dark:bg-gray-600" />
-                )}
+                <div className="flex-1 pb-3">
+                  <p className="font-medium text-sm">{node.title}</p>
+                  {node.description && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-2">
+                      {node.description}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 pb-3">
-                <p className="font-medium text-sm">{node.title}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {node.description} · {node.estimatedHours}h
-                </p>
+            ))}
+            {/* 终点线 */}
+            <div className="flex items-center gap-3 mt-1">
+              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                <Icon name="check" className="w-4 h-4 text-white" />
               </div>
+              <p className="font-medium text-green-600 dark:text-green-400">
+                拿到 offer <span aria-hidden="true">🏆</span>
+              </p>
             </div>
-          ))}
-          {/* 终点线 */}
-          <div className="flex items-center gap-3 mt-1">
-            <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-              <Icon name="check" className="w-4 h-4 text-white" />
-            </div>
-            <p className="font-medium text-green-600 dark:text-green-400">
-              拿到 offer <span aria-hidden="true">🏆</span>
-            </p>
           </div>
         </div>
-      </div>
+      )}
 
       <Button
         variant="success"
