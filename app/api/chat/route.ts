@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // 再读 body（不再含客户端凭证字段）
     const body = await req.json();
-    const { messages, contextSnapshot, toolContext, personaContext, preferredPersona } = body as {
+    const { messages, contextSnapshot, toolContext, personaContext, preferredPersona, knowledgeContext } = body as {
       messages?: ChatMessage[];
       contextSnapshot?: string;
       toolContext?: ToolContext;
@@ -77,6 +77,12 @@ export async function POST(req: NextRequest) {
       personaContext?: PersonaContext;
       /** 用户手动设置的偏好 Persona（覆盖自动选择） */
       preferredPersona?: PersonaId;
+      /**
+       * 知识库检索结果（v1 知识检索）：客户端 pre-retrieval 命中后注入。
+       * 服务端追加到 system prompt，让 AI 回答 grounded 在检索结果上。
+       * 为可选字段，老客户端不发送时行为不变。
+       */
+      knowledgeContext?: string;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -153,10 +159,21 @@ export async function POST(req: NextRequest) {
     }
     void personaId; // 当前仅用于调试/未来归因，不写入响应
 
-    // systemPrompt 拼接顺序：基础 prompt → contextSnapshot → persona 片段 → 工具能力说明
-    // persona 片段在 contextSnapshot 之后，让 AI 先了解用户上下文再调整语气
+    // systemPrompt 拼接顺序：基础 prompt → contextSnapshot → 知识检索结果 → persona 片段 → 工具能力说明
+    // 知识检索结果在 contextSnapshot 之后、persona 之前，让 AI 先了解用户上下文和检索知识再调整语气
     const parts: string[] = [PROMPT_DEF.system];
     if (safeContext) parts.push(safeContext);
+    // 知识库检索结果注入（v1 知识检索）：客户端 pre-retrieval 命中后传入，
+    // 让 AI 回答 grounded 在检索结果上，回答中可引用知识标题
+    const safeKnowledgeContext =
+      typeof knowledgeContext === "string" && knowledgeContext.length > 0
+        ? knowledgeContext.slice(0, 4000)
+        : "";
+    if (safeKnowledgeContext) {
+      parts.push(
+        `【知识库检索结果】\n以下是检索到的相关知识，回答时可参考并引用其标题。若用户问"有哪些 X"，请基于这些知识作答；若与问题无关请忽略。\n${safeKnowledgeContext}`,
+      );
+    }
     if (personaSnippet) parts.push(personaSnippet);
     // Trial 模式追加提示：让 AI 知道当前是体验用户、应建议添加自己的模型
     if (isTrial) {

@@ -10,6 +10,7 @@ import type { LearningPlan, Question, ScheduleItem, KnowledgeNode } from "@/lib/
 import { KnowledgeTree } from "@/components/KnowledgeTree";
 import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
+import { RelatedKnowledge } from "@/components/RelatedKnowledge";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Select, Modal } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
@@ -612,6 +613,13 @@ export default function PlanDetailClient() {
     return true;
   });
 
+  // 当前选中的知识点节点（用于「相关知识」面板）
+  // 仅在用户从知识树/脑图选中某个节点时存在，未选（filterNodeId==="all"）时为 null
+  const selectedNodeForRelated =
+    filterNodeId !== "all"
+      ? plan.knowledgeTree.find((n) => n.id === filterNodeId) ?? null
+      : null;
+
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto pb-20">
       <div className="mb-6">
@@ -684,6 +692,12 @@ export default function PlanDetailClient() {
           onMarkNeedsReinforce={handleMarkNodeNeedsReinforce}
         />
       </div>
+
+      {/* 相关知识（v1 知识检索扩展1）：选中某个知识点节点后，
+          基于该节点语义检索知识库中的相关知识，点击进入学习详情 */}
+      {selectedNodeForRelated && (
+        <RelatedKnowledge node={selectedNodeForRelated} />
+      )}
 
       <div className="mb-6" ref={questionsSectionRef}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">

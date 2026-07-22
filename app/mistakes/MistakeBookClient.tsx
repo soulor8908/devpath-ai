@@ -6,13 +6,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { listItems } from "@/lib/storage/db";
-import { KEY_PREFIXES, type LearningPlan, type MistakeRecord } from "@/lib/types";
+import { KEY_PREFIXES, type LearningPlan, type MistakeRecord, type KnowledgeNode } from "@/lib/types";
 import {
   getUnresolvedMistakes,
   resolveMistake,
 } from "@/lib/mistake-book";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
+import { RelatedKnowledge } from "@/components/RelatedKnowledge";
 
 /** 相对时间（"2小时前"） */
 function relativeTime(iso: string): string {
@@ -67,12 +68,12 @@ export default function MistakeBookClient() {
     loadData();
   }, [loadData]);
 
-  // nodeId → 节点标题（从所有计划的知识树里找）
-  const nodeTitleMap = useMemo(() => {
-    const map = new Map<string, string>();
+  // nodeId → 节点对象（从所有计划的知识树里找；存全节点以便 RelatedKnowledge 用 summary 检索）
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, KnowledgeNode>();
     for (const plan of plans) {
       for (const node of plan.knowledgeTree) {
-        if (!map.has(node.id)) map.set(node.id, node.title);
+        if (!map.has(node.id)) map.set(node.id, node);
       }
     }
     return map;
@@ -93,8 +94,8 @@ export default function MistakeBookClient() {
       }
     }
     if (!topId) return null;
-    return { title: nodeTitleMap.get(topId) ?? "未知知识点", count: topCount };
-  }, [unresolved, nodeTitleMap]);
+    return { title: nodeMap.get(topId)?.title ?? "未知知识点", count: topCount };
+  }, [unresolved, nodeMap]);
 
   async function handleResolve(id: string) {
     await resolveMistake(id);
@@ -165,7 +166,8 @@ export default function MistakeBookClient() {
         <div className="space-y-3">
           {unresolved.map((m) => {
             const expanded = expandedId === m.id;
-            const nodeTitle = nodeTitleMap.get(m.nodeId);
+            const node = nodeMap.get(m.nodeId);
+            const nodeTitle = node?.title;
             return (
               <div
                 key={m.id}
@@ -208,6 +210,15 @@ export default function MistakeBookClient() {
                     </Link>
                   </div>
                 </div>
+
+                {/* 相关知识点（v1 知识检索扩展2）：展开错题时，
+                    基于题目原文 + 关联节点检索知识库中的相关知识，
+                    帮用户从"这道题错了"延伸到"该补哪些知识" */}
+                {expanded && node && (
+                  <div className="mt-3">
+                    <RelatedKnowledge node={node} query={m.questionText} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -230,7 +241,7 @@ export default function MistakeBookClient() {
           {showResolved && (
             <div className="mt-3 space-y-2">
               {resolved.map((m) => {
-                const nodeTitle = nodeTitleMap.get(m.nodeId);
+                const nodeTitle = nodeMap.get(m.nodeId)?.title;
                 return (
                   <div
                     key={m.id}

@@ -35,6 +35,7 @@ const SCENE_LABELS: Record<AIScene, string> = {
   plan_generate: "精准计划生成",
   schedule_optimize: "日程优化",
   focus_session_start: "番茄启动",
+  embed: "知识检索嵌入",
 };
 
 // 时间范围选项

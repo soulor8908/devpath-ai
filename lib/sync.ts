@@ -35,6 +35,8 @@ const LAST_SYNC_KEY = "sync:last_synced_at";
 // API Key 仅本地存储，换设备需重新输入（与 lib/types.ts ModelConfig.apiKey 注释一致）。
 // DAILY_NUDGE / WEEKLY 是缓存，无需同步
 // DAILY_LOG（每日日志 Markdown）和 EMOTION（情绪笔记）需同步以支持跨设备
+// KB_INDEX（知识向量索引）不在此列——静态资源人人相同，随版本发布，
+// 同步会污染 KV backup 配额（详见 docs/superpowers/specs/2026-07-22-knowledge-vector-search-design.md 4.2）
 export const SYNC_PREFIXES = [
   KEY_PREFIXES.PLAN,
   KEY_PREFIXES.PLAN_SUMMARY,

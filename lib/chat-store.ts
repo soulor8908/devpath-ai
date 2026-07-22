@@ -84,6 +84,8 @@ export async function addMessage(params: {
   conversationId: string;
   role: ChatMessage["role"];
   content: string;
+  /** 该 assistant 回答引用的知识来源（v1 知识检索 pre-retrieval 命中后传入） */
+  knowledgeSources?: ChatMessage["knowledgeSources"];
 }): Promise<ChatMessage> {
   const msg: ChatMessage = {
     id: nanoid(),
@@ -91,6 +93,9 @@ export async function addMessage(params: {
     role: params.role,
     content: params.content,
     createdAt: new Date().toISOString(),
+    ...(params.knowledgeSources && params.knowledgeSources.length > 0
+      ? { knowledgeSources: params.knowledgeSources }
+      : {}),
   };
   await setItem(KEY_PREFIXES.CHAT_MESSAGE + msg.id, msg);
   // 更新对话的 lastMessageAt 和 messageCount

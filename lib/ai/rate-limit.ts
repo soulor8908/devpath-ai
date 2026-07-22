@@ -110,6 +110,8 @@ export function getRateLimitScenes(): AIScene[] {
  */
 const TRIAL_SCENE_QUOTAS: Partial<Record<AIScene, number>> = {
   chat: 5,
+  // 知识检索嵌入：trial 用户 100/天（每次知识型聊天约 1 次 embed，足够体验）
+  embed: 100,
 };
 
 const TRIAL_DEFAULT_QUOTA = 2;

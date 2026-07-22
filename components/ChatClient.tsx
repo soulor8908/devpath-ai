@@ -19,8 +19,14 @@ import {
   type ModelConfig,
   type LearningPlan,
   type ChatSource,
+  type KnowledgeSourceRef,
   KEY_PREFIXES,
 } from "@/lib/types";
+import {
+  shouldRetrieveKnowledge,
+  retrieveKnowledge,
+} from "@/lib/knowledge/search";
+import { KnowledgeCardGroup } from "./KnowledgeCardGroup";
 import {
   listConversations,
   createConversation,
@@ -561,13 +567,62 @@ export default function ChatClient({
     inputRef.current?.focus();
   }, []);
 
+  // Pre-retrieval：在发起 AI 请求前，先检索知识库（启发式 + 向量/关键词），
+  // 命中时返回 knowledgeContext 文本和 knowledgeSources 引用，
+  // 由 streamAIResponse 注入 system prompt 并挂到 assistant 消息。
+  // 失败时静默降级（不阻塞聊天），返回空数组。
+  const preRetrieveKnowledge = useCallback(
+    async (
+      text: string,
+    ): Promise<{ knowledgeContext: string; knowledgeSources: KnowledgeSourceRef[] }> => {
+      if (!shouldRetrieveKnowledge(text)) {
+        return { knowledgeContext: "", knowledgeSources: [] };
+      }
+      try {
+        const result = await retrieveKnowledge(text, { topK: 5 });
+        if (result.entries.length === 0) {
+          return { knowledgeContext: "", knowledgeSources: [] };
+        }
+        // 构造注入 system prompt 的检索结果文本（带编号 + 标题 + 摘要 + 来源）
+        const contextLines = result.entries.map((r, i) => {
+          const entry = r.entry;
+          const sourceLabel =
+            entry.source === "preset"
+              ? entry.presetName ?? "预设知识"
+              : entry.docCategory ?? "产品文档";
+          const tags = entry.tags.length > 0 ? ` 标签: ${entry.tags.slice(0, 4).join(",")}` : "";
+          const summary = entry.summary ? `\n摘要: ${entry.summary}` : "";
+          return `${i + 1}. [${sourceLabel}] ${entry.title}${summary}${tags}`;
+        });
+        const knowledgeContext = contextLines.join("\n\n");
+        const knowledgeSources: KnowledgeSourceRef[] = result.entries.map((r) => ({
+          id: r.entry.id,
+          title: r.entry.title,
+          score: r.score,
+          source: r.entry.source,
+        }));
+        return { knowledgeContext, knowledgeSources };
+      } catch {
+        // 检索失败不影响聊天主流程
+        return { knowledgeContext: "", knowledgeSources: [] };
+      }
+    },
+    [],
+  );
+
   // 共享：调用 /api/chat 流式获取 AI 回复，返回完整内容 + 执行 clientAction
   // convId/msgs/history 由调用方决定（普通发送 vs 重新生成）
+  // knowledgeContext/knowledgeSources：调用方在发送前做 pre-retrieval，
+  // 命中时把检索结果文本注入 system prompt，并把来源引用挂到 assistant 消息。
   const streamAIResponse = useCallback(
     async (params: {
       convId: string;
       history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
       label: string;
+      /** 注入 system prompt 的知识检索结果文本（可选） */
+      knowledgeContext?: string;
+      /** 挂到 assistant 消息上的知识来源引用（可选） */
+      knowledgeSources?: KnowledgeSourceRef[];
     }): Promise<{ content: string; callId: string } | { error: string } | { aborted: true }> => {
       // 准备模型配置
       let modelConfig = modelConfigs.find((m) => m.id === selectedModelId);
@@ -615,6 +670,9 @@ export default function ChatClient({
         messages: params.history,
         contextSnapshot,
         toolContext,
+        // 知识检索结果（v1 知识检索）：客户端 pre-retrieval 命中后注入，
+        // 服务端追加到 system prompt 让 AI grounded 回答（route 中按 4000 字截断）
+        ...(params.knowledgeContext ? { knowledgeContext: params.knowledgeContext } : {}),
       });
       let res: Response;
       try {
@@ -767,6 +825,8 @@ export default function ChatClient({
         conversationId: params.convId,
         role: "assistant",
         content: finalContent,
+        // 挂上 pre-retrieval 命中的知识来源，供消息渲染时展示「知识来源卡片」
+        knowledgeSources: params.knowledgeSources,
       });
       setMessages((prev) => [...prev, aiMsg]);
       setStreamContent("");
@@ -901,10 +961,15 @@ export default function ChatClient({
         content: m.content,
       }));
 
+      // Pre-retrieval：根据 user 消息检索知识库，命中则注入到 AI 请求
+      const { knowledgeContext, knowledgeSources } = await preRetrieveKnowledge(text);
+
       const result = await streamAIResponse({
         convId: conv.id,
         history,
         label: text,
+        knowledgeContext,
+        knowledgeSources,
       });
       if ("error" in result) {
         setError(result.error);
@@ -928,6 +993,7 @@ export default function ChatClient({
     selectedModelId,
     refreshConversations,
     streamAIResponse,
+    preRetrieveKnowledge,
   ]);
 
   // 重新生成：以 user 消息为锚点，删除其后的 AI 回复及后续消息，用该 user 消息重新请求 AI
@@ -967,10 +1033,16 @@ export default function ChatClient({
           role: m.role,
           content: m.content,
         }));
+        // Pre-retrieval：重新生成时也走知识检索（结果可能变化）
+        const { knowledgeContext, knowledgeSources } = await preRetrieveKnowledge(
+          userMsg.content,
+        );
         const result = await streamAIResponse({
           convId,
           history,
           label: userMsg.content,
+          knowledgeContext,
+          knowledgeSources,
         });
         if ("error" in result) {
           setError(result.error);
@@ -986,7 +1058,7 @@ export default function ChatClient({
         setError(msg);
       }
     },
-    [messages, streaming, streamAIResponse, refreshConversations],
+    [messages, streaming, streamAIResponse, refreshConversations, preRetrieveKnowledge],
   );
 
   // 删除单条消息（多轮对话中删除某次对话）
@@ -1054,10 +1126,14 @@ export default function ChatClient({
           role: m.role,
           content: m.content,
         }));
+        // Pre-retrieval：编辑后再走一次知识检索（用户可能改成不同主题）
+        const { knowledgeContext, knowledgeSources } = await preRetrieveKnowledge(text);
         const result = await streamAIResponse({
           convId,
           history,
           label: text,
+          knowledgeContext,
+          knowledgeSources,
         });
         if ("error" in result) {
           setError(result.error);
@@ -1073,7 +1149,7 @@ export default function ChatClient({
         setError(msg);
       }
     },
-    [editContent, streaming, messages, streamAIResponse, refreshConversations],
+    [editContent, streaming, messages, streamAIResponse, refreshConversations, preRetrieveKnowledge],
   );
 
   // 键盘快捷键：Enter 发送，Shift+Enter 换行
@@ -1451,6 +1527,11 @@ export default function ChatClient({
                   </Button>
                 )}
               </div>
+              {/* 知识来源卡片（v1 知识检索）：pre-retrieval 命中时挂在 assistant 消息上，
+                  点击任一卡片打开 KnowledgeDetailModal 进入学习详情 */}
+              {m.knowledgeSources && m.knowledgeSources.length > 0 && (
+                <KnowledgeCardGroup sources={m.knowledgeSources} compact />
+              )}
             </div>
           )
         )}

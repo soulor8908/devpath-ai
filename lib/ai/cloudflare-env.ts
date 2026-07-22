@@ -133,3 +133,44 @@ export function getAuthNoncesKV(): KVNamespace | null {
 export function getAuthAuditKV(): KVNamespace | null {
   return getAuthKV("AUTH_AUDIT");
 }
+
+// ============================================================================
+// Workers AI binding（知识库向量化用）
+// ============================================================================
+
+/**
+ * Workers AI binding 最小接口。
+ * 真实运行时由 @cloudflare/workers-types 提供 Ai 全局类型；
+ * 该包未安装时使用本接口（与 Workers AI run() API 子集兼容）。
+ *
+ * bge 嵌入模型返回形状：{ shape: [N, D], data: number[][] }
+ */
+export interface AIExecutor {
+  run(
+    model: string,
+    inputs: { text: string | string[] },
+  ): Promise<{ shape?: number[]; data: number[][] | number[] }>;
+}
+
+/**
+ * 从当前 Cloudflare Pages 请求上下文获取 Workers AI binding。
+ * app/api 的 Edge runtime 路由通过 getRequestContext 读取 env.AI。
+ * 非 Cloudflare 环境或 binding 不存在 → 返回 null，调用方（/api/embed）返回 503，
+ * 客户端走离线降级（关键词检索）。
+ */
+export function getAI(): AIExecutor | null {
+  try {
+    const ctx = (globalThis as Record<symbol, { env?: Record<string, unknown> } | undefined>)[CF_CTX_SYMBOL];
+    const ai = ctx?.env?.AI;
+    if (
+      ai &&
+      typeof ai === "object" &&
+      typeof (ai as { run?: unknown }).run === "function"
+    ) {
+      return ai as AIExecutor;
+    }
+  } catch {
+    // 非 Cloudflare 环境，忽略
+  }
+  return null;
+}
