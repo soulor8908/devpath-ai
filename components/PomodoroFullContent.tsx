@@ -91,11 +91,17 @@ export interface PomodoroFullContentProps {
   onComplete?: () => void;
   /** 放弃后回调 */
   onAbandon?: () => void;
+  /** 用户点击"开始专注"后回调（widget 据此切回 small 浮窗） */
+  onStart?: () => void;
+  /** 用户点击"开始休息"后回调（widget 据此切回 small 浮窗） */
+  onStartBreak?: () => void;
 }
 
 export function PomodoroFullContent({
   onComplete,
   onAbandon,
+  onStart,
+  onStartBreak,
 }: PomodoroFullContentProps = {}) {
   // 视图状态
   const [view, setView] = useState<View>("idle");
@@ -312,6 +318,8 @@ export function PomodoroFullContent({
         const ok = await requestPermission();
         setNotifPermission(ok);
       }
+      // 通知 widget 切回 small 浮窗（修需求3：之前点了开始专注后还停留在大弹窗）
+      onStart?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "启动失败");
     }
@@ -428,6 +436,8 @@ export function PomodoroFullContent({
       completingRef.current = false;
       // 休息 session 不启动打断追踪
       stopGuard();
+      // 通知 widget 切回 small 浮窗（休息态在小浮窗里展示，进度环用绿色）
+      onStartBreak?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "启动休息失败");
     }

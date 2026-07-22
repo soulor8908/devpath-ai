@@ -34,12 +34,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { PomodoroSession } from "@/lib/types";
 import {
   getActiveSession,
+  createSession,
+  completeSession,
   pauseSession,
   resumeSession,
   abandonSession,
   POMODORO_SESSION_CHANGED_EVENT,
   POMODORO_OPEN_LARGE_EVENT,
 } from "@/lib/timer/pomodoro";
+import { getNextBreakType, getRecommendedDuration } from "@/lib/timer/pomodoro-rule";
+import { getTodayCount } from "@/lib/timer/session-tracker";
 import { notify } from "@/lib/timer/notification-permission";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Button } from "@/components/ui";
@@ -191,47 +195,89 @@ export function PomodoroWidget() {
   const notifiedRef = useRef<string | null>(null);
   // 拖动 vs 点击判定：移动距离 < 5px 视为点击
   const dragMovedRef = useRef(false);
-  // 上一次 refresh 时的 session 快照：用于检测 focus session 从 running → completed 的转变
-  // 检测到完成时自动展开 large modal 显示 completed 视图（需求2：番茄结束后提醒进入休息）
-  const prevSessionRef = useRef<PomodoroSession | null>(null);
+  // 正在完成的 session id：防止 refresh 重入（每秒轮询 + 事件触发）
+  // 一旦归零检测到，立刻占位，避免下一秒重复 completeSession
+  const completingRef = useRef<string | null>(null);
 
+  // 单一事实源（卡帕西视角）：
+  // 把"倒计时归零 → 完成 → 进入休息/break 结束切大弹窗"状态机收归到 widget，
+  // small / large 两种形态共享同一套生命周期，PomodoroFullContent 退化为展示+表单组件。
+  //
+  // 关键修复（用户需求）：
+  //   - 小浮窗 focus 倒计时到 0 → notify 用户 + 自动 completeSession + 自动创建 break session（继续小浮窗）
+  //   - 小浮窗 break 倒计时到 0 → notify 用户 + 自动 completeSession + 切换 large modal 让用户选择下一个 focus
+  //   - large modal 中点"开始专注"/"开始休息" → 通过 onStart/onStartBreak 回调切回 small 浮窗
   const refresh = useCallback(async () => {
     // 用 getActiveSession（running 或 paused 都算活跃）：
     // 修 bug：用户点暂停后 session.status=paused，原 getRunningSession 返回 null
     // → setSession(null) → widget 守卫隐藏整个 widget，看起来像"点暂停关闭了弹窗"
     const active = await getActiveSession();
-    const prev = prevSessionRef.current;
 
-    // 检测 focus session 刚刚完成（prev 是 running focus session，当前已无 active 或换了新 session）
-    // → 自动展开 large modal 显示 completed 视图（休息建议）
-    // 仅在 small 模式下触发（large 模式下 PomodoroFullContent 内部已 setView("completed")）
+    // ===== 1. 完成状态机：检测归零需自动完成 =====
+    // 仅 running 状态触发（paused 不算超时），且未被 completingRef 占位
     if (
-      prev &&
-      prev.type === "focus" &&
-      prev.status === "running" &&
-      (!active || active.id !== prev.id) &&
-      mode === "small"
+      active &&
+      active.status === "running" &&
+      computeRemainingMs(active) <= 0 &&
+      completingRef.current !== active.id
     ) {
-      setMode("large");
-    }
-    prevSessionRef.current = active;
+      completingRef.current = active.id;
+      try {
+        // 1.1 通知用户（按 type 区分文案）
+        if (notifiedRef.current !== active.id) {
+          notifiedRef.current = active.id;
+          if (active.type === "focus") {
+            await notify(
+              "番茄完成",
+              `「${active.taskDescription || "专注"}」专注完成，开始休息`,
+            );
+          } else {
+            await notify(
+              "休息结束",
+              "休息结束，准备开始下一段专注",
+            );
+          }
+        }
+        // 1.2 完成 session（写 LearnLog、清 current flag、派发 change 事件）
+        await completeSession(active.id);
 
-    setSession(active);
-    if (active) {
-      const remaining = computeRemainingMs(active);
-      setRemainingMs(remaining);
-      setProgress(computeProgress(active));
-      if (remaining <= 0 && notifiedRef.current !== active.id) {
-        notifiedRef.current = active.id;
-        void notify(
-          "番茄完成",
-          `「${active.taskDescription}」专注完成，去休息一下吧`,
-        );
+        // 1.3 按 type 决定下一步
+        if (active.type === "focus") {
+          // focus 完成 → 自动创建对应 break session（按 4-1 规则选长短休）
+          // break session 仍是 running，下一帧 refresh 拉到新的 active → 小浮窗继续显示
+          const todayCount = await getTodayCount();
+          const breakType = getNextBreakType(todayCount);
+          const breakMinutes = getRecommendedDuration(breakType, "standard");
+          await createSession({
+            taskDescription: breakType === "long_break" ? "长休息" : "短休息",
+            type: breakType,
+            durationMinutes: breakMinutes,
+          });
+          // markSessionCurrent 由 createSession 内部已调用
+        } else {
+          // break 完成 → 切大弹窗让用户选择下一个 focus
+          // 此时无 active session，PomodoroFullContent init 会检测"10s 内完成的 focus session"
+          // 但 break 完成后没有 just-completed focus（除非巧合），所以会进 idle 视图让用户主动开始
+          // 这正是用户需求："休息完再提醒用户并切换到大弹窗让用户选择"
+          setMode("large");
+        }
+      } catch (e) {
+        console.error("[pomodoro-widget] auto-complete failed:", e);
+      } finally {
+        completingRef.current = null;
       }
+    }
+
+    // ===== 2. 重新拉取 active（completeSession + createSession 后状态可能已变） =====
+    const latest = await getActiveSession();
+    setSession(latest);
+    if (latest) {
+      setRemainingMs(computeRemainingMs(latest));
+      setProgress(computeProgress(latest));
     } else {
       notifiedRef.current = null;
     }
-  }, [mode]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -452,8 +498,12 @@ export function PomodoroWidget() {
   // large 模式：只渲染 Modal，不渲染 small widget（需求4：打开大番茄时钟时隐藏小番茄时钟）
   // 关闭 Modal 后会自然回到 small 模式渲染，无需提前渲染 small widget
   // position 未就绪时不显示（避免首帧闪烁在错误位置）
-  // 需求2：onComplete 不再关闭 modal —— 番茄完成是"胜利时刻"，应保持 modal 打开
-  // 显示 completed 视图（休息建议 + 再来一个番茄）。用户主动关闭或开始休息后才回到 small。
+  //
+  // 单一事实源（卡帕西视角）：
+  //   - 完成状态机已在 widget 的 refresh 中统一处理，PomodoroFullContent 不再独占完成逻辑
+  //   - 大弹窗内的 running tick 仍保留自动完成（用户在大弹窗里看专注时也能自动归档）
+  //   - onStart / onStartBreak 回调：用户点"开始专注"/"开始休息"后自动切回 small 浮窗
+  //     （修需求3：之前点了开始专注后还停留在大弹窗，需手动关闭才回小浮窗）
   if (mode === "large") {
     return (
       <Modal
@@ -462,7 +512,10 @@ export function PomodoroWidget() {
         title="番茄专注"
         size="lg"
       >
-        <PomodoroFullContent />
+        <PomodoroFullContent
+          onStart={() => setMode("small")}
+          onStartBreak={() => setMode("small")}
+        />
       </Modal>
     );
   }
@@ -520,6 +573,10 @@ function SmallWidget({
 }: SmallWidgetProps) {
   const isPaused = session.status === "paused";
   const isOvertime = remainingMs <= 0 && session.status === "running";
+  // 休息态：short_break / long_break 用绿色环区分（卡帕西视角：状态色编码一致性）
+  const isBreak =
+    session.type === "short_break" || session.type === "long_break";
+  const isLongBreak = session.type === "long_break";
 
   // 圆环参数：直径 56px，stroke 4
   const SIZE = SMALL_SIZE;
@@ -532,13 +589,25 @@ function SmallWidget({
   // 控制菜单（长按或右键唤起）
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // aria-label：休息态显式区分（无障碍 + 状态可感知）
+  const stateLabel = isOvertime
+    ? "已超时"
+    : isPaused
+      ? "已暂停"
+      : isLongBreak
+        ? "长休息中"
+        : isBreak
+          ? "短休息中"
+          : "专注中";
+  const ariaLabel = `番茄钟 · ${stateLabel} · 剩余 ${remainingMinutes} 分钟，点击展开`;
+
   return (
     <>
       <div
         ref={widgetRef}
         role="button"
         tabIndex={0}
-        aria-label={`番茄钟 剩余 ${remainingMinutes} 分钟，点击展开`}
+        aria-label={ariaLabel}
         aria-live="polite"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -590,7 +659,9 @@ function SmallWidget({
                 ? "stroke-danger"
                 : isPaused
                   ? "stroke-gray-400 dark:stroke-gray-500"
-                  : "stroke-brand-500"
+                  : isBreak
+                    ? "stroke-green-500"
+                    : "stroke-brand-500"
             }
             strokeWidth={STROKE}
             strokeLinecap="round"
@@ -598,14 +669,16 @@ function SmallWidget({
             strokeDashoffset={dashOffset}
           />
         </svg>
-        {/* 中间分钟数 */}
+        {/* 中间分钟数：休息态用绿色文字呼应 */}
         <div
           className={`absolute inset-0 flex items-center justify-center font-mono font-bold tabular-nums text-sm ${
             isOvertime
               ? "text-danger"
               : isPaused
                 ? "text-gray-400 dark:text-gray-500"
-                : "text-gray-900 dark:text-gray-100"
+                : isBreak
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-gray-900 dark:text-gray-100"
           }`}
         >
           {remainingMinutes}
@@ -615,6 +688,13 @@ function SmallWidget({
           <div
             aria-hidden
             className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"
+          />
+        )}
+        {/* 休息标记：左上角绿色小点（与暂停标记区分位置） */}
+        {isBreak && !isPaused && (
+          <div
+            aria-hidden
+            className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-green-500"
           />
         )}
       </div>
