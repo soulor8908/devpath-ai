@@ -29,7 +29,9 @@ id = "31f90bc37a644f55902e1a8b4ebce13b"
 # Workers AI binding（知识库向量化：/api/embed 调 bge-base-en-v1.5 嵌入查询文本）
 # 注意：@cloudflare/next-on-pages 通过 getRequestContext().env.AI 读取，
 # 此声明让 wrangler 在本地 dev 和 Pages 部署时注入 AI binding。
-[[ai]]
+# 写法注意：wrangler 4.x 要求 [ai]（对象形式），不是 [[ai]]（数组形式），
+# 否则报 "The field 'ai' should be an object but got [...]"
+[ai]
 binding = "AI"
 
 [vars]

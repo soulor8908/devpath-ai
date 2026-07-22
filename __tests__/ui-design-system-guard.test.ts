@@ -61,7 +61,6 @@ const LEGACY_FILES = new Set<string>([
   "app/HomeClient.tsx",
   "app/achievements/page.tsx",
   "app/daily/page.tsx",
-  "app/dashboard/DashboardClient.tsx",
   "app/docs/page.tsx",
   "app/emotion/page.tsx",
   "app/error.tsx",

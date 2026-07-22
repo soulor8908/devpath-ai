@@ -31,8 +31,28 @@ import {
   makeOutputDigest,
   generateCallId,
 } from "@/lib/ai/quality-tracker";
-import { useAutoFullscreen } from "@/lib/hooks/use-auto-fullscreen";
 import { toast } from "@/lib/toast";
+
+// 上次查看的题目缓存（按 planId 维度，localStorage 存储）
+// 用户点开过任一面试题后写入；下次进入该 plan 不再弹脑图，直接滚动到这题
+// key 形如 "learn:lastViewedQ:<planId>"，value 为 questionId
+const LAST_VIEWED_Q_PREFIX = "learn:lastViewedQ:";
+function getLastViewedQuestion(planId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(LAST_VIEWED_Q_PREFIX + planId);
+  } catch {
+    return null;
+  }
+}
+function setLastViewedQuestion(planId: string, questionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_VIEWED_Q_PREFIX + planId, questionId);
+  } catch {
+    // 隐私模式或配额满，静默忽略
+  }
+}
 import { confirmDialog } from "@/lib/confirm-dialog";
 import {
   startAITask,
@@ -81,7 +101,10 @@ export default function PlanDetailClient() {
   const [showMindMapModal, setShowMindMapModal] = useState(false);
   const [showMindMapFloat, setShowMindMapFloat] = useState(false);
 
-  const fullscreen = useAutoFullscreen();
+  // 知识树 / 学习计划外层区块默认折叠（用户主动展开查看）
+  // 折叠按钮带 aria-expanded + aria-controls（遵循 AGENTS.md 2.5）
+  const [knowledgeTreeCollapsed, setKnowledgeTreeCollapsed] = useState(true);
+  const [scheduleCollapsed, setScheduleCollapsed] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -117,8 +140,27 @@ export default function PlanDetailClient() {
             block: "start",
           });
         }, 100);
+        return;
+      }
+
+      // 上次查看的题目缓存：用户点开过任一面试题后写入 localStorage，
+      // 下次进入该 plan 不再弹脑图，直接滚动到上次查看的题目（续学场景）
+      const lastViewedQid = getLastViewedQuestion(p.id);
+      const lastViewedQ = lastViewedQid
+        ? p.questions.find((q) => q.id === lastViewedQid)
+        : null;
+      if (lastViewedQ) {
+        // 自动筛选到该题所属知识点（让用户看到上下文），再滚动到该题
+        setFilterNodeId(lastViewedQ.nodeId);
+        setShowMindMapFloat(true); // 不弹脑图，但保留悬浮入口
+        setTimeout(() => {
+          questionRefs.current[lastViewedQ.id]?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }, 150);
       } else {
-        // 需求 5：首次进入学习页（无 ?node= 参数）→ 自动弹出脑图入口弹窗
+        // 首次进入（无 ?node= 参数 + 无上次查看记录）→ 自动弹出脑图入口弹窗
         // 让用户鸟瞰整个知识树，主动选择今天从哪个知识点开始
         setShowMindMapModal(true);
       }
@@ -176,23 +218,60 @@ export default function PlanDetailClient() {
   }
 
   // 学习反馈闭环：用户标记题目"看懂了 / 再想想"
+  // 增强项（需求 5）：标记"看懂"后，检查所属知识点下的题目是否全部 understood，
+  // 若是且该节点尚未 mastered → 自动调用 markNodeMastered(plan, nodeId, true)
+  // 让"看完所有题"自然推导出"掌握该知识点"，无需用户再手动标记
   async function handleMarkUnderstood(questionId: string, understood: boolean) {
     if (!plan) return;
     try {
       const updated = await markQuestionUnderstood(plan, questionId, understood);
       setPlan(updated);
+
+      // 仅在「标记看懂」时检查自动掌握（取消看懂不触发）
+      if (understood) {
+        const targetQ = updated.questions.find((q) => q.id === questionId);
+        if (targetQ) {
+          const nodeQuestions = updated.questions.filter(
+            (q) => q.nodeId === targetQ.nodeId,
+          );
+          const node = updated.knowledgeTree.find(
+            (n) => n.id === targetQ.nodeId,
+          );
+          // 该节点至少有 1 道题，且全部 understood，且节点尚未被显式 mastered
+          if (
+            node &&
+            !node.mastered &&
+            nodeQuestions.length > 0 &&
+            nodeQuestions.every((q) => q.understood)
+          ) {
+            const masteredPlan = await markNodeMastered(
+              updated,
+              node.id,
+              true,
+            );
+            setPlan(masteredPlan);
+            toast.success(
+              `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
+            );
+            return;
+          }
+        }
+      }
       toast.success(understood ? "已记录「看懂了」" : "已取消「看懂了」标记");
     } catch (e) {
       toast.error("标记失败：" + (e instanceof Error ? e.message : String(e)));
     }
   }
 
-  // 学习反馈闭环：用户首次展开答案 → 隐式记录 viewed
+  // 学习反馈闭环：用户首次展开答案 → 隐式记录 viewed + 缓存到 localStorage
+  // 缓存的 questionId 用于下次进入该 plan 时直接滚动到这题（不弹脑图）
   async function handleQuestionViewed(questionId: string) {
     if (!plan) return;
     try {
       const updated = await markQuestionViewed(plan, questionId);
       setPlan(updated);
+      // 持久化上次查看的题目 id（按 planId 维度）
+      setLastViewedQuestion(plan.id, questionId);
     } catch {
       // 静默失败（隐式反馈不应阻塞用户阅读答案）
     }
@@ -655,23 +734,6 @@ export default function PlanDetailClient() {
             >
               <Icon name="pen" className="w-4 h-4 inline-block align-middle" /> 调整计划
             </Link>
-            {fullscreen.supported && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const ok = await fullscreen.enterFullscreen();
-                  if (ok) {
-                    toast.info("已进入全屏专注，按 Esc 退出");
-                  } else {
-                    toast.warning("当前浏览器不支持全屏");
-                  }
-                }}
-                title="进入全屏专注模式（默认竖屏）"
-              >
-                <Icon name="monitor" className="w-4 h-4 inline-block align-middle" /> 全屏
-              </Button>
-            )}
           </div>
         </div>
         <Button
@@ -684,13 +746,36 @@ export default function PlanDetailClient() {
       </div>
 
       <div className="mb-6">
-        <KnowledgeTree
-          nodes={plan.knowledgeTree}
-          onSelectNode={handleKnowledgeNodeSelect}
-          selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
-          onMarkMastered={handleMarkNodeMastered}
-          onMarkNeedsReinforce={handleMarkNodeNeedsReinforce}
-        />
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={!knowledgeTreeCollapsed}
+          aria-controls="knowledge-tree-panel"
+          onClick={() => setKnowledgeTreeCollapsed((v) => !v)}
+          className="w-full justify-between mb-2"
+        >
+          <span className="flex items-center gap-1.5 font-bold text-base text-gray-800 dark:text-gray-100">
+            <Icon
+              name={knowledgeTreeCollapsed ? "chevron-right" : "chevron-down"}
+              className="w-4 h-4"
+            />
+            知识树（{plan.knowledgeTree.length}）
+          </span>
+          <span className="text-2xs text-gray-400 dark:text-gray-500">
+            {knowledgeTreeCollapsed ? "展开" : "收起"}
+          </span>
+        </Button>
+        {!knowledgeTreeCollapsed && (
+          <div id="knowledge-tree-panel">
+            <KnowledgeTree
+              nodes={plan.knowledgeTree}
+              onSelectNode={handleKnowledgeNodeSelect}
+              selectedNodeId={filterNodeId !== "all" ? filterNodeId : undefined}
+              onMarkMastered={handleMarkNodeMastered}
+              onMarkNeedsReinforce={handleMarkNodeNeedsReinforce}
+            />
+          </div>
+        )}
       </div>
 
       {/* 相关知识（v1 知识检索扩展1）：选中某个知识点节点后，
@@ -771,6 +856,89 @@ export default function PlanDetailClient() {
                 </option>
               ))}
             </Select>
+            {/* 上一个 / 下一个 知识点快速切换：仅当 Select 选了具体知识点时显示，
+                按知识树顺序前后切换 filterNodeId 并滚动到题目区 */}
+            {filterNodeId !== "all" && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const idx = plan.knowledgeTree.findIndex(
+                      (n) => n.id === filterNodeId,
+                    );
+                    if (idx > 0) {
+                      const prev = plan.knowledgeTree[idx - 1];
+                      setFilterNodeId(prev.id);
+                      setTimeout(() => {
+                        const q = plan.questions.find(
+                          (x) => x.nodeId === prev.id,
+                        );
+                        if (q && questionRefs.current[q.id]) {
+                          questionRefs.current[q.id]?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                        } else {
+                          questionsSectionRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }
+                      }, 50);
+                    }
+                  }}
+                  disabled={
+                    plan.knowledgeTree.findIndex(
+                      (n) => n.id === filterNodeId,
+                    ) <= 0
+                  }
+                  title="上一个知识点"
+                  aria-label="上一个知识点"
+                >
+                  <Icon name="chevron-left" className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const idx = plan.knowledgeTree.findIndex(
+                      (n) => n.id === filterNodeId,
+                    );
+                    if (idx >= 0 && idx < plan.knowledgeTree.length - 1) {
+                      const next = plan.knowledgeTree[idx + 1];
+                      setFilterNodeId(next.id);
+                      setTimeout(() => {
+                        const q = plan.questions.find(
+                          (x) => x.nodeId === next.id,
+                        );
+                        if (q && questionRefs.current[q.id]) {
+                          questionRefs.current[q.id]?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                        } else {
+                          questionsSectionRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }
+                      }, 50);
+                    }
+                  }}
+                  disabled={
+                    plan.knowledgeTree.findIndex(
+                      (n) => n.id === filterNodeId,
+                    ) >=
+                    plan.knowledgeTree.length - 1
+                  }
+                  title="下一个知识点"
+                  aria-label="下一个知识点"
+                >
+                  <Icon name="chevron-right" className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
             <Input
               type="text"
               value={searchQuery}
@@ -826,57 +994,79 @@ export default function PlanDetailClient() {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-lg font-bold mb-3">学习计划</h2>
-        <p className="text-xs text-gray-400 mb-2">点击任务标记完成/取消，点击标题跳转到对应题目</p>
-        <div className="space-y-2">
-          {days.map((day) => {
-            const dayItems = scheduleByDay[day];
-            const completedCount = dayItems.filter((d) => d.item.completed).length;
-            return (
-              <div key={day} className="border rounded-lg p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium">第 {day} 天</p>
-                  <span className="text-xs text-gray-400">{completedCount}/{dayItems.length} 完成</span>
-                </div>
-                <div className="space-y-1">
-                  {dayItems.map(({ item, index }) => {
-                    const nodeTitle = plan.knowledgeTree.find((n) => n.id === item.nodeId)?.title || item.nodeId;
-                    return (
-                      <div
-                        key={index}
-                        className={`flex items-center gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors ${
-                          item.completed ? "opacity-50" : ""
-                        }`}
-                        onClick={() => handleScheduleClick(index)}
-                      >
-                        <span
-                          className={`px-2 py-0.5 rounded select-none ${
-                            item.type === "learn"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
-                        >
-                          {item.type === "learn" ? "学" : "复"}
-                        </span>
-                        <span
-                          className="text-gray-600 flex-1 hover:text-blue-600 hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleScheduleScroll(item.nodeId);
-                          }}
-                        >
-                          {nodeTitle}
-                        </span>
-                        {item.completed && <span className="text-green-500"><Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
-                        <span className="text-gray-400">{item.estimatedMinutes}min</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={!scheduleCollapsed}
+          aria-controls="schedule-panel"
+          onClick={() => setScheduleCollapsed((v) => !v)}
+          className="w-full justify-between mb-2"
+        >
+          <span className="flex items-center gap-1.5 font-bold text-base text-gray-800 dark:text-gray-100">
+            <Icon
+              name={scheduleCollapsed ? "chevron-right" : "chevron-down"}
+              className="w-4 h-4"
+            />
+            学习计划（{days.length} 天）
+          </span>
+          <span className="text-2xs text-gray-400 dark:text-gray-500">
+            {scheduleCollapsed ? "展开" : "收起"}
+          </span>
+        </Button>
+        {!scheduleCollapsed && (
+          <div id="schedule-panel">
+            <p className="text-xs text-gray-400 mb-2">点击任务标记完成/取消，点击标题跳转到对应题目</p>
+            <div className="space-y-2">
+              {days.map((day) => {
+                const dayItems = scheduleByDay[day];
+                const completedCount = dayItems.filter((d) => d.item.completed).length;
+                return (
+                  <div key={day} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium">第 {day} 天</p>
+                      <span className="text-xs text-gray-400">{completedCount}/{dayItems.length} 完成</span>
+                    </div>
+                    <div className="space-y-1">
+                      {dayItems.map(({ item, index }) => {
+                        const nodeTitle = plan.knowledgeTree.find((n) => n.id === item.nodeId)?.title || item.nodeId;
+                        return (
+                          <div
+                            key={index}
+                            className={`flex items-center gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors ${
+                              item.completed ? "opacity-50" : ""
+                            }`}
+                            onClick={() => handleScheduleClick(index)}
+                          >
+                            <span
+                              className={`px-2 py-0.5 rounded select-none ${
+                                item.type === "learn"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-green-100 text-green-700"
+                              }`}
+                            >
+                              {item.type === "learn" ? "学" : "复"}
+                            </span>
+                            <span
+                              className="text-gray-600 flex-1 hover:text-blue-600 hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleScheduleScroll(item.nodeId);
+                              }}
+                            >
+                              {nodeTitle}
+                            </span>
+                            {item.completed && <span className="text-green-500"><Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
+                            <span className="text-gray-400">{item.estimatedMinutes}min</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 重新生成弹窗（用统一 Modal 组件）*/}

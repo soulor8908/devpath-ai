@@ -93,7 +93,7 @@ export default function DailyPage() {
     <div className="mx-auto max-w-2xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">每日日志</h1>
-        <Link href="/dashboard" className="text-sm text-blue-500 hover:underline">
+        <Link href="/profile" className="text-sm text-blue-500 hover:underline">
           ← 返回
         </Link>
       </div>

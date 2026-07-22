@@ -556,6 +556,19 @@ export function useHomeData(): HomeData & {
   const load = useCallback(async () => {
     const today = chinaDateNow();
     const todayStatusKey = KEY_PREFIXES.STATUS + today;
+
+    // 新用户首次访问：注入 demo 数据（frontend 示例计划 + 几张复习卡 + 2 天学习日志）
+    // 让新用户立刻看到"有内容"的产品状态，而非空荡荡的空白引导页
+    // 幂等：shouldInjectDemo 内部已检查 demo plan 是否存在，重复调用不会叠加
+    // 注入完成后继续走下面的并行加载，此时 listPlanSummaries 会读到 demo plan
+    try {
+      const { shouldInjectDemo, injectDemoData } = await import("@/lib/demo/preset-data");
+      if (await shouldInjectDemo()) {
+        await injectDemoData();
+      }
+    } catch {
+      // demo 注入失败不影响首页加载（继续走空状态分支）
+    }
     // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
     const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
 
