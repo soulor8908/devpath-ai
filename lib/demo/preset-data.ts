@@ -130,8 +130,11 @@ export async function injectDemoData(): Promise<void> {
 /**
  * 清除所有 Demo 数据：
  * - 删除所有 isDemo=true 的计划 + 对应 summary
- * - 删除关联这些计划的卡片
- * - 删除关联这些计划的 LearnLog
+ * - 删除关联这些计划的卡片 + 孤儿 demo 卡片（id 以 demo-card- 开头）
+ * - 删除关联这些计划的 LearnLog + 孤儿 demo 日志（id 以 demo-log- 开头）
+ *
+ * 孤儿数据兜底：用户可能在 /learn/list 手动删过 demo plan（早期 deletePlan 不联动清理），
+ * 导致 demo plan 不存在但 demo cards 残留。此处用 id 前缀兜底清理。
  */
 export async function clearDemoData(): Promise<void> {
   if (typeof window === "undefined") return;
@@ -147,18 +150,18 @@ export async function clearDemoData(): Promise<void> {
     await deletePlanSummary(plan.id);
   }
 
-  // 3. 删除关联 demo 计划的卡片
+  // 3. 删除关联 demo 计划的卡片 + 孤儿 demo 卡片（id 前缀兜底）
   const cards = await listItems<ReviewCard>(KEY_PREFIXES.CARD);
   for (const card of cards) {
-    if (demoPlanIds.has(card.planId)) {
+    if (demoPlanIds.has(card.planId) || card.id.startsWith("demo-card-")) {
       await delItem(KEY_PREFIXES.CARD + card.id);
     }
   }
 
-  // 4. 删除关联 demo 计划的 LearnLog
+  // 4. 删除关联 demo 计划的 LearnLog + 孤儿 demo 日志（id 前缀兜底）
   const logs = await listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG);
   for (const log of logs) {
-    if (demoPlanIds.has(log.planId)) {
+    if (demoPlanIds.has(log.planId) || log.id.startsWith("demo-log-")) {
       await delItem(KEY_PREFIXES.LEARN_LOG + log.id);
     }
   }
@@ -166,9 +169,18 @@ export async function clearDemoData(): Promise<void> {
 
 /**
  * 检测是否存在 Demo 数据（用于创建真实计划后提示清除）
+ * 检查范围：demo plan（isDemo）+ 孤儿 demo 卡片（id 前缀）+ 孤儿 demo 日志（id 前缀）
+ * 孤儿兜底：demo plan 可能已被手动删除，但 cards/logs 残留
  */
 export async function hasDemoData(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   const plans = await listItems<LearningPlan>(KEY_PREFIXES.PLAN);
-  return plans.some((p) => p.isDemo === true);
+  if (plans.some((p) => p.isDemo === true)) return true;
+  // 孤儿 demo cards（plan 已删但卡残留）
+  const cards = await listItems<ReviewCard>(KEY_PREFIXES.CARD);
+  if (cards.some((c) => c.id.startsWith("demo-card-"))) return true;
+  // 孤儿 demo logs
+  const logs = await listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG);
+  if (logs.some((l) => l.id.startsWith("demo-log-"))) return true;
+  return false;
 }

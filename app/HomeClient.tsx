@@ -44,6 +44,8 @@ import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
 import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import type { PublicProfile } from "@/lib/types";
+import { getLastSyncedAt, uploadIncremental } from "@/lib/sync";
+import { confirmDialog } from "@/lib/confirm-dialog";
 
 export default function HomeClient() {
   const {
@@ -97,6 +99,30 @@ export default function HomeClient() {
       setPendingShare(true);
       setUsernameModalOpen(true);
       return;
+    }
+    // 检测是否曾同步到远程——未同步则分享链接打开会 404，需提示用户先同步
+    try {
+      const lastSync = await getLastSyncedAt();
+      if (!lastSync) {
+        const ok = await confirmDialog({
+          title: "同步到云端？",
+          message:
+            "你的主页尚未同步到云端，朋友打开分享链接会看不到内容。是否现在同步？",
+          confirmText: "同步并分享",
+          cancelText: "仅本地分享",
+        });
+        if (ok) {
+          setShareMsg("正在同步到云端…");
+          try {
+            await uploadIncremental();
+          } catch {
+            // 同步失败不阻断分享，仅提示
+          }
+          setShareMsg("");
+        }
+      }
+    } catch {
+      // 同步状态读取失败，降级为直接分享
     }
     doShare(username);
   }

@@ -53,6 +53,8 @@ export interface UsernameSetupModalProps {
   description?: string;
   /** 是否允许点击遮罩/ESC 关闭（默认 true；分享场景应保持 true，避免强制困住用户）*/
   allowClose?: boolean;
+  /** 是否显示头像 URL 字段（默认 false；profile 页面编辑时设 true）*/
+  showAvatar?: boolean;
 }
 
 export function UsernameSetupModal({
@@ -62,6 +64,7 @@ export function UsernameSetupModal({
   title = "设置用户名",
   description = "用户名用于生成你的公开主页地址，设置后即可分享给朋友。",
   allowClose = true,
+  showAvatar = false,
 }: UsernameSetupModalProps) {
   const [profile, setProfile] = useState<PublicProfile>(DEFAULT_PROFILE);
   const [saving, setSaving] = useState(false);
@@ -246,6 +249,19 @@ export function UsernameSetupModal({
               className="mt-1"
             />
           </div>
+          {showAvatar && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                头像 URL（可选）
+              </label>
+              <Input
+                value={profile.avatar ?? ""}
+                onChange={(e) => update("avatar", e.target.value || undefined)}
+                placeholder="https://..."
+                className="mt-1"
+              />
+            </div>
+          )}
           {error && (
             <div
               role="alert"

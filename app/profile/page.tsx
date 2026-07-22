@@ -38,6 +38,7 @@ import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
 import { Button, Input, Textarea, Checkbox, Modal } from "@/components/ui";
 import { ModelConfigModal } from "@/components/ModelConfigModal";
+import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import { mapExchangeErrorMessage } from "@/lib/model-config-form";
 import { toast } from "@/lib/toast";
 import { maybeRetrain } from "@/lib/energy-regression";
@@ -712,99 +713,33 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* 编辑表单：复用原 editOpen 状态 */}
+        {/* 编辑个人信息：复用 UsernameSetupModal 弹窗组件（与首页分享场景共用同一表单） */}
         <Button
           variant="secondary"
           block
-          onClick={() => setEditOpen((v) => !v)}
+          leftIcon="edit"
+          onClick={() => setEditOpen(true)}
         >
-          {editOpen ? "▲ 收起编辑表单" : "▼ 展开编辑表单"}
+          编辑个人信息
         </Button>
 
-        {editOpen && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium">用户名（URL 标识）</label>
-              <Input
-                value={profile.username}
-                onChange={(e) =>
-                  update(
-                    "username",
-                    e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase(),
-                  )
-                }
-                placeholder="alice"
-                className="mt-1"
-              />
-              {profile.username && (
-                <p className="mt-1 text-xs text-gray-500">
-                  主页地址：/u/{profile.username}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium">显示名</label>
-              <Input
-                value={profile.displayName}
-                onChange={(e) => update("displayName", e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">简介</label>
-              <Textarea
-                value={profile.bio}
-                onChange={(e) => update("bio", e.target.value)}
-                rows={2}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">头像 URL（可选）</label>
-              <Input
-                value={profile.avatar ?? ""}
-                onChange={(e) => update("avatar", e.target.value || undefined)}
-                className="mt-1"
-              />
-            </div>
+        <UsernameSetupModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setProfile(updated);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+          }}
+          title="编辑个人信息"
+          description="修改你的公开主页信息，保存后自动同步到云端。"
+          showAvatar
+        />
 
-            <div className="rounded bg-gray-50 p-3">
-              <p className="mb-2 text-xs font-medium text-gray-500">实时预览</p>
-              <div className="flex items-center gap-2">
-                {profile.avatar && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.avatar} alt="" className="h-8 w-8 rounded-full" />
-                )}
-                <div>
-                  <div className="font-medium">
-                    {profile.displayName || "(未设置)"}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    @{profile.username || "username"}
-                  </div>
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                {profile.bio || "(暂无简介)"}
-              </p>
-              <div className="mt-2 flex gap-2 text-xs text-gray-500">
-                {profile.visibility.radar && <span className="inline-flex items-center gap-1"><Icon name="chart" className="w-3.5 h-3.5 inline-block" />雷达图</span>}
-                {profile.visibility.heatmap && <span className="inline-flex items-center gap-1"><Icon name="flame" className="w-3.5 h-3.5 inline-block" />热力图</span>}
-                {profile.visibility.currentTopic && <span className="inline-flex items-center gap-1"><Icon name="book" className="w-3.5 h-3.5 inline-block" />当前主题</span>}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={save}
-                disabled={saving || !profile.username}
-                loading={saving}
-              >
-                保存
-              </Button>
-              {saved && <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
-            </div>
-          </div>
+        {saved && (
+          <p className="text-sm text-green-600 dark:text-green-400 inline-flex items-center gap-1">
+            <Icon name="check" className="w-3.5 h-3.5 inline-block" /> 已保存
+          </p>
         )}
       </CollapsibleSection>
 
