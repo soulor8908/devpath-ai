@@ -58,7 +58,6 @@ const PERMANENT_EXEMPT_FILES = new Set<string>([
 // 当前违规分布：app/* 21 个文件，components/* 16 个文件
 const LEGACY_FILES = new Set<string>([
   // ============ app/ ============
-  "app/HomeClient.tsx",
   "app/achievements/page.tsx",
   "app/daily/page.tsx",
   "app/docs/page.tsx",
@@ -444,6 +443,23 @@ describe("UI 设计系统守护", () => {
       );
     }
     expect(violations).toHaveLength(0);
+  });
+
+  it("守护范围包含函数返回的字符串字面量（不只是 JSX className 属性）", () => {
+    // 回归测试：工具函数返回的 className 字符串字面量也必须带 dark: 配对。
+    // 守护扫描按行匹配，任何包含被追踪浅色 utility 的行都会被检查，
+    // 不论是 className="..." 还是 return "..." 形式。
+    // 注意：bg-green-* 等饱和色不在 LIGHT_DARK_PAIRS 中（视为状态色），
+    // 这是已知的设计边界，仅追踪 bg-white / bg-gray-* / text-gray-* / border-gray-*。
+    const fakeLine = '    if (mode === "light") return "bg-white text-gray-900";';
+    const violations = checkDarkPairInLine(fakeLine);
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some((v) => v.rule.includes("bg-white"))).toBe(true);
+
+    // 修复后应该通过
+    const fixedLine = '    if (mode === "light") return "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100";';
+    const fixedViolations = checkDarkPairInLine(fixedLine);
+    expect(fixedViolations).toHaveLength(0);
   });
 });
 

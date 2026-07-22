@@ -112,10 +112,10 @@ export default function HomeClient() {
 
   const heatColor = (minutes: number) => {
     if (minutes === 0) return "bg-gray-100 dark:bg-gray-700";
-    if (minutes < 15) return "bg-green-200";
-    if (minutes < 30) return "bg-green-400";
-    if (minutes < 60) return "bg-green-500";
-    return "bg-green-700";
+    if (minutes < 15) return "bg-green-200 dark:bg-green-900/40";
+    if (minutes < 30) return "bg-green-400 dark:bg-green-700";
+    if (minutes < 60) return "bg-green-500 dark:bg-green-600";
+    return "bg-green-700 dark:bg-green-500";
   };
 
   const streakMeta = getStreakMeta(streak, lastStreak);
@@ -219,7 +219,7 @@ export default function HomeClient() {
                 href="/onboarding"
                 variant="secondary"
                 size="sm"
-                className="bg-white text-blue-600 hover:bg-gray-50 font-bold"
+                className="bg-white dark:bg-gray-50 text-blue-600 hover:bg-gray-50 dark:hover:bg-gray-100 font-bold"
                 leftIcon="zap"
               >
                 选择职业路径 →
@@ -320,24 +320,24 @@ export default function HomeClient() {
                 <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-xs font-medium text-gray-500">能力画像</span>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">能力画像</span>
                   </div>
                   <div className="space-y-0.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">入门</span>
+                      <span className="text-gray-400 dark:text-gray-500">入门</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">进阶</span>
+                      <span className="text-gray-400 dark:text-gray-500">进阶</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">高级</span>
+                      <span className="text-gray-400 dark:text-gray-500">高级</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
                     </div>
                     {userProfileSummary.preferredSlot && (
                       <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
-                        <span className="text-gray-400">偏好时段</span>
+                        <span className="text-gray-400 dark:text-gray-500">偏好时段</span>
                         <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
                       </div>
                     )}
@@ -348,15 +348,15 @@ export default function HomeClient() {
                 <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
-                    <span className="text-xs font-medium text-gray-500">AI 质量</span>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">AI 质量</span>
                   </div>
                   <div className="space-y-0.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">今日调用</span>
+                      <span className="text-gray-400 dark:text-gray-500">今日调用</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">采纳率</span>
+                      <span className="text-gray-400 dark:text-gray-500">采纳率</span>
                       <span className="text-green-600 dark:text-green-400 font-medium">
                         {Math.round(aiQualitySummary.adoptionRate * 100)}%
                       </span>
@@ -364,7 +364,7 @@ export default function HomeClient() {
                   </div>
                   <Link
                     href="/stats/ai-quality"
-                    className="block text-2xs text-gray-400 hover:text-blue-500 mt-2 text-center"
+                    className="block text-2xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 mt-2 text-center"
                   >
                     详情 →
                   </Link>
@@ -400,7 +400,7 @@ export default function HomeClient() {
                     <span className="text-xs text-white font-medium">{d.minutes}</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">{d.date.slice(5)}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{d.date.slice(5)}</p>
               </div>
             ))}
           </div>
@@ -455,9 +455,9 @@ export default function HomeClient() {
                     )}
                   </div>
                   {task.estimatedMinutes && (
-                    <span className="text-xs text-gray-400 shrink-0">{task.estimatedMinutes}min</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{task.estimatedMinutes}min</span>
                   )}
-                  <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-1" />
+                  <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0 mt-1" />
                 </Link>
               );
             })}
