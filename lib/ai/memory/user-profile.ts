@@ -9,9 +9,15 @@
 //   - P2 增量更新：高频维度（averageSessionMinutes）事件驱动即时刷新，
 //     低频维度（skillLevel/preferredTimeSlots）保持 24h 批量重建
 
-import { getItem, setItem } from "@/lib/storage/db";
-import { KEY_PREFIXES, type UserProfile } from "@/lib/types";
-import { buildUserProfile, computeAverageSessionMinutes } from "./profile-builder";
+import { getItem, setItem, listItems } from "@/lib/storage/db";
+import { KEY_PREFIXES, type UserProfile, type ReviewCard, type ReviewLog, type SkillLevel } from "@/lib/types";
+import {
+  buildUserProfile,
+  computeAverageSessionMinutes,
+  aggregateStabilityByNode,
+  aggregateAccuracyByNode,
+  inferSkillLevel,
+} from "./profile-builder";
 import { listEnergySamples } from "@/lib/energy-collector";
 
 /** IndexedDB key：单例画像 */
@@ -92,5 +98,52 @@ export async function refreshAverageSessionMinutes(): Promise<void> {
     await updateProfileField("averageSessionMinutes", newAverage);
   } catch {
     // 增量更新失败不影响番茄完成主流程
+  }
+}
+
+/**
+ * 事件驱动刷新 accuracyByNode + skillLevel（中频维度增量更新）。
+ *
+ * 复习评分/错题记录后调用——读取 ReviewLog + ReviewCard，重算准确率与技能等级，写回画像。
+ * 避免等 24h 批量重建才能反映最新复习表现。
+ * 失败静默（不阻塞复习主流程）。
+ *
+ * 设计权衡（卡帕西视角）：
+ *   - 本函数重算全量 accuracyByNode + skillLevel（非真增量）
+ *   - 真增量需维护 per-node running counter，复杂度高且 ReviewLog 数据量小（< 1k 条）
+ *   - 全量重算 < 10ms，性能够用；待数据量增长后再优化为真增量
+ *
+ * 调用时机：
+ *   - 复习评分（app/review/page.tsx handleRate）→ ReviewLog 写入后
+ *   - 错题记录（lib/mistake-book.ts recordMistake）→ MistakeRecord + 复习卡写入后
+ */
+export async function refreshAccuracyAndSkill(): Promise<void> {
+  try {
+    const existing = await getUserProfile();
+    if (!existing) return; // 冷启动无画像，等 maybeBuildProfile 兜底
+    const [cards, reviewLogs] = await Promise.all([
+      listItems<ReviewCard>(KEY_PREFIXES.CARD),
+      listItems<ReviewLog>(KEY_PREFIXES.REVIEW_LOG),
+    ]);
+    const stabilityByNode = aggregateStabilityByNode(cards);
+    const accuracyByNode = aggregateAccuracyByNode(reviewLogs, cards);
+    // 对 stability 和 accuracy 的 nodeId 并集逐一推断技能等级
+    const skillLevel: Record<string, SkillLevel> = {};
+    const allNodeIds = new Set<string>([
+      ...Object.keys(stabilityByNode),
+      ...Object.keys(accuracyByNode),
+    ]);
+    for (const nodeId of allNodeIds) {
+      const stability = stabilityByNode[nodeId] ?? 0;
+      const accuracy = accuracyByNode[nodeId] ?? { correct: 0, total: 0 };
+      skillLevel[nodeId] = inferSkillLevel(stability, accuracy);
+    }
+    await saveUserProfile({
+      ...existing,
+      accuracyByNode,
+      skillLevel,
+    });
+  } catch {
+    // 增量更新失败不影响复习主流程
   }
 }

@@ -24,6 +24,7 @@ import type {
   KnowledgeNode,
 } from "@/lib/types";
 import { recordMistake } from "@/lib/mistake-book";
+import { refreshAccuracyAndSkill } from "@/lib/ai/memory/user-profile";
 import { listFavoriteDecks } from "@/lib/favorite";
 import { ReviewCardView } from "@/components/ReviewCardView";
 import { Icon } from "@/components/Icon";
@@ -188,6 +189,12 @@ export default function ReviewPage() {
           // 错题记录失败不影响复习流程
         }
       }
+
+      // 事件驱动刷新画像（复习评分影响 accuracyByNode + skillLevel）
+      // fire-and-forget：不阻塞复习主流程
+      // 注意：rating=1 时 recordMistake 内部也会触发刷新，此处冗余调用保证
+      //   rating=2/3/4 也能即时更新画像
+      void refreshAccuracyAndSkill();
 
       // 更新统计
       setStats((prev) => ({

@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { getItem, setItem, listItems, delItem } from "./storage/db";
 import { KEY_PREFIXES, type MistakeRecord } from "./types";
 import { createCard, findExistingCard } from "./fsrs";
+import { refreshAccuracyAndSkill } from "./ai/memory/user-profile";
 
 /** 记录答错（如果已存在则增加 wrongCount），同时自动造复习卡（带查重） */
 export async function recordMistake(params: {
@@ -59,6 +60,10 @@ export async function recordMistake(params: {
   } catch {
     // 造卡失败不影响错题记录主流程
   }
+
+  // 事件驱动刷新画像（错题影响 accuracyByNode + skillLevel）
+  // fire-and-forget：不阻塞错题记录主流程，失败由内部 try/catch 静默
+  void refreshAccuracyAndSkill();
 }
 
 /** 查找题目的错题记录 */
