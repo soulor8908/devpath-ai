@@ -18,6 +18,18 @@ import { chinaTimeNow } from "@/lib/time";
 import { collectRhythmContext, getNextAction } from "@/lib/ai/rhythm-engine";
 import type { NextAction, CurrentTask as CurrentTaskType } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
+import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
+
+/** 在 window 上派发"打开番茄钟 large Modal"事件，由全局 PomodoroWidget 监听 */
+function openPomodoroLarge() {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+  } catch {
+    // 极端环境下 dispatchEvent 可能抛错，忽略
+  }
+}
 
 const TYPE_COLORS: Record<string, string> = {
   运动: "bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800",
@@ -192,23 +204,39 @@ function RhythmActionCard({ action }: { action: NextAction }) {
       </div>
 
       {button && (
-        <Link
-          href={button.href}
-          className="mt-3 flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900 transition-colors"
-        >
-          <span className="text-sm">
-            <Icon name={button.icon} className="w-4 h-4 inline-block align-middle" /> {button.label}
-          </span>
-          <span className={`text-xs ${button.accentColor}`}>{button.cta} →</span>
-        </Link>
+        button.action === "pomodoro" ? (
+          // 番茄钟入口：派发事件打开 large Modal，不跳转 /timer（该路由已移除）
+          <Button
+            variant="ghost"
+            onClick={openPomodoroLarge}
+            className="mt-3 w-full flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900 transition-colors h-auto"
+          >
+            <span className="text-sm">
+              <Icon name={button.icon} className="w-4 h-4 inline-block align-middle" /> {button.label}
+            </span>
+            <span className={`text-xs ${button.accentColor}`}>{button.cta} →</span>
+          </Button>
+        ) : (
+          <Link
+            href={button.href ?? "/"}
+            className="mt-3 flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900 transition-colors"
+          >
+            <span className="text-sm">
+              <Icon name={button.icon} className="w-4 h-4 inline-block align-middle" /> {button.label}
+            </span>
+            <span className={`text-xs ${button.accentColor}`}>{button.cta} →</span>
+          </Link>
+        )
       )}
     </div>
   );
 }
 
-/** 根据 NextAction.type 选按钮（href + 文案 + 图标 + 强调色） */
+/** 根据 NextAction.type 选按钮（href + 文案 + 图标 + 强调色）
+ *  action: "link" → 跳转路由；"pomodoro" → 派发事件打开番茄钟 large Modal */
 function pickActionButton(type: NextAction["type"]): {
-  href: string;
+  action: "link" | "pomodoro";
+  href?: string;
   label: string;
   cta: string;
   icon: Parameters<typeof Icon>[0]["name"];
@@ -217,15 +245,15 @@ function pickActionButton(type: NextAction["type"]): {
   switch (type) {
     case "continue_focus":
       return {
-        href: "/timer",
+        action: "pomodoro",
         label: "继续专注",
-        cta: "回到计时页",
+        cta: "打开番茄钟",
         icon: "clock",
         accentColor: "text-blue-600",
       };
     case "start_focus":
       return {
-        href: "/timer",
+        action: "pomodoro",
         label: "开始专注",
         cta: "启动番茄钟",
         icon: "target",
@@ -233,6 +261,7 @@ function pickActionButton(type: NextAction["type"]): {
       };
     case "review":
       return {
+        action: "link",
         href: "/review",
         label: "去复习",
         cta: "查看待复习卡片",
@@ -242,6 +271,7 @@ function pickActionButton(type: NextAction["type"]): {
     case "break":
     case "rest":
       return {
+        action: "link",
         href: "/rest",
         label: "去休息",
         cta: "478 呼吸放松",
@@ -250,6 +280,7 @@ function pickActionButton(type: NextAction["type"]): {
       };
     case "plan_next_day":
       return {
+        action: "link",
         href: "/review",
         label: "复盘今天",
         cta: "规划明天",
@@ -258,6 +289,7 @@ function pickActionButton(type: NextAction["type"]): {
       };
     default:
       return {
+        action: "link",
         href: "/",
         label: "查看首页",
         cta: "返回",

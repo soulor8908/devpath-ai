@@ -16,6 +16,8 @@ import { setItem, set as dbSet } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type CareerPath as CareerPathType, type CareerPathNode } from "@/lib/types";
 import { CAREER_PATHS, getCareerPathNodes } from "@/lib/onboarding/career-paths";
 import { getPresetById } from "@/lib/presets";
+import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { nanoid } from "nanoid";
@@ -29,6 +31,20 @@ export default function OnboardingPage() {
     if (!selectedPath) return;
     setStarting(true);
     try {
+      // 用户选择路径进入学习时，若存在 demo 示例数据，先询问是否清除
+      // 避免示例计划/复习卡片干扰真实学习流程
+      const hasDemo = await hasDemoData();
+      if (hasDemo) {
+        const ok = await confirmDialog({
+          title: "清除示例数据？",
+          message: "检测到首次访问注入的示例数据。已选择职业路径，是否清除示例数据？",
+          confirmText: "清除",
+          cancelText: "保留",
+          danger: true,
+        });
+        if (ok) await clearDemoData();
+      }
+
       const now = new Date().toISOString();
       const preset = getPresetById(selectedPath.linkedPresetId);
       const plan: LearningPlan = {

@@ -8,8 +8,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { listPlanSummaries, migrateSummaries, deletePlanSummary } from "@/lib/plan-summary";
-import { delItem } from "@/lib/storage/db";
-import { KEY_PREFIXES, type LearningPlanSummary } from "@/lib/types";
+import { delItem, listItems } from "@/lib/storage/db";
+import {
+  KEY_PREFIXES,
+  type LearningPlanSummary,
+  type ReviewCard,
+  type LearnLog,
+  type MistakeRecord,
+  type FavoriteDeck,
+} from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 
@@ -44,6 +51,16 @@ export default function ListClient() {
     refresh();
   }, [refresh]);
 
+  // 删除学习计划 + 联动清理关联数据（避免孤立数据残留）
+  // 联动清理范围：
+  //   1. 计划本身（KEY_PREFIXES.PLAN）
+  //   2. 计划摘要（PlanSummary，列表/首页用）
+  //   3. FSRS 复习卡片（KEY_PREFIXES.CARD，card.planId === planId）
+  //   4. 学习日志（KEY_PREFIXES.LEARN_LOG，log.planId === planId）
+  //   5. 错题记录（KEY_PREFIXES.MISTAKE，mistake.planId === planId）
+  //   6. 收藏的知识库（KEY_PREFIXES.DECK，deck.planId === planId）
+  // 不删除：PomodoroSession（历史专注记录，用于统计/打卡，与计划解耦）
+  //         EmotionEntry / EnergySample（用户级数据，与计划无关）
   async function deletePlan(planId: string, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -52,8 +69,34 @@ export default function ListClient() {
       setTimeout(() => setConfirmingDeleteId(null), 3000);
       return;
     }
+    // 并行查询所有关联数据，再串行删除（查询无依赖，删除按类型批量执行）
+    const [cards, logs, mistakes, decks] = await Promise.all([
+      listItems<ReviewCard>(KEY_PREFIXES.CARD),
+      listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG),
+      listItems<MistakeRecord>(KEY_PREFIXES.MISTAKE),
+      listItems<FavoriteDeck>(KEY_PREFIXES.DECK),
+    ]);
+    const cardsToDelete = cards.filter((c) => c.planId === planId);
+    const logsToDelete = logs.filter((l) => l.planId === planId);
+    const mistakesToDelete = mistakes.filter((m) => m.planId === planId);
+    const decksToDelete = decks.filter((d) => d.planId === planId);
+
+    // 串行删除（IndexedDB 单事务，避免并发冲突）
     await delItem(KEY_PREFIXES.PLAN + planId);
     await deletePlanSummary(planId);
+    for (const card of cardsToDelete) {
+      await delItem(KEY_PREFIXES.CARD + card.id);
+    }
+    for (const log of logsToDelete) {
+      await delItem(KEY_PREFIXES.LEARN_LOG + log.id);
+    }
+    for (const mistake of mistakesToDelete) {
+      await delItem(KEY_PREFIXES.MISTAKE + mistake.id);
+    }
+    for (const deck of decksToDelete) {
+      await delItem(KEY_PREFIXES.DECK + deck.id);
+    }
+
     const remaining = plans.filter((p) => p.id !== planId);
     setPlans(remaining);
     setConfirmingDeleteId(null);

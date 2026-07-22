@@ -3,17 +3,31 @@
 // app/train/TrainClient.tsx
 // 训练会话页客户端——沉浸式学习，不跳转
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useHomeData } from "@/lib/home";
 import { TrainSessionFlow } from "@/components/TrainSessionFlow";
 import { Icon } from "@/components/Icon";
 import { LinkButton } from "@/components/ui";
+import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
 
 export default function TrainClient() {
   const { studyQueue, reload } = useHomeData();
   const [sessionStartTime] = useState(() => Date.now());
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
+  // 防止 StrictMode 双调用导致重复唤起番茄钟
+  const pomodoroTriggeredRef = useRef(false);
+
+  // 训练会话重排：先学新内容，后复习。
+  // useHomeData 返回的 studyQueue 按 FSRS 紧迫度排序（review 高于 new），
+  // 适合首页"今日学习清单"展示紧迫感；但训练会话的体感是"先学新再复习"，
+  // 因此这里按 type 重排：new 在前（保持 priority 降序），review 在后（保持 priority 降序）。
+  // 首页 studyQueue 的排序不受影响，仅在训练页本地重排。
+  const orderedQueue = useMemo(() => {
+    const newTasks = studyQueue.filter((t) => t.type === "new");
+    const reviewTasks = studyQueue.filter((t) => t.type === "review");
+    return [...newTasks, ...reviewTasks];
+  }, [studyQueue]);
 
   // 计时器
   useEffect(() => {
@@ -23,7 +37,19 @@ export default function TrainClient() {
     return () => clearInterval(timer);
   }, [sessionStartTime]);
 
-  if (studyQueue.length === 0) {
+  // 进入训练会话时自动唤起番茄钟（沉浸专注的氛围感）
+  useEffect(() => {
+    if (orderedQueue.length > 0 && !pomodoroTriggeredRef.current) {
+      pomodoroTriggeredRef.current = true;
+      try {
+        window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+      } catch {
+        // 极端环境下 dispatchEvent 可能抛错，忽略
+      }
+    }
+  }, [orderedQueue.length]);
+
+  if (orderedQueue.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center pb-20 dark:bg-gray-900">
         <Icon name="check-circle" className="w-16 h-16 text-green-500 mb-4" />
@@ -49,7 +75,7 @@ export default function TrainClient() {
           <div className="text-center">
             <p className="text-xs text-gray-400 dark:text-gray-500">训练中</p>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              第 1/{studyQueue.length} 项 · 专注 {elapsedMinutes}分钟
+              第 1/{orderedQueue.length} 项 · 专注 {elapsedMinutes}分钟
             </p>
           </div>
           <div className="w-5" />
@@ -59,7 +85,7 @@ export default function TrainClient() {
       {/* 训练会话核心 */}
       <div className="p-4 max-w-2xl mx-auto">
         <TrainSessionFlow
-          studyQueue={studyQueue}
+          studyQueue={orderedQueue}
           onSessionComplete={() => reload()}
         />
       </div>

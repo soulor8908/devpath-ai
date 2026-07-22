@@ -23,11 +23,24 @@ import { chinaDateNow, chinaDateShift } from "@/lib/time";
 const DEMO_PLAN_ID = "demo-frontend-plan";
 
 /**
+ * localStorage flag：标记是否已注入过 demo 数据（每个浏览器一次性）
+ * 避免用户手动删除 demo plan 后再次进入首页又重新注入
+ */
+const DEMO_INJECTED_FLAG = "demo:injected";
+
+/**
  * 检测是否需要注入 Demo 数据
- * 规则：IndexedDB 中没有任何 "plan:" key 时返回 true
+ * 规则：① 未注入过（localStorage flag 不存在）+ ② IndexedDB 中没有任何 plan
+ * 注入一次后设置 flag，即使用户删除 demo plan 也不会重新注入
  */
 export async function shouldInjectDemo(): Promise<boolean> {
   if (typeof window === "undefined") return false;
+  // 已注入过 → 不再注入（避免用户删了 demo plan 后又重新出现）
+  try {
+    if (window.localStorage.getItem(DEMO_INJECTED_FLAG) === "1") return false;
+  } catch {
+    // localStorage 不可用，继续走下面的检查
+  }
   // 直接检查 demo plan 是否已存在（快速路径）
   const existing = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + DEMO_PLAN_ID);
   if (existing) return false;
@@ -104,6 +117,13 @@ export async function injectDemoData(): Promise<void> {
   ];
   for (const log of logs) {
     await setItem(KEY_PREFIXES.LEARN_LOG + log.id, log);
+  }
+
+  // 标记已注入（一次性，避免用户删除 demo plan 后重新注入）
+  try {
+    window.localStorage.setItem(DEMO_INJECTED_FLAG, "1");
+  } catch {
+    // localStorage 不可用，静默忽略
   }
 }
 

@@ -30,7 +30,7 @@
 //   - 第 2 阶段：studyQueue 智能排序学习队列（合并 learn + review 单一待办流）
 //   - 需求 4：KPI 第 1 格可点击进入学习（队列第一项或 /learn/new 兜底）
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
@@ -42,6 +42,8 @@ import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
+import { UsernameSetupModal } from "@/components/UsernameSetupModal";
+import type { PublicProfile } from "@/lib/types";
 
 export default function HomeClient() {
   const {
@@ -64,30 +66,47 @@ export default function HomeClient() {
   } = useHomeData();
 
   const [shareMsg, setShareMsg] = useState<string>("");
+  const [usernameModalOpen, setUsernameModalOpen] = useState(false);
+  // 用户名设置成功后，是否继续走分享流程（避免用户设置完后还要再点一次分享）
+  const [pendingShare, setPendingShare] = useState(false);
+
+  const doShare = useCallback((uname: string) => {
+    const shareUrl = `${window.location.origin}/u/${encodeURIComponent(uname)}`;
+    const shareText = "来看看我的开发者成长主页";
+    if (navigator.share) {
+      void navigator.share({ title: "devpath", text: shareText, url: shareUrl }).catch(() => {
+        // 用户取消分享，静默
+      });
+    } else {
+      navigator.clipboard
+        ?.writeText(shareUrl)
+        .then(() => {
+          setShareMsg("链接已复制到剪贴板");
+          setTimeout(() => setShareMsg(""), 2500);
+        })
+        .catch(() => {
+          setShareMsg(shareUrl);
+          setTimeout(() => setShareMsg(""), 5000);
+        });
+    }
+  }, []);
 
   async function handleShare() {
     if (!username) {
-      setShareMsg("请先在「我的」设置用户名");
-      setTimeout(() => setShareMsg(""), 2500);
+      // 未设置用户名：弹窗引导设置，设置成功后自动继续分享
+      setPendingShare(true);
+      setUsernameModalOpen(true);
       return;
     }
-    const shareUrl = `${window.location.origin}/u/${encodeURIComponent(username)}`;
-    const shareText = "来看看我的开发者成长主页";
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "devpath", text: shareText, url: shareUrl });
-      } catch {
-        // 用户取消
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareMsg("链接已复制到剪贴板");
-        setTimeout(() => setShareMsg(""), 2500);
-      } catch {
-        setShareMsg(shareUrl);
-        setTimeout(() => setShareMsg(""), 5000);
-      }
+    doShare(username);
+  }
+
+  function handleUsernameSaved(profile: PublicProfile) {
+    // 设置成功后，刷新首页数据（让 useHomeData 重新读到新 username）
+    reload();
+    if (pendingShare && profile.username) {
+      setPendingShare(false);
+      doShare(profile.username);
     }
   }
 
@@ -172,6 +191,17 @@ export default function HomeClient() {
             />
             <div className="mt-2">
               <PathCoachInsight insight={coachInsight} />
+            </div>
+            {/* 重新选择岗位入口：用户选错路径时可切换
+                语义：旧 plan 保留在 /learn/list，新 plan 立即开始训练，
+                my:onboarding 记录会被新选择覆盖 */}
+            <div className="mt-2 text-center">
+              <Link
+                href="/onboarding"
+                className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:underline"
+              >
+                选错方向了？重新选择岗位 →
+              </Link>
             </div>
           </>
         ) : (
@@ -455,6 +485,16 @@ export default function HomeClient() {
           </div>
         )}
       </section>
+
+      {/* 用户名设置弹窗：未设置用户名时点击分享触发 */}
+      <UsernameSetupModal
+        open={usernameModalOpen}
+        onClose={() => {
+          setUsernameModalOpen(false);
+          setPendingShare(false);
+        }}
+        onSaved={handleUsernameSaved}
+      />
     </div>
   );
 }
