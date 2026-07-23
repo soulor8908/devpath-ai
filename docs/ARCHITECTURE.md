@@ -86,18 +86,21 @@
 
 ### 番茄时钟完整流程
 
-番茄时钟统一为右下角浮动 widget（`components/PomodoroWidget.tsx`），两态切换：
+番茄时钟统一为右下角浮动 widget（`components/PomodoroWidget.tsx`），三态切换（2026-07-23 重构，移除 large Modal）：
 
-- **small 态**：56px 圆环浮窗，常驻显示倒计时进度，可拖动 + 边缘吸附
-- **large 态**：通过全局事件 `POMODORO_OPEN_LARGE_EVENT` 触发，渲染 `<Modal><PomodoroFullContent/></Modal>`，承载 idle / running / completed 三态视图与表单输入
+- **hidden 态**：不渲染 DOM（无运行中 session 且用户未主动打开）
+- **ring 态**：56px 圆环浮窗，常驻显示倒计时进度，可拖动 + 边缘吸附（`z-[80]`）
+- **card 态**：280×420 卡片浮窗，承载 idle / running / completed 三态视图与表单输入（`z-[80]`）；长按弹出操作菜单（`z-[100]`）；拖动期间渲染透明遮罩（`z-[90]`）
 
-1. 用户点击「开始专注」或 AI 调用 `start_focus_session` 工具（首页 Hero / 训练页 / Chat 工具均通过 `window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT))` 唤起 large 态）
+> 设计变更说明：原 large 态使用 `<Modal>` 渲染（z-[60]），会与底部 Nav / FloatingChat 产生层叠冲突且移动端体验割裂。重构为 card 浮窗后，所有番茄交互都在 widget 内部完成，不再依赖 Modal。事件名从 `POMODORO_OPEN_LARGE_EVENT` 重命名为 `POMODORO_OPEN_EVENT`（旧名作为 deprecated 别名保留向后兼容）。
+
+1. 用户点击「开始专注」或 AI 调用 `start_focus_session` 工具（首页 Hero / 训练页 / Chat 工具均通过 `window.dispatchEvent(new CustomEvent(POMODORO_OPEN_EVENT))` 唤起 card 态）
 2. `createSession({ taskDescription, durationMinutes, planId?, nodeId? })` → 创建 `PomodoroSession`（status=running）
-3. `PomodoroWidget` 在 small 态显示圆环倒计时，可点击切到 large 态查看详情
+3. `PomodoroWidget` 在 ring 态显示圆环倒计时，点击切到 card 态查看详情
 4. `startGuard(sessionId, mode, callbacks)` 启动专注保护：
    - 严格模式：3 次打断（visibilitychange + blur）→ `onAbandon` → `abandonSession()`
    - 宽松模式：只记录打断次数，不暂停
-5. 倒计时结束 → 浏览器 Notification（降级为 console.log），widget 自动切到 large 态展示 completed 视图
+5. 倒计时结束 → 浏览器 Notification（降级为 console.log），widget 自动切到 card 态展示 completed 视图
 6. 用户标记完成 → `completeSession(id)`：
    - 写 `LearnLog(type=focus_session, duration=扣除打断后的实际时长)`
    - 调用 `updateActualMinutes()` 更新能量样本
@@ -296,7 +299,7 @@ buildProfileContext(profile) → ≤500 字符文本
 
 ## 测试策略
 
-- **Vitest 单测**（758+ 用例 / 67 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / no-native-form-elements 守护 / ui-design-system-guard 守护 等核心模块
+- **Vitest 单测**（786 用例 / 70 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / no-native-form-elements 守护 / ui-design-system-guard 守护 / pomodoro-widget-no-modal 守护 / mindmap-question-stats 守护 / nav-icon-only 守护 等核心模块
 - **Playwright E2E**：主流程（首页 → 学习 → 复习 → 我的；浮动按钮打开 AI 对话）+ Demo 注入/清除
 - **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint、UI 设计系统守护测试（原生表单元素 / dark 配对 / 逃逸值）
 

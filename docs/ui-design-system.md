@@ -452,6 +452,7 @@ const DIFFICULTY_COLORS = {
 |---|---|---|
 | 2026-07-19 | v1.0 | 首次发布。包含设计令牌、13 个 UI 组件、暗色模式、可访问性、首页 5 区结构等完整规范 |
 | 2026-07-23 | v1.1 | 首页结构由 5 区升级为 6 区（折叠区删除，热力图常驻，学习队列移到最下面）；新增第 11 节 z-index 层级表，规范 Nav/FloatingChat/Modal/PomodoroWidget 的层叠关系 |
+| 2026-07-23 | v1.2 | 番茄钟移除 large Modal，改为 hidden/ring/card 三态浮窗；新增 ring/card 拖动遮罩 z-[90] + 长按菜单 z-[100]；Nav 纯图标 + min-h-[44px]；Modal 新增 mobilePosition="center" 用于 ModelConfigModal 居中定位 |
 
 ---
 
@@ -462,14 +463,17 @@ const DIFFICULTY_COLORS = {
 | 层级 | z-index | 元素 | 文件 | 说明 |
 |---|---|---|---|---|
 | 内容层 | `z-10` | sticky 顶部进度条 / 训练页头部 | `app/train/TrainClient.tsx` 等 | 页面内局部 sticky |
-| 导航层 | `z-50` | 底部 `<Nav>` | [components/Nav.tsx](file:///workspace/components/Nav.tsx) | 3 Tab：路径 / 训练 / 我的 |
+| 导航层 | `z-50` | 底部 `<Nav>`（纯图标 + min-h-[44px]） | [components/Nav.tsx](file:///workspace/components/Nav.tsx) | 3 Tab：路径 / 训练 / 我的；iOS HIG 触控区合规 |
 | 浮动按钮层 | `z-50` | `<FloatingChatButton>` | [components/FloatingChatButton.tsx](file:///workspace/components/FloatingChatButton.tsx) | 右下角 AI 对话入口（与 Nav 同层，靠 `bottom-20` 让位 Nav） |
-| 模态层 | `z-[60]` | 统一 `<Modal>` | [components/ui/Modal.tsx](file:///workspace/components/ui/Modal.tsx) | 内置 focus trap + ESC + 焦点恢复 + body lock；移动端 `items-end` 贴底，桌面端 `items-center` 居中 |
+| 模态层 | `z-[60]` | 统一 `<Modal>` | [components/ui/Modal.tsx](file:///workspace/components/ui/Modal.tsx) | 内置 focus trap + ESC + 焦点恢复 + body lock；`mobilePosition="bottom"`（默认，贴底）/ `"center"`（居中，用于 ModelConfigModal 等配置类弹窗） |
 | 学习页脑图浮按钮 | `z-50` | `<Button>` fixed right-4 bottom-32 | `app/learn/[planId]/PlanDetailClient.tsx` | 脑图悬浮小图标，点击展开脑图 Modal |
-| 番茄 widget 层 | `z-[80]` | `<PomodoroWidget>` small 态 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 右下角圆环浮窗，常驻；large 态通过 Modal 渲染（z-[60]） |
+| 番茄 widget 浮窗层 | `z-[80]` | `<PomodoroWidget>` ring/card 态 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 三态浮窗：`hidden`（不渲染）/ `ring`（56px 圆环）/ `card`（280×420 卡片）；不再使用 Modal |
+| 番茄拖动遮罩 | `z-[90]` | card 拖动时的全屏透明遮罩 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 阻止拖动期间触发其他点击；仅在拖动中渲染 |
+| 番茄长按菜单 | `z-[100]` | card 长按弹出的操作菜单 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 重置 / 切换模式 / 关闭 等操作；仅 card 态长按触发 |
 
 **规则**：
 - 任何新浮层必须先查本表，禁止凭感觉写 `z-[100]` / `z-[9999]`
 - 模态层（`z-[60]`）高于 Nav/FloatingChat（`z-50`），保证打开模态时遮罩覆盖底部 Nav
-- 番茄 widget（`z-[80]`）高于模态层，保证 small 态始终可见；large 态复用 Modal，仍为 `z-[60]`
+- 番茄 widget（`z-[80]`）高于模态层，保证 ring/card 浮窗在模态之上仍可见；不再使用 Modal 渲染 large 态
+- 番茄长按菜单（`z-[100]`）为 widget 内最高层，仅 card 态长按触发；不要在其他地方复用此值
 - `ToastContainer` 在 `<Modal>` 之上（具体值见 [components/ui/Toast.tsx](file:///workspace/components/ui/Toast.tsx)）
