@@ -218,7 +218,7 @@ href={studyQueue[0] ? (studyQueue[0].type === "review" ? "/review" : `/learn/${s
 - `MindMap` 组件已支持 `titleClickMode="select"` + `onSelectNode` 回调
 - 已掌握节点变绿（`MASTERED_BG/BORDER/BAR`）
 
-### 5.2 优化方向（4 项，按优先级）
+### 5.2 优化方向（3 项，按优先级）
 
 #### 优化 1：节点题目数统计（P0）
 
@@ -236,21 +236,7 @@ href={studyQueue[0] ? (studyQueue[0].type === "review" ? "/review" : `/learn/${s
 - `PlanDetailClient` 计算 stats 并传入
 - 节点渲染时优先级：mastered > questionStats > 默认元信息
 
-#### 优化 2：mastered 自动折叠子树（P1）
-
-**问题**：用户掌握父节点后，子节点通常也掌握，但当前默认全部展开，视觉噪音大。
-
-**方案**：`MindMap` 初始化 `expanded` Set 时，过滤掉 `mastered === true` 的节点（其子树默认折叠）：
-```ts
-const [expanded, setExpanded] = useState<Set<string>>(
-  () => new Set(allIds.filter(id => !nodeMap.get(id)?.mastered))
-);
-```
-
-- 用户主动点击父节点可展开查看（不影响交互）
-- "全部展开"按钮仍可强制展开所有
-
-#### 优化 3：脑图搜索高亮（P1）
+#### 优化 2：脑图搜索高亮（P1）
 
 **问题**：知识树节点多时，找特定知识点需要拖动 + 缩放，效率低。
 
@@ -264,7 +250,7 @@ const [expanded, setExpanded] = useState<Set<string>>(
 - 工具栏右上角增加 `<Input inputSize="sm" placeholder="搜索知识点" />`
 - 节点渲染时根据 `searchQuery` 决定 `opacity` 和 `strokeWidth`
 
-#### 优化 4：节点状态实时更新（P2）
+#### 优化 3：节点状态实时更新（P2）
 
 **问题**：当前答对题目后，脑图节点的 mastery 不会实时变绿，需要刷新页面或重新打开脑图。
 
@@ -304,7 +290,7 @@ const [expanded, setExpanded] = useState<Set<string>>(
 | `components/Nav.tsx` | 修改 | 去掉 label，min-h-[44px] |
 | `components/ui/Modal.tsx` | 扩展 | 新增 `mobilePosition` prop |
 | `components/ModelConfigModal.tsx` | 修改 | 传 `mobilePosition="center"` |
-| `components/MindMap.tsx` | 扩展 | 新增 `questionStats` prop + 搜索框 + mastered 折叠 |
+| `components/MindMap.tsx` | 扩展 | 新增 `questionStats` prop + 搜索框 |
 | `app/HomeClient.tsx` | 微调 | KPI 第 1 格视觉强化 + 空队列 EmptyState |
 | `app/layout.tsx` | 修改 | `pb-16` → `pb-11` |
 | `app/learn/[planId]/PlanDetailClient.tsx` | 扩展 | 计算 questionStats 传入 MindMap + 实时更新节点状态 |
@@ -358,7 +344,7 @@ const [expanded, setExpanded] = useState<Set<string>>(
 - 重命名 POMODORO_OPEN_LARGE_EVENT → POMODORO_OPEN_EVENT
 
 ### 阶段 3：学习页脑图优化（独立）
-- 设计点 5：MindMap 扩展 questionStats + 搜索 + mastered 折叠
+- 设计点 5：MindMap 扩展 questionStats + 搜索
 - PlanDetailClient 计算 stats + 实时更新节点状态
 
 ### 阶段 4：首页微调（独立）
@@ -376,7 +362,7 @@ const [expanded, setExpanded] = useState<Set<string>>(
 | 2 | ModelConfigModal 在移动端居中显示；顶部无空白；不与底部 Nav 视觉重叠 |
 | 3 | Nav 仅显示图标；高度 44px；aria-label 保留；3 Tab 总宽不超过屏幕 |
 | 4 | 今日学习队列在首页最底部；KPI 第 1 格可点击进入学习且有视觉提示；空队列显示 EmptyState |
-| 5 | 脑图节点显示 X/Y 题目数；mastered 节点默认折叠子树；搜索框可高亮匹配节点；答对题目后节点实时变绿 |
+| 5 | 脑图节点显示 X/Y 题目数；搜索框可高亮匹配节点；答对题目后节点实时变绿 |
 | 全局 | `npm run quality-gate` 全绿；新增 3 个守护测试通过；z-index 层级表更新到 ui-design-system.md v1.2 |
 
 ---
