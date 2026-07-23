@@ -19,13 +19,13 @@ import { collectRhythmContext, getNextAction } from "@/lib/ai/rhythm-engine";
 import type { NextAction, CurrentTask as CurrentTaskType } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
-import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
+import { POMODORO_OPEN_EVENT } from "@/lib/timer/pomodoro";
 
-/** 在 window 上派发"打开番茄钟 large Modal"事件，由全局 PomodoroWidget 监听 */
-function openPomodoroLarge() {
+/** 在 window 上派发"打开番茄钟 card 浮窗"事件，由全局 PomodoroWidget 监听 */
+function openPomodoroCard() {
   if (typeof window === "undefined") return;
   try {
-    window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+    window.dispatchEvent(new CustomEvent(POMODORO_OPEN_EVENT));
   } catch {
     // 极端环境下 dispatchEvent 可能抛错，忽略
   }
@@ -205,10 +205,10 @@ function RhythmActionCard({ action }: { action: NextAction }) {
 
       {button && (
         button.action === "pomodoro" ? (
-          // 番茄钟入口：派发事件打开 large Modal，不跳转 /timer（该路由已移除）
+          // 番茄钟入口：派发事件打开 card 浮窗，不跳转 /timer（该路由已移除）
           <Button
             variant="ghost"
-            onClick={openPomodoroLarge}
+            onClick={openPomodoroCard}
             className="mt-3 w-full flex items-center justify-between rounded-lg bg-white/70 dark:bg-gray-900/60 px-3 py-2 hover:bg-white dark:hover:bg-gray-900 transition-colors h-auto"
           >
             <span className="text-sm">
@@ -233,7 +233,7 @@ function RhythmActionCard({ action }: { action: NextAction }) {
 }
 
 /** 根据 NextAction.type 选按钮（href + 文案 + 图标 + 强调色）
- *  action: "link" → 跳转路由；"pomodoro" → 派发事件打开番茄钟 large Modal */
+ *  action: "link" → 跳转路由；"pomodoro" → 派发事件打开番茄钟 card 浮窗 */
 function pickActionButton(type: NextAction["type"]): {
   action: "link" | "pomodoro";
   href?: string;

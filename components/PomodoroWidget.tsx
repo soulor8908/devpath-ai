@@ -1,58 +1,58 @@
 "use client";
 
 // components/PomodoroWidget.tsx
-// 番茄钟两态 widget：small ↔ large
+// 番茄钟两态 widget：ring（圆环小浮窗）↔ card（卡片浮窗）
 //
-// 两态设计（乔布斯视角：克制即设计，移除冗余的 medium 半步）：
-//   - small：圆形进度条（直径 56px）+ 中间显示剩余分钟数 + 可拖动
-//     点击 → 展开 large Modal（不丢失当前 session 状态）
-//   - large：Modal 形式渲染 PomodoroFullContent（idle/running/completed 三态视图）
-//     失焦 / ESC / 关闭按钮 → 回到 small
+// 2026-07-23 UI 重设计（设计点 1）：
+//   - 移除 large Modal（全屏遮罩打断用户流，与"专注工具应该克制"冲突）
+//   - 改为 ring / card / hidden 三态自适应浮窗
+//   - ring 态：56px 圆环（running/paused/break-running 时显示，专注中无打扰）
+//   - card 态：280px 卡片浮窗（idle/completed 时显示，承载表单 + 休息建议）
+//   - hidden 态：无 session 且用户未主动打开
+//
+// 状态机（卡帕西视角：单一事实源，状态机统一在 widget）：
+//   - focus running/paused → ring
+//   - break running/paused → ring（绿色环区分）
+//   - focus 完成（倒计时归零）→ card（completed 视图，显示休息建议，不自动开始 break）
+//   - break 完成 → card（idle 视图，让用户主动开始下一个 focus）
+//   - POMODORO_OPEN_EVENT → card（即使无 session 也显示 idle）
+//   - 用户点击 ring → card（查看详情/操作）
+//   - card 关闭按钮 → ring（若有 session）或 hidden（若无 session）
 //
 // 拖动优化（卡帕西视角，修卡顿 + 防事件透传）：
 //   - Pointer Events API 替代 mouse + touch 双套监听
-//   - setPointerCapture(e.pointerId)：所有后续指针事件都路由到 handle 元素，
-//     **不会透传到页面**（修拖动快时鼠标飞出 widget 触发底层 hover/click 的问题）
+//   - setPointerCapture(e.pointerId)：所有后续指针事件都路由到 handle 元素
 //   - 拖动时直接操作 ref.style.left/top（不 setState），拖动结束才同步 state
-//     → 60fps 平滑拖动，无重渲染开销
 //
 // 边界 + 吸附：
-//   - clampPosition：上下左右不能跑到屏幕外，底部预留 96px 给底部 Nav
-//   - 小弹框拖动结束时，自动吸附到最近边（左/右/上/下）：
-//     计算到 4 个边的距离，取最近的吸附，带 200ms transition 平滑过渡
-//
-// 暂停不关闭弹窗（关键约束）：
-//   - small：暂停只切 session.status=paused，widget 仍渲染
-//   - large：Modal onClose 由用户主动触发（关闭按钮/ESC），pauseSession 不调用 onClose
-//
-// 入口改造：
-//   - HomeClient 入口派发 POMODORO_OPEN_LARGE_EVENT 全局事件
-//   - widget useEffect 监听该事件 → setMode("large") 唤醒大弹窗
-//   - 即使无 running session 也能打开 large modal（PomodoroFullContent 内有 start form）
+//   - clampPosition：上下左右不能跑到屏幕外，底部预留 56px 给底部 Nav
+//   - ring 拖动结束时，自动吸附到最近边（左/右/上/下）
+//   - card 拖动结束时，也吸附到最近边（但 card 尺寸更大）
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { PomodoroSession } from "@/lib/types";
 import {
   getActiveSession,
-  createSession,
   completeSession,
   pauseSession,
   resumeSession,
   abandonSession,
   POMODORO_SESSION_CHANGED_EVENT,
-  POMODORO_OPEN_LARGE_EVENT,
+  POMODORO_OPEN_EVENT,
 } from "@/lib/timer/pomodoro";
-import { getNextBreakType, getRecommendedDuration } from "@/lib/timer/pomodoro-rule";
-import { getTodayCount } from "@/lib/timer/session-tracker";
 import { notify } from "@/lib/timer/notification-permission";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Button } from "@/components/ui";
-import { Modal } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { PomodoroFullContent } from "@/components/PomodoroFullContent";
 
-/** Widget 两态：small（圆环）/ large（Modal） */
-type WidgetMode = "small" | "large";
+/**
+ * Widget 三态：
+ * - "hidden"：无 session 且用户未主动打开（不渲染任何浮窗）
+ * - "ring"：圆环小浮窗（running session 时显示）
+ * - "card"：卡片浮窗（idle/completed 时显示，承载表单）
+ */
+type WidgetMode = "hidden" | "ring" | "card";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -122,7 +122,7 @@ const BOTTOM_NAV_RESERVE = 56;
 
 /**
  * 把 widget 位置约束在 viewport 内，避免拖到屏幕外找不回来。
- * 底部预留 BOTTOM_NAV_RESERVE（56px）给底部 Nav。
+ * 底部预留 BOTTOM_NAV_RESERVE 给底部 Nav。
  */
 function clampPosition(
   pos: WidgetPosition,
@@ -141,46 +141,48 @@ function clampPosition(
 }
 
 /**
- * 计算小弹框拖动结束时的吸附位置：吸附到最近的边（左/右/上/下）。
+ * 计算浮窗拖动结束时的吸附位置：吸附到最近的边（左/右/上/下）。
  * 上下边距为 8px，左右边距为 8px；底部需预留 Nav。
- * 返回吸附后的坐标。
  */
 function snapToNearestEdge(
   pos: WidgetPosition,
   vw: number,
   vh: number,
-  widgetSize: number,
+  widgetW: number,
+  widgetH: number,
 ): WidgetPosition {
   const margin = 8;
-  // 到 4 个边的距离
   const distLeft = pos.x;
-  const distRight = vw - pos.x - widgetSize;
+  const distRight = vw - pos.x - widgetW;
   const distTop = pos.y;
-  const distBottom = vh - pos.y - widgetSize - BOTTOM_NAV_RESERVE;
+  const distBottom = vh - pos.y - widgetH - BOTTOM_NAV_RESERVE;
   const minDist = Math.min(distLeft, distRight, distTop, distBottom);
   if (minDist === distLeft) {
     return { x: margin, y: pos.y };
   }
   if (minDist === distRight) {
-    return { x: vw - widgetSize - margin, y: pos.y };
+    return { x: vw - widgetW - margin, y: pos.y };
   }
   if (minDist === distTop) {
     return { x: pos.x, y: margin };
   }
   // 吸附到 Nav 上方
-  return { x: pos.x, y: vh - widgetSize - BOTTOM_NAV_RESERVE - margin };
+  return { x: pos.x, y: vh - widgetH - BOTTOM_NAV_RESERVE - margin };
 }
 
-/** small 模式尺寸：直径 56px */
-const SMALL_SIZE = 56;
+/** ring 模式尺寸：直径 56px */
+const RING_SIZE = 56;
+/** card 模式尺寸：宽 280px，最大高度 420px（idle 表单 + 今日统计） */
+const CARD_WIDTH = 280;
+const CARD_MAX_HEIGHT = 420;
 
 export function PomodoroWidget() {
   const [session, setSession] = useState<PomodoroSession | null>(null);
   const [remainingMs, setRemainingMs] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [busy, setBusy] = useState(false);
-  // 两态模式：small（默认）/ large
-  const [mode, setMode] = useState<WidgetMode>("small");
+  // 三态模式：hidden（默认）/ ring / card
+  const [mode, setMode] = useState<WidgetMode>("hidden");
   // widget 位置（相对 viewport 左上角像素）
   const [position, setPosition] = useState<WidgetPosition | null>(null);
   // 拖动状态：使用 ref 直接操作 DOM transform，避免每帧 setState 重渲染
@@ -196,26 +198,24 @@ export function PomodoroWidget() {
   const notifiedRef = useRef<string | null>(null);
   // 拖动 vs 点击判定：移动距离 < 5px 视为点击
   const dragMovedRef = useRef(false);
-  // 正在完成的 session id：防止 refresh 重入（每秒轮询 + 事件触发）
-  // 一旦归零检测到，立刻占位，避免下一秒重复 completeSession
+  // 正在完成的 session id：防止 refresh 重入
   const completingRef = useRef<string | null>(null);
 
   // 单一事实源（卡帕西视角）：
-  // 把"倒计时归零 → 完成 → 进入休息/break 结束切大弹窗"状态机收归到 widget，
-  // small / large 两种形态共享同一套生命周期，PomodoroFullContent 退化为展示+表单组件。
+  // 把"倒计时归零 → 完成 → 切 card 浮窗"状态机收归到 widget，
+  // ring / card 两种形态共享同一套生命周期。
   //
-  // 关键修复（用户需求）：
-  //   - 小浮窗 focus 倒计时到 0 → notify 用户 + 自动 completeSession + 自动创建 break session（继续小浮窗）
-  //   - 小浮窗 break 倒计时到 0 → notify 用户 + 自动 completeSession + 切换 large modal 让用户选择下一个 focus
-  //   - large modal 中点"开始专注"/"开始休息" → 通过 onStart/onStartBreak 回调切回 small 浮窗
+  // 2026-07-23 UI 重设计后的状态机：
+  //   - focus 完成（归零）→ notify + completeSession + setMode("card")
+  //     （不自动创建 break，让用户在 card 的 completed 视图主动选择"开始休息"或"再来一个"）
+  //   - break 完成（归零）→ notify + completeSession + setMode("card")
+  //     （让用户在 card 的 idle 视图主动开始下一个 focus）
+  //   - ring 态：focus/break running/paused 时显示
+  //   - card 态：idle/completed 时显示
   const refresh = useCallback(async () => {
-    // 用 getActiveSession（running 或 paused 都算活跃）：
-    // 修 bug：用户点暂停后 session.status=paused，原 getRunningSession 返回 null
-    // → setSession(null) → widget 守卫隐藏整个 widget，看起来像"点暂停关闭了弹窗"
     const active = await getActiveSession();
 
     // ===== 1. 完成状态机：检测归零需自动完成 =====
-    // 仅 running 状态触发（paused 不算超时），且未被 completingRef 占位
     if (
       active &&
       active.status === "running" &&
@@ -224,13 +224,13 @@ export function PomodoroWidget() {
     ) {
       completingRef.current = active.id;
       try {
-        // 1.1 通知用户（按 type 区分文案）
+        // 1.1 通知用户
         if (notifiedRef.current !== active.id) {
           notifiedRef.current = active.id;
           if (active.type === "focus") {
             await notify(
               "番茄完成",
-              `「${active.taskDescription || "专注"}」专注完成，开始休息`,
+              `「${active.taskDescription || "专注"}」专注完成，去休息一下吧`,
             );
           } else {
             await notify(
@@ -242,26 +242,10 @@ export function PomodoroWidget() {
         // 1.2 完成 session（写 LearnLog、清 current flag、派发 change 事件）
         await completeSession(active.id);
 
-        // 1.3 按 type 决定下一步
-        if (active.type === "focus") {
-          // focus 完成 → 自动创建对应 break session（按 4-1 规则选长短休）
-          // break session 仍是 running，下一帧 refresh 拉到新的 active → 小浮窗继续显示
-          const todayCount = await getTodayCount();
-          const breakType = getNextBreakType(todayCount);
-          const breakMinutes = getRecommendedDuration(breakType, "standard");
-          await createSession({
-            taskDescription: breakType === "long_break" ? "长休息" : "短休息",
-            type: breakType,
-            durationMinutes: breakMinutes,
-          });
-          // markSessionCurrent 由 createSession 内部已调用
-        } else {
-          // break 完成 → 切大弹窗让用户选择下一个 focus
-          // 此时无 active session，PomodoroFullContent init 会检测"10s 内完成的 focus session"
-          // 但 break 完成后没有 just-completed focus（除非巧合），所以会进 idle 视图让用户主动开始
-          // 这正是用户需求："休息完再提醒用户并切换到大弹窗让用户选择"
-          setMode("large");
-        }
+        // 1.3 切到 card 态让用户看 completed 视图（focus）或 idle 视图（break）
+        // 不再自动创建 break session：用户在 card 的 completed 视图主动点"开始休息"
+        // PomodoroFullContent 重新挂载后会检测"10s 内完成的 focus session"→ completed 视图
+        setMode("card");
       } catch (e) {
         console.error("[pomodoro-widget] auto-complete failed:", e);
       } finally {
@@ -269,12 +253,16 @@ export function PomodoroWidget() {
       }
     }
 
-    // ===== 2. 重新拉取 active（completeSession + createSession 后状态可能已变） =====
+    // ===== 2. 重新拉取 active（completeSession 后状态可能已变） =====
     const latest = await getActiveSession();
     setSession(latest);
     if (latest) {
       setRemainingMs(computeRemainingMs(latest));
       setProgress(computeProgress(latest));
+      // 有 running session 时自动切到 ring（除非用户正在 card 里操作）
+      // 但如果当前是 card 态且 session 是 running，说明用户刚点了"开始专注"
+      // → 此时应该切到 ring（PomodoroFullContent 的 onStart 回调已处理）
+      // 这里不强制切换，避免覆盖用户主动打开 card 的意图
     } else {
       notifiedRef.current = null;
     }
@@ -291,7 +279,7 @@ export function PomodoroWidget() {
     };
   }, [refresh]);
 
-  // 首次挂载：恢复位置（默认 small 模式，不持久化模式偏好——只有 small 一种常态）
+  // 首次挂载：恢复位置 + 根据 session 状态决定初始 mode
   useEffect(() => {
     const savedPos = loadPosition();
     if (savedPos) {
@@ -301,30 +289,34 @@ export function PomodoroWidget() {
       const vh = window.innerHeight;
       // 默认右下角，避开底部 Nav
       setPosition({
-        x: Math.max(0, vw - SMALL_SIZE - 16),
-        y: Math.max(0, vh - SMALL_SIZE - 96),
+        x: Math.max(0, vw - RING_SIZE - 16),
+        y: Math.max(0, vh - RING_SIZE - 96),
       });
     }
+    // 检查是否有 running session → 初始 mode 为 ring
+    void getActiveSession().then((active) => {
+      if (active && active.status !== "completed") {
+        setMode("ring");
+      }
+      // 无 session 时保持 hidden（等用户主动派发 POMODORO_OPEN_EVENT）
+    });
   }, []);
 
-  // 监听全局事件：HomeClient 的「番茄钟」入口派发 POMODORO_OPEN_LARGE_EVENT
-  // → 唤醒 large Modal。即使无 running session 也能打开（PomodoroFullContent 内有 start form）
+  // 监听全局事件：HomeClient / TrainClient / CurrentTaskCard 派发 POMODORO_OPEN_EVENT
+  // → 唤醒 card 浮窗。即使无 running session 也能打开（PomodoroFullContent 内有 idle 表单）
   useEffect(() => {
-    const openLarge = () => setMode("large");
-    window.addEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
-    return () => window.removeEventListener(POMODORO_OPEN_LARGE_EVENT, openLarge);
+    const openCard = () => setMode("card");
+    window.addEventListener(POMODORO_OPEN_EVENT, openCard);
+    return () => window.removeEventListener(POMODORO_OPEN_EVENT, openCard);
   }, []);
 
-  // 模式切换时重新吸附（small 模式下，从 large 关闭回来时重新吸附到最近边）：
-  // 用 requestAnimationFrame 延后一帧再设置 transition，让浏览器先绘制 small
-  // 在旧 position 的初始位置，然后再启动过渡到吸附位置。
+  // ring 模式下，从 card 切回时重新吸附（带 200ms transition）
   useEffect(() => {
-    if (mode !== "small") return;
+    if (mode !== "ring") return;
     if (!widgetRef.current || !position) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const snapped = snapToNearestEdge(position, vw, vh, SMALL_SIZE);
-    // 仅当位置变化时才更新（避免不必要的 transition）
+    const snapped = snapToNearestEdge(position, vw, vh, RING_SIZE, RING_SIZE);
     if (snapped.x === position.x && snapped.y === position.y) return;
 
     const rafId = requestAnimationFrame(() => {
@@ -345,22 +337,17 @@ export function PomodoroWidget() {
       cancelAnimationFrame(rafId);
       window.clearTimeout(t);
     };
-    // 故意不依赖 position：仅 mode 变化时才需要重新吸附
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   /**
-   * Pointer Events 拖动：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素，
-   * 即使鼠标飞出 widget 也不会触发底层元素的 click/hover（修事件透传）。
-   * 拖动时直接操作 ref.style.left/top，不 setState → 60fps 平滑无重渲染。
-   * 拖动距离 < 5px 视为点击（触发 large Modal）。
+   * Pointer Events 拖动（ring 态）：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素。
+   * 拖动距离 < 5px 视为点击（触发 card 浮窗）。
    */
-  const handlePointerDown = useCallback(
+  const handleRingPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!position) return;
-      // 仅响应主键（左键 / 触屏）
       if (e.button !== 0 && e.pointerType === "mouse") return;
-      // 捕获指针：后续所有 pointer 事件都路由到当前元素，不会透传
       e.currentTarget.setPointerCapture(e.pointerId);
       dragMovedRef.current = false;
       dragStateRef.current = {
@@ -374,13 +361,12 @@ export function PomodoroWidget() {
     [position],
   );
 
-  const handlePointerMove = useCallback(
+  const handleRingPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragStateRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
       const dx = e.clientX - drag.startClientX;
       const dy = e.clientY - drag.startClientY;
-      // 标记是否发生过移动（> 5px 视为拖动，否则视为点击）
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         dragMovedRef.current = true;
       }
@@ -390,10 +376,9 @@ export function PomodoroWidget() {
         { x: drag.startWidgetX + dx, y: drag.startWidgetY + dy },
         vw,
         vh,
-        SMALL_SIZE,
-        SMALL_SIZE,
+        RING_SIZE,
+        RING_SIZE,
       );
-      // 直接操作 DOM（不 setState，避免重渲染抖动）
       if (widgetRef.current) {
         widgetRef.current.style.left = `${next.x}px`;
         widgetRef.current.style.top = `${next.y}px`;
@@ -402,11 +387,10 @@ export function PomodoroWidget() {
     [],
   );
 
-  const handlePointerUp = useCallback(
+  const handleRingPointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragStateRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
-      // 释放指针捕获
       try {
         e.currentTarget.releasePointerCapture(drag.pointerId);
       } catch {
@@ -414,13 +398,12 @@ export function PomodoroWidget() {
       }
       dragStateRef.current = null;
 
-      // 若拖动距离 < 5px，视为点击 → 打开 large Modal
+      // 拖动距离 < 5px → 视为点击 → 打开 card 浮窗
       if (!dragMovedRef.current) {
-        setMode("large");
+        setMode("card");
         return;
       }
 
-      // 读取拖动结束时的当前位置
       const left = widgetRef.current?.style.left;
       const top = widgetRef.current?.style.top;
       if (left && top) {
@@ -429,13 +412,13 @@ export function PomodoroWidget() {
         if (Number.isFinite(x) && Number.isFinite(y)) {
           const vw = window.innerWidth;
           const vh = window.innerHeight;
-          // small 模式：吸附到最近边（带 200ms transition 平滑过渡）
           if (widgetRef.current) {
             const snapped = snapToNearestEdge(
               { x, y },
               vw,
               vh,
-              SMALL_SIZE,
+              RING_SIZE,
+              RING_SIZE,
             );
             widgetRef.current.style.transition =
               "left 200ms ease-out, top 200ms ease-out";
@@ -455,9 +438,120 @@ export function PomodoroWidget() {
     [],
   );
 
-  // large modal 关闭：回到 small
-  const handleLargeClose = useCallback(() => {
-    setMode("small");
+  /**
+   * Pointer Events 拖动（card 态）：与 ring 类似，但尺寸不同。
+   * 拖动距离 < 5px 视为点击（不触发任何操作，card 内部有自己的交互）。
+   */
+  const handleCardPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // 仅在 header 区域启动拖动（避免拖动冲突内部按钮/输入）
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-card-header]")) return;
+      if (!position) return;
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragMovedRef.current = false;
+      dragStateRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startWidgetX: position.x,
+        startWidgetY: position.y,
+      };
+    },
+    [position],
+  );
+
+  const handleCardPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragStateRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const dx = e.clientX - drag.startClientX;
+      const dy = e.clientY - drag.startClientY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        dragMovedRef.current = true;
+      }
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // card 高度用当前实际高度（从 DOM 读取）
+      const cardH = widgetRef.current?.offsetHeight ?? CARD_MAX_HEIGHT;
+      const next = clampPosition(
+        { x: drag.startWidgetX + dx, y: drag.startWidgetY + dy },
+        vw,
+        vh,
+        CARD_WIDTH,
+        cardH,
+      );
+      if (widgetRef.current) {
+        widgetRef.current.style.left = `${next.x}px`;
+        widgetRef.current.style.top = `${next.y}px`;
+      }
+    },
+    [],
+  );
+
+  const handleCardPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragStateRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      try {
+        e.currentTarget.releasePointerCapture(drag.pointerId);
+      } catch {
+        /* ignore */
+      }
+      dragStateRef.current = null;
+      if (!dragMovedRef.current) return; // 点击不处理
+
+      const left = widgetRef.current?.style.left;
+      const top = widgetRef.current?.style.top;
+      if (left && top) {
+        const x = parseFloat(left);
+        const y = parseFloat(top);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          if (widgetRef.current) {
+            const cardH = widgetRef.current.offsetHeight;
+            const snapped = snapToNearestEdge(
+              { x, y },
+              vw,
+              vh,
+              CARD_WIDTH,
+              cardH,
+            );
+            widgetRef.current.style.transition =
+              "left 200ms ease-out, top 200ms ease-out";
+            widgetRef.current.style.left = `${snapped.x}px`;
+            widgetRef.current.style.top = `${snapped.y}px`;
+            setPosition(snapped);
+            savePosition(snapped);
+            window.setTimeout(() => {
+              if (widgetRef.current) {
+                widgetRef.current.style.transition = "";
+              }
+            }, 220);
+          }
+        }
+      }
+    },
+    [],
+  );
+
+  // card 关闭：若有 running session → 切 ring；否则 → hidden
+  const handleCardClose = useCallback(() => {
+    if (session && session.status !== "completed") {
+      setMode("ring");
+    } else {
+      setMode("hidden");
+    }
+  }, [session]);
+
+  // PomodoroFullContent 回调：用户点"开始专注"/"开始休息"后切回 ring
+  const handleStart = useCallback(() => {
+    setMode("ring");
+  }, []);
+  const handleStartBreak = useCallback(() => {
+    setMode("ring");
   }, []);
 
   async function handlePauseResume(e?: React.MouseEvent) {
@@ -491,59 +585,65 @@ export function PomodoroWidget() {
     try {
       await abandonSession(session.id, "user_abandon_from_widget");
       await refresh();
+      // 放弃后无 session → 切 hidden
+      setMode("hidden");
     } finally {
       setBusy(false);
     }
   }
 
-  // large 模式：只渲染 Modal，不渲染 small widget（需求4：打开大番茄时钟时隐藏小番茄时钟）
-  // 关闭 Modal 后会自然回到 small 模式渲染，无需提前渲染 small widget
-  // position 未就绪时不显示（避免首帧闪烁在错误位置）
-  //
-  // 单一事实源（卡帕西视角）：
-  //   - 完成状态机已在 widget 的 refresh 中统一处理，PomodoroFullContent 不再独占完成逻辑
-  //   - 大弹窗内的 running tick 仍保留自动完成（用户在大弹窗里看专注时也能自动归档）
-  //   - onStart / onStartBreak 回调：用户点"开始专注"/"开始休息"后自动切回 small 浮窗
-  //     （修需求3：之前点了开始专注后还停留在大弹窗，需手动关闭才回小浮窗）
-  if (mode === "large") {
+  // ===== 渲染 =====
+  // hidden 态：不渲染
+  if (mode === "hidden" || !position) return null;
+
+  // card 态：渲染卡片浮窗 + PomodoroFullContent
+  if (mode === "card") {
     return (
-      <Modal
-        open
-        onClose={handleLargeClose}
-        title="番茄专注"
-        size="lg"
+      <CardWidget
+        widgetRef={widgetRef}
+        position={position}
+        onClose={handleCardClose}
+        onPointerDown={handleCardPointerDown}
+        onPointerMove={handleCardPointerMove}
+        onPointerUp={handleCardPointerUp}
+        onPointerCancel={handleCardPointerUp}
       >
         <PomodoroFullContent
-          onStart={() => setMode("small")}
-          onStartBreak={() => setMode("small")}
+          onStart={handleStart}
+          onStartBreak={handleStartBreak}
         />
-      </Modal>
+      </CardWidget>
     );
   }
 
-  // small 模式：必须有 running session 才显示
-  if (!session || !position) return null;
+  // ring 态：必须有 running session 才显示
+  // 边界情况：用户在 ring 态时 session 被外部清除（如 AI 工具放弃）→ 回退到 hidden
+  if (!session) {
+    // session 暂时为 null 但 mode=ring，可能是 refresh 间隙 → 渲染 null 避免闪烁
+    return null;
+  }
 
   return (
-    <SmallWidget
+    <RingWidget
       widgetRef={widgetRef}
       position={position}
       session={session}
       remainingMs={remainingMs}
       progress={progress}
       busy={busy}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerDown={handleRingPointerDown}
+      onPointerMove={handleRingPointerMove}
+      onPointerUp={handleRingPointerUp}
+      onPointerCancel={handleRingPointerUp}
       onPauseResume={handlePauseResume}
       onAbandon={handleAbandon}
     />
   );
 }
 
-/** 小弹框组件：圆形进度条 + 中间显示剩余分钟数 + 长按弹出控制菜单 */
-interface SmallWidgetProps {
+// ============ RingWidget：圆环小浮窗 ============
+
+interface RingWidgetProps {
   widgetRef: React.RefObject<HTMLDivElement | null>;
   position: WidgetPosition;
   session: PomodoroSession;
@@ -558,7 +658,7 @@ interface SmallWidgetProps {
   onAbandon: (e?: React.MouseEvent) => void;
 }
 
-function SmallWidget({
+function RingWidget({
   widgetRef,
   position,
   session,
@@ -571,26 +671,22 @@ function SmallWidget({
   onPointerCancel,
   onPauseResume,
   onAbandon,
-}: SmallWidgetProps) {
+}: RingWidgetProps) {
   const isPaused = session.status === "paused";
   const isOvertime = remainingMs <= 0 && session.status === "running";
-  // 休息态：short_break / long_break 用绿色环区分（卡帕西视角：状态色编码一致性）
   const isBreak =
     session.type === "short_break" || session.type === "long_break";
   const isLongBreak = session.type === "long_break";
 
-  // 圆环参数：直径 56px，stroke 4
-  const SIZE = SMALL_SIZE;
+  const SIZE = RING_SIZE;
   const STROKE = 4;
   const RADIUS = (SIZE - STROKE) / 2;
   const CIRC = 2 * Math.PI * RADIUS;
   const dashOffset = CIRC * (1 - progress / 100);
   const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
 
-  // 控制菜单（长按或右键唤起）
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // aria-label：休息态显式区分（无障碍 + 状态可感知）
   const stateLabel = isOvertime
     ? "已超时"
     : isPaused
@@ -617,12 +713,10 @@ function SmallWidget({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            // 键盘点击：打开控制菜单（不拖动）
             setMenuOpen((v) => !v);
           }
         }}
         onContextMenu={(e) => {
-          // 右键唤起菜单（桌面端补充）
           e.preventDefault();
           setMenuOpen(true);
         }}
@@ -670,7 +764,6 @@ function SmallWidget({
             strokeDashoffset={dashOffset}
           />
         </svg>
-        {/* 中间分钟数：休息态用绿色文字呼应 */}
         <div
           className={`absolute inset-0 flex items-center justify-center font-mono font-bold tabular-nums text-sm ${
             isOvertime
@@ -684,14 +777,12 @@ function SmallWidget({
         >
           {remainingMinutes}
         </div>
-        {/* 暂停标记：右上角小点 */}
         {isPaused && (
           <div
             aria-hidden
             className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"
           />
         )}
-        {/* 休息标记：左上角绿色小点（与暂停标记区分位置） */}
         {isBreak && !isPaused && (
           <div
             aria-hidden
@@ -703,13 +794,11 @@ function SmallWidget({
       {/* 控制菜单：长按或右键唤起，pause/resume/abandon */}
       {menuOpen && (
         <>
-          {/* 全屏点击关闭 */}
           <div
             className="fixed inset-0 z-[90]"
             onClick={() => setMenuOpen(false)}
             aria-hidden
           />
-          {/* 菜单本体：定位在 widget 上方 */}
           <div
             role="menu"
             aria-label="番茄钟控制"
@@ -755,5 +844,76 @@ function SmallWidget({
   );
 }
 
-// 注：原 medium 模式（224px 卡片）已移除，简化为 small + large 两态。
-// 暂停/放弃等控制操作通过 small widget 长按/右键唤起的菜单完成。
+// ============ CardWidget：卡片浮窗（替代原 large Modal）============
+
+interface CardWidgetProps {
+  widgetRef: React.RefObject<HTMLDivElement | null>;
+  position: WidgetPosition;
+  onClose: () => void;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (e: React.PointerEvent<HTMLDivElement>) => void;
+  children: React.ReactNode;
+}
+
+function CardWidget({
+  widgetRef,
+  position,
+  onClose,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  children,
+}: CardWidgetProps) {
+  return (
+    <div
+      ref={widgetRef}
+      role="dialog"
+      aria-modal="false"
+      aria-label="番茄专注"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      className="fixed z-[80] touch-none select-none bg-white dark:bg-gray-800 rounded-card shadow-floating border border-gray-200 dark:border-gray-700 flex flex-col animate-slide-up"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${CARD_WIDTH}px`,
+        maxHeight: `${CARD_MAX_HEIGHT}px`,
+      }}
+    >
+      {/* Header（可拖动区域）：标题 + 关闭按钮 */}
+      <div
+        data-card-header
+        className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing shrink-0"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon name="tomato" className="w-4 h-4 text-red-500 shrink-0" />
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            番茄专注
+          </h2>
+        </div>
+        <Button
+          iconOnly
+          size="sm"
+          variant="ghost"
+          aria-label="关闭"
+          onClick={onClose}
+          className="-mr-1 -mt-0.5 shrink-0"
+        >
+          <Icon name="x" className="w-4 h-4" />
+        </Button>
+      </div>
+      {/* 内容区：可滚动，不响应拖动（避免与内部交互冲突） */}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 touch-auto"
+        style={{ touchAction: "auto" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}

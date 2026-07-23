@@ -37,15 +37,25 @@ export interface CreateSessionParams {
 export const POMODORO_SESSION_CHANGED_EVENT = "pomodoro:session-changed";
 
 /**
- * 全局事件名：调用方派发此事件让全局挂载的 PomodoroWidget 进入 large 模式（Modal）。
+ * 全局事件名：调用方派发此事件让全局挂载的 PomodoroWidget 进入 card 模式（卡片浮窗）。
  *
  * 用途：HomeClient 的「番茄钟 · 开始一段专注」入口不再跳转 /timer 路由
- * （该路由已移除），改为派发此事件唤醒 large Modal。
+ * （该路由已移除），改为派发此事件唤醒 card 浮窗（idle/completed 视图）。
  *
- * 派发：window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT))
- * 监听：PomodoroWidget useEffect 内 addEventListener，setMode("large")
+ * 2026-07-23 UI 重设计：从 POMODORO_OPEN_LARGE_EVENT 重命名为 POMODORO_OPEN_EVENT，
+ * 因为 large Modal 已移除，改为 card 卡片浮窗。
+ *
+ * 派发：window.dispatchEvent(new CustomEvent(POMODORO_OPEN_EVENT))
+ * 监听：PomodoroWidget useEffect 内 addEventListener，setMode("card")
  */
-export const POMODORO_OPEN_LARGE_EVENT = "pomodoro:open-large";
+export const POMODORO_OPEN_EVENT = "pomodoro:open";
+
+/**
+ * @deprecated 使用 POMODORO_OPEN_EVENT 代替。
+ * 2026-07-23 UI 重设计后 large Modal 已移除，此别名仅为向后兼容保留，
+ * 新代码请直接使用 POMODORO_OPEN_EVENT。
+ */
+export const POMODORO_OPEN_LARGE_EVENT = POMODORO_OPEN_EVENT;
 
 /** 派发 session 变化事件，让监听方（如 PomodoroWidget）立即刷新，避免 1 秒轮询延迟 */
 function notifySessionChanged(): void {

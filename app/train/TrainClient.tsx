@@ -9,7 +9,7 @@ import { useHomeData } from "@/lib/home";
 import { TrainSessionFlow } from "@/components/TrainSessionFlow";
 import { Icon } from "@/components/Icon";
 import { LinkButton } from "@/components/ui";
-import { POMODORO_OPEN_LARGE_EVENT, getRunningSession } from "@/lib/timer/pomodoro";
+import { POMODORO_OPEN_EVENT, getRunningSession } from "@/lib/timer/pomodoro";
 
 export default function TrainClient() {
   const { studyQueue, reload } = useHomeData();
@@ -57,7 +57,7 @@ export default function TrainClient() {
       if (cancelled) return;
       pomodoroTriggeredRef.current = true;
       try {
-        window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+        window.dispatchEvent(new CustomEvent(POMODORO_OPEN_EVENT));
       } catch {
         // 极端环境下 dispatchEvent 可能抛错，忽略
       }

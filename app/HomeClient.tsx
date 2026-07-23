@@ -41,7 +41,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
-import { POMODORO_OPEN_LARGE_EVENT } from "@/lib/timer/pomodoro";
+import { POMODORO_OPEN_EVENT } from "@/lib/timer/pomodoro";
 import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import type { PublicProfile } from "@/lib/types";
 import { getLastSyncedAt, uploadIncremental } from "@/lib/sync";
@@ -257,13 +257,13 @@ export default function HomeClient() {
 
         {/* 行动入口：番茄钟（常驻）+ 低能量休息提示（条件，文字链接避免视觉过重）
             入口改造：原 <Link href="/timer"> 跳转路由 → 移除 /timer 路由
-            改为派发 POMODORO_OPEN_LARGE_EVENT 事件，全局 PomodoroWidget 监听后打开 large Modal
-            （路由 → 弹框工具：更符合 AI Native 风格，不离开当前页就能开始专注） */}
+            改为派发 POMODORO_OPEN_EVENT 事件，全局 PomodoroWidget 监听后打开 card 浮窗
+            （路由 → 浮窗工具：更符合 AI Native 风格，不离开当前页就能开始专注） */}
         <Button
           variant="ghost"
           onClick={() => {
             if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT));
+              window.dispatchEvent(new CustomEvent(POMODORO_OPEN_EVENT));
             }
           }}
           className="mt-2 w-full flex items-center justify-between rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors h-auto"
