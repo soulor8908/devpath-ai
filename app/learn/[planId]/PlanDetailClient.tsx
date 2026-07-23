@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getItem, setItem } from "@/lib/storage/db";
@@ -655,6 +655,22 @@ export default function PlanDetailClient() {
     }
   }
 
+  // 题目数统计（2026-07-23 优化 1）：按 nodeId 分组，统计 total / understood
+  // 传入 MindMap 后节点元信息行显示 `X/Y 题`，understood 全部时高亮绿色
+  // 依赖 plan?.questions：用户标记"看懂"后 plan 更新 → questionStats 重算 → MindMap 重渲染
+  // 这是优化 3（节点状态实时更新）的数据通路之一
+  // 必须放在早返回之前（hooks 规则），plan 为 null 时返回空对象
+  const questionStats = useMemo(() => {
+    if (!plan) return {};
+    const stats: Record<string, { total: number; understood: number }> = {};
+    for (const q of plan.questions) {
+      if (!stats[q.nodeId]) stats[q.nodeId] = { total: 0, understood: 0 };
+      stats[q.nodeId].total += 1;
+      if (q.understood) stats[q.nodeId].understood += 1;
+    }
+    return stats;
+  }, [plan]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1204,6 +1220,7 @@ export default function PlanDetailClient() {
             fillHeight
             showEnterButton={false}
             titleClickMode="select"
+            questionStats={questionStats}
           />
         </Modal>
       )}

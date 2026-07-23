@@ -21,7 +21,7 @@
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { KnowledgeNode } from "@/lib/types";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 
 interface MindMapProps {
   nodes: KnowledgeNode[];
@@ -38,6 +38,13 @@ interface MindMapProps {
    * - "select"：标题点击 = 触发 onSelectNode 跳转/筛选（学习详情页用）
    */
   titleClickMode?: "expand" | "select";
+  /**
+   * 节点题目数统计（2026-07-23 优化 1）：
+   * - key = nodeId，value = { total: 该节点题目数, understood: 已看懂题数 }
+   * - 传入后节点元信息行显示 `X/Y 题`（understood/total）
+   * - 数据源：PlanDetailClient 从 plan.questions 按 nodeId 分组 + question.understood 统计
+   */
+  questionStats?: Record<string, { total: number; understood: number }>;
 }
 
 interface TreeNode {
@@ -230,10 +237,13 @@ export function MindMap({
   fillHeight = false,
   showEnterButton = true,
   titleClickMode = "expand",
+  questionStats,
 }: MindMapProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  // 搜索查询（2026-07-23 优化 2）：输入关键词后匹配节点高亮、非匹配节点变灰
+  const [searchQuery, setSearchQuery] = useState("");
   // 折叠状态：默认全部展开
   const treeRoots = useMemo(() => buildTree(nodes), [nodes]);
   const allIds = useMemo(() => collectAllIds(treeRoots), [treeRoots]);
@@ -447,6 +457,43 @@ export function MindMap({
     setTranslate({ x: 0, y: 0 });
   }, [positions.length, width, height]);
 
+  // 搜索匹配（2026-07-23 优化 2）：
+  // - query 为空 → 所有节点都是"匹配"（不应用高亮/变灰）
+  // - query 非空 → title 包含 query（大小写不敏感）的节点为匹配
+  // 匹配节点高亮（边框加粗 + 蓝色），非匹配节点变灰（opacity 0.25）
+  const matchedIds = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return null; // null 表示"无搜索"，不做高亮/变灰
+    const set = new Set<string>();
+    for (const n of nodes) {
+      if (n.title.toLowerCase().includes(q)) set.add(n.id);
+    }
+    return set;
+  }, [searchQuery, nodes]);
+
+  // 适配视图到匹配节点（按 Enter 触发）：仅匹配节点参与边界计算
+  const fitViewToMatches = useCallback(() => {
+    if (!containerRef.current || !matchedIds || matchedIds.size === 0) return;
+    const matchedPositions = positions.filter((p) => matchedIds.has(p.id));
+    if (matchedPositions.length === 0) return;
+    const minX = Math.min(...matchedPositions.map((p) => p.x));
+    const maxX = Math.max(...matchedPositions.map((p) => p.x + NODE_W));
+    const minY = Math.min(...matchedPositions.map((p) => p.y));
+    const maxY = Math.max(...matchedPositions.map((p) => p.y + NODE_H));
+    const matchesWidth = maxX - minX + PADDING * 2;
+    const matchesHeight = maxY - minY + PADDING * 2;
+    const rect = containerRef.current.getBoundingClientRect();
+    const scaleX = (rect.width - PADDING * 2) / matchesWidth;
+    const scaleY = (rect.height - PADDING * 2) / matchesHeight;
+    const next = Math.max(0.3, Math.min(2.5, Math.min(scaleX, scaleY)));
+    setScale(next);
+    // translate 让匹配节点群居中：补偿 PADDING + 偏移到匹配区域左上角
+    setTranslate({
+      x: -minX + PADDING,
+      y: -minY + PADDING,
+    });
+  }, [matchedIds, positions]);
+
   useEffect(() => {
     const handler = () => {
       dragRef.current = null;
@@ -541,6 +588,30 @@ export function MindMap({
         </Button>
       </div>
 
+      {/* 搜索框（2026-07-23 优化 2）：左上角，输入关键词高亮匹配节点，Enter 聚焦匹配节点群 */}
+      <div className="absolute top-2 left-2 z-20 w-44">
+        <Input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              fitViewToMatches();
+            }
+          }}
+          placeholder="搜索知识点..."
+          inputSize="sm"
+          leftIcon="search"
+          aria-label="搜索知识点"
+        />
+        {matchedIds && (
+          <p className="text-2xs text-gray-500 dark:text-gray-400 mt-1 px-1 bg-white/80 dark:bg-gray-800/80 rounded">
+            匹配 {matchedIds.size} 个节点
+          </p>
+        )}
+      </div>
+
       {/* 提示 */}
       <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
         双指缩放 · 单指拖拽 · 点击节点展开/收起
@@ -593,7 +664,16 @@ export function MindMap({
               const isBigTech = p.node.bigTech === true;
               const isMastered = p.node.mastered === true;
               const isExpanded = expanded.has(p.id);
+              // 搜索高亮（2026-07-23 优化 2）：
+              // - matchedIds === null → 无搜索，不做高亮/变灰
+              // - matchedIds.has(p.id) → 匹配，边框加粗 + 蓝色高亮
+              // - 否则 → 变灰（opacity 0.25，通过 <g> opacity 实现）
+              const isMatched = matchedIds === null || matchedIds.has(p.id);
+              const isDimmed = matchedIds !== null && !matchedIds.has(p.id);
+              // 题目数统计（2026-07-23 优化 1）：questionStats 有该节点数据时显示 X/Y 题
+              const stats = questionStats?.[p.id];
               // mastered 优先级最高（用户主观已掌握 → 绿色，覆盖难度/大厂配色）
+              // 搜索匹配优先级次之（高亮蓝边框，覆盖 hover/bigTech 但不覆盖 mastered/selected）
               const bg = isSelected
                 ? "#0f172a"
                 : isMastered
@@ -605,11 +685,13 @@ export function MindMap({
                 ? "#3b82f6"
                 : isMastered
                   ? MASTERED_BORDER
-                  : isBigTech
-                    ? "#f59e0b"
-                    : isHover
-                      ? DIFF_BORDER[diff - 1] || "#475569"
-                      : "#cbd5e1";
+                  : isMatched && matchedIds !== null
+                    ? "#3b82f6" // 搜索匹配高亮：蓝色边框
+                    : isBigTech
+                      ? "#f59e0b"
+                      : isHover
+                        ? DIFF_BORDER[diff - 1] || "#475569"
+                        : "#cbd5e1";
               const fg = isSelected ? "#fff" : "#1e293b";
               const subFg = isSelected ? "#cbd5e1" : isMastered ? "#15803d" : "#64748b";
               const barColor = isSelected
@@ -617,13 +699,31 @@ export function MindMap({
                 : isMastered
                   ? MASTERED_BAR
                   : "#3b82f6";
+              // 边框宽度：搜索匹配 > selected/mastered > bigTech/hover > 默认
+              const strokeWidth = isMatched && matchedIds !== null
+                ? 3
+                : isSelected
+                  ? 2.5
+                  : isMastered
+                    ? 2.5
+                    : isBigTech
+                      ? 2
+                      : isHover
+                        ? 2
+                        : 1;
 
               // foreignObject 用于渲染 HTML 节点（多行文本 + 按钮）
               return (
                 <g
                   key={p.id}
                   transform={`translate(${p.x}, ${p.y})`}
-                  style={{ pointerEvents: "all" }}
+                  // 变灰节点 opacity 0.25； mastered 节点带 fade-in 动画（2026-07-23 优化 3）
+                  className={isMastered ? "animate-fade-in" : undefined}
+                  style={{
+                    pointerEvents: "all",
+                    opacity: isDimmed ? 0.25 : 1,
+                    transition: "opacity 150ms ease-out",
+                  }}
                   onMouseEnter={() => setHoverId(p.id)}
                   onMouseLeave={() => setHoverId(null)}
                 >
@@ -633,7 +733,9 @@ export function MindMap({
                     rx={12}
                     fill={bg}
                     stroke={border}
-                    strokeWidth={isSelected ? 2.5 : isMastered ? 2.5 : isBigTech ? 2 : isHover ? 2 : 1}
+                    strokeWidth={strokeWidth}
+                    // 边框颜色过渡（2026-07-23 优化 3：节点变绿时平滑过渡）
+                    style={{ transition: "stroke 200ms ease-out, stroke-width 200ms ease-out" }}
                   />
                   <foreignObject x={0} y={0} width={NODE_W} height={NODE_H} style={{ pointerEvents: "none" }}>
                     <div
@@ -745,6 +847,20 @@ export function MindMap({
                           <>
                             <span>·</span>
                             <span style={{ color: isSelected ? "#fbbf24" : "#d97706" }}>大厂</span>
+                          </>
+                        )}
+                        {/* 题目数统计（2026-07-23 优化 1）：X/Y 题，understood 全部时高亮绿色 */}
+                        {stats && stats.total > 0 && (
+                          <>
+                            <span>·</span>
+                            <span style={{
+                              color: stats.understood >= stats.total
+                                ? (isSelected ? "#86efac" : "#15803d")
+                                : subFg,
+                              fontWeight: stats.understood >= stats.total ? 600 : 400,
+                            }}>
+                              {stats.understood}/{stats.total} 题
+                            </span>
                           </>
                         )}
                         {p.node.customOrder != null && (
