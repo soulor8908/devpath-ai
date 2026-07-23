@@ -279,6 +279,7 @@ export function ModelConfigModal({
           : "选预设 → 填 API Key → 保存，3 步即可使用"
       }
       size="md"
+      mobilePosition="center"
     >
       <div className="space-y-3">
         {/* 预设模板 */}

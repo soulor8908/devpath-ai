@@ -116,12 +116,13 @@ function savePosition(pos: WidgetPosition): void {
 
 /**
  * 底部 Nav 高度预留（避开底部导航栏，widget 不被遮挡）
+ * 2026-07-23 UI 重设计：Nav 高度从 48px 降到 44px，预留从 96 调整为 56（44 + 12 安全边距）
  */
-const BOTTOM_NAV_RESERVE = 96;
+const BOTTOM_NAV_RESERVE = 56;
 
 /**
  * 把 widget 位置约束在 viewport 内，避免拖到屏幕外找不回来。
- * 底部预留 BOTTOM_NAV_RESERVE（96px）给底部 Nav。
+ * 底部预留 BOTTOM_NAV_RESERVE（56px）给底部 Nav。
  */
 function clampPosition(
   pos: WidgetPosition,

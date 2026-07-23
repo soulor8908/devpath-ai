@@ -6,9 +6,11 @@ import { Icon, type IconName } from "@/components/Icon";
 
 // 底部导航：8→4→2→3 Tab（乔布斯焦点原则 + V2 重构）
 // V2：从 2 Tab 升级为 3 Tab，新增"训练"入口
+// V3（2026-07-23 UI 重设计）：去文字、纯图标、min-h-[44px]（iOS HIG 最小触控区）
 //   - 路径 Tab（原"今日"）：首页 Path 路径视图，看进度+开始训练
-//   - 训练 Tab（新增）：沉浸式训练会话，学→练→复→休息一体化
-//   - 我的 Tab（保留）：个人设置/模型配置/同步
+//   - 训练 Tab：沉浸式训练会话，学→练→复→休息一体化
+//   - 我的 Tab：个人设置/模型配置/同步
+//   - label 仅作 aria-label 用途（无障碍不变），不再渲染 <span>
 const items: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/", label: "路径", icon: "map" },
   { href: "/train", label: "训练", icon: "target" },
@@ -33,14 +35,13 @@ export function Nav() {
             href={item.href}
             aria-label={item.label}
             aria-current={active ? "page" : undefined}
-            className={`flex flex-col items-center gap-0.5 py-2 px-1 transition-colors min-h-[48px] ${
+            className={`flex items-center justify-center py-2.5 px-1 transition-colors min-h-[44px] ${
               active
                 ? "text-blue-600 dark:text-blue-400"
                 : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             }`}
           >
             <Icon name={item.icon} className="w-[22px] h-[22px]" />
-            <span className="text-2xs font-medium">{item.label}</span>
           </Link>
         );
       })}

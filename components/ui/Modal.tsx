@@ -61,6 +61,13 @@ export interface ModalProps {
   contentClassName?: string;
   /** 是否撑满视口高度（默认 false，脑图等大画布场景设 true 让内容区高度 = 90vh - header - footer）*/
   fillHeight?: boolean;
+  /**
+   * 移动端定位策略（2026-07-23 UI 重设计新增）：
+   * - "bottom"（默认）：贴底显示，顶部无圆角（适合底部抽屉、选择器）
+   * - "center"：居中显示，全圆角（适合表单类弹窗，避免顶部空白 + 与底部 Nav 视觉重叠）
+   * 桌面端始终居中（sm:items-center）
+   */
+  mobilePosition?: "bottom" | "center";
 }
 
 export function Modal({
@@ -78,6 +85,7 @@ export function Modal({
   className,
   contentClassName,
   fillHeight = false,
+  mobilePosition = "bottom",
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -144,9 +152,11 @@ export function Modal({
     <div
       className={cn(
         // z-[60]：高于底部 Nav (z-50) 与 FloatingChat (z-50)，低于 PomodoroWidget (z-[80])
-        // 移动端 items-end：modal 从底部滑入，避免键盘弹出时顶部留白
-        // sm+ items-center：桌面端居中
-        "fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4",
+        // 移动端定位：mobilePosition="bottom" → items-end（贴底抽屉）
+        //              mobilePosition="center" → items-center（表单类居中，避免顶部空白）
+        // sm+ 始终 items-center（桌面端居中）
+        "fixed inset-0 z-[60] flex justify-center p-0 sm:p-4",
+        mobilePosition === "center" ? "items-center" : "items-end sm:items-center",
         open ? "animate-fade-in" : "opacity-0 pointer-events-none",
       )}
       role="presentation"
@@ -168,8 +178,9 @@ export function Modal({
         tabIndex={-1}
         className={cn(
           "relative w-full bg-white dark:bg-gray-800 shadow-modal",
-          // 移动端：贴底显示，顶部大圆角，无底部圆角，最大高度 90vh 防溢出
-          "rounded-t-card sm:rounded-card",
+          // 圆角：mobilePosition="center" → 全圆角（移动端也居中）
+          //       mobilePosition="bottom" → 移动端贴底时顶部无圆角，桌面端全圆角
+          mobilePosition === "center" ? "rounded-card" : "rounded-t-card sm:rounded-card",
           "max-h-[90vh] overflow-y-auto",
           "animate-slide-up",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",

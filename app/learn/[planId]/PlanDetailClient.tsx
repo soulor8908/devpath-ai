@@ -1211,7 +1211,7 @@ export default function PlanDetailClient() {
       {/* ============ 需求 5：脑图悬浮小图标 ============ */}
       {/* 弹窗关闭后显示，点击重新展开脑图。
           样式与 FloatingChatButton / PomodoroWidget 统一：56px 圆形 + shadow-floating
-          定位：right-4 bottom-32（垂直错开 FloatingChat bottom-20，避开底部 nav）
+          定位：right-4 bottom-28（垂直错开 FloatingChat bottom-16，避开底部 nav 44px）
           层级：z-50（与 FloatingChat 同层，低于 PomodoroWidget z-[80]、Modal z-[60]） */}
       {showMindMapFloat && !showMindMapModal && (
         <Button
@@ -1220,7 +1220,7 @@ export default function PlanDetailClient() {
           aria-label="打开知识点脑图"
           title="打开知识点脑图"
           onClick={() => setShowMindMapModal(true)}
-          className="fixed right-4 bottom-32 z-50 w-14 h-14 rounded-full shadow-floating flex items-center justify-center"
+          className="fixed right-4 bottom-28 z-50 w-14 h-14 rounded-full shadow-floating flex items-center justify-center"
         >
           <Icon name="target" className="w-6 h-6" />
         </Button>

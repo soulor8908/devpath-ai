@@ -172,7 +172,7 @@ export function FloatingChatButton({ onOpen }: FloatingChatButtonProps) {
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       style={positionStyle}
-      className={`fixed w-14 h-14 rounded-full bg-black text-white shadow-floating z-50 touch-none select-none flex items-center justify-center right-4 bottom-20 ${
+      className={`fixed w-14 h-14 rounded-full bg-black text-white shadow-floating z-50 touch-none select-none flex items-center justify-center right-4 bottom-16 ${
         dragging ? "cursor-grabbing" : "cursor-grab"
       }`}
     >

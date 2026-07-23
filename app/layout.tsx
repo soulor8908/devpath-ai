@@ -39,7 +39,7 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen pb-16">
+      <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen pb-11">
         <a href="#main-content" className="skip-link">跳到主内容</a>
         <main id="main-content">{children}</main>
         <ToastContainer />
