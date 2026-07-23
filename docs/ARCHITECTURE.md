@@ -57,7 +57,13 @@
 1. `app/page.tsx`（Server Component）渲染 `HomeSkeleton` 骨架屏 HTML
 2. Suspense fallback 显示骨架屏，hydration 后 `HomeClient` 接管
 3. `useHomeData()` hook 并行发起 IndexedDB 查询（`Promise.all`）
-4. 数据返回后渲染：节奏引擎推荐任务、待学/待复习卡片、今日日程、热力图、Streak、能量状态
+4. 数据返回后按 **6 区结构**渲染（详见 [docs/ui-design-system.md](file:///workspace/docs/ui-design-system.md) 第 6 节）：
+   1. Hero 行动区：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
+   2. KPI 三宫格：今日学习清单 N 项（可点击进入学习）/ 已完成 X 项 / 连续打卡 N 天
+   3. AI 教练洞察区：HomeInsightsCard + 能力画像 + AI 质量摘要
+   4. 能量趋势迷你图（新账户无数据时隐藏）
+   5. 7 天热力图（常驻，新账户无打卡记录时隐藏）
+   6. 今日学习队列（移到最下面作为详细视图，KPI 卡片已能快速进入学习）
 5. 末尾并行触发 **5 路后台维护任务**（`Promise.allSettled`，不阻塞 UI）：
    - `autoFillTodayActualMinutes()`：从今日 LearnLog + 番茄 session 累计时长回填能量样本
    - `maybeRetrain()`：若样本数 ≥ 10 且距上次训练 ≥ 1 天，重新训练线性回归模型
@@ -80,19 +86,25 @@
 
 ### 番茄时钟完整流程
 
-1. 用户点击「开始专注」或 AI 调用 `start_focus_session` 工具
+番茄时钟统一为右下角浮动 widget（`components/PomodoroWidget.tsx`），两态切换：
+
+- **small 态**：56px 圆环浮窗，常驻显示倒计时进度，可拖动 + 边缘吸附
+- **large 态**：通过全局事件 `POMODORO_OPEN_LARGE_EVENT` 触发，渲染 `<Modal><PomodoroFullContent/></Modal>`，承载 idle / running / completed 三态视图与表单输入
+
+1. 用户点击「开始专注」或 AI 调用 `start_focus_session` 工具（首页 Hero / 训练页 / Chat 工具均通过 `window.dispatchEvent(new CustomEvent(POMODORO_OPEN_LARGE_EVENT))` 唤起 large 态）
 2. `createSession({ taskDescription, durationMinutes, planId?, nodeId? })` → 创建 `PomodoroSession`（status=running）
-3. `PomodoroWidget` 显示右下角浮动倒计时
+3. `PomodoroWidget` 在 small 态显示圆环倒计时，可点击切到 large 态查看详情
 4. `startGuard(sessionId, mode, callbacks)` 启动专注保护：
    - 严格模式：3 次打断（visibilitychange + blur）→ `onAbandon` → `abandonSession()`
    - 宽松模式：只记录打断次数，不暂停
-5. 倒计时结束 → 浏览器 Notification（降级为 console.log）
+5. 倒计时结束 → 浏览器 Notification（降级为 console.log），widget 自动切到 large 态展示 completed 视图
 6. 用户标记完成 → `completeSession(id)`：
    - 写 `LearnLog(type=focus_session, duration=扣除打断后的实际时长)`
    - 调用 `updateActualMinutes()` 更新能量样本
    - `sessionIndex++` → `getNextBreakType()` 判断短休息/长休息（4-1 规则）
-7. 建议「休息 5 分钟」或「再来一个番茄」
+7. completed 视图建议「休息 5 分钟」或「再来一个番茄」
 8. 浏览器关闭后重启 → `recoverInterruptedSession()` 超时自动完成
+9. `BOTTOM_NAV_RESERVE = 96` 确保 widget 拖动范围避开底部导航
 
 ### 节奏引擎决策流
 
@@ -221,7 +233,7 @@ buildProfileContext(profile) → ≤500 字符文本
 
 - Persona 片段定义在 `lib/ai/prompts.ts` 的 `PERSONA_SNIPPETS` 中
 - `lib/ai/persona.ts` 通过 import 引用，避免两处维护不同步
-- 选择逻辑在 `persona.ts`，展示在 `profile/page.tsx`，注入在 `chat/route.ts`
+- 选择逻辑在 `persona.ts`，展示在 `app/profile/page.tsx`，注入在 `app/api/chat/route.ts`
 
 ### 9. 乐观限流（streamText 前递增）
 
@@ -284,9 +296,9 @@ buildProfileContext(profile) → ≤500 字符文本
 
 ## 测试策略
 
-- **Vitest 单测**（403+）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking 等核心模块
-- **Playwright E2E**：主流程（首页 → 学习 → 复习 → 统计）+ 番茄时钟完整流程 + Demo 注入/清除
-- **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint
+- **Vitest 单测**（758+ 用例 / 67 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / no-native-form-elements 守护 / ui-design-system-guard 守护 等核心模块
+- **Playwright E2E**：主流程（首页 → 学习 → 复习 → 我的；浮动按钮打开 AI 对话）+ Demo 注入/清除
+- **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint、UI 设计系统守护测试（原生表单元素 / dark 配对 / 逃逸值）
 
 ## 部署
 

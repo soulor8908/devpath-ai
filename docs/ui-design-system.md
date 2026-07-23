@@ -327,25 +327,29 @@ const DIFFICULTY_COLORS = {
 
 ---
 
-## 6. 首页设计范式（5 区结构）
+## 6. 首页设计范式（6 区结构）
 
-参考 [app/HomeClient.tsx](file:///workspace/app/HomeClient.tsx) 的 5 区结构：
+参考 [app/HomeClient.tsx](file:///workspace/app/HomeClient.tsx) 的 6 区结构（第 5 轮简化后，折叠区已删除，热力图常驻）：
 
 1. **Hero 行动区**：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
-2. **KPI 三宫格**：今日待学 / 今日待复习 / 连续打卡
-3. **AI 教练洞察区**：HomeInsightsCard + 能力画像 + AI 质量摘要
-4. **今日学习安排**：精简 schedule 列表 + 能量趋势迷你图
-5. **折叠区**：情绪记录 / 错题 / 7 天热力图
+2. **KPI 三宫格**：今日学习清单 N 项（可点击进入学习）/ 已完成 X 项 / 连续打卡 N 天
+3. **AI 教练洞察区**：HomeInsightsCard（成就 + 健康提醒）+ 能力画像 + AI 质量摘要
+4. **能量趋势迷你图**（新账户无数据时隐藏）
+5. **7 天热力图**（常驻，新账户无打卡记录时隐藏）
+6. **今日学习队列**（移到最下面作为详细视图，KPI 卡片已能快速进入学习）
 
 **原则**：
 - 用户进入 3 秒内能看到 1+2 区（核心答案 + KPI）
 - 3+4 区是次要洞察，可滚动查看
-- 5 区是低频功能，默认折叠
+- 5 区是低频可视化，常驻但可空
+- 6 区作为详细视图，KPI 卡片已能快速进入学习，避免重复入口
+- 新账户隐藏空数据区块（第 3/4/5 区按数据存在性条件渲染）
 
 **禁止**：
 - 在首页堆砌 9+ 个并列区块
 - 与底部 Nav 重复的快捷入口
 - 与 HomeInsightsCard 功能重叠的 StatusCard
+- 与 EmotionQuickPicker / /mistakes 重复的折叠入口
 
 ---
 
@@ -425,8 +429,9 @@ const DIFFICULTY_COLORS = {
 2. **是否用了设计令牌**？查本文档第 1 节，禁止逃逸值
 3. **是否补了 dark 配对**？浅色 utility 必须带 `dark:` 变体
 4. **是否补了 ARIA**？模态、折叠、进度条、计时器、icon-only 按钮都有专属规则
-5. **是否破坏了 5 区结构**？首页修改前先读 [app/HomeClient.tsx](file:///workspace/app/HomeClient.tsx) 头注释
-6. **运行守护测试**：`./node_modules/.bin/vitest run no-native-form-elements ui-design-system-guard`
+5. **是否破坏了 6 区结构**？首页修改前先读 [app/HomeClient.tsx](file:///workspace/app/HomeClient.tsx) 头注释
+6. **是否冲突了 z-index 层级**？参考第 11 节"z-index 层级表"
+7. **运行守护测试**：`./node_modules/.bin/vitest run no-native-form-elements ui-design-system-guard`
 
 ---
 
@@ -446,3 +451,25 @@ const DIFFICULTY_COLORS = {
 | 日期 | 版本 | 变更 |
 |---|---|---|
 | 2026-07-19 | v1.0 | 首次发布。包含设计令牌、13 个 UI 组件、暗色模式、可访问性、首页 5 区结构等完整规范 |
+| 2026-07-23 | v1.1 | 首页结构由 5 区升级为 6 区（折叠区删除，热力图常驻，学习队列移到最下面）；新增第 11 节 z-index 层级表，规范 Nav/FloatingChat/Modal/PomodoroWidget 的层叠关系 |
+
+---
+
+## 11. z-index 层级表
+
+全局浮层与模态的层叠关系（避免互相遮挡，定义单一事实源）：
+
+| 层级 | z-index | 元素 | 文件 | 说明 |
+|---|---|---|---|---|
+| 内容层 | `z-10` | sticky 顶部进度条 / 训练页头部 | `app/train/TrainClient.tsx` 等 | 页面内局部 sticky |
+| 导航层 | `z-50` | 底部 `<Nav>` | [components/Nav.tsx](file:///workspace/components/Nav.tsx) | 3 Tab：路径 / 训练 / 我的 |
+| 浮动按钮层 | `z-50` | `<FloatingChatButton>` | [components/FloatingChatButton.tsx](file:///workspace/components/FloatingChatButton.tsx) | 右下角 AI 对话入口（与 Nav 同层，靠 `bottom-20` 让位 Nav） |
+| 模态层 | `z-[60]` | 统一 `<Modal>` | [components/ui/Modal.tsx](file:///workspace/components/ui/Modal.tsx) | 内置 focus trap + ESC + 焦点恢复 + body lock；移动端 `items-end` 贴底，桌面端 `items-center` 居中 |
+| 学习页脑图浮按钮 | `z-50` | `<Button>` fixed right-4 bottom-32 | `app/learn/[planId]/PlanDetailClient.tsx` | 脑图悬浮小图标，点击展开脑图 Modal |
+| 番茄 widget 层 | `z-[80]` | `<PomodoroWidget>` small 态 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 右下角圆环浮窗，常驻；large 态通过 Modal 渲染（z-[60]） |
+
+**规则**：
+- 任何新浮层必须先查本表，禁止凭感觉写 `z-[100]` / `z-[9999]`
+- 模态层（`z-[60]`）高于 Nav/FloatingChat（`z-50`），保证打开模态时遮罩覆盖底部 Nav
+- 番茄 widget（`z-[80]`）高于模态层，保证 small 态始终可见；large 态复用 Modal，仍为 `z-[60]`
+- `ToastContainer` 在 `<Modal>` 之上（具体值见 [components/ui/Toast.tsx](file:///workspace/components/ui/Toast.tsx)）

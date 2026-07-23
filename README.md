@@ -21,7 +21,7 @@
 
 ### 智能化能力（AI-Native）
 
-- **番茄时钟**：25 分钟专注 + 5 分钟休息的番茄工作法，4-1 长休息规则，浏览器通知提醒，打断追踪（严格模式 3 次打断自动放弃），完成后自动写 LearnLog + 更新能量样本
+- **番茄时钟**：25 分钟专注 + 5 分钟休息的番茄工作法，4-1 长休息规则，浏览器通知提醒，打断追踪（严格模式 3 次打断自动放弃），完成后自动写 LearnLog + 更新能量样本；统一为右下角浮动 widget（`PomodoroWidget` 两态：small 圆环浮窗 ↔ large Modal 详情）
 - **用户画像**：从 FSRS 稳定性 + 准确率 + 学习日志 + 能量样本自动构建多维画像（技能水平 / 偏好时段 / 平均专注时长 / 薄弱环节 / 学习风格），24h TTL 自动重建，注入每次 AI 对话上下文
 - **精准计划**：基于用户画像生成个性化学习计划，可行性评分（confidence < 0.5 自动降级），跳过已掌握节点加速进度
 - **优先级引擎**：4 维加权评分（截止紧迫度 0.3 + FSRS 到期 0.3 + 技能差距 0.2 + 能量匹配 0.2），每日缓存，健康检查（逾期 / 完成率 / 能量趋势 / 卡片积压）
@@ -47,7 +47,7 @@
 | 复习算法 | ts-fsrs（FSRS-4.5）|
 | 能量模型 | 线性回归（3 特征 → actualMinutes，正则方程闭式解）|
 | PWA | Service Worker + Web Push + Manifest |
-| 测试 | Vitest（403+ 单测）+ Playwright（E2E）|
+| 测试 | Vitest（758+ 单测 / 67 个测试文件）+ Playwright（E2E）|
 | 代码质量 | ESLint（next/core-web-vitals + typescript）|
 
 ## 📁 仓库结构
@@ -55,31 +55,36 @@
 ```
 app/                    Next.js App Router 路由
   ├── page.tsx          首页（Server Component + Suspense 骨架屏）
-  ├── HomeClient.tsx    首页客户端（健康告警 + 成就通知 + 节奏引擎）
-  ├── chat/             AI 聊天（流式 + 工具调用 + Persona 注入）
-  ├── learn/            学习计划详情 / 编辑（Demo 清除提示）
+  ├── HomeClient.tsx    首页客户端（6 区结构：Hero / KPI / AI 洞察 / 能量 / 热力图 / 学习队列）
+  ├── learn/            学习（new / list / [planId] 详情与编辑 / Demo 清除提示）
   ├── review/           FSRS 复习卡片
-  ├── timer/            番茄时钟全屏专注模式
+  ├── train/            训练会话（沉浸式学习，自动唤起番茄钟）
+  ├── interview/        面试题练习
   ├── achievements/     成就墙
   ├── emotion/          情绪日记
   ├── daily/            每日状态评估
-  ├── stats/            学习统计 + AI 质量看板
+  ├── stats/            学习统计 + AI 质量看板（ai-quality 子页）
   ├── mistakes/         错题本
   ├── favorites/        收藏
-  ├── dashboard/        仪表盘
+  ├── onboarding/       首次引导
   ├── profile/          个人设置（AI 模型 / Persona / 专注模式 / 时间表 / 成就墙隐私）
   ├── u/[username]/     公开学习主页（含成就墙）
   ├── rest/             休息引导
   ├── docs/             应用内使用文档
   └── api/              Edge API 路由（聊天 / 学习 / 复习 / 节奏 / 限流 / 同步 / 周报 等）
 components/              React 组件
-  ├── PomodoroWidget.tsx    番茄时钟浮动组件（small ↔ large Modal 两态）
+  ├── PomodoroWidget.tsx    番茄时钟浮动组件（small 圆环 ↔ large Modal 详情）
+  ├── PomodoroFullContent.tsx 番茄钟主体内容（idle/running/completed 三态）
+  ├── FloatingChat.tsx      全局浮动聊天入口（FloatingChatButton + ChatModal）
+  ├── ChatClient.tsx        AI 聊天客户端（流式 + 工具调用 + Persona 注入）
+  ├── ModelConfigModal.tsx  AI 模型配置弹窗（统一 Modal 实现）
+  ├── Nav.tsx               底部导航（3 Tab：路径 / 训练 / 我的）
+  ├── MindMap.tsx           知识树脑图（DAG→Tree + 拖拽缩放 + 已掌握节点变绿）
   ├── CurrentTaskCard.tsx   节奏引擎驱动的"现在该做什么"
   ├── HealthAlertCard.tsx   健康告警 + 一键采纳
   ├── AchievementCard.tsx   新成就通知
   ├── UserProfileCard.tsx   用户画像展示
-  ├── RateLimitBanner.tsx   AI 额度提示
-  └── ...                   Heatmap / RadarChart / KnowledgeTree / EmotionRecorder ...
+  └── ...                   Heatmap / RadarChart / EmotionRecorder / TrainSessionFlow ...
 lib/
   ├── ai/               AI 调用层
   │   ├── provider.ts       模型解析（服务端默认 / 用户自定义）
@@ -118,7 +123,7 @@ lib/
   └── types.ts          全局类型
 functions/api/public/   Cloudflare Pages Functions（公开主页 API + 成就墙）
 public/                 PWA 配置（manifest / sw / icons）
-__tests__/              Vitest 单测（37 个文件 / 403+ 用例）
+__tests__/              Vitest 单测（67 个测试文件 / 758+ 用例）
 e2e/                    Playwright E2E（番茄时钟 + Demo 流程 + 主流程）
 docs/                   项目文档（架构 / 开发指南）
 .github/workflows/      CI：自动部署到 Cloudflare Pages
@@ -155,7 +160,7 @@ npm run dev
 ### 4. 测试
 
 ```bash
-npm test           # Vitest 单测（403+ 用例）
+npm test           # Vitest 单测（758+ 用例）
 npm run test:e2e   # Playwright E2E（需先 npx playwright install chromium）
 npx tsc --noEmit   # 类型检查
 npx next lint      # ESLint

@@ -58,7 +58,7 @@ npx wrangler pages secret put MASTER_KEY --project-name=devpath-ai
 ## 测试
 
 ```bash
-# 全部单测（403+ 用例）
+# 全部单测（758+ 用例 / 67 个测试文件）
 npm test
 
 # 监听模式
@@ -125,9 +125,11 @@ my_new_prompt: "v1:<hash>",
 3. 如果是写入工具（有副作用），必须：
    - 使用 `makeIdempotencyKey(type, params)` 生成幂等键
    - 在返回值中填充 `clientAction.idempotencyKey`
-4. 在 `app/chat/ChatClient.tsx` 的 `executeClientAction` 中添加处理分支
+4. 在 `components/ChatClient.tsx` 的 `executeClientAction` 中添加处理分支
 5. 在 `app/api/chat/route.ts` 的 `TOOL_SYSTEM_SUFFIX` 中添加工具描述
 6. 写入操作用不可变克隆 + 单次原子写入（参考 `adjust_plan` 的实现）
+
+> 聊天已统一为浮动入口：`components/FloatingChat.tsx`（FloatingChatButton 常驻 + ChatModal 按需挂载 ChatClient），通过 `lib/chat-modal-store.ts` 全局 store 触发开关，不再走 `/chat` 路由。
 
 ## 添加新的 IndexedDB 数据类型
 
@@ -146,6 +148,10 @@ export const KEY_PREFIXES = {
 
 ## 番茄时钟开发
 
+番茄时钟统一为右下角浮动 widget（`components/PomodoroWidget.tsx`），两态切换：
+- **small 态**：56px 圆环浮窗，常驻显示倒计时进度，可拖动 + 边缘吸附
+- **large 态**：通过全局事件 `POMODORO_OPEN_LARGE_EVENT` 触发，渲染 `<Modal><PomodoroFullContent/></Modal>`，承载 idle / running / completed 三态视图与表单输入
+
 ### Session 生命周期
 
 ```
@@ -157,7 +163,17 @@ lib/timer/pomodoro.ts
   resumeSession()     → 恢复 running
   getRunningSession() → 查询当前进行中
   recoverInterruptedSession() → 浏览器重启后恢复（超时自动完成）
+  POMODORO_OPEN_LARGE_EVENT → 全局事件，触发 widget 切到 large 态
 ```
+
+### 唤起 large 态的入口
+
+- 首页 Hero 区「开始专注」按钮
+- 训练页 `app/train/TrainClient.tsx` 进入训练时自动唤起（`getRunningSession()` 检测无运行 session 时）
+- AI 聊天工具 `start_focus_session` 调用
+- widget 自身 small 态被点击
+
+> 已删除 `/timer` 路由，番茄时钟全部交互收敛到 widget 内。
 
 ### 休息规则
 
@@ -312,7 +328,7 @@ lib/ai/rhythm-engine.ts
 - `lib/ai/rate-limit.ts` — `checkRateLimit()` + `incrementRateLimit()` + `getClientRateLimitEstimate()`
 - `lib/storage/kv.ts` — `getRateLimitCount()` + `incrementRateLimitCount()`（KV key: `ratelimit:{userId}:{scene}:{date}`）
 - `app/api/chat/route.ts` — 乐观递增（streamText 前递增，失败不回滚）
-- `components/RateLimitBanner.tsx` — 客户端剩余次数展示
+- 限流提示内联在 ChatClient 的回答气泡顶部，无独立 RateLimitBanner 组件
 
 ### 添加新的限流场景
 
@@ -396,7 +412,7 @@ lib/ai/rhythm-engine.ts
 - `lib/ai/quality-tracker.ts` — `MODEL_PRICING` + `estimateCost()` + `normalizeModelId()` + `parseUsageFromFinishMessage()`
 - `lib/types.ts` — `TokenUsage` 接口 + `AICallRecord.tokenUsage/estimatedCost/modelId` 字段
 - `app/api/chat/route.ts` — `onFinish` 回调日志 + `X-AI-Model-Id` 响应头
-- `app/chat/ChatClient.tsx` — 解析流式 "d:" 消息 + 读取响应头 + 传给 `recordAICall()`
+- `components/ChatClient.tsx` — 解析流式 "d:" 消息 + 读取响应头 + 传给 `recordAICall()`
 - `app/stats/ai-quality/page.tsx` — Token / 成本统计卡片 + 场景表新列
 
 ### 添加新模型定价
