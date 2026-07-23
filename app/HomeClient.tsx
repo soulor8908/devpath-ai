@@ -294,18 +294,23 @@ export default function HomeClient() {
       <EmotionQuickPicker onRecorded={reload} />
 
       {/* ============ 2. KPI 三宫格（第 2 阶段：学习+复习合并为单一队列）
-          需求 4：第一格「今日学习清单」可点击进入学习（队列第一项或 /learn/new 兜底）============ */}
+          需求 4：第一格「今日学习清单」可点击进入学习（队列第一项或 /learn/new 兜底）
+          2026-07-23 优化：第 1 格视觉强化——蓝色渐变背景 + 右上角箭头 + "进入学习"提示，
+          与第 2/3 格（纯展示）形成视觉区分，让"可点击"更明显 ============ */}
       <section className="mb-5 grid grid-cols-3 gap-3">
         <Link
           href={studyQueue[0] ? (studyQueue[0].type === "review" ? "/review" : `/learn/${studyQueue[0].planId ?? ""}`) : "/learn/new"}
           aria-label={`今日学习清单 ${studyQueue.length} 项，点击进入学习`}
-          className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all group relative"
+          className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/40 dark:to-gray-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all group relative"
         >
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{studyQueue.length}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center justify-center gap-0.5">
-            今日学习清单
-            <Icon name="chevron-right" className="w-3 h-3 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
-          </p>
+          {/* 右上角箭头图标：绝对定位，hover 时向右移动 */}
+          <Icon
+            name="chevron-right"
+            className="absolute top-2 right-2 w-4 h-4 text-blue-400 dark:text-blue-500 group-hover:translate-x-0.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all"
+          />
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{studyQueue.length}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">今日学习清单</p>
+          <p className="text-2xs text-blue-500 dark:text-blue-400 mt-0.5">点击进入学习</p>
         </Link>
         <div
           aria-label={`今日已完成 ${todayCompletedCount} 项`}
@@ -497,17 +502,29 @@ export default function HomeClient() {
             )}
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-center">
-            <Icon name="check-circle" className="w-8 h-8 mx-auto text-green-500 mb-1" />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {todayCompletedCount > 0 ? "今日清单已清空" : "今日暂无待办"}
+          /* 空队列 EmptyState（2026-07-23 优化）：
+             - todayCompletedCount > 0：今日清单已清空（成就感）
+             - todayCompletedCount === 0：今天没有待学习项（引导创建）
+             CTA 用 LinkButton 强化视觉，引导用户去 /learn/new 创建计划 */
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 text-center">
+            <Icon
+              name={todayCompletedCount > 0 ? "check-circle" : "sparkles"}
+              className={`w-10 h-10 mx-auto mb-2 ${todayCompletedCount > 0 ? "text-green-500" : "text-blue-400 dark:text-blue-500"}`}
+            />
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+              {todayCompletedCount > 0 ? "今日清单已清空，干得漂亮！" : "今天没有待学习项"}
             </p>
-            <Link
+            <p className="text-2xs text-gray-400 dark:text-gray-500 mb-3">
+              {todayCompletedCount > 0 ? "休息一下，或规划明天的学习" : "创建一个学习计划，开始你的成长之旅"}
+            </p>
+            <LinkButton
               href="/learn/new"
-              className="text-xs text-blue-500 hover:underline mt-2 inline-block"
+              size="sm"
+              variant="primary"
+              leftIcon="plus"
             >
-              建一个学习计划 →
-            </Link>
+              {todayCompletedCount > 0 ? "新建计划" : "创建学习计划"}
+            </LinkButton>
           </div>
         )}
       </section>
