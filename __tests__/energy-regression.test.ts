@@ -113,10 +113,13 @@ describe("dopamineToNumeric", () => {
 // ============ 时间工具函数 ============
 
 describe("getHourFromISO", () => {
-  it("从 ISO 提取小时", () => {
-    expect(getHourFromISO("2026-07-17T14:30:00.000Z")).toBe(14);
-    expect(getHourFromISO("2026-07-17T00:00:00.000Z")).toBe(0);
-    expect(getHourFromISO("2026-07-17T23:59:00.000Z")).toBe(23);
+  it("从 ISO 提取本地小时（时区无关）", () => {
+    // 用本地时间构造，再转 ISO——任何时区下提取结果都应等于本地小时
+    const local = (h: number, m: number) =>
+      new Date(2026, 6, 17, h, m).toISOString();
+    expect(getHourFromISO(local(14, 30))).toBe(14);
+    expect(getHourFromISO(local(0, 0))).toBe(0);
+    expect(getHourFromISO(local(23, 59))).toBe(23);
   });
 
   it("无效 ISO → 默认 12（中午）", () => {

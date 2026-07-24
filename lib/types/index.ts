@@ -15,3 +15,4 @@ export * from "./profile";
 export * from "./engine";
 export * from "./achievement";
 export * from "./constants";
+export * from "./curriculum";

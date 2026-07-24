@@ -1,0 +1,37 @@
+id: python.async-basics
+title: 异步 Python（asyncio 基础）
+summary: async/await、事件循环、并发任务编排。AI 应用中所有 LLM 调用都是 IO 密集型，异步是吞吐量的前提。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [python.for-js-devs]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  async/await 语法与 JS 几乎一致，事件循环概念同源。
+  关键差异：asyncio 的协程必须显式 await 或 gather 才会并发
+  （没有 Promise.all 的"创建即并发"习惯要改）；
+  且同步/异步是两个世界——在 async 函数里调用阻塞 IO（如 requests、time.sleep）
+  会冻结整个事件循环。
+concepts:
+  - 事件循环：单线程协作式调度，await 即让出控制权
+  - asyncio.gather ≈ Promise.all；asyncio.create_task ≈ 启动一个后台 Promise
+  - 同步/异步边界：async with、async for 与对应的异步库（httpx/aiohttp）
+  - asyncio.run：程序入口的事件循环启动器
+  - 并发不是并行：GIL 限制下 asyncio 只解决 IO 密集，不解决 CPU 密集
+sourceIds: [python-asyncio, fastapi-docs]
+gotchas:
+  - 在协程中调用 time.sleep 或 requests 会阻塞整个事件循环——必须用 asyncio.sleep / httpx
+  - 忘记 await 一个协程不会报错，只会静默不执行（RuntimeWarning 常被忽略）
+  - gather 中一个任务异常，默认行为是传播首个异常，其余任务仍在跑——需要 return_exceptions=True 时显式声明
+interview:
+  - q: asyncio 和 JS 的 Promise 模型有什么本质区别？
+    answerSkeleton: 语法同源 → 调度差异（协程惰性 vs Promise 创建即执行）→ 生态割裂（sync/async 两套库 vs JS 统一）→ GIL 限制 → 适用场景一致（IO 密集）
+    followups:
+      - 为什么 CPU 密集任务用 asyncio 没收益？该用什么？
+      - gather 与 TaskGroup 的错误处理差异？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 httpx + asyncio.gather 并发请求 10 个 URL，要求总耗时接近最慢单个请求而非总和，并正确处理部分失败
+status: reviewed
+lastVerified: "2026-07-24"

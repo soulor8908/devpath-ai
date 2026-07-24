@@ -1,0 +1,35 @@
+id: llm.streaming-basics
+title: 流式响应（SSE 基础）
+summary: 服务端推送的流式协议、增量事件解析、客户端断线处理。流式是 AI UX 的物理基础——首 token 延迟决定产品的"快"感。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [llm.api-first-call]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  SSE ≈ 一个不会自动关闭的 fetch 响应，服务端持续往连接里写文本块。
+  你处理过分块传输、做过打字机效果，这里的增量心智完全一致：
+  区别是数据语义——每个 chunk 是一小段 JSON delta，
+  需要按 OpenAI 协议拼接成完整消息，中途断线要能续传或降级。
+concepts:
+  - "SSE 协议：text/event-stream，data: 前缀行，[DONE] 终止标记"
+  - 增量 delta：每个 chunk 只含新增 token，客户端负责拼接
+  - 首 token 延迟（TTFT）：用户感知"快"的核心指标
+  - 断线与重连：网络抖动时的续传、幂等与内容去重
+sourceIds: [openai-streaming, mdn-sse, deepseek-api-docs]
+gotchas:
+  - SSE 是单向协议：客户端→服务端仍走普通 POST，别试图在 SSE 里回写
+  - 浏览器原生 EventSource 不支持自定义 header/POST，生产环境用 fetch + ReadableStream 解析
+  - 拼 chunk 时绝不能假设每次收到完整 JSON——缓冲区必须按 \n\n 分割事件
+interview:
+  - q: 为什么 AI 聊天应用都用流式输出？技术上怎么实现？
+    answerSkeleton: 生成是逐 token 的（O(n)）→ 全量等待 = TTFT + 全量生成时间 → 流式把感知延迟降到 TTFT → SSE 协议逐 chunk 推送 delta → 前端增量渲染
+    followups:
+      - 如果连接在第 50 个 token 时断了，你的恢复策略是什么？
+      - EventSource 有哪些限制？生产环境替代方案？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 fetch + ReadableStream 手写 SSE 解析器（不依赖 SDK），正确处理分块跨边界与 [DONE] 终止
+status: reviewed
+lastVerified: "2026-07-24"

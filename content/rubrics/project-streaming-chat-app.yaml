@@ -1,0 +1,23 @@
+# Phase 1 里程碑项目评分细则：流式对话应用
+# V3 构建验证用：AI 按本细则审查用户 GitHub 仓库代码 + 部署验证
+
+rubric:
+  id: project-streaming-chat-app
+  title: 流式对话应用 · 构建验证评分细则
+  passScore: 70
+  criteria:
+    - id: streaming-ux
+      description: SSE 流式渲染、打字机效果、中断恢复，无卡顿与状态错乱
+      weight: 25
+    - id: structured-output
+      description: 至少一处结构化输出（JSON Schema/Zod 校验）用于真实业务逻辑
+      weight: 20
+    - id: error-resilience
+      description: API 失败、限流、网络中断的用户可见降级，非白屏
+      weight: 20
+    - id: cost-instrumentation
+      description: token 用量与成本仪表盘，数据来自真实 API 返回
+      weight: 20
+    - id: code-quality
+      description: 前后端分层清晰、类型完整、有测试
+      weight: 15

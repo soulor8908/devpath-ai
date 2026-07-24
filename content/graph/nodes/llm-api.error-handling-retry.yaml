@@ -1,0 +1,35 @@
+id: llm-api.error-handling-retry
+title: 错误处理与重试策略
+summary: LLM API 的失败模式（限流/超时/内容过滤/模型过载）与对应的工程策略：指数退避、熔断、降级模型。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm.api-first-call]
+estimatedMinutes: 60
+difficulty: 2
+frontendBridge: >-
+  和你处理过无数次的上游 API 故障完全同构：429 像 CDN 限流，
+  500 像服务端抖动，content_filter 像 WAF 拦截。
+  指数退避 + 抖动 + 熔断器，这些模式你闭着眼睛都会写——
+  只是这次要额外处理"模型不确定输出"这种新失败类型。
+concepts:
+  - 失败分类：可重试（429/5xx/超时）vs 不可重试（认证错误/内容过滤/参数错误）
+  - 指数退避 + 随机抖动：避免惊群效应
+  - 熔断器：连续失败时快速失败，保护下游
+  - 降级链：主模型失败 → 备用模型 → 缓存回复 → 人工兜底
+sourceIds: [openai-docs, deepseek-api-docs, eugene-yan-llm-patterns]
+gotchas:
+  - 对所有错误统一重试是灾难：内容过滤错误重试 100 次也过不了
+  - 退避不加抖动会导致所有客户端同时重试（thundering herd）
+  - 流式响应中途失败的处理最棘手：已输出的部分如何回滚或标注？
+interview:
+  - q: 你的 LLM 调用收到 429，重试策略怎么设计？
+    answerSkeleton: 识别 Retry-After → 指数退避 + 抖动 → 最大重试次数 → 熔断保护 → 降级模型 → 监控告警；区分 429（配额）与 429（速率）
+    followups:
+      - 流式响应中途断开，已渲染的 50 个字怎么处理？
+      - 什么错误绝不重试？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 实现一个健壮的 LLM 调用封装：分类错误、指数退避、熔断、降级到备用模型，附故障注入测试
+status: reviewed
+lastVerified: "2026-07-24"

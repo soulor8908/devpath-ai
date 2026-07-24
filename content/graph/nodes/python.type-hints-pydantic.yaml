@@ -1,0 +1,36 @@
+id: python.type-hints-pydantic
+title: 类型提示与 Pydantic 数据校验
+summary: Python type hints 的语法与工程价值；Pydantic 模型定义、校验与序列化——这是 AI 系统中校验 LLM 输出的标准工具。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [python.for-js-devs]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  type hints ≈ TypeScript 类型标注，但只是"提示"，运行时不强制。
+  Pydantic ≈ Zod：schema 定义 + 运行时校验 + 类型推导一体。
+  你在前端用 Zod 校验 API 响应的心智模型可以直接平移——
+  区别是 Pydantic 更深地进入了语言生态（FastAPI、LangChain 全部建立在它之上）。
+concepts:
+  - type hints 是静态检查工具（mypy/pyright）的输入，运行时不生效
+  - Pydantic BaseModel：声明式 schema，校验失败抛 ValidationError
+  - Field 约束：默认值、范围、正则、自定义 validator
+  - model_dump / model_validate：序列化与反序列化的显式边界
+  - 在 AI 工程中的角色：LLM 输出的第一道类型闸门
+sourceIds: [pydantic-docs, python-docs]
+gotchas:
+  - type hints 不阻止运行时类型错误——把它当文档 + lint，别当运行时保障
+  - Pydantic v1 与 v2 API 差异巨大（parse_obj → model_validate），网上旧教程需甄别
+  - 严格模式（strict=True）下 "1" 不会自动转 1——处理 LLM 输出时要明确选择
+interview:
+  - q: 为什么 Python 有了 type hints 还需要 Pydantic？
+    answerSkeleton: hints 静态不强制 → 运行时数据不可信（网络/LLM 输出）→ Pydantic 提供运行时校验 +  coercion → 与生态（FastAPI/LangChain）集成
+    followups:
+      - Pydantic 校验失败的错误信息结构是怎样的？怎么用于 LLM 输出重试？
+      - strict 模式与 lax 模式各自适合什么场景？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 定义 3 个 Pydantic 模型校验一组含脏数据的 JSON，编写 pytest 断言校验行为与错误消息
+status: reviewed
+lastVerified: "2026-07-24"

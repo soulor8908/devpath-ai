@@ -19,3 +19,6 @@ next-env.d.ts.bak
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# WorkBuddy 本地记忆（不入库）
+.workbuddy/

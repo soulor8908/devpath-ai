@@ -1,0 +1,35 @@
+id: llm-api.structured-output
+title: 结构化输出（JSON Schema 与校验闭环）
+summary: 让模型输出机器可消费的 JSON：JSON Mode、Structured Outputs（Schema 强制）、Pydantic/Zod 校验与失败重试闭环。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm.api-first-call]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  你在前端处理过"后端返回的 JSON 不可信"问题——运行时校验（Zod）是标准答案。
+  这里的区别在于：生产者不是后端服务而是概率模型。
+  Structured Outputs ≈ 在模型侧加了类型约束（生成时强制遵循 Schema），
+  Pydantic/Zod 校验 ≈ 消费侧的二次保险——两道闸门缺一不可。
+concepts:
+  - JSON Mode：保证输出是合法 JSON，但不保证结构
+  - Structured Outputs：提供 JSON Schema，生成过程被约束，结构有保证
+  - 校验闭环：解析失败 → 错误信息回喂模型 → 重试（最多 N 次）→ 人工兜底
+  - Schema 设计：字段命名、枚举约束、可选字段的显式 null
+sourceIds: [openai-structured-outputs, pydantic-docs, vercel-ai-sdk]
+gotchas:
+  - JSON Mode 下模型仍可能输出结构错误的 JSON——Mode ≠ Schema
+  - Schema 嵌套过深会显著降低遵循度——扁平结构优于深层嵌套
+  - 重试不带错误反馈是死循环：必须把校验错误信息喂回给模型
+interview:
+  - q: 如何保证 LLM 输出的 JSON 100% 可解析且结构正确？
+    answerSkeleton: 分层防御 → 生成侧（Structured Outputs/Function Calling 强约束）→ 解析侧（Pydantic/Zod 校验）→ 失败闭环（错误回喂 + 有限重试）→ 最终兜底（人工/默认值）→ 没有银弹，工程上接受有限重试 + 监控失败率
+    followups:
+      - 什么场景下你宁愿用自然语言输出 + 正则提取？
+      - Schema 里 enum 和 free text 字段对模型遵循度的影响？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 实现"简历 → 结构化 JSON"提取器：Structured Outputs + Pydantic 校验 + 失败重试闭环，附 10 条真实简历的解析成功率统计
+status: reviewed
+lastVerified: "2026-07-24"

@@ -1,0 +1,35 @@
+id: llm.model-routing
+title: 模型选择与路由
+summary: 不同任务用不同模型：分类用小模型、复杂推理用大模型、敏感场景用本地模型。路由是成本与质量的杠杆。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm.cost-and-latency]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  这就是前端的"按需加载"策略：首屏用轻量资源，交互复杂时再加载重型组件。
+  模型路由同理——简单任务（意图分类、格式转换）用 GPT-4o-mini/DeepSeek-V3，
+  复杂任务（多步推理、代码生成）才上 Claude Sonnet/GPT-4o。
+  路由器本身也可以是一个小模型。
+concepts:
+  - 任务分级：简单（分类/提取）、中等（摘要/改写）、复杂（推理/代码）
+  - 路由策略：规则路由（if-else）、模型路由（小模型判断任务复杂度）、混合
+  - 级联模式：先小模型尝试，置信度低则升级大模型
+  - 本地模型：Ollama + 开源模型，隐私敏感场景的出路
+sourceIds: [openai-cookbook, anthropic-effective-agents, eugene-yan-llm-patterns]
+gotchas:
+  - 路由器本身也是模型，有错误率——路由错误比直接用大模型更糟
+  - 级联模式增加了延迟：小模型尝试失败再上大模型，总耗时 = 两次调用
+  - 本地模型的"免费"是幻觉：硬件成本 + 运维成本 + 质量差距要算总账
+interview:
+  - q: 设计一个多模型路由系统，考虑哪些因素？
+    answerSkeleton: 任务复杂度分级 → 路由策略（规则/模型/级联）→ 成本与延迟权衡 → 质量监控（各路由分支的准确率）→ 降级与兜底 → A/B 测试验证路由决策
+    followups:
+      - 路由器用规则还是模型？各自优劣？
+      - 怎么度量"这个任务该用大模型还是小模型"？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 实现一个两级路由：意图分类（小模型）→ 分发到不同处理器，统计路由准确率与成本节省比例
+status: reviewed
+lastVerified: "2026-07-24"

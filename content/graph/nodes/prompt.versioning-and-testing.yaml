@@ -1,0 +1,34 @@
+id: prompt.versioning-and-testing
+title: Prompt 版本化与可测试性
+summary: 把 Prompt 当代码对待：版本管理、测试数据集、回归评估。Prompt 改动必须有数据支撑，不靠手感。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [prompt.system-and-fewshot]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  这就是你在前端做的 A/B 测试 + CI：Prompt 是代码，测试用例是标注数据，
+  准确率是指标。每次改 Prompt 都跑一遍回归——不过"测试框架"换成了
+  LLM 评估（LLM-as-judge 或规则校验）。你的工程纪律是最大优势。
+concepts:
+  - Prompt 模板化：变量插值、环境分离（dev/staging/prod）
+  - 测试数据集：50-200 条标注样本，覆盖典型与边界
+  - LLM-as-judge：用强模型评估弱模型输出，需人工抽检校准
+  - 回归门禁：改动 Prompt 后准确率下降 > 阈值则阻止合并
+sourceIds: [anthropic-prompt-engineering, openai-cookbook, hamel-husain-evals]
+gotchas:
+  - 测试集太小（<30 条）时，指标波动大于真实差异——统计显著性被忽视
+  - LLM-as-judge 有偏见（偏爱长回答、自信语气）——必须人工抽检 10% 校准
+  - Prompt 改动 + 模型版本升级会交互影响——变量要分开控制
+interview:
+  - q: 怎么验证一次 Prompt 优化是真的改进？
+    answerSkeleton: 固定测试集 + 固定模型版本 → 跑改动前后对比 → 指标（准确率/格式正确率）→ 统计显著性（样本量）→ 人工抽检边界 case → 灰度上线监控真实指标
+    followups:
+      - LLM-as-judge 的评分漂移怎么检测？
+      - 测试集被污染（模型训练数据见过）怎么办？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个真实任务建 50 条标注数据集，实现 Prompt 回归测试脚本，输出改动前后对比报告
+status: reviewed
+lastVerified: "2026-07-24"

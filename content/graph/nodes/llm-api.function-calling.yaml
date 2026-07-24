@@ -1,0 +1,35 @@
+id: llm-api.function-calling
+title: Function Calling（工具调用）
+summary: 让模型请求调用你定义的函数：工具声明（name/description/parameters）、模型决策、执行与结果回喂。这是 Agent 的原子能力。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm-api.structured-output]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  声明一个 tool ≈ 定义一个组件的 props 接口：name 是组件名，
+  description 是文档注释，parameters 是 TypeScript interface。
+  模型扮演"调用方"，根据上下文决定调哪个函数、传什么参。
+  你的工程直觉——单一职责、清晰接口、可组合——直接决定工具设计质量。
+concepts:
+  - 工具三要素：name、description（决定模型何时选它）、parameters（JSON Schema）
+  - 调用循环：模型返回 tool_call → 你执行函数 → 结果以 tool 角色回喂 → 模型继续生成
+  - 并行工具调用：一次响应可请求多个 tool_call
+  - 危险操作闸门：写操作（发邮件/删数据）必须人工确认后才执行
+sourceIds: [openai-function-calling, anthropic-tool-use, vercel-ai-sdk]
+gotchas:
+  - description 写不好，模型就不会在正确时机调用——它读的是文档不是代码
+  - 工具执行结果可能很大（如搜索结果），直接回喂会爆上下文——需要截断或摘要
+  - 模型可能幻觉出不存在的参数值——执行端必须再做一次参数校验
+interview:
+  - q: Function Calling 的完整调用循环是什么？哪一步最容易出 bug？
+    answerSkeleton: 声明工具 → 模型决策返回 tool_call → 执行函数 → 结果回喂 → 模型生成最终回复；最易错的是结果回喂（格式、大小、多轮上下文一致性）与参数幻觉
+    followups:
+      - 怎么防止模型调用工具做危险操作（如删库）？
+      - 工具数量到几十上百个时，选择准确率下降怎么办？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 实现 3 个工具（查天气 mock、读本地文件、计算器）的完整调用循环，含参数校验与危险操作确认
+status: reviewed
+lastVerified: "2026-07-24"

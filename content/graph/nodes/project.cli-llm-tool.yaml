@@ -1,0 +1,37 @@
+id: project.cli-llm-tool
+title: 里程碑项目 · CLI 文本批处理工具
+summary: Phase 0 出口项目：一个命令行工具，读取本地文件列表，调用 LLM API 批量处理（如翻译/摘要/打标签），流式输出进度，统计 token 成本。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [llm.streaming-basics, python.env-tooling]
+estimatedMinutes: 240
+difficulty: 3
+frontendBridge: >-
+  这是你写过无数遍的 CLI/脚本任务，只是数据源换成了 LLM API。
+  文件遍历 ≈ Node fs，异步并发 ≈ Promise 池，进度输出 ≈ CLI spinner。
+  重点不在功能，在于第一次用 Python 工程规范（uv + 类型 + pytest）
+  完成一个真实可交付的工具。
+concepts:
+  - 项目脚手架：uv init + pyproject.toml + src 布局
+  - 异步并发池：asyncio.Semaphore 限制并发数，防止触发 API 限流
+  - 成本统计：从 usage 字段累计 token，按单价估算 USD 成本
+  - 断点续跑：处理结果落盘，重跑时跳过已完成项
+sourceIds: [openai-cookbook, deepseek-api-docs, python-docs]
+lab: content/labs/cli-llm-tool
+gotchas:
+  - 并发不设上限会立刻触发 429 限流——Semaphore 或队列必须第一版就加
+  - 批量任务中单个文件失败不该中断全局——错误隔离与最终报告分开
+  - token 成本要在设计时就算清：批处理 1000 个文件的预算可能是原型期的 100 倍
+interview:
+  - q: 设计一个批量处理 10 万条文本的 LLM 管线，你会考虑哪些工程问题？
+    answerSkeleton: 吞吐（并发池/批 API）→ 可靠性（重试/断点续跑/错误隔离）→ 成本（token 预算/模型分级）→ 可观测（进度/失败报告）→ 合规（数据出域）
+    followups:
+      - 限流 429 的退避策略怎么设计？
+      - 如何向老板证明这 10 万条处理结果的质量？
+masteryCheck:
+  level: V3
+  type: project-checkpoint
+  description: 提交 GitHub 仓库，AI 按评分细则审查代码；要求 README 含使用说明与成本测算
+  rubricId: project-cli-llm-tool
+status: reviewed
+lastVerified: "2026-07-24"

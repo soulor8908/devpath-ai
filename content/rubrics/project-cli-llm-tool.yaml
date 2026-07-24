@@ -1,0 +1,23 @@
+# Phase 0 里程碑项目评分细则：CLI 文本批处理工具
+# V3 构建验证用：AI 按本细则审查用户 GitHub 仓库代码
+
+rubric:
+  id: project-cli-llm-tool
+  title: CLI LLM 批处理工具 · 构建验证评分细则
+  passScore: 70
+  criteria:
+    - id: api-usage
+      description: 正确使用 LLM API（认证、参数、消息结构），非复制粘贴 demo
+      weight: 30
+    - id: error-handling
+      description: 网络错误/限流/超时的重试与降级策略，指数退避
+      weight: 25
+    - id: streaming
+      description: 流式响应的正确消费与中断处理
+      weight: 20
+    - id: code-quality
+      description: 模块化、类型标注、可读性，符合 Python 工程规范
+      weight: 15
+    - id: cost-awareness
+      description: 统计并输出 token 用量，有基本的成本控制意识
+      weight: 10

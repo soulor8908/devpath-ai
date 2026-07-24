@@ -1,0 +1,35 @@
+id: llm.cost-and-latency
+title: 成本与延迟工程
+summary: token 定价模型、TTFT 与总延迟、缓存策略、成本预算。让 AI 功能从"能跑"变成"跑得起"。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm.api-first-call]
+estimatedMinutes: 60
+difficulty: 2
+frontendBridge: >-
+  这就是性能优化 + 资源计费，和你做过的图片懒加载、CDN 缓存、
+  API 调用配额管理完全同构。区别是资源单位从 MB/次变成了 token。
+  输入 token 像上传流量，输出 token 像下载流量——而且下载贵得多。
+concepts:
+  - 定价模型：输入/输出 token 分开计费，输出通常贵 3-5 倍
+  - TTFT（首 token 延迟）：用户感知"快"的核心指标，受模型大小与负载影响
+  - 总延迟：TTFT + 生成速度 × 输出长度——流式输出掩盖总延迟但不能掩盖 TTFT
+  - Prompt 缓存：重复前缀（如长 system prompt）可缓存以降低成本与 TTFT
+  - 预算模型：单次调用成本 × 日活 × 人均调用次数 = 月度账单
+sourceIds: [openai-docs, deepseek-api-docs, eugene-yan-llm-patterns]
+gotchas:
+  - 只看单次调用成本会误判：真实成本 = 单次 × 调用频率 × 重试率 × 多轮历史膨胀
+  - 中文场景的 token 消耗常被低估——必须用真实语料实测
+  - 长 system prompt 是隐性成本大头：每次都重发，Prompt 缓存能省 50%+
+interview:
+  - q: 你的 AI 功能月账单 10 万，怎么降本？
+    answerSkeleton: 审计账单构成（输入 vs 输出 / 模型分布 / 功能分布）→ 降输入（Prompt 压缩/历史截断/缓存）→ 降输出（限制 max_tokens/流式截断）→ 降级模型（简单任务用小模型）→ 缓存常见查询 → 架构优化（RAG 替代长上下文）
+    followups:
+      - Prompt 缓存的适用条件和失效场景？
+      - TTFT 和总延迟，优化哪个对用户体验影响更大？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个假想产品（日活 1 万的客服助手）做成本模型：测算不同模型/策略下的月账单，输出优化方案对比表
+status: reviewed
+lastVerified: "2026-07-24"

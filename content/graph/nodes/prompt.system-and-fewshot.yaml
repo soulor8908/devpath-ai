@@ -1,0 +1,35 @@
+id: prompt.system-and-fewshot
+title: Prompt 工程基础（System 设定与 Few-shot）
+summary: System Prompt 的结构化写法、Few-shot 示例的设计原则、输出格式约束。把"写提示词"从玄学变成可复用的工程模板。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [llm.api-first-call]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  System Prompt ≈ 组件的 props + slots：你在声明"这个对话实例"的行为契约。
+  Few-shot ≈ 写测试用例：给模型 2-3 个输入输出示例，
+  等价于给函数写了类型签名 + 单元测试——模型按示例归纳模式。
+  你在前端写组件接口定义的经验，决定了你写 Prompt 的天花板。
+concepts:
+  - System Prompt 三段式：角色与目标 → 行为约束 → 输出格式
+  - Few-shot：示例质量 > 数量；示例要覆盖边界情况
+  - 指令层级：system > user，但都可被后续输入稀释——关键约束要重复与后置
+  - 输出格式约束：明确给出 JSON 模板或分隔符，比"请输出 JSON"可靠一个量级
+sourceIds: [anthropic-prompt-engineering, openai-cookbook, promptingguide]
+gotchas:
+  - 提示词不是越长越好：无关细节稀释注意力，关键约束被淹没
+  - 示例中的错误格式会被模型忠实模仿——Few-shot 必须人工校对
+  - '"请确保输出合法 JSON" 是祈祷不是工程——格式约束要配合结构化输出或后处理校验'
+interview:
+  - q: Few-shot 示例的选择原则是什么？
+    answerSkeleton: 覆盖典型与边界 → 格式严格一致 → 数量 2-5 个（边际收益递减）→ 顺序影响（最新示例权重高）→ 与真实分布对齐
+    followups:
+      - 示例放多了有什么副作用？（成本、注意力稀释、过拟合示例模式）
+      - 怎么验证 Prompt 改动是改进而不是回归？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为"会议纪要 → 结构化 JSON"任务写 System Prompt + 3 个 Few-shot，要求输出通过 Pydantic 校验
+status: reviewed
+lastVerified: "2026-07-24"

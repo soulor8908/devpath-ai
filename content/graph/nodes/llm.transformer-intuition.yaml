@@ -1,0 +1,37 @@
+id: llm.transformer-intuition
+title: Transformer 架构直觉（不推公式）
+summary: 通过 nanoGPT 代码理解 Transformer 的工作机制：Embedding、Attention、前馈网络、生成循环。目标是可以向同事讲清楚"模型是怎么吐出下一个词的"，而非推导数学。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [llm.tokens-and-context]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  把 Transformer 想成一个极致优化的"查表 + 加权投票"状态机：
+  Embedding ≈ 把 token 映射成向量的字典；Attention ≈ 每个位置
+  对所有历史位置做一次带权重的 reduce；生成循环 ≈ 一个
+  每次把输出拼回输入的递归渲染。不需要懂矩阵求导，
+  需要懂"信息在层间如何流动"。
+concepts:
+  - Embedding：token → 高维向量，语义距离 ≈ 向量距离（这也是 RAG 的地基）
+  - Self-Attention：每个位置对上下文加权求和，权重由 Q/K 相似度决定
+  - 多头注意力：多组权重并行关注不同模式
+  - 因果掩码：生成时只能看左边，保证自回归
+  - 生成循环：一次前向 = 一个 token，输出拼回输入再算下一个——这就是流式 API 存在的原因
+sourceIds: [attention-paper, karpathy-nanogpt, karpathy-lets-build-gpt]
+gotchas:
+  - 不要陷入数学推导：应用层工程师需要的是架构直觉与复杂度认知（Attention 是 O(n²)），不是反向传播
+  - '"上下文窗口"的物理来源就是 Attention 的 O(n²) 计算量——窗口越长越贵不是商业定价是算法定价'
+  - nanoGPT 是教学实现，生产模型有大量工程优化（KV Cache 等），别把教学代码当性能基准
+interview:
+  - q: 用不用数学公式，解释 Attention 在做什么？
+    answerSkeleton: 每个位置提出查询 Q → 与所有位置的键 K 算相似度 → softmax 归一化成权重 → 对值 V 加权求和 → 效果是每个词"参考"上下文中最相关的词来更新自己的表示
+    followups:
+      - 为什么上下文长度增加会显著推高推理成本？
+      - KV Cache 在生成循环里缓存了什么？为什么能加速？
+masteryCheck:
+  level: V1
+  type: fsrs-cards
+  description: 观看 Let's build GPT 并跟敲 nanoGPT 核心段落；能画出 Embedding→Attention→输出 的数据流图
+status: reviewed
+lastVerified: "2026-07-24"

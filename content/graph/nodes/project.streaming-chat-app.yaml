@@ -1,0 +1,37 @@
+id: project.streaming-chat-app
+title: 里程碑项目 · 流式对话应用
+summary: Phase 1 出口项目：完整的 AI 对话产品——流式 UI、结构化输出、错误恢复、成本仪表盘。从前端到后端再到部署，全流程独立完成。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [frontend.streaming-ux, llm-api.structured-output, llm-api.error-handling-retry]
+estimatedMinutes: 360
+difficulty: 4
+frontendBridge: >-
+  这是你前端技能的集大成者：Next.js 全栈、SSE 流式、状态管理、错误边界、
+  仪表盘可视化——每一块你都做过，只是这次数据源是 LLM。
+  后端用 Next.js API Routes 或 FastAPI 均可，重点是产品完整度而非技术炫技。
+concepts:
+  - 全栈架构：前端（React）→ API 层（Next.js Routes / FastAPI）→ LLM API
+  - 流式状态机：idle → streaming → done / error / aborted
+  - 结构化输出应用：用 Function Calling 让模型返回 UI 指令（如"生成图表"）
+  - 成本仪表盘：实时显示本次会话 token 消耗与估算成本
+  - 部署：Vercel / Cloudflare Pages，环境变量管理 API Key
+sourceIds: [vercel-ai-sdk, openai-cookbook, anthropic-docs]
+lab: content/labs/streaming-chat-app
+gotchas:
+  - API Key 泄露：Next.js 的 NEXT_PUBLIC_ 前缀变量会打进前端 bundle——Key 绝不能用这个前缀
+  - 流式中断后的状态错乱：messages 数组与服务端不同步——需要乐观 UI + 服务端确认的两阶段提交
+  - 成本统计造假：不要用估算值，必须用 API 返回的 usage 字段
+interview:
+  - q: 你的对话应用在生产环境出现大量"流式中断后消息重复"，怎么排查？
+    answerSkeleton: 定位断点（前端/网络/LLM API）→ 检查重连逻辑（是否重复追加 chunk）→ 检查状态同步（乐观 UI 与服务端确认的冲突）→ 检查消息 ID 幂等性 → 加监控（断线率/重连率）→ 修复后灰度验证
+    followups:
+      - 如何实现"重新生成"功能而不污染消息历史？
+      - 多标签页同时聊天，状态怎么同步？
+masteryCheck:
+  level: V3
+  type: project-checkpoint
+  description: 提交 GitHub 仓库 + 部署链接，AI 按评分细则审查；要求 README 含架构图、成本模型、已知限制
+  rubricId: project-streaming-chat-app
+status: reviewed
+lastVerified: "2026-07-24"

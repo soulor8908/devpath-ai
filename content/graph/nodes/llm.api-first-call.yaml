@@ -1,0 +1,36 @@
+id: llm.api-first-call
+title: 第一次 LLM API 调用（消息模型与参数）
+summary: 消息模型（system/user/assistant 角色）、请求构造、认证、响应解析。覆盖 OpenAI 兼容协议——DeepSeek 等国产模型同构。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: [llm.tokens-and-context]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  调 LLM API 就是调一个特殊的 REST API：POST + JSON + Authorization header，
+  你闭着眼都会。真正的差异只有两个：请求体里的 messages 是"剧本"而非
+  "参数"（system 消息设定角色与约束，类似给组件传 props）；
+  响应是不确定的——同样的输入可能有不同输出，这是与传统 API 的本质区别。
+concepts:
+  - 消息角色：system（设定行为边界）、user（用户输入）、assistant（模型历史回复）
+  - OpenAI 兼容协议：DeepSeek/Moonshot 等国产模型共用同一协议，换 base_url 即可切换
+  - max_tokens：输出上限控制成本与截断
+  - 响应结构：choices[0].message.content 与 usage 统计
+  - API Key 安全：永远走服务端，绝不进前端 bundle
+sourceIds: [openai-docs, deepseek-api-docs, anthropic-docs]
+gotchas:
+  - 把 API Key 写进前端代码是最常见的安全事故——Key 必须只在服务端
+  - system 消息不是"更强的指令"，只是约定角色——用户输入仍可覆盖（prompt 注入的地基认知）
+  - 多轮对话需要客户端维护全部 messages 历史并重发——API 本身无状态
+interview:
+  - q: LLM API 是无状态的，多轮对话是怎么实现的？
+    answerSkeleton: API 无会话记忆 → 客户端保存 messages 数组 → 每轮追加 user/assistant 消息后全量重发 → 推论：历史增长导致 token 成本线性上升 → 需要历史管理策略
+    followups:
+      - 全量重发历史，上下文窗口爆了怎么办？
+      - system 消息和用户消息的优先级冲突时模型怎么处理？这带来什么安全风险？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 手写一个多轮对话函数：维护 messages 历史、调用 API、打印每轮 token 用量；禁止复制 SDK 示例
+status: reviewed
+lastVerified: "2026-07-24"

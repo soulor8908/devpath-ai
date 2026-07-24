@@ -1,0 +1,36 @@
+id: llm.tokens-and-context
+title: Token、上下文窗口与模型参数
+summary: LLM 的计量单位（token）、工作记忆边界（context window）、核心采样参数（temperature/top_p）。一切成本、延迟、能力讨论的原子概念。
+tracks: [frontend-to-ai-engineer]
+phase: 0
+prerequisites: []
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  token ≈ 计费与限流的"流量包"：像运营商按 MB 计费一样按 token 计费。
+  context window ≈ 一块固定大小的内存条：所有对话历史、系统提示、
+  检索内容都挤在里面，超了就得截断或压缩——和你做虚拟列表
+  的窗口化思维完全同构，只是窗口外的东西模型真的"看不见"。
+concepts:
+  - token：模型读写的基本单位，约 0.75 个英文单词或 0.5-0.6 个中文字
+  - 上下文窗口：单次请求可处理的最大 token 数（输入+输出共享）
+  - temperature：采样随机性，0 更确定、1+ 更发散；工程默认值随任务定
+  - top_p：核采样，只从累积概率前 p 的候选中选
+  - 计费模型：输入 token 与输出 token 单价不同，输出通常贵 3-5 倍
+sourceIds: [openai-tokenizer, openai-docs, karpathy-lets-build-gpt]
+gotchas:
+  - 中文 token 消耗远高于直觉：一句中文常用 1.5-2 倍 token——成本估算必须实测
+  - 上下文窗口是输入输出共享的：128k 窗口不代表能输入 128k 再输出 128k
+  - temperature=0 不保证严格确定性（浮点与批处理非确定性），关键逻辑要加校验而非赌概率
+interview:
+  - q: 为什么 LLM 应用要做 token 预算？怎么做？
+    answerSkeleton: 成本与延迟都随 token 线性增长 → 预算 = 系统提示 + 历史 + 检索 + 预留输出 → 超限策略（截断/摘要/滑动窗口）→ 实测中英语料的 token 比率校准估算
+    followups:
+      - 多轮对话历史无限增长，你会用哪几种压缩策略？各自代价？
+      - 输入输出 token 单价不同时，优化方向是什么？
+masteryCheck:
+  level: V1
+  type: fsrs-cards
+  description: 用 OpenAI Tokenizer 实测 5 段中英文文本并记录 token 数，完成参数含义卡片 15 张
+status: reviewed
+lastVerified: "2026-07-24"

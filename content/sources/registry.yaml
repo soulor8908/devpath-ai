@@ -1,0 +1,202 @@
+# 权威来源登记处
+# 等级定义：T0 一手规范（官方文档/协议/论文）｜ T1 一手实现（经典源码/官方 Cookbook）
+#           T2 权威工程实践（一线从业者深度文章）｜ T3 二手解读（仅作补充）
+# 节点内容的可信度 = 其来源的最高等级；每个节点必须至少含 1 条 T0/T1。
+
+sources:
+  # ---------- T0 一手规范 ----------
+  - id: openai-docs
+    title: OpenAI Platform Documentation
+    url: https://platform.openai.com/docs
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: openai-structured-outputs
+    title: OpenAI Structured Outputs
+    url: https://platform.openai.com/docs/guides/structured-outputs
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: openai-function-calling
+    title: OpenAI Function Calling Guide
+    url: https://platform.openai.com/docs/guides/function-calling
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: openai-streaming
+    title: OpenAI Streaming Responses
+    url: https://platform.openai.com/docs/guides/streaming-responses
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: openai-tokenizer
+    title: OpenAI Tokenizer Tool
+    url: https://platform.openai.com/tokenizer
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: anthropic-docs
+    title: Anthropic Documentation
+    url: https://docs.anthropic.com
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: anthropic-prompt-engineering
+    title: Anthropic Prompt Engineering Overview
+    url: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: anthropic-tool-use
+    title: Anthropic Tool Use (Function Calling)
+    url: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: deepseek-api-docs
+    title: DeepSeek API Documentation
+    url: https://api-docs.deepseek.com
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: python-docs
+    title: Python 3 Official Documentation
+    url: https://docs.python.org/3/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: python-asyncio
+    title: Python asyncio Documentation
+    url: https://docs.python.org/3/library/asyncio.html
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: pydantic-docs
+    title: Pydantic Documentation
+    url: https://docs.pydantic.dev/latest/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: fastapi-docs
+    title: FastAPI Documentation
+    url: https://fastapi.tiangolo.com
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: uv-docs
+    title: uv — Astral Documentation
+    url: https://docs.astral.sh/uv/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: mcp-spec
+    title: Model Context Protocol Specification
+    url: https://modelcontextprotocol.io/specification
+    tier: T0
+    type: spec
+    lastVerified: "2026-07-20"
+
+  - id: mdn-sse
+    title: MDN — Server-sent events
+    url: https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: vercel-ai-sdk
+    title: Vercel AI SDK Documentation
+    url: https://ai-sdk.dev/docs
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-20"
+
+  - id: attention-paper
+    title: "Attention Is All You Need (Vaswani et al., 2017)"
+    url: https://arxiv.org/abs/1706.03762
+    tier: T0
+    type: paper
+    lastVerified: "2026-07-20"
+    note: Transformer 原始论文，只需理解架构直觉，不要求推导
+
+  # ---------- T1 一手实现 ----------
+  - id: karpathy-nanogpt
+    title: karpathy/nanoGPT
+    url: https://github.com/karpathy/nanoGPT
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-20"
+    note: 最小可读的 GPT 训练/推理实现
+
+  - id: karpathy-lets-build-gpt
+    title: "Let's build GPT: from scratch, in code, spelled out (Karpathy)"
+    url: https://www.youtube.com/watch?v=kCc8FmEb1nY
+    tier: T1
+    type: engineering-blog
+    lastVerified: "2026-07-20"
+    note: 视频课程，配合 nanoGPT 代码逐行讲解
+
+  - id: openai-cookbook
+    title: OpenAI Cookbook
+    url: https://cookbook.openai.com
+    tier: T1
+    type: official-cookbook
+    lastVerified: "2026-07-20"
+
+  - id: learn-python-repo
+    title: trekhleb/learn-python
+    url: https://github.com/trekhleb/learn-python
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-20"
+    note: 可执行的 Python 语法练习集，适合 JS 背景快速过语法
+
+  # ---------- T2 权威工程实践 ----------
+  - id: lilian-weng-agents
+    title: "LLM Powered Autonomous Agents (Lilian Weng)"
+    url: https://lilianweng.github.io/posts/2023-06-23-agent/
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-20"
+
+  - id: eugene-yan-llm-patterns
+    title: "Patterns for Building LLM-based Systems & Products (Eugene Yan)"
+    url: https://eugeneyan.com/writing/llm-patterns/
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-20"
+
+  - id: hamel-husain-evals
+    title: "Your AI Product Needs Evals (Hamel Husain)"
+    url: https://hamel.dev/blog/posts/evals/
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-20"
+    note: Eval 体系的事实标准读物
+
+  - id: anthropic-effective-agents
+    title: "Building Effective Agents (Anthropic Engineering)"
+    url: https://www.anthropic.com/engineering/building-effective-agents
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-20"
+
+  - id: promptingguide
+    title: Prompt Engineering Guide (DAIR.AI)
+    url: https://www.promptingguide.ai
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-20"

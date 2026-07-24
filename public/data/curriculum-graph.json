@@ -1,0 +1,1204 @@
+{
+  "version": 1,
+  "builtAt": "2026-07-24T12:59:53.642Z",
+  "sources": {
+    "openai-docs": {
+      "id": "openai-docs",
+      "title": "OpenAI Platform Documentation",
+      "url": "https://platform.openai.com/docs",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "openai-structured-outputs": {
+      "id": "openai-structured-outputs",
+      "title": "OpenAI Structured Outputs",
+      "url": "https://platform.openai.com/docs/guides/structured-outputs",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "openai-function-calling": {
+      "id": "openai-function-calling",
+      "title": "OpenAI Function Calling Guide",
+      "url": "https://platform.openai.com/docs/guides/function-calling",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "openai-streaming": {
+      "id": "openai-streaming",
+      "title": "OpenAI Streaming Responses",
+      "url": "https://platform.openai.com/docs/guides/streaming-responses",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "openai-tokenizer": {
+      "id": "openai-tokenizer",
+      "title": "OpenAI Tokenizer Tool",
+      "url": "https://platform.openai.com/tokenizer",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "anthropic-docs": {
+      "id": "anthropic-docs",
+      "title": "Anthropic Documentation",
+      "url": "https://docs.anthropic.com",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "anthropic-prompt-engineering": {
+      "id": "anthropic-prompt-engineering",
+      "title": "Anthropic Prompt Engineering Overview",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "anthropic-tool-use": {
+      "id": "anthropic-tool-use",
+      "title": "Anthropic Tool Use (Function Calling)",
+      "url": "https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "deepseek-api-docs": {
+      "id": "deepseek-api-docs",
+      "title": "DeepSeek API Documentation",
+      "url": "https://api-docs.deepseek.com",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "python-docs": {
+      "id": "python-docs",
+      "title": "Python 3 Official Documentation",
+      "url": "https://docs.python.org/3/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "python-asyncio": {
+      "id": "python-asyncio",
+      "title": "Python asyncio Documentation",
+      "url": "https://docs.python.org/3/library/asyncio.html",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "pydantic-docs": {
+      "id": "pydantic-docs",
+      "title": "Pydantic Documentation",
+      "url": "https://docs.pydantic.dev/latest/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "fastapi-docs": {
+      "id": "fastapi-docs",
+      "title": "FastAPI Documentation",
+      "url": "https://fastapi.tiangolo.com",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "uv-docs": {
+      "id": "uv-docs",
+      "title": "uv — Astral Documentation",
+      "url": "https://docs.astral.sh/uv/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "mcp-spec": {
+      "id": "mcp-spec",
+      "title": "Model Context Protocol Specification",
+      "url": "https://modelcontextprotocol.io/specification",
+      "tier": "T0",
+      "type": "spec",
+      "lastVerified": "2026-07-20"
+    },
+    "mdn-sse": {
+      "id": "mdn-sse",
+      "title": "MDN — Server-sent events",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "vercel-ai-sdk": {
+      "id": "vercel-ai-sdk",
+      "title": "Vercel AI SDK Documentation",
+      "url": "https://ai-sdk.dev/docs",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-20"
+    },
+    "attention-paper": {
+      "id": "attention-paper",
+      "title": "Attention Is All You Need (Vaswani et al., 2017)",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "tier": "T0",
+      "type": "paper",
+      "lastVerified": "2026-07-20",
+      "note": "Transformer 原始论文，只需理解架构直觉，不要求推导"
+    },
+    "karpathy-nanogpt": {
+      "id": "karpathy-nanogpt",
+      "title": "karpathy/nanoGPT",
+      "url": "https://github.com/karpathy/nanoGPT",
+      "tier": "T1",
+      "type": "canonical-repo",
+      "lastVerified": "2026-07-20",
+      "note": "最小可读的 GPT 训练/推理实现"
+    },
+    "karpathy-lets-build-gpt": {
+      "id": "karpathy-lets-build-gpt",
+      "title": "Let's build GPT: from scratch, in code, spelled out (Karpathy)",
+      "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+      "tier": "T1",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20",
+      "note": "视频课程，配合 nanoGPT 代码逐行讲解"
+    },
+    "openai-cookbook": {
+      "id": "openai-cookbook",
+      "title": "OpenAI Cookbook",
+      "url": "https://cookbook.openai.com",
+      "tier": "T1",
+      "type": "official-cookbook",
+      "lastVerified": "2026-07-20"
+    },
+    "learn-python-repo": {
+      "id": "learn-python-repo",
+      "title": "trekhleb/learn-python",
+      "url": "https://github.com/trekhleb/learn-python",
+      "tier": "T1",
+      "type": "canonical-repo",
+      "lastVerified": "2026-07-20",
+      "note": "可执行的 Python 语法练习集，适合 JS 背景快速过语法"
+    },
+    "lilian-weng-agents": {
+      "id": "lilian-weng-agents",
+      "title": "LLM Powered Autonomous Agents (Lilian Weng)",
+      "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20"
+    },
+    "eugene-yan-llm-patterns": {
+      "id": "eugene-yan-llm-patterns",
+      "title": "Patterns for Building LLM-based Systems & Products (Eugene Yan)",
+      "url": "https://eugeneyan.com/writing/llm-patterns/",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20"
+    },
+    "hamel-husain-evals": {
+      "id": "hamel-husain-evals",
+      "title": "Your AI Product Needs Evals (Hamel Husain)",
+      "url": "https://hamel.dev/blog/posts/evals/",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20",
+      "note": "Eval 体系的事实标准读物"
+    },
+    "anthropic-effective-agents": {
+      "id": "anthropic-effective-agents",
+      "title": "Building Effective Agents (Anthropic Engineering)",
+      "url": "https://www.anthropic.com/engineering/building-effective-agents",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20"
+    },
+    "promptingguide": {
+      "id": "promptingguide",
+      "title": "Prompt Engineering Guide (DAIR.AI)",
+      "url": "https://www.promptingguide.ai",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-20"
+    }
+  },
+  "nodes": [
+    {
+      "id": "frontend.streaming-ux",
+      "title": "AI 流式 UX（前端主场）",
+      "summary": "流式渲染、打字机效果、乐观 UI、中断恢复。这是前端工程师在 AI 时代最锋利的矛——纯后端出身的人做不好这个。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.streaming-basics"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "这就是你的主场。SSE 增量渲染 ≈ 你处理过的 WebSocket 消息流； 打字机效果 ≈ CSS 动画 + requestAnimationFrame；中断恢复 ≈ 断线重连。 区别只在数据源是 LLM——内容逐字到达、可能中途失败、需要 Markdown 实时渲染。 Vercel AI SDK 的 useChat 把这套封装成了 React hook，和你用 SWR 的体感一致。",
+      "concepts": [
+        "增量渲染：每收到 chunk 追加到消息 buffer，React 状态驱动 UI",
+        "Markdown 流式渲染：不完整语法（如未闭合的 ```）需要容错渲染",
+        "中断恢复：连接断开时保留已生成内容，用户可重试或继续",
+        "乐观 UI：发送即显示用户消息，不等服务端确认",
+        "Vercel AI SDK：useChat / useCompletion 的状态机与生命周期"
+      ],
+      "sourceIds": [
+        "vercel-ai-sdk",
+        "mdn-sse",
+        "openai-streaming"
+      ],
+      "lab": "content/labs/streaming-chat-ui",
+      "gotchas": [
+        "直接渲染未闭合的 Markdown 会闪烁或错乱——需要流式感知的渲染器",
+        "useChat 的 messages 是追加式的，编辑历史消息需要手动管理状态",
+        "流式过程中的错误（如内容过滤）可能在第 N 个 chunk 才出现——UI 要能优雅降级"
+      ],
+      "interview": [
+        {
+          "q": "实现一个 AI 聊天界面，流式体验的关键技术点有哪些？",
+          "answerSkeleton": "SSE 解析 → 增量状态更新 → Markdown 容错渲染 → 中断/错误恢复 → 乐观 UI → 滚动管理（自动跟随 vs 用户翻阅）",
+          "followups": [
+            "用户在上翻历史时新消息到达，自动滚动怎么处理？",
+            "如何实现\"停止生成\"按钮？前后端各做什么？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "用 Next.js + Vercel AI SDK 实现流式聊天 UI，支持中断恢复与 Markdown 渲染，部署到 Vercel/Cloudflare",
+        "rubricId": "project-streaming-chat-app"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm-api.error-handling-retry",
+      "title": "错误处理与重试策略",
+      "summary": "LLM API 的失败模式（限流/超时/内容过滤/模型过载）与对应的工程策略：指数退避、熔断、降级模型。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.api-first-call"
+      ],
+      "estimatedMinutes": 60,
+      "difficulty": 2,
+      "frontendBridge": "和你处理过无数次的上游 API 故障完全同构：429 像 CDN 限流， 500 像服务端抖动，content_filter 像 WAF 拦截。 指数退避 + 抖动 + 熔断器，这些模式你闭着眼睛都会写—— 只是这次要额外处理\"模型不确定输出\"这种新失败类型。",
+      "concepts": [
+        "失败分类：可重试（429/5xx/超时）vs 不可重试（认证错误/内容过滤/参数错误）",
+        "指数退避 + 随机抖动：避免惊群效应",
+        "熔断器：连续失败时快速失败，保护下游",
+        "降级链：主模型失败 → 备用模型 → 缓存回复 → 人工兜底"
+      ],
+      "sourceIds": [
+        "openai-docs",
+        "deepseek-api-docs",
+        "eugene-yan-llm-patterns"
+      ],
+      "gotchas": [
+        "对所有错误统一重试是灾难：内容过滤错误重试 100 次也过不了",
+        "退避不加抖动会导致所有客户端同时重试（thundering herd）",
+        "流式响应中途失败的处理最棘手：已输出的部分如何回滚或标注？"
+      ],
+      "interview": [
+        {
+          "q": "你的 LLM 调用收到 429，重试策略怎么设计？",
+          "answerSkeleton": "识别 Retry-After → 指数退避 + 抖动 → 最大重试次数 → 熔断保护 → 降级模型 → 监控告警；区分 429（配额）与 429（速率）",
+          "followups": [
+            "流式响应中途断开，已渲染的 50 个字怎么处理？",
+            "什么错误绝不重试？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现一个健壮的 LLM 调用封装：分类错误、指数退避、熔断、降级到备用模型，附故障注入测试"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm-api.function-calling",
+      "title": "Function Calling（工具调用）",
+      "summary": "让模型请求调用你定义的函数：工具声明（name/description/parameters）、模型决策、执行与结果回喂。这是 Agent 的原子能力。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm-api.structured-output"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "声明一个 tool ≈ 定义一个组件的 props 接口：name 是组件名， description 是文档注释，parameters 是 TypeScript interface。 模型扮演\"调用方\"，根据上下文决定调哪个函数、传什么参。 你的工程直觉——单一职责、清晰接口、可组合——直接决定工具设计质量。",
+      "concepts": [
+        "工具三要素：name、description（决定模型何时选它）、parameters（JSON Schema）",
+        "调用循环：模型返回 tool_call → 你执行函数 → 结果以 tool 角色回喂 → 模型继续生成",
+        "并行工具调用：一次响应可请求多个 tool_call",
+        "危险操作闸门：写操作（发邮件/删数据）必须人工确认后才执行"
+      ],
+      "sourceIds": [
+        "openai-function-calling",
+        "anthropic-tool-use",
+        "vercel-ai-sdk"
+      ],
+      "gotchas": [
+        "description 写不好，模型就不会在正确时机调用——它读的是文档不是代码",
+        "工具执行结果可能很大（如搜索结果），直接回喂会爆上下文——需要截断或摘要",
+        "模型可能幻觉出不存在的参数值——执行端必须再做一次参数校验"
+      ],
+      "interview": [
+        {
+          "q": "Function Calling 的完整调用循环是什么？哪一步最容易出 bug？",
+          "answerSkeleton": "声明工具 → 模型决策返回 tool_call → 执行函数 → 结果回喂 → 模型生成最终回复；最易错的是结果回喂（格式、大小、多轮上下文一致性）与参数幻觉",
+          "followups": [
+            "怎么防止模型调用工具做危险操作（如删库）？",
+            "工具数量到几十上百个时，选择准确率下降怎么办？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现 3 个工具（查天气 mock、读本地文件、计算器）的完整调用循环，含参数校验与危险操作确认"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm-api.structured-output",
+      "title": "结构化输出（JSON Schema 与校验闭环）",
+      "summary": "让模型输出机器可消费的 JSON：JSON Mode、Structured Outputs（Schema 强制）、Pydantic/Zod 校验与失败重试闭环。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.api-first-call"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "你在前端处理过\"后端返回的 JSON 不可信\"问题——运行时校验（Zod）是标准答案。 这里的区别在于：生产者不是后端服务而是概率模型。 Structured Outputs ≈ 在模型侧加了类型约束（生成时强制遵循 Schema）， Pydantic/Zod 校验 ≈ 消费侧的二次保险——两道闸门缺一不可。",
+      "concepts": [
+        "JSON Mode：保证输出是合法 JSON，但不保证结构",
+        "Structured Outputs：提供 JSON Schema，生成过程被约束，结构有保证",
+        "校验闭环：解析失败 → 错误信息回喂模型 → 重试（最多 N 次）→ 人工兜底",
+        "Schema 设计：字段命名、枚举约束、可选字段的显式 null"
+      ],
+      "sourceIds": [
+        "openai-structured-outputs",
+        "pydantic-docs",
+        "vercel-ai-sdk"
+      ],
+      "gotchas": [
+        "JSON Mode 下模型仍可能输出结构错误的 JSON——Mode ≠ Schema",
+        "Schema 嵌套过深会显著降低遵循度——扁平结构优于深层嵌套",
+        "重试不带错误反馈是死循环：必须把校验错误信息喂回给模型"
+      ],
+      "interview": [
+        {
+          "q": "如何保证 LLM 输出的 JSON 100% 可解析且结构正确？",
+          "answerSkeleton": "分层防御 → 生成侧（Structured Outputs/Function Calling 强约束）→ 解析侧（Pydantic/Zod 校验）→ 失败闭环（错误回喂 + 有限重试）→ 最终兜底（人工/默认值）→ 没有银弹，工程上接受有限重试 + 监控失败率",
+          "followups": [
+            "什么场景下你宁愿用自然语言输出 + 正则提取？",
+            "Schema 里 enum 和 free text 字段对模型遵循度的影响？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现\"简历 → 结构化 JSON\"提取器：Structured Outputs + Pydantic 校验 + 失败重试闭环，附 10 条真实简历的解析成功率统计"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.api-first-call",
+      "title": "第一次 LLM API 调用（消息模型与参数）",
+      "summary": "消息模型（system/user/assistant 角色）、请求构造、认证、响应解析。覆盖 OpenAI 兼容协议——DeepSeek 等国产模型同构。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "llm.tokens-and-context"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "调 LLM API 就是调一个特殊的 REST API：POST + JSON + Authorization header， 你闭着眼都会。真正的差异只有两个：请求体里的 messages 是\"剧本\"而非 \"参数\"（system 消息设定角色与约束，类似给组件传 props）； 响应是不确定的——同样的输入可能有不同输出，这是与传统 API 的本质区别。",
+      "concepts": [
+        "消息角色：system（设定行为边界）、user（用户输入）、assistant（模型历史回复）",
+        "OpenAI 兼容协议：DeepSeek/Moonshot 等国产模型共用同一协议，换 base_url 即可切换",
+        "max_tokens：输出上限控制成本与截断",
+        "响应结构：choices[0].message.content 与 usage 统计",
+        "API Key 安全：永远走服务端，绝不进前端 bundle"
+      ],
+      "sourceIds": [
+        "openai-docs",
+        "deepseek-api-docs",
+        "anthropic-docs"
+      ],
+      "gotchas": [
+        "把 API Key 写进前端代码是最常见的安全事故——Key 必须只在服务端",
+        "system 消息不是\"更强的指令\"，只是约定角色——用户输入仍可覆盖（prompt 注入的地基认知）",
+        "多轮对话需要客户端维护全部 messages 历史并重发——API 本身无状态"
+      ],
+      "interview": [
+        {
+          "q": "LLM API 是无状态的，多轮对话是怎么实现的？",
+          "answerSkeleton": "API 无会话记忆 → 客户端保存 messages 数组 → 每轮追加 user/assistant 消息后全量重发 → 推论：历史增长导致 token 成本线性上升 → 需要历史管理策略",
+          "followups": [
+            "全量重发历史，上下文窗口爆了怎么办？",
+            "system 消息和用户消息的优先级冲突时模型怎么处理？这带来什么安全风险？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "手写一个多轮对话函数：维护 messages 历史、调用 API、打印每轮 token 用量；禁止复制 SDK 示例"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.cost-and-latency",
+      "title": "成本与延迟工程",
+      "summary": "token 定价模型、TTFT 与总延迟、缓存策略、成本预算。让 AI 功能从\"能跑\"变成\"跑得起\"。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.api-first-call"
+      ],
+      "estimatedMinutes": 60,
+      "difficulty": 2,
+      "frontendBridge": "这就是性能优化 + 资源计费，和你做过的图片懒加载、CDN 缓存、 API 调用配额管理完全同构。区别是资源单位从 MB/次变成了 token。 输入 token 像上传流量，输出 token 像下载流量——而且下载贵得多。",
+      "concepts": [
+        "定价模型：输入/输出 token 分开计费，输出通常贵 3-5 倍",
+        "TTFT（首 token 延迟）：用户感知\"快\"的核心指标，受模型大小与负载影响",
+        "总延迟：TTFT + 生成速度 × 输出长度——流式输出掩盖总延迟但不能掩盖 TTFT",
+        "Prompt 缓存：重复前缀（如长 system prompt）可缓存以降低成本与 TTFT",
+        "预算模型：单次调用成本 × 日活 × 人均调用次数 = 月度账单"
+      ],
+      "sourceIds": [
+        "openai-docs",
+        "deepseek-api-docs",
+        "eugene-yan-llm-patterns"
+      ],
+      "gotchas": [
+        "只看单次调用成本会误判：真实成本 = 单次 × 调用频率 × 重试率 × 多轮历史膨胀",
+        "中文场景的 token 消耗常被低估——必须用真实语料实测",
+        "长 system prompt 是隐性成本大头：每次都重发，Prompt 缓存能省 50%+"
+      ],
+      "interview": [
+        {
+          "q": "你的 AI 功能月账单 10 万，怎么降本？",
+          "answerSkeleton": "审计账单构成（输入 vs 输出 / 模型分布 / 功能分布）→ 降输入（Prompt 压缩/历史截断/缓存）→ 降输出（限制 max_tokens/流式截断）→ 降级模型（简单任务用小模型）→ 缓存常见查询 → 架构优化（RAG 替代长上下文）",
+          "followups": [
+            "Prompt 缓存的适用条件和失效场景？",
+            "TTFT 和总延迟，优化哪个对用户体验影响更大？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个假想产品（日活 1 万的客服助手）做成本模型：测算不同模型/策略下的月账单，输出优化方案对比表"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.model-routing",
+      "title": "模型选择与路由",
+      "summary": "不同任务用不同模型：分类用小模型、复杂推理用大模型、敏感场景用本地模型。路由是成本与质量的杠杆。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.cost-and-latency"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "这就是前端的\"按需加载\"策略：首屏用轻量资源，交互复杂时再加载重型组件。 模型路由同理——简单任务（意图分类、格式转换）用 GPT-4o-mini/DeepSeek-V3， 复杂任务（多步推理、代码生成）才上 Claude Sonnet/GPT-4o。 路由器本身也可以是一个小模型。",
+      "concepts": [
+        "任务分级：简单（分类/提取）、中等（摘要/改写）、复杂（推理/代码）",
+        "路由策略：规则路由（if-else）、模型路由（小模型判断任务复杂度）、混合",
+        "级联模式：先小模型尝试，置信度低则升级大模型",
+        "本地模型：Ollama + 开源模型，隐私敏感场景的出路"
+      ],
+      "sourceIds": [
+        "openai-cookbook",
+        "anthropic-effective-agents",
+        "eugene-yan-llm-patterns"
+      ],
+      "gotchas": [
+        "路由器本身也是模型，有错误率——路由错误比直接用大模型更糟",
+        "级联模式增加了延迟：小模型尝试失败再上大模型，总耗时 = 两次调用",
+        "本地模型的\"免费\"是幻觉：硬件成本 + 运维成本 + 质量差距要算总账"
+      ],
+      "interview": [
+        {
+          "q": "设计一个多模型路由系统，考虑哪些因素？",
+          "answerSkeleton": "任务复杂度分级 → 路由策略（规则/模型/级联）→ 成本与延迟权衡 → 质量监控（各路由分支的准确率）→ 降级与兜底 → A/B 测试验证路由决策",
+          "followups": [
+            "路由器用规则还是模型？各自优劣？",
+            "怎么度量\"这个任务该用大模型还是小模型\"？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现一个两级路由：意图分类（小模型）→ 分发到不同处理器，统计路由准确率与成本节省比例"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.streaming-basics",
+      "title": "流式响应（SSE 基础）",
+      "summary": "服务端推送的流式协议、增量事件解析、客户端断线处理。流式是 AI UX 的物理基础——首 token 延迟决定产品的\"快\"感。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "llm.api-first-call"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "SSE ≈ 一个不会自动关闭的 fetch 响应，服务端持续往连接里写文本块。 你处理过分块传输、做过打字机效果，这里的增量心智完全一致： 区别是数据语义——每个 chunk 是一小段 JSON delta， 需要按 OpenAI 协议拼接成完整消息，中途断线要能续传或降级。",
+      "concepts": [
+        "SSE 协议：text/event-stream，data: 前缀行，[DONE] 终止标记",
+        "增量 delta：每个 chunk 只含新增 token，客户端负责拼接",
+        "首 token 延迟（TTFT）：用户感知\"快\"的核心指标",
+        "断线与重连：网络抖动时的续传、幂等与内容去重"
+      ],
+      "sourceIds": [
+        "openai-streaming",
+        "mdn-sse",
+        "deepseek-api-docs"
+      ],
+      "gotchas": [
+        "SSE 是单向协议：客户端→服务端仍走普通 POST，别试图在 SSE 里回写",
+        "浏览器原生 EventSource 不支持自定义 header/POST，生产环境用 fetch + ReadableStream 解析",
+        "拼 chunk 时绝不能假设每次收到完整 JSON——缓冲区必须按 \\n\\n 分割事件"
+      ],
+      "interview": [
+        {
+          "q": "为什么 AI 聊天应用都用流式输出？技术上怎么实现？",
+          "answerSkeleton": "生成是逐 token 的（O(n)）→ 全量等待 = TTFT + 全量生成时间 → 流式把感知延迟降到 TTFT → SSE 协议逐 chunk 推送 delta → 前端增量渲染",
+          "followups": [
+            "如果连接在第 50 个 token 时断了，你的恢复策略是什么？",
+            "EventSource 有哪些限制？生产环境替代方案？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "用 fetch + ReadableStream 手写 SSE 解析器（不依赖 SDK），正确处理分块跨边界与 [DONE] 终止"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.tokens-and-context",
+      "title": "Token、上下文窗口与模型参数",
+      "summary": "LLM 的计量单位（token）、工作记忆边界（context window）、核心采样参数（temperature/top_p）。一切成本、延迟、能力讨论的原子概念。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "token ≈ 计费与限流的\"流量包\"：像运营商按 MB 计费一样按 token 计费。 context window ≈ 一块固定大小的内存条：所有对话历史、系统提示、 检索内容都挤在里面，超了就得截断或压缩——和你做虚拟列表 的窗口化思维完全同构，只是窗口外的东西模型真的\"看不见\"。",
+      "concepts": [
+        "token：模型读写的基本单位，约 0.75 个英文单词或 0.5-0.6 个中文字",
+        "上下文窗口：单次请求可处理的最大 token 数（输入+输出共享）",
+        "temperature：采样随机性，0 更确定、1+ 更发散；工程默认值随任务定",
+        "top_p：核采样，只从累积概率前 p 的候选中选",
+        "计费模型：输入 token 与输出 token 单价不同，输出通常贵 3-5 倍"
+      ],
+      "sourceIds": [
+        "openai-tokenizer",
+        "openai-docs",
+        "karpathy-lets-build-gpt"
+      ],
+      "gotchas": [
+        "中文 token 消耗远高于直觉：一句中文常用 1.5-2 倍 token——成本估算必须实测",
+        "上下文窗口是输入输出共享的：128k 窗口不代表能输入 128k 再输出 128k",
+        "temperature=0 不保证严格确定性（浮点与批处理非确定性），关键逻辑要加校验而非赌概率"
+      ],
+      "interview": [
+        {
+          "q": "为什么 LLM 应用要做 token 预算？怎么做？",
+          "answerSkeleton": "成本与延迟都随 token 线性增长 → 预算 = 系统提示 + 历史 + 检索 + 预留输出 → 超限策略（截断/摘要/滑动窗口）→ 实测中英语料的 token 比率校准估算",
+          "followups": [
+            "多轮对话历史无限增长，你会用哪几种压缩策略？各自代价？",
+            "输入输出 token 单价不同时，优化方向是什么？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V1",
+        "type": "fsrs-cards",
+        "description": "用 OpenAI Tokenizer 实测 5 段中英文文本并记录 token 数，完成参数含义卡片 15 张"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "llm.transformer-intuition",
+      "title": "Transformer 架构直觉（不推公式）",
+      "summary": "通过 nanoGPT 代码理解 Transformer 的工作机制：Embedding、Attention、前馈网络、生成循环。目标是可以向同事讲清楚\"模型是怎么吐出下一个词的\"，而非推导数学。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "llm.tokens-and-context"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "把 Transformer 想成一个极致优化的\"查表 + 加权投票\"状态机： Embedding ≈ 把 token 映射成向量的字典；Attention ≈ 每个位置 对所有历史位置做一次带权重的 reduce；生成循环 ≈ 一个 每次把输出拼回输入的递归渲染。不需要懂矩阵求导， 需要懂\"信息在层间如何流动\"。",
+      "concepts": [
+        "Embedding：token → 高维向量，语义距离 ≈ 向量距离（这也是 RAG 的地基）",
+        "Self-Attention：每个位置对上下文加权求和，权重由 Q/K 相似度决定",
+        "多头注意力：多组权重并行关注不同模式",
+        "因果掩码：生成时只能看左边，保证自回归",
+        "生成循环：一次前向 = 一个 token，输出拼回输入再算下一个——这就是流式 API 存在的原因"
+      ],
+      "sourceIds": [
+        "attention-paper",
+        "karpathy-nanogpt",
+        "karpathy-lets-build-gpt"
+      ],
+      "gotchas": [
+        "不要陷入数学推导：应用层工程师需要的是架构直觉与复杂度认知（Attention 是 O(n²)），不是反向传播",
+        "\"上下文窗口\"的物理来源就是 Attention 的 O(n²) 计算量——窗口越长越贵不是商业定价是算法定价",
+        "nanoGPT 是教学实现，生产模型有大量工程优化（KV Cache 等），别把教学代码当性能基准"
+      ],
+      "interview": [
+        {
+          "q": "用不用数学公式，解释 Attention 在做什么？",
+          "answerSkeleton": "每个位置提出查询 Q → 与所有位置的键 K 算相似度 → softmax 归一化成权重 → 对值 V 加权求和 → 效果是每个词\"参考\"上下文中最相关的词来更新自己的表示",
+          "followups": [
+            "为什么上下文长度增加会显著推高推理成本？",
+            "KV Cache 在生成循环里缓存了什么？为什么能加速？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V1",
+        "type": "fsrs-cards",
+        "description": "观看 Let's build GPT 并跟敲 nanoGPT 核心段落；能画出 Embedding→Attention→输出 的数据流图"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "project.cli-llm-tool",
+      "title": "里程碑项目 · CLI 文本批处理工具",
+      "summary": "Phase 0 出口项目：一个命令行工具，读取本地文件列表，调用 LLM API 批量处理（如翻译/摘要/打标签），流式输出进度，统计 token 成本。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "llm.streaming-basics",
+        "python.env-tooling"
+      ],
+      "estimatedMinutes": 240,
+      "difficulty": 3,
+      "frontendBridge": "这是你写过无数遍的 CLI/脚本任务，只是数据源换成了 LLM API。 文件遍历 ≈ Node fs，异步并发 ≈ Promise 池，进度输出 ≈ CLI spinner。 重点不在功能，在于第一次用 Python 工程规范（uv + 类型 + pytest） 完成一个真实可交付的工具。",
+      "concepts": [
+        "项目脚手架：uv init + pyproject.toml + src 布局",
+        "异步并发池：asyncio.Semaphore 限制并发数，防止触发 API 限流",
+        "成本统计：从 usage 字段累计 token，按单价估算 USD 成本",
+        "断点续跑：处理结果落盘，重跑时跳过已完成项"
+      ],
+      "sourceIds": [
+        "openai-cookbook",
+        "deepseek-api-docs",
+        "python-docs"
+      ],
+      "lab": "content/labs/cli-llm-tool",
+      "gotchas": [
+        "并发不设上限会立刻触发 429 限流——Semaphore 或队列必须第一版就加",
+        "批量任务中单个文件失败不该中断全局——错误隔离与最终报告分开",
+        "token 成本要在设计时就算清：批处理 1000 个文件的预算可能是原型期的 100 倍"
+      ],
+      "interview": [
+        {
+          "q": "设计一个批量处理 10 万条文本的 LLM 管线，你会考虑哪些工程问题？",
+          "answerSkeleton": "吞吐（并发池/批 API）→ 可靠性（重试/断点续跑/错误隔离）→ 成本（token 预算/模型分级）→ 可观测（进度/失败报告）→ 合规（数据出域）",
+          "followups": [
+            "限流 429 的退避策略怎么设计？",
+            "如何向老板证明这 10 万条处理结果的质量？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "提交 GitHub 仓库，AI 按评分细则审查代码；要求 README 含使用说明与成本测算",
+        "rubricId": "project-cli-llm-tool"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "project.streaming-chat-app",
+      "title": "里程碑项目 · 流式对话应用",
+      "summary": "Phase 1 出口项目：完整的 AI 对话产品——流式 UI、结构化输出、错误恢复、成本仪表盘。从前端到后端再到部署，全流程独立完成。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "frontend.streaming-ux",
+        "llm-api.structured-output",
+        "llm-api.error-handling-retry"
+      ],
+      "estimatedMinutes": 360,
+      "difficulty": 4,
+      "frontendBridge": "这是你前端技能的集大成者：Next.js 全栈、SSE 流式、状态管理、错误边界、 仪表盘可视化——每一块你都做过，只是这次数据源是 LLM。 后端用 Next.js API Routes 或 FastAPI 均可，重点是产品完整度而非技术炫技。",
+      "concepts": [
+        "全栈架构：前端（React）→ API 层（Next.js Routes / FastAPI）→ LLM API",
+        "流式状态机：idle → streaming → done / error / aborted",
+        "结构化输出应用：用 Function Calling 让模型返回 UI 指令（如\"生成图表\"）",
+        "成本仪表盘：实时显示本次会话 token 消耗与估算成本",
+        "部署：Vercel / Cloudflare Pages，环境变量管理 API Key"
+      ],
+      "sourceIds": [
+        "vercel-ai-sdk",
+        "openai-cookbook",
+        "anthropic-docs"
+      ],
+      "lab": "content/labs/streaming-chat-app",
+      "gotchas": [
+        "API Key 泄露：Next.js 的 NEXT_PUBLIC_ 前缀变量会打进前端 bundle——Key 绝不能用这个前缀",
+        "流式中断后的状态错乱：messages 数组与服务端不同步——需要乐观 UI + 服务端确认的两阶段提交",
+        "成本统计造假：不要用估算值，必须用 API 返回的 usage 字段"
+      ],
+      "interview": [
+        {
+          "q": "你的对话应用在生产环境出现大量\"流式中断后消息重复\"，怎么排查？",
+          "answerSkeleton": "定位断点（前端/网络/LLM API）→ 检查重连逻辑（是否重复追加 chunk）→ 检查状态同步（乐观 UI 与服务端确认的冲突）→ 检查消息 ID 幂等性 → 加监控（断线率/重连率）→ 修复后灰度验证",
+          "followups": [
+            "如何实现\"重新生成\"功能而不污染消息历史？",
+            "多标签页同时聊天，状态怎么同步？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "提交 GitHub 仓库 + 部署链接，AI 按评分细则审查；要求 README 含架构图、成本模型、已知限制",
+        "rubricId": "project-streaming-chat-app"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "prompt.system-and-fewshot",
+      "title": "Prompt 工程基础（System 设定与 Few-shot）",
+      "summary": "System Prompt 的结构化写法、Few-shot 示例的设计原则、输出格式约束。把\"写提示词\"从玄学变成可复用的工程模板。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "llm.api-first-call"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "System Prompt ≈ 组件的 props + slots：你在声明\"这个对话实例\"的行为契约。 Few-shot ≈ 写测试用例：给模型 2-3 个输入输出示例， 等价于给函数写了类型签名 + 单元测试——模型按示例归纳模式。 你在前端写组件接口定义的经验，决定了你写 Prompt 的天花板。",
+      "concepts": [
+        "System Prompt 三段式：角色与目标 → 行为约束 → 输出格式",
+        "Few-shot：示例质量 > 数量；示例要覆盖边界情况",
+        "指令层级：system > user，但都可被后续输入稀释——关键约束要重复与后置",
+        "输出格式约束：明确给出 JSON 模板或分隔符，比\"请输出 JSON\"可靠一个量级"
+      ],
+      "sourceIds": [
+        "anthropic-prompt-engineering",
+        "openai-cookbook",
+        "promptingguide"
+      ],
+      "gotchas": [
+        "提示词不是越长越好：无关细节稀释注意力，关键约束被淹没",
+        "示例中的错误格式会被模型忠实模仿——Few-shot 必须人工校对",
+        "\"请确保输出合法 JSON\" 是祈祷不是工程——格式约束要配合结构化输出或后处理校验"
+      ],
+      "interview": [
+        {
+          "q": "Few-shot 示例的选择原则是什么？",
+          "answerSkeleton": "覆盖典型与边界 → 格式严格一致 → 数量 2-5 个（边际收益递减）→ 顺序影响（最新示例权重高）→ 与真实分布对齐",
+          "followups": [
+            "示例放多了有什么副作用？（成本、注意力稀释、过拟合示例模式）",
+            "怎么验证 Prompt 改动是改进而不是回归？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为\"会议纪要 → 结构化 JSON\"任务写 System Prompt + 3 个 Few-shot，要求输出通过 Pydantic 校验"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "prompt.versioning-and-testing",
+      "title": "Prompt 版本化与可测试性",
+      "summary": "把 Prompt 当代码对待：版本管理、测试数据集、回归评估。Prompt 改动必须有数据支撑，不靠手感。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 1,
+      "prerequisites": [
+        "prompt.system-and-fewshot"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "这就是你在前端做的 A/B 测试 + CI：Prompt 是代码，测试用例是标注数据， 准确率是指标。每次改 Prompt 都跑一遍回归——不过\"测试框架\"换成了 LLM 评估（LLM-as-judge 或规则校验）。你的工程纪律是最大优势。",
+      "concepts": [
+        "Prompt 模板化：变量插值、环境分离（dev/staging/prod）",
+        "测试数据集：50-200 条标注样本，覆盖典型与边界",
+        "LLM-as-judge：用强模型评估弱模型输出，需人工抽检校准",
+        "回归门禁：改动 Prompt 后准确率下降 > 阈值则阻止合并"
+      ],
+      "sourceIds": [
+        "anthropic-prompt-engineering",
+        "openai-cookbook",
+        "hamel-husain-evals"
+      ],
+      "gotchas": [
+        "测试集太小（<30 条）时，指标波动大于真实差异——统计显著性被忽视",
+        "LLM-as-judge 有偏见（偏爱长回答、自信语气）——必须人工抽检 10% 校准",
+        "Prompt 改动 + 模型版本升级会交互影响——变量要分开控制"
+      ],
+      "interview": [
+        {
+          "q": "怎么验证一次 Prompt 优化是真的改进？",
+          "answerSkeleton": "固定测试集 + 固定模型版本 → 跑改动前后对比 → 指标（准确率/格式正确率）→ 统计显著性（样本量）→ 人工抽检边界 case → 灰度上线监控真实指标",
+          "followups": [
+            "LLM-as-judge 的评分漂移怎么检测？",
+            "测试集被污染（模型训练数据见过）怎么办？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个真实任务建 50 条标注数据集，实现 Prompt 回归测试脚本，输出改动前后对比报告"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "python.async-basics",
+      "title": "异步 Python（asyncio 基础）",
+      "summary": "async/await、事件循环、并发任务编排。AI 应用中所有 LLM 调用都是 IO 密集型，异步是吞吐量的前提。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "python.for-js-devs"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "async/await 语法与 JS 几乎一致，事件循环概念同源。 关键差异：asyncio 的协程必须显式 await 或 gather 才会并发 （没有 Promise.all 的\"创建即并发\"习惯要改）； 且同步/异步是两个世界——在 async 函数里调用阻塞 IO（如 requests、time.sleep） 会冻结整个事件循环。",
+      "concepts": [
+        "事件循环：单线程协作式调度，await 即让出控制权",
+        "asyncio.gather ≈ Promise.all；asyncio.create_task ≈ 启动一个后台 Promise",
+        "同步/异步边界：async with、async for 与对应的异步库（httpx/aiohttp）",
+        "asyncio.run：程序入口的事件循环启动器",
+        "并发不是并行：GIL 限制下 asyncio 只解决 IO 密集，不解决 CPU 密集"
+      ],
+      "sourceIds": [
+        "python-asyncio",
+        "fastapi-docs"
+      ],
+      "gotchas": [
+        "在协程中调用 time.sleep 或 requests 会阻塞整个事件循环——必须用 asyncio.sleep / httpx",
+        "忘记 await 一个协程不会报错，只会静默不执行（RuntimeWarning 常被忽略）",
+        "gather 中一个任务异常，默认行为是传播首个异常，其余任务仍在跑——需要 return_exceptions=True 时显式声明"
+      ],
+      "interview": [
+        {
+          "q": "asyncio 和 JS 的 Promise 模型有什么本质区别？",
+          "answerSkeleton": "语法同源 → 调度差异（协程惰性 vs Promise 创建即执行）→ 生态割裂（sync/async 两套库 vs JS 统一）→ GIL 限制 → 适用场景一致（IO 密集）",
+          "followups": [
+            "为什么 CPU 密集任务用 asyncio 没收益？该用什么？",
+            "gather 与 TaskGroup 的错误处理差异？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "用 httpx + asyncio.gather 并发请求 10 个 URL，要求总耗时接近最慢单个请求而非总和，并正确处理部分失败"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "python.env-tooling",
+      "title": "Python 工程环境（uv 与虚拟环境）",
+      "summary": "用 uv 管理 Python 版本、虚拟环境与依赖——Python 世界的 npm/nvm 二合一，2026 年的事实标准。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "python.for-js-devs"
+      ],
+      "estimatedMinutes": 60,
+      "difficulty": 1,
+      "frontendBridge": "uv ≈ npm + nvm + lockfile 的高速重写版：pyproject.toml ≈ package.json， uv.lock ≈ package-lock.json，uv add ≈ npm install，uv run ≈ npx。 虚拟环境 ≈ node_modules 的隔离思想，但按项目目录独立 Python 解释器。 心智模型完全平移，只需记命令映射。",
+      "concepts": [
+        "虚拟环境：隔离项目依赖，避免系统 Python 污染",
+        "pyproject.toml：项目元数据与依赖声明的统一标准",
+        "lockfile：可复现构建的前提，必须提交 git",
+        "uv run：在正确环境中执行命令，免去手动激活"
+      ],
+      "sourceIds": [
+        "uv-docs",
+        "python-docs"
+      ],
+      "gotchas": [
+        "不要把虚拟环境目录（.venv）提交到 git——提交 lockfile 即可复现",
+        "系统 Python 永远不该直接装包（pip install --user 也是坏味道）",
+        "IDE 的解释器路径要指向项目 .venv，否则类型检查与运行环境不一致"
+      ],
+      "interview": [
+        {
+          "q": "为什么 Python 项目必须用虚拟环境？",
+          "answerSkeleton": "依赖隔离（版本冲突）→ 可复现（lockfile + 环境一致性）→ 系统保护（不污染全局）→ 部署一致性",
+          "followups": [
+            "lockfile 和 pyproject.toml 的分工是什么？",
+            "uv 相比 pip + venv 的传统组合快在哪？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V1",
+        "type": "fsrs-cards",
+        "description": "完成 12 张命令映射卡片（npm → uv），并能脱稿完成新项目初始化全流程"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "python.for-js-devs",
+      "title": "Python 语法速通（TS 工程师视角）",
+      "summary": "只学与 TypeScript 有映射关系的 Python 核心语法：变量、数据结构、函数、类、模块。跳过与 JS 同构的部分，聚焦差异点。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "Python 与 TS 共享绝大多数概念：list≈Array、dict≈Object/Map、 f-string≈模板字符串、切片≈slice。真正的差异只有四个： 缩进即作用域、无可变/不可变声明区分（const 缺失）、 鸭子类型 + 运行时报错文化、import 机制基于文件路径。",
+      "concepts": [
+        "缩进即作用域：Python 用缩进表达代码块，这是语法而非风格",
+        "可变与不可变：list/dict/set 可变，str/tuple/int 不可变——影响函数传参行为",
+        "鸭子类型：\"看起来像鸭子就是鸭子\"，类型约束靠约定与运行时检查",
+        "解包与切片：a, b = pair、items[1:3]，对应 JS 解构但更强",
+        "推导式：[x*2 for x in items if x > 0] ≈ filter+map 链"
+      ],
+      "sourceIds": [
+        "python-docs",
+        "learn-python-repo"
+      ],
+      "gotchas": [
+        "默认参数是可变对象（如 def f(x=[])) 会在多次调用间共享状态——经典面试坑",
+        "== 与 is 的区别：is 比较身份，== 比较值；小整数与短字符串会被驻留导致 is 偶然为真",
+        "除法 / 永远返回 float，整除用 //"
+      ],
+      "interview": [
+        {
+          "q": "Python 的列表和元组有什么区别？工程上怎么选？",
+          "answerSkeleton": "可变性（list 可变/tuple 不可变）→ 哈希性（tuple 可作 dict key）→ 语义（tuple 表记录，list 表集合）→ 性能微调",
+          "followups": [
+            "不可变对象作为函数默认参数为什么安全？",
+            "深拷贝与浅拷贝在嵌套 list 上的行为差异？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V1",
+        "type": "fsrs-cards",
+        "description": "完成 20 张语法对照卡片（TS → Python 映射），FSRS 连续 3 天准确率 ≥85%"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "python.type-hints-pydantic",
+      "title": "类型提示与 Pydantic 数据校验",
+      "summary": "Python type hints 的语法与工程价值；Pydantic 模型定义、校验与序列化——这是 AI 系统中校验 LLM 输出的标准工具。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 0,
+      "prerequisites": [
+        "python.for-js-devs"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "type hints ≈ TypeScript 类型标注，但只是\"提示\"，运行时不强制。 Pydantic ≈ Zod：schema 定义 + 运行时校验 + 类型推导一体。 你在前端用 Zod 校验 API 响应的心智模型可以直接平移—— 区别是 Pydantic 更深地进入了语言生态（FastAPI、LangChain 全部建立在它之上）。",
+      "concepts": [
+        "type hints 是静态检查工具（mypy/pyright）的输入，运行时不生效",
+        "Pydantic BaseModel：声明式 schema，校验失败抛 ValidationError",
+        "Field 约束：默认值、范围、正则、自定义 validator",
+        "model_dump / model_validate：序列化与反序列化的显式边界",
+        "在 AI 工程中的角色：LLM 输出的第一道类型闸门"
+      ],
+      "sourceIds": [
+        "pydantic-docs",
+        "python-docs"
+      ],
+      "gotchas": [
+        "type hints 不阻止运行时类型错误——把它当文档 + lint，别当运行时保障",
+        "Pydantic v1 与 v2 API 差异巨大（parse_obj → model_validate），网上旧教程需甄别",
+        "严格模式（strict=True）下 \"1\" 不会自动转 1——处理 LLM 输出时要明确选择"
+      ],
+      "interview": [
+        {
+          "q": "为什么 Python 有了 type hints 还需要 Pydantic？",
+          "answerSkeleton": "hints 静态不强制 → 运行时数据不可信（网络/LLM 输出）→ Pydantic 提供运行时校验 +  coercion → 与生态（FastAPI/LangChain）集成",
+          "followups": [
+            "Pydantic 校验失败的错误信息结构是怎样的？怎么用于 LLM 输出重试？",
+            "strict 模式与 lax 模式各自适合什么场景？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "定义 3 个 Pydantic 模型校验一组含脏数据的 JSON，编写 pytest 断言校验行为与错误消息"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-24"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "frontend-to-ai-engineer",
+      "title": "前端工程师 → AI 工程师",
+      "description": "利用前端已有资产（TypeScript / 异步 / API 集成 / 组件化 / 工程素养）， 补齐三块真实缺口：Python 工程能力、LLM 心智模型、Agent 系统范式。 每个阶段以可部署的里程碑项目收尾，学习轨迹即求职资产。",
+      "audience": "有 1 年以上经验的 Vue/React 前端工程师",
+      "phases": [
+        {
+          "index": 0,
+          "title": "语言与心智模型桥接",
+          "goal": "能用 Python 完成基本工程任务；建立 token/上下文/Transformer 的直觉"
+        },
+        {
+          "index": 1,
+          "title": "LLM API 工程化",
+          "goal": "结构化输出、Function Calling、流式 UX、成本意识，达到生产可用"
+        },
+        {
+          "index": 2,
+          "title": "生产级 RAG",
+          "goal": "全链路检索增强 + 评估驱动调优（待策展）"
+        },
+        {
+          "index": 3,
+          "title": "Agent 系统",
+          "goal": "LangGraph 编排、MCP 工具生态、HITL 安全闸（待策展）"
+        },
+        {
+          "index": 4,
+          "title": "工程化与交付",
+          "goal": "Eval 体系、可观测、安全、Capstone 端到端交付（待策展）"
+        }
+      ]
+    }
+  ],
+  "rubrics": [
+    {
+      "id": "project-cli-llm-tool",
+      "title": "CLI LLM 批处理工具 · 构建验证评分细则",
+      "criteria": [
+        {
+          "id": "api-usage",
+          "description": "正确使用 LLM API（认证、参数、消息结构），非复制粘贴 demo",
+          "weight": 30
+        },
+        {
+          "id": "error-handling",
+          "description": "网络错误/限流/超时的重试与降级策略，指数退避",
+          "weight": 25
+        },
+        {
+          "id": "streaming",
+          "description": "流式响应的正确消费与中断处理",
+          "weight": 20
+        },
+        {
+          "id": "code-quality",
+          "description": "模块化、类型标注、可读性，符合 Python 工程规范",
+          "weight": 15
+        },
+        {
+          "id": "cost-awareness",
+          "description": "统计并输出 token 用量，有基本的成本控制意识",
+          "weight": 10
+        }
+      ],
+      "passScore": 70
+    },
+    {
+      "id": "project-streaming-chat-app",
+      "title": "流式对话应用 · 构建验证评分细则",
+      "criteria": [
+        {
+          "id": "streaming-ux",
+          "description": "SSE 流式渲染、打字机效果、中断恢复，无卡顿与状态错乱",
+          "weight": 25
+        },
+        {
+          "id": "structured-output",
+          "description": "至少一处结构化输出（JSON Schema/Zod 校验）用于真实业务逻辑",
+          "weight": 20
+        },
+        {
+          "id": "error-resilience",
+          "description": "API 失败、限流、网络中断的用户可见降级，非白屏",
+          "weight": 20
+        },
+        {
+          "id": "cost-instrumentation",
+          "description": "token 用量与成本仪表盘，数据来自真实 API 返回",
+          "weight": 20
+        },
+        {
+          "id": "code-quality",
+          "description": "前后端分层清晰、类型完整、有测试",
+          "weight": 15
+        }
+      ],
+      "passScore": 70
+    }
+  ]
+}

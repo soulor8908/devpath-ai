@@ -1,0 +1,27 @@
+# 旗舰轨道：前端工程师 → AI 全栈 / Agent 工程师
+# 对应 redesign 文档第四部分：5 域能力图谱、5 阶段路径（16-20 周）
+
+track:
+  id: frontend-to-ai-engineer
+  title: 前端工程师 → AI 工程师
+  description: >-
+    利用前端已有资产（TypeScript / 异步 / API 集成 / 组件化 / 工程素养），
+    补齐三块真实缺口：Python 工程能力、LLM 心智模型、Agent 系统范式。
+    每个阶段以可部署的里程碑项目收尾，学习轨迹即求职资产。
+  audience: 有 1 年以上经验的 Vue/React 前端工程师
+  phases:
+    - index: 0
+      title: 语言与心智模型桥接
+      goal: 能用 Python 完成基本工程任务；建立 token/上下文/Transformer 的直觉
+    - index: 1
+      title: LLM API 工程化
+      goal: 结构化输出、Function Calling、流式 UX、成本意识，达到生产可用
+    - index: 2
+      title: 生产级 RAG
+      goal: 全链路检索增强 + 评估驱动调优（待策展）
+    - index: 3
+      title: Agent 系统
+      goal: LangGraph 编排、MCP 工具生态、HITL 安全闸（待策展）
+    - index: 4
+      title: 工程化与交付
+      goal: Eval 体系、可观测、安全、Capstone 端到端交付（待策展）
