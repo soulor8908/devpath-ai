@@ -37,6 +37,36 @@ function collectYamlFiles(dir: string): string[] {
   return files.sort();
 }
 
+/**
+ * 新鲜度校验：已提交的编译产物必须与 content/ 当前状态一致。
+ * preset（lib/presets/frontend-to-ai-engineer.ts）在构建期打包该 JSON，
+ * 若 content 改了却没重新编译，应用会静默发布陈旧内容。
+ * 比较时剔除 builtAt 时间戳（每次编译必然变化）。
+ */
+function assertCompiledArtifactFresh(graph: unknown): void {
+  if (!existsSync(OUTPUT_PATH)) {
+    console.error(
+      `编译产物不存在: ${OUTPUT_PATH}\n请运行 npm run content:compile 生成`,
+    );
+    process.exit(1);
+  }
+  const committed = JSON.parse(readFileSync(OUTPUT_PATH, "utf-8")) as Record<
+    string,
+    unknown
+  >;
+  const fresh = graph as Record<string, unknown>;
+  const strip = (g: Record<string, unknown>) =>
+    JSON.stringify({ ...g, builtAt: null });
+  if (strip(committed) !== strip(fresh)) {
+    console.error(
+      "编译产物已陈旧：content/ 与 public/data/curriculum-graph.json 不一致\n" +
+        "请运行 npm run content:compile 重新生成",
+    );
+    process.exit(1);
+  }
+  console.log("编译产物新鲜度校验通过");
+}
+
 function main(): void {
   const validateOnly = process.argv.includes("--check");
 
@@ -68,6 +98,7 @@ function main(): void {
 
     if (validateOnly) {
       console.log("内容校验通过:", JSON.stringify(summary, null, 2));
+      assertCompiledArtifactFresh(graph);
       return;
     }
 

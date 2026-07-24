@@ -9,6 +9,7 @@ import { FRONTEND_PRESET } from "./frontend";
 import { BACKEND_PRESET } from "./backend";
 import { AI_PRESET } from "./ai";
 import { LLM_APP_PRESET } from "./llm-app";
+import { FRONTEND_TO_AI_ENGINEER_PRESET } from "./frontend-to-ai-engineer";
 
 // 预设元信息（用于 UI 卡片展示）
 export interface PresetMeta {
@@ -25,6 +26,15 @@ export interface PresetMeta {
 }
 
 export const PRESETS: PresetMeta[] = [
+  {
+    id: "frontend-to-ai-engineer",
+    name: "前端转 AI 工程师",
+    icon: "⚡",
+    description:
+      "策展旗舰轨道：Python 桥接 → LLM 心智模型 → API 工程化 → RAG → Agent，每节点带权威来源与面试题",
+    tags: ["前端转型", "LLM", "Agent", "RAG", "策展内容"],
+    ...FRONTEND_TO_AI_ENGINEER_PRESET,
+  },
   {
     id: "algorithm-200",
     name: "算法 200 题",

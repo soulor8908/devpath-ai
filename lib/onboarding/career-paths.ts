@@ -11,6 +11,23 @@ import type { CareerPath } from "@/lib/types";
 
 export const CAREER_PATHS: CareerPath[] = [
   {
+    id: "frontend-to-ai-engineer",
+    title: "前端工程师 → AI 工程师",
+    subtitle: "技能嫁接不做零基础，直达 AI 全栈/Agent 岗",
+    icon: "⚡",
+    description:
+      "适合有前端经验想转 AI 应用层的工程师：Python 桥接 → LLM 心智模型 → API 工程化 → RAG → Agent，策展内容每步带权威来源",
+    weeksEstimate: 5,
+    weeklyHours: 7,
+    dailyMinutesDefault: 60,
+    maxNewPerDayDefault: 2,
+    difficulty: "intermediate",
+    cta: "从 Python 与 TS 的类型映射开始，把已有技能直接迁移过去",
+    linkedPresetId: "frontend-to-ai-engineer",
+    // 节点从策展 preset 动态获取，与其他路径一致
+    nodes: [],
+  },
+  {
     id: "ai-app-dev",
     title: "AI 应用开发工程师",
     subtitle: "做 LLM 应用/RAG/Agent，最快上岗",
