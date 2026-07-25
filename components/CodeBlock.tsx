@@ -212,6 +212,13 @@ const TOKEN_COLORS: Record<TokenType, string> = {
 // 轻量 Markdown 渲染（无外部依赖，解析失败自动降级为纯文本）
 // ============================================================
 
+/** 校验 markdown 链接 URL 协议（防 javascript: 伪协议 XSS，内容来自 AI 生成不可全信） */
+function isSafeUrl(url: string): boolean {
+  const trimmed = url.trim().toLowerCase();
+  if (trimmed.startsWith("/") || trimmed.startsWith("#")) return true;
+  return /^https?:\/\//.test(trimmed) || trimmed.startsWith("mailto:");
+}
+
 /** 解析行内 Markdown：**粗体** *斜体* `代码` [链接](url) */
 function parseInline(text: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
@@ -235,11 +242,16 @@ function parseInline(text: string): React.ReactNode[] {
         </code>
       );
     } else if (match[7]) {
-      nodes.push(
-        <a key={key++} href={match[9]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline break-all">
-          {match[8]}
-        </a>
-      );
+      if (isSafeUrl(match[9])) {
+        nodes.push(
+          <a key={key++} href={match[9]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline break-all">
+            {match[8]}
+          </a>
+        );
+      } else {
+        // 不安全协议（javascript:/data: 等）→ 降级为纯文本，阻断 XSS
+        nodes.push(match[0]);
+      }
     }
     lastIdx = regex.lastIndex;
   }

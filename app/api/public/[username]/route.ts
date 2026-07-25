@@ -54,10 +54,23 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   // 统一 session 鉴权（requireSession 内部用 req.clone().text() 读 body 签名校验，不消费原 body）
   const sessionResult = await requireSession(req);
   if (sessionResult instanceof NextResponse) return sessionResult;
-  // session 注入成功即放行（userId 不参与 username 校验，因 username 是可变别名）
-  void sessionResult;
+  const { session } = sessionResult;
 
   const store = createKVStore(getCloudflareKV());
+
+  // 越权防护（IDOR 修复）：username 与 session.userId 绑定校验
+  // - 已绑定：仅 owner 可写（防止任意 session 覆写他人公开主页/统计/成就）
+  // - 未绑定：当前 session 认领（首次写入；老数据无绑定时由首个写入者认领）
+  const owner = await store.getUsernameOwner(username);
+  if (owner && owner !== session.userId) {
+    return NextResponse.json(
+      { error: "无权修改该用户的公开数据", code: "FORBIDDEN" },
+      { status: 403 },
+    );
+  }
+  if (!owner) {
+    await store.claimUsername(username, session.userId);
+  }
 
   let body: {
     profile?: Partial<PublicProfile>;

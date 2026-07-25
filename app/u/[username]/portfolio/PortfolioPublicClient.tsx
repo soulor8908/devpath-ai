@@ -325,6 +325,8 @@ function LinkButton({
   icon: IconName;
   label: string;
 }) {
+  // URL 协议白名单（存储型 XSS 防护：数据来自 KV，访问者点击 javascript: 链接会在本站域下执行脚本）
+  if (!/^https?:\/\//i.test(href.trim())) return null;
   return (
     <a
       href={href}

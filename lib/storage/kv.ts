@@ -66,6 +66,16 @@ export interface KVStore {
    * 客户端维护完整列表后整体上传（与 setPublicAchievements 同构）。
    */
   setPortfolio(username: string, portfolio: PublicPortfolio): Promise<void>;
+  /**
+   * 读取 username 的所有者 userId（防越权覆写：PUT 公开数据前校验绑定）。
+   * 未绑定返回 null。
+   */
+  getUsernameOwner(username: string): Promise<string | null>;
+  /**
+   * 认领 username 所有权：首次写入公开数据时把 username 绑定到 session.userId。
+   * 绑定后其他 userId 的 session 无法覆写该 username 的公开数据。
+   */
+  claimUsername(username: string, userId: string): Promise<void>;
 }
 
 interface KVLike {
@@ -201,6 +211,12 @@ export function createKVStore(envKV?: KVLike): KVStore {
     },
     async setPortfolio(username, portfolio) {
       await kv.put(`portfolio:${username}`, JSON.stringify(portfolio));
+    },
+    async getUsernameOwner(username: string) {
+      return await kv.get(`username_owner:${username}`);
+    },
+    async claimUsername(username: string, userId: string) {
+      await kv.put(`username_owner:${username}`, userId);
     },
   };
 }

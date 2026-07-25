@@ -37,7 +37,23 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 
   const sessionResult = await requireSession(req);
   if (sessionResult instanceof NextResponse) return sessionResult;
-  void sessionResult;
+  const { session } = sessionResult;
+
+  const store = createKVStore(getCloudflareKV());
+
+  // 越权防护（IDOR 修复）：username 与 session.userId 绑定校验
+  // - 已绑定：仅 owner 可写（防止任意 session 覆写他人公开作品集）
+  // - 未绑定：当前 session 认领（首次写入；老数据无绑定时由首个写入者认领）
+  const owner = await store.getUsernameOwner(username);
+  if (owner && owner !== session.userId) {
+    return NextResponse.json(
+      { error: "无权修改该用户的作品集", code: "FORBIDDEN" },
+      { status: 403 },
+    );
+  }
+  if (!owner) {
+    await store.claimUsername(username, session.userId);
+  }
 
   let body: { entries?: PublicPortfolioEntry[] };
   try {
@@ -61,9 +77,17 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
         { status: 400 },
       );
     }
+    // URL 协议白名单（防存储型 XSS：公开页会直接渲染这些链接）
+    for (const url of [e.repoUrl, e.deployUrl, e.docUrl]) {
+      if (url !== undefined && url !== "" && !/^https?:\/\//i.test(url.trim())) {
+        return NextResponse.json(
+          { error: `链接必须是 http(s) URL: ${e.id}` },
+          { status: 400 },
+        );
+      }
+    }
   }
 
-  const store = createKVStore(getCloudflareKV());
   const portfolio: PublicPortfolio = {
     username,
     entries: body.entries,
