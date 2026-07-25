@@ -160,9 +160,20 @@ export default function TrainClient() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           休息一下，明天继续。
         </p>
-        <Button variant="primary" size="lg" onClick={handleViewTodayProgress}>
-          查看今日进度
-        </Button>
+        {/* 2026-07-25 用户需求：课程完成后除了"查看今日进度"，
+            还要提供"我的学习列表"入口，让用户可以进入任意知识库做全量学习 */}
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          <Button variant="primary" size="lg" onClick={handleViewTodayProgress}>
+            查看今日进度
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => router.push("/learn/list")}
+          >
+            我的学习列表
+          </Button>
+        </div>
       </div>
     );
   }
@@ -229,7 +240,7 @@ export default function TrainClient() {
           <p className="text-xs text-gray-400 dark:text-gray-500">
             番茄钟已自动结束并计入今日统计
           </p>
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
             <Button
               variant="primary"
               block
@@ -239,6 +250,16 @@ export default function TrainClient() {
               leftIcon="check"
             >
               查看今日进度
+            </Button>
+            {/* 2026-07-25 用户需求：完成后可进入"我的学习列表"
+                选择任意知识库做全量学习（不止今日队列） */}
+            <Button
+              variant="secondary"
+              block
+              size="lg"
+              onClick={() => router.push("/learn/list")}
+            >
+              我的学习列表
             </Button>
           </div>
         </div>
