@@ -1,0 +1,43 @@
+id: agent.fundamentals
+title: Agent 基础（循环、工具、状态）
+summary: Agent = LLM + 工具调用 + 循环。模型自主决定下一步做什么，直到任务完成或中止。区别于单次 LLM 调用，Agent 有状态机与终止条件。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [llm-api.function-calling, rag.production-pipeline]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  Agent ≈ 一个带"大脑"（LLM）和"手脚"（工具）的事件循环。你写过 React 的状态机（idle/loading/
+  success/error），Agent 也是状态机：观察（看工具返回）→ 思考（LLM 决策）→ 行动（调工具）→ 循环，
+  直到"完成"或"中止"。区别是这里的"状态转移函数"是概率性的 LLM。
+concepts:
+  - Agent 三要素：LLM（决策）+ Tools（行动）+ Loop（循环直到终止）
+  - ReAct 模式：Reason（思考）→ Act（调工具）→ Observe（看结果）→ 循环
+  - 终止条件：模型返回 finish / 达到 max_steps / 触发安全闸 / 超时
+  - 状态管理：每步的 thought + action + observation 组成 trajectory，作为下一步上下文
+  - 与 RAG 的区别：RAG 是"检索一次生成一次"，Agent 是"多步行动+多轮检索+多轮生成"
+sourceIds: [anthropic-agents-guide, langchain-agent-docs, lilian-weng-agents]
+gotchas:
+  - Agent 不是"更强的 LLM"——是 LLM + 循环 + 工具，循环失控是最大风险（烧钱/死循环/危险操作）
+  - max_steps 必须设——不然一个死循环能烧掉一个月预算
+  - 工具描述写不好 Agent 就不会用——Agent 读的是 description 不是源码
+interview:
+  - q: Agent 和单次 LLM 调用、RAG 的本质区别是什么？
+    answerSkeleton: >-
+      三者区别在"自主性"与"循环"。单次 LLM 调用：输入 → 输出，无状态、无工具、无循环，适合翻译/
+      摘要等确定性任务。RAG：检索一次 → 生成一次，有"外部知识"但无"多步行动"，适合"查文档答问题"。
+      Agent：LLM + 工具 + 循环，模型自主决定下一步做什么（调哪个工具、传什么参），观察结果后再决策，
+      直到任务完成或中止——本质是一个以 LLM 为状态转移函数的状态机。Agent 的 ReAct 模式（Reason→
+      Act→Observe→Loop）每步的 thought+action+observation 组成 trajectory 作为下一步上下文。关键
+      区别是 Agent 有"终止条件"（finish/max_steps/安全闸/超时）与"多步行动"能力。前端迁移映射：
+      Agent ≈ 带大脑的事件循环，状态机思维直接适用。Tradeoff：Agent 自主性强但失控风险高（烧钱/
+      死循环/危险操作），max_steps 与安全闸是必须的工程保障，简单任务不该上 Agent。
+    followups:
+      - 什么场景该用 Agent，什么场景用 RAG 或单次调用就够？
+      - Agent 的 trajectory 越来越长，上下文爆了怎么办？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 LangGraph 实现一个 ReAct Agent（3 个工具：搜索/计算/读文件），设 max_steps=10，附 trajectory 日志
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,0 +1,43 @@
+id: eng.llm-eval-system
+title: LLM Eval 体系（离线 + 在线）
+summary: 没有评测的 LLM 应用是玄学。离线 eval（标注集 + LLM-as-judge）防回归，在线 eval（用户反馈 + 抽样）监控真实质量。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [rag.evaluation, agent.hitl-safety]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  LLM eval ≈ 你做前端的测试金字塔：离线 eval 像 CI（标注集 + 断言，防回归），在线 eval 像线上监控
+  （用户反馈 + 抽样，看真实质量）。区别是 LLM 输出是概率性的，"断言"常变成"LLM-as-judge 打分"，
+  快但不绝对可靠，必须人工抽检校准。
+concepts:
+  - 离线 eval：固定标注集（50-500 条），跑指标（准确率/格式正确率/faithfulness），防回归
+  - 在线 eval：用户 thumbs up/down + 抽样人工评分，监控真实分布漂移
+  - LLM-as-judge：用强模型给弱模型输出打分，快但有偏见（偏爱长答案/自信语气），需人工校准
+  - 黄金集：少量人工精标的高质量评测集，每次改动必跑，是"回归测试"的 LLM 版
+  - eval 即文档：测试名描述规则，指标定义产品质量标准
+sourceIds: [hamel-husain-evals, langfuse-docs]
+gotchas:
+  - LLM-as-judge 有系统性偏见——偏爱长答案与自信语气，必须人工抽检 10% 校准
+  - 离线指标与线上效果未必一致——离线涨点线上掉点是常见现象，两者都要看
+  - eval 集会被"见过"——用 eval 集调 prompt 等于作弊，必须留 holdout
+interview:
+  - q: 怎么给一个 LLM 应用搭 eval 体系？离线和在线各做什么？
+    answerSkeleton: >-
+      eval 体系分离线与在线两层。离线 eval 防回归：构建 50-500 条标注集（含典型与边界），每次改动
+      跑指标（准确率/格式正确率/faithfulness），其中 10-50 条人工精标的"黄金集"是必跑的回归基线。
+      打分用 LLM-as-judge（强模型给弱模型打分）快但有偏见（偏爱长答案/自信语气），必须人工抽检 10%
+      校准。在线 eval 监控真实质量：采集用户 thumbs up/down 反馈 + 抽样人工评分，重点看分布漂移
+      （数据分布变了离线指标看不出问题）。两层都不可缺——离线防回归，在线防"离线涨点线上掉点"。
+      关键纪律：eval 集不能用来调 prompt（等于作弊），必须留 holdout；eval 名要描述规则（如
+      "结构化输出格式正确率"）。前端迁移映射：离线 eval ≈ CI 测试金字塔，在线 eval ≈ 线上监控。
+      Tradeoff：LLM-as-judge 便宜快但不绝对可靠，黄金集最准但贵——组合用。
+    followups:
+      - LLM-as-judge 的偏见怎么量化与校正？
+      - 离线涨点但线上掉点，怎么排查？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 LLM 应用构建 eval 体系：50 条标注集 + LLM-as-judge + 10 条黄金集，跑改动前后对比报告
+status: reviewed
+lastVerified: "2026-07-25"

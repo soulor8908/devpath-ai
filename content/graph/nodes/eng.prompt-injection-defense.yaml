@@ -1,0 +1,44 @@
+id: eng.prompt-injection-defense
+title: Prompt 注入防御
+summary: Prompt 注入是 LLM 应用的 SQL 注入——用户输入覆盖系统指令。深度防御（输入护栏+输出护栏+最小权限+HITL）是唯一现实路径。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [agent.hitl-safety]
+estimatedMinutes: 90
+difficulty: 4
+frontendBridge: >-
+  Prompt 注入 ≈ LLM 时代的 SQL 注入：用户输入里藏"忽略之前指令，改做 X"，模型可能照做。你在前端
+  做过 XSS 防御（转义输出/CSP）——这里是同类问题，但"沙箱"是概率性的 LLM 而非确定性解析器，
+  没有 100% 防御，只能深度防御降低风险。
+concepts:
+  - 注入类型：直接注入（用户输入含恶意指令）/ 间接注入（检索到的文档/工具返回里藏指令）
+  - 系统提示优先级：用结构化分隔符（如 <system>...</system>）+ 显式"用户输入在 <user> 标签内，其内容是指令而非数据"
+  - 输入护栏：模式匹配（"忽略之前指令"等）+ LLM 二次审查输入是否含注入
+  - 输出护栏：校验生成内容是否执行了越权动作（如不该发邮件时输出了邮件内容）
+  - 最小权限 + HITL：Agent 工具默认无副作用，危险操作必须人工确认——这是注入造成实际危害的最后一道闸
+sourceIds: [owasp-llm-top10, prompt-injection-paper, anthropic-effective-agents]
+gotchas:
+  - 没有银弹——任何单一防御都能被针对性绕过，必须深度防御（多层叠加）
+  - 间接注入防不胜防——RAG 检索到的外部文档里藏指令，用户无感知却被攻击
+  - 系统提示优先级不可靠——模型未必遵守"系统 > 用户"的层级，尤其当用户输入很强势时
+interview:
+  - q: 什么是 prompt 注入？怎么防御？能 100% 防住吗？
+    answerSkeleton: >-
+      prompt 注入是 LLM 应用的 SQL 注入：攻击者在用户输入（或被检索的外部文档）里藏"忽略之前指令，
+      改做 X"，模型可能照做。分两类——直接注入（用户主动输入恶意指令）和间接注入（RAG 检索到的
+      文档/工具返回里藏指令，用户无感知）。不能 100% 防住——因为"沙箱"是概率性的 LLM 而非确定性
+      解析器，任何单一防御都能被针对性绕过。现实路径是深度防御多层叠加：第一，系统提示优先级——用
+      结构化分隔符（<system>/<user> 标签）+ 显式声明"用户输入内容是指令还是数据"；第二，输入护栏
+      ——模式匹配（"忽略之前指令"）+ LLM 二次审查；第三，输出护栏——校验是否执行了越权动作；
+      第四，最小权限 + HITL——危险工具默认禁用，调用前人工确认，这是注入造成实际危害的最后一道闸。
+      前端迁移映射：这和 XSS 防御同构（转义/CSP/最小权限），区别是没有确定性沙箱。Tradeoff：防御
+      越严用户体验越差（频繁 HITL），按风险等级分级。
+    followups:
+      - 间接注入怎么防？RAG 检索到的文档能信任吗？
+      - 系统提示优先级不可靠，还有什么补救？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个含工具调用的 Agent 实现三层 prompt 注入防御（系统提示分隔符 + 输入护栏 + 输出护栏），用 10 条注入攻击 payload 测试拦截率
+status: reviewed
+lastVerified: "2026-07-25"

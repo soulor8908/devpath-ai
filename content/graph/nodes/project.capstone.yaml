@@ -1,0 +1,47 @@
+id: project.capstone
+title: Capstone 项目 · 端到端 AI 工程化系统
+summary: Phase 4 出口项目（也是整条轨道的毕业项目）：把 Phase 0-3 的全部技能集成进一个可上线的 AI 应用，含 RAG + Agent + Eval + 可观测 + 安全 + 成本优化 + 生产部署。这是能直接拿去面试的硬资产。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [eng.llm-eval-system, eng.observability, eng.prompt-injection-defense, eng.cost-latency-optimization, eng.production-deployment]
+estimatedMinutes: 960
+difficulty: 5
+frontendBridge: >-
+  这是整条轨道的集大成。你做前端时经历过"从组件到页面到工程化到上线"的完整链路——这里是一样的，
+  只是技术栈换成 AI 工程化。你的工程纪律（模块化、测试、监控、灰度、安全）是最大优势，AI 知识
+  是新维度。重点不是堆功能，是每个环节都有数据支撑（eval 报告、trace 日志、成本对比）。
+concepts:
+  - 集成 RAG + Agent：Agent 调用 RAG 工具检索知识，多步推理解决复杂查询
+  - 完整 Eval 体系：离线标注集 + LLM-as-judge + 黄金集，在线用户反馈 + 抽样评分
+  - 全链路可观测：trace 串联检索/重排/生成/工具调用，成本与质量双监控
+  - 安全纵深：prompt 注入防御 + HITL + 最小权限 + 审计日志
+  - 生产就绪：模型版本锁定 + 灰度 + 降级链 + SLO + 成本配额
+sourceIds: [langfuse-docs, hamel-husain-evals, owasp-llm-top10, langchain-deploy]
+lab: content/labs/capstone
+gotchas:
+  - 不要做"大而全"——聚焦一个真实场景做深（如"AI 代码审查员""企业知识库问答 Agent"），比通用 demo 强
+  - Capstone 的价值在"工程化深度"而非"功能数量"——一个有完整 eval + 监控 + 安全的小系统胜过功能多但没保障的大系统
+  - 必须有可验证的"质量证据"——eval 报告、trace 日志、成本对比、安全测试，面试官看的是这些而非 demo
+interview:
+  - q: 你的 Capstone 项目从 demo 到生产，最大的工程挑战是什么？怎么解决的？
+    answerSkeleton: >-
+      （这是开放题，考察的是真实的工程化经验而非知识点。以下是一个高质量回答的框架示例，实际要结合
+      自己项目讲。）最大挑战通常是"概率性组件的工程化保障"——LLM 不像传统服务确定可预测。以 RAG+
+      Agent 系统为例，三个核心挑战与解法。第一，质量不可预测——RAG 召回率会随数据分布漂移下降，解法
+      是搭完整 eval 体系（离线标注集防回归 + 在线抽样监控漂移）+ 黄金集每次改动必跑。第二，成本失控
+      ——Agent 多步循环 + RAG 多次检索很容易烧爆预算，解法是分层缓存（embedding/语义/响应）+ 分级
+      路由（简单任务小模型）+ 速率限制 + 成本告警。第三，安全风险——Agent 自主调用工具 + prompt 注入
+      可能让模型执行危险操作，解法是深度防御（工具分级 + HITL + 输入输出护栏 + 最小权限 + 审计日志）。
+      贯穿三者的是全链路 trace——没有可观测就只能在事故后盲猜。前端迁移映射：这套工程化纪律和你做
+      前端生产化（监控/灰度/安全/性能预算）同构。Tradeoff：每层保障都有成本，按业务风险分级投入。
+      面试官要听的是"你遇到过什么真实问题 + 用什么数据驱动决策"，不是"你知道哪些概念"。
+    followups:
+      - 你的 eval 体系怎么发现过一次真实的质量回归？
+      - Agent 失控烧钱的场景，你的速率限制怎么设计的？
+masteryCheck:
+  level: V4
+  type: portfolio-release
+  description: 提交 GitHub 仓库 + 部署链接 + 完整文档（架构图 + eval 报告 + trace 示例 + 成本对比 + 安全测试），发布到作品集
+  rubricId: project-capstone
+status: reviewed
+lastVerified: "2026-07-25"

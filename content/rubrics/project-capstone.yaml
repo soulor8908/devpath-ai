@@ -1,0 +1,29 @@
+# Phase 4 Capstone 项目评分细则：端到端 AI 工程化系统
+# V4 作品集发布用：AI 按本细则审查用户 GitHub 仓库 + 完整文档
+
+rubric:
+  id: project-capstone
+  title: 端到端 AI 工程化系统 · Capstone 评分细则
+  passScore: 75
+  criteria:
+    - id: integration
+      description: RAG + Agent 集成（Agent 调用 RAG 工具多步推理），非孤立功能堆砌
+      weight: 15
+    - id: eval-system
+      description: 完整 eval 体系（离线标注集 50+ + LLM-as-judge + 黄金集 10+），附改动前后对比报告
+      weight: 20
+    - id: observability
+      description: 全链路 trace 串联检索/重排/生成/工具调用，成本与质量双监控，配告警
+      weight: 15
+    - id: security
+      description: 安全纵深（prompt 注入防御 + HITL + 最小权限 + 审计日志），附 10 条注入攻击测试结果
+      weight: 15
+    - id: cost-optimization
+      description: 成本优化（缓存分层 + 分级路由 + 速率限制），附优化前后成本对比数据
+      weight: 10
+    - id: production-readiness
+      description: 生产就绪（模型版本锁定 + 灰度策略 + 降级链 + SLO 定义），附降级链演练记录
+      weight: 15
+    - id: documentation
+      description: 完整文档（架构图 + 部署指南 + eval 报告 + 安全测试），可被面试官独立评审
+      weight: 10

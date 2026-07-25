@@ -1,0 +1,26 @@
+# Phase 2 里程碑项目评分细则：生产级 RAG 问答系统
+# V3 构建验证用：AI 按本细则审查用户 GitHub 仓库代码 + 评测报告
+
+rubric:
+  id: project-rag-pipeline
+  title: 生产级 RAG 问答系统 · 构建验证评分细则
+  passScore: 70
+  criteria:
+    - id: retrieval-quality
+      description: 混合检索（dense + sparse）+ 重排，评测集 recall@5 >= 0.7，附评测报告
+      weight: 25
+    - id: chunking
+      description: 切分策略针对文档类型定制（非默认固定窗口），附 chunk_size A/B 对比数据
+      weight: 15
+    - id: incremental-index
+      description: 增量索引实现（文档 hash + 变更队列），或论证为何全量重建更优
+      weight: 10
+    - id: evaluation
+      description: 50+ 条人工标注评测集，RAGAS 三维度评分（faithfulness/answer relevancy/context relevancy）报告
+      weight: 20
+    - id: observability
+      description: 全链路 trace（每步延迟可回放），查询日志落盘，召回率漂移监控
+      weight: 15
+    - id: production-readiness
+      description: 失败降级链（向量库挂→BM25→缓存→兜底），语义缓存，部署文档
+      weight: 15

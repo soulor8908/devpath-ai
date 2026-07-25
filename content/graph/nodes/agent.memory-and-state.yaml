@@ -1,0 +1,43 @@
+id: agent.memory-and-state
+title: Agent 记忆与状态管理
+summary: 短期记忆（trajectory 上下文）vs 长期记忆（跨会话持久化）。Agent 跑久了上下文会爆，记忆管理是生产 Agent 的核心难题。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [agent.langgraph-orchestration]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  Agent 记忆 ≈ 你做 SPA 的状态管理：短期记忆是组件内 state（trajectory 在上下文里），长期记忆是
+  localStorage/IndexedDB（跨会话持久化）。区别是 Agent 的"state"是文本且会按 token 计费——
+  trajectory 越长越贵且越慢，必须主动压缩或外存。
+concepts:
+  - 短期记忆：当前会话的 trajectory（thought+action+observation），塞在 prompt 上下文里
+  - 长期记忆：跨会话持久化，通常用向量库存"过去经验"，按需检索召回
+  - 上下文压缩：trajectory 过长时用 LLM 摘要历史步骤，或只保留最近 N 步 + 摘要
+  - 记忆类型：episodic（具体事件）/ semantic（抽象知识）/ procedural（怎么做某事，类似 SOP）
+  - 记忆写入策略：不是所有 trajectory 都值得记——只记"成功/失败的关键决策点"
+sourceIds: [langchain-memory, langgraph-docs]
+gotchas:
+  - 把全部 trajectory 塞进上下文是最常见错误——10 步后 token 就爆，且模型注意力被稀释
+  - 长期记忆不是"存 everything"——写入要筛选（只记关键决策），检索要精准（否则召回噪声）
+  - 记忆与 RAG 的边界：长期记忆本质是"对自己过往经验的 RAG"，但写入策略比文档 RAG 更难
+interview:
+  - q: Agent 跑了 20 步，trajectory 上下文要爆了，怎么办？
+    answerSkeleton: >-
+      trajectory 压缩按代价递增有四招。第一，滑动窗口——只保留最近 N 步的完整 trajectory，更早的
+      丢弃，最简单但丢失早期关键决策。第二，摘要压缩——用 LLM 把早期步骤摘要成一段文字替换原始
+      trajectory，保留要点省 token，但摘要可能丢细节。第三，外存 + 检索——把历史 trajectory 写进
+      向量库，当前步只保留最近 N 步 + 按需检索相关历史（本质是对自己经验的 RAG），最省 token 但
+      实现复杂且有检索延迟。第四，结构化状态——把关键中间结果（如"已收集的数据""已排除的假设"）
+      写进显式 state 字段而非塞进自然语言 trajectory，模型读结构化字段比读历史对话高效。生产 Agent
+      通常组合用：结构化 state + 滑动窗口 + 必要时外存检索。前端迁移映射：这和 SPA 状态管理同构，
+      短期=组件 state，长期=IndexedDB。Tradeoff：压缩省 token 但丢信息，必须按任务容错度调。
+    followups:
+      - 长期记忆该存什么？不该存什么？
+      - 结构化 state 和自然语言 trajectory 各自适合存什么？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 20+ 步的 Agent 实现三层记忆：结构化 state + 滑动窗口（最近 5 步）+ 历史 trajectory 摘要
+status: reviewed
+lastVerified: "2026-07-25"

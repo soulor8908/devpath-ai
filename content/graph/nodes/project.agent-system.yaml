@@ -1,0 +1,46 @@
+id: project.agent-system
+title: 里程碑项目 · 生产级 Agent 系统
+summary: Phase 3 出口项目：实现一个有真实用途的 Agent 系统（如"研究助手""代码 PR 审查员""客服 Agent"），含 LangGraph 编排、工具生态、记忆、HITL 安全闸。这是 Agent 工程师的求职名片。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [agent.langgraph-orchestration, agent.tool-ecosystem, agent.memory-and-state, agent.hitl-safety]
+estimatedMinutes: 480
+difficulty: 4
+frontendBridge: >-
+  这是 Phase 0-2 技能的集成 + Agent 全栈落地。你做过的前端工程化（状态机、错误边界、监控、
+  二次确认）全部适用，只是"决策者"从"用户点击"换成了"LLM 自主"。重点是有真实用途 + HITL
+  安全闸，不是炫技 demo。
+concepts:
+  - LangGraph 编排：节点图 + 条件路由 + checkpointer 持久化
+  - 工具生态：至少 3 个工具（含 1 个危险操作），MCP server 或自实现
+  - 记忆管理：结构化 state + 滑动窗口 + 长期记忆（向量库）
+  - HITL 安全闸：工具分级 + 危险操作暂停确认 + 审计日志
+  - 可观测：每步 trajectory 落盘，token 成本统计，失败可回放
+sourceIds: [langgraph-docs, anthropic-agents-guide, lilian-weng-agents]
+lab: content/labs/agent-system
+gotchas:
+  - 不要做"通用 Agent"——聚焦一个真实场景（研究/审查/客服），通用 Agent 做不深且难评估
+  - HITL 不是"加上去就行"——要设计好暂停/恢复的 UX，人工确认的上下文要清晰呈现
+  - 评测 Agent 比评测 RAG 更难——定义清楚"任务成功"的标准（如"研究助手产出的报告含 3+ 可信来源"）
+interview:
+  - q: 你设计的 Agent 在生产中"卡住"了（循环但不进展），怎么检测与恢复？
+    answerSkeleton: >-
+      Agent 卡住指"循环在跑但 trajectory 不再有实质进展"——比崩溃更隐蔽，会无声烧钱。检测分三层。
+      第一层，结构化检测——监测"连续 N 步的 action 重复"或"state 字段连续 M 步不变"，命中即判定
+      卡住，这是最可靠的信号。第二层，LLM 评判——每 K 步让另一个 LLM 看 trajectory 判断"是否在
+      取得进展"，但增加成本与延迟。第三层，预算/时间硬上限——max_steps/max_tokens/timeout 兜底，
+      即使前两层没检出也能强制中止。恢复策略：一是回滚到上一个"进展检查点"的 state 重新分支（需
+      checkpointer 支持）；二是注入"你似乎卡住了，换个思路"的提示让 LLM 换策略；三是降级为简单
+      RAG 或人工兜底。关键是有 trajectory 落盘可回放——否则只能盲猜卡在哪。前端迁移映射：这和
+      "loading 转圈但不报错"的卡死排查同构，可观测是核心。Tradeoff：检测越严越早发现但可能误杀
+      正常的长思考，阈值要按任务调。
+    followups:
+      - 怎么区分"Agent 在长时间思考"和"Agent 卡住了"？
+      - 回滚到检查点后，怎么避免又走同一条死路？
+masteryCheck:
+  level: V3
+  type: project-checkpoint
+  description: 提交 GitHub 仓库 + 部署链接 + 3 个真实场景的 trajectory 日志，AI 按评分细则审查
+  rubricId: project-agent-system
+status: reviewed
+lastVerified: "2026-07-25"

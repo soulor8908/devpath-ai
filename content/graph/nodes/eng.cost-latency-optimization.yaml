@@ -1,0 +1,44 @@
+id: eng.cost-latency-optimization
+title: 成本与延迟工程化优化
+summary: 从"能跑"到"扛得住"——批量、缓存、并发、分级、流式、模型蒸馏的系统化降本提速。LLM 应用的工程内功。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [llm.cost-and-latency, eng.observability]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  这是你前端性能优化直觉的全面迁移：缓存 ≈ HTTP 缓存/Service Worker，批量 ≈ 批量请求合并，
+  分级 ≈ 代码分割按需加载，流式 ≈ 流式渲染。区别是资源单位从 MB/次变成 token，且 LLM 调用慢
+  且贵，优化杠杆更大。
+concepts:
+  - 批量（batch）：多请求合并成一次 API 调用（OpenAI Batch API 半价但延迟高），或并发池限速
+  - 缓存分层：embedding 缓存 / 语义缓存（相似查询复用答案）/ 响应缓存（精确匹配）
+  - 分级路由：简单任务小模型，复杂任务大模型，按任务复杂度动态路由
+  - 流式 + 预计算：流式降感知延迟；预计算常见查询结果（如离线生成 + 缓存）
+  - 模型蒸馏/微调：用大模型标注数据微调小模型，长期降本（但前期投入大）
+sourceIds: [eugene-yan-llm-patterns, openai-cookbook]
+gotchas:
+  - 语义缓存是双刃剑——相似查询复用答案会放大错误，必须配质量监控
+  - 批 API 半价但要等批满（延迟数小时）——只适合离线任务，实时场景不能用
+  - 微调小模型前期成本高（数据标注 + 训练）——量不够大时不如直接用托管小模型
+interview:
+  - q: 一个 LLM 应用月账单 10 万、p99 延迟 8 秒，怎么系统化优化？
+    answerSkeleton: >-
+      系统化优化按"先审计后优化、先低成本后高投入"顺序。第一步审计——拆账单构成（输入/输出 token、
+      模型分布、功能分布），找 80/20 大头；拆延迟构成（TTFT/生成/检索/重排），找瓶颈段。盲优是浪费。
+      降本四招（按投入递增）：一是缓存分层——embedding 缓存（同文本不重编码）、语义缓存（相似查询
+      复用答案，需质量监控防放大错误）、响应缓存（精确匹配）；二是降输入成本——Prompt 缓存省 50%+、
+      历史截断/摘要；三是降输出成本——限 max_tokens（输出单价是输入 3-5 倍杠杆更大）；四是分级路由
+      ——简单任务小模型，复杂任务大模型，按复杂度动态路由。降延迟四招：流式（降感知延迟到 TTFT）、
+      并发池（多请求并行限速）、预计算常见查询、模型蒸馏/微调（长期降本但前期投入大）。前端迁移映射：
+      缓存 ≈ HTTP 缓存，批量 ≈ 请求合并，分级 ≈ 代码分割。Tradeoff：每招都有副作用（语义缓存放大
+      错误、批 API 延迟高、微调前期贵），必须 A/B 验证不损质量。
+    followups:
+      - 语义缓存怎么判断"相似到可以复用答案"？
+      - 什么时候该微调小模型，什么时候直接用托管模型？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 RAG 应用实现成本延迟优化（embedding 缓存 + 语义缓存 + 分级路由 + 流式），输出优化前后对比报告
+status: reviewed
+lastVerified: "2026-07-25"

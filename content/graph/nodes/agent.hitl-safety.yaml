@@ -1,0 +1,44 @@
+id: agent.hitl-safety
+title: HITL 安全闸与护栏
+summary: Agent 自主性强但不可信——危险操作前必须人工确认。HITL（Human-in-the-Loop）是生产 Agent 的安全底线，不是可选功能。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [agent.langgraph-orchestration]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  HITL ≈ 你做表单的"二次确认弹窗"：删除/支付等危险操作前弹窗确认。Agent 的 HITL 更重要——
+  因为决策者是概率性的 LLM，可能误判"该删库"或"该发邮件"。护栏（guardrails）≈ 输入输出的
+  校验中间件，和你在 API 层做的参数校验同构。
+concepts:
+  - HITL 触发点：危险工具调用前（写操作/外部通信/不可逆动作）暂停等人工确认
+  - 护栏类型：输入护栏（防 prompt 注入/越权请求）+ 输出护栏（防有害内容/敏感数据泄露）
+  - 速率限制：每用户/每工具的调用频率上限，防 Agent 失控烧钱
+  - 审计日志：每次工具调用记录 who/when/what/结果，可回溯
+  - 紧急停止：一键中止所有运行中 Agent 的开关
+sourceIds: [anthropic-agents-guide, owasp-llm-top10]
+gotchas:
+  - HITL 不能只靠 LLM 自我判断"这个操作危不危险"——必须用显式工具标签（如 dangerous=true）
+  - 输入护栏防不住所有 prompt 注入——深度防御，配合输出护栏与最小权限原则
+  - 审计日志不能事后补——必须同步写，否则事故时无据可查
+interview:
+  - q: 生产 Agent 的安全闸怎么设计？哪些操作必须人工确认？
+    answerSkeleton: >-
+      生产 Agent 安全闸按"纵深防御"设计，四层缺一不可。第一层，工具分级——每个工具显式标注风险
+      等级（safe/dangerous），dangerous（写操作/外部通信/不可逆动作如删库/发邮件/支付）必须 HITL
+      确认，不能靠 LLM 自判危险性。第二层，输入护栏——拦截 prompt 注入与越权请求（如"忽略之前
+      指令"模式匹配 + LLM 二次审查），但防不住所有，需配合最小权限。第三层，输出护栏——校验生成
+      内容（防有害/防敏感数据泄露/防越权指令）。第四层，运行时管控——速率限制（每用户/每工具
+      频率上限防烧钱）、审计日志（同步写 who/when/what/结果，不能事后补）、紧急停止开关。必须人工
+      确认的：不可逆操作（删数据）、外部通信（发邮件/短信）、资金操作（支付）、权限变更。前端迁移
+      映射：HITL ≈ 危险操作二次确认弹窗，护栏 ≈ API 中间件校验。Tradeoff：HITL 增加延迟与人工成本，
+      但生产 Agent 没有它等于让概率模型掌控不可逆操作，风险不可接受。
+    followups:
+      - 怎么防止 prompt 注入绕过 HITL？
+      - 紧急停止开关怎么实现才能真的"立即生效"？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个含"发邮件/删文件"工具的 Agent 实现 HITL（工具分级 + 暂停确认 + 审计日志 + 速率限制）
+status: reviewed
+lastVerified: "2026-07-25"

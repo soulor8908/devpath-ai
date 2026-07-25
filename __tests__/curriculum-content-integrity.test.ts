@@ -166,9 +166,11 @@ describe("路径引擎端到端（真实内容）", () => {
       n.tracks.includes(TRACK),
     ).length;
     expect(path.orderedNodeIds).toHaveLength(trackNodeCount);
-    // 每天 2 小时，总时长应在 5-30 天之间（Phase 0+1 约 2-4 周）
+    // 每天 2 小时，总时长应在 5-90 天之间
+    // （Phase 0-4 全程：语言桥接 + LLM API + RAG + Agent + 工程化 + Capstone，
+    // 完整前端转 AI 工程师路径，38-45 天为当前规模典型值）
     expect(path.totalDays).toBeGreaterThanOrEqual(5);
-    expect(path.totalDays).toBeLessThanOrEqual(30);
+    expect(path.totalDays).toBeLessThanOrEqual(90);
   });
 
   it("入学评估跳过 Python 基础后路径缩短", () => {

@@ -1,0 +1,44 @@
+id: eng.production-deployment
+title: 生产部署与运维
+summary: 从 demo 到生产——环境隔离、密钥管理、灰度发布、故障演练、SLO。LLM 应用的运维纪律，与传统 Web 服务同构但有新挑战。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [eng.observability, eng.cost-latency-optimization]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  这是你的前端运维直觉全面迁移：环境隔离 ≈ dev/staging/prod，密钥管理 ≈ 不把 key 写进代码，
+  灰度 ≈ feature flag，SLO ≈ 性能预算。新增的是"模型版本管理"——LLM 是概率性的，换模型版本
+  等于换了个"新员工"，必须灰度 + eval 验证。
+concepts:
+  - 环境隔离：dev/staging/prod 三环境，密钥用环境变量/Secrets Store，绝不进代码
+  - 模型版本管理：锁定模型版本（如 gpt-4o-2024-08-06），升级要灰度 + eval 验证（模型是概率性的，换版本=换行为）
+  - 灰度发布：feature flag 控制新 prompt/新模型/新功能的流量比例，5%→20%→100%
+  - 故障演练：上游 AI 服务挂了的降级链（备模型/缓存/兜底文案），定期演练非"纸上谈兵"
+  - SLO：p99 延迟 / 可用性 / 成本预算 / 质量评分的错误预算（error budget）
+sourceIds: [langchain-deploy, langfuse-docs]
+gotchas:
+  - 模型版本不锁会被"静默升级"——OpenAI/Anthropic 会更新默认版本，行为变了你却不知道
+  - 灰度只看技术指标不看 eval——prompt/模型改动必须同时跑 eval，否则质量回归发现不了
+  - 降级链不演练等于没有——上游真挂时才发现降级路径有 bug 是常见事故
+interview:
+  - q: LLM 应用上生产，运维上和传统 Web 服务有什么不同？
+    answerSkeleton: >-
+      同构部分占 80%——环境隔离、密钥管理、灰度发布、SLO、监控告警，这套运维纪律直接适用。新增的
+      20% 是"概率性组件"带来的新挑战。第一，模型版本管理——传统服务换库版本行为确定，LLM 换模型
+      版本行为是概率性变化（同样的 prompt 不同输出），必须锁版本（如 gpt-4o-2024-08-06）且升级要
+      灰度 + 跑 eval 验证，否则被供应商静默升级了行为变了你却不知道。第二，降级链更复杂——传统服务
+      挂了返回 5xx，LLM 服务挂了要降级到备模型/缓存/兜底文案，且不同失败模式（限流/超时/内容过滤）
+      要不同降级策略。第三，质量 SLO——除了延迟/可用性还要监控质量指标（faithfulness 漂移），数据
+      分布变了质量会掉但技术指标一切正常。第四，成本 SLO——LLM 按用量计费易超预算，要按用户/功能
+      配额 + 告警。前端迁移映射：模型版本 ≈ 依赖锁版本，灰度 ≈ feature flag，SLO ≈ 性能预算。
+      Tradeoff：锁版本失去自动优化（新版可能更好），但不锁等于让供应商控制你的生产行为，锁是必须的。
+    followups:
+      - 模型版本升级怎么做灰度 + eval 验证？
+      - 上游 AI 服务挂了，降级链怎么设计？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 LLM 应用设计生产部署方案：三环境隔离 + 模型版本锁定 + 灰度发布策略 + 降级链 + SLO 定义
+status: reviewed
+lastVerified: "2026-07-25"

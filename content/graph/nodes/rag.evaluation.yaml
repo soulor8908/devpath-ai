@@ -1,0 +1,44 @@
+id: rag.evaluation
+title: RAG 评估（RAGAS 与离线评测）
+summary: 没有评测的 RAG 是玄学。RAGAS 三维度（faithfulness/answer relevancy/context relevancy）+ 人工标注集是生产 RAG 的质量底线。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [rag.retrieval-strategies]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  RAG 评测 ≈ 你做前端的单元测试 + E2E：检索召回率像单元测试（每个 query 该召回哪条文档），
+  生成质量像 E2E（端到端答案对不对）。RAGAS 用 LLM-as-judge 自动评分，相当于 snapshot 测试——
+  快但不绝对可靠，必须人工抽检校准。
+concepts:
+  - 检索评估：recall@k（应召回的文档是否在 top-k）/ precision@k（top-k 里有多少相关）/ MRR（正确文档排名）
+  - 生成评估：faithfulness（答案是否忠于上下文，防幻觉）/ answer relevancy（答案是否切题）/ context relevancy（上下文是否相关）
+  - RAGAS 框架：用 LLM-as-judge 自动跑三维度评分，开源 Python 库
+  - 评测集构建：50-200 条 (query, ground-truth answer, relevant docs) 三元组，人工标注成本是大头
+  - 在线监控：记录查询日志 + 抽样人工评分，离线指标与线上效果未必一致
+sourceIds: [jerry-liu-rag-eval, hamel-husain-evals]
+gotchas:
+  - 没有评测集的 RAG 优化是瞎调——你以为召回率提升了，其实只是 cherry-pick 的案例
+  - RAGAS 的 faithfulness 评分有偏向——偏爱短答案（短答案不易"不忠于上下文"）
+  - 评测集会被"见过"——模型迭代时若用评测集做 prompt 调优，等于作弊，必须留 holdout
+interview:
+  - q: 怎么评测一个 RAG 系统的好坏？哪些指标最重要？
+    answerSkeleton: >-
+      RAG 评测分两层。检索层指标：recall@k（应召回的文档是否进 top-k，最关键——检索不到生成再好
+      也白搭）、precision@k（top-k 里相关文档占比，防噪声）、MRR（正确文档排名位置，越靠前越好）。
+      生成层指标：faithfulness（答案是否忠于检索上下文，防幻觉——这是 RAG 区别于纯生成的核心价值）、
+      answer relevancy（答案是否切题）、context relevancy（检索的上下文是否真的相关）。最重要是
+      recall@k 与 faithfulness——前者决定"能不能答"，后者决定"答得可不可信"。RAGAS 框架用
+      LLM-as-judge 自动跑三维度评分，但必须配 50-200 条人工标注的 (query, 真值答案, 相关文档) 评测集，
+      且评测集要留 holdout 防"见过"。前端迁移映射：检索评估 ≈ 单测（每 query 该召回哪条），生成
+      评估 ≈ E2E（端到端答案对不对）。Tradeoff：RAGAS 自动评分快但有偏见（偏爱短答案），必须人工
+      抽检 10% 校准。
+    followups:
+      - faithfulness 评分怎么防幻觉？原理是什么？
+      - 评测集被模型"见过"怎么办？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 50 条文档的 RAG 系统构建 20 条评测集，用 RAGAS 跑三维度评分，输出 baseline 报告
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,0 +1,26 @@
+# Phase 3 里程碑项目评分细则：生产级 Agent 系统
+# V3 构建验证用：AI 按本细则审查用户 GitHub 仓库代码 + trajectory 日志
+
+rubric:
+  id: project-agent-system
+  title: 生产级 Agent 系统 · 构建验证评分细则
+  passScore: 70
+  criteria:
+    - id: orchestration
+      description: LangGraph StateGraph 编排，节点图清晰，含条件路由与回退，非单线 ReAct 循环
+      weight: 20
+    - id: tools
+      description: 至少 3 个工具含 1 个危险操作，工具描述清晰，参数校验完整
+      weight: 15
+    - id: memory
+      description: 三层记忆（结构化 state + 滑动窗口 + 长期记忆），trajectory 不爆上下文
+      weight: 15
+    - id: hitl-safety
+      description: HITL 安全闸完整（工具分级 + 危险操作暂停确认 + 审计日志 + 速率限制）
+      weight: 20
+    - id: stuck-detection
+      description: 卡住检测与恢复（结构化检测 + 预算硬上限 + 回滚或降级策略）
+      weight: 15
+    - id: observability
+      description: 每步 trajectory 落盘可回放，token 成本统计，附 3 个真实场景的运行日志
+      weight: 15

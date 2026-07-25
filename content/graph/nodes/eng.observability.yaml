@@ -1,0 +1,44 @@
+id: eng.observability
+title: LLM 可观测性（trace 与监控）
+summary: LLM 应用是黑盒——没有 trace 就只能盲猜。Langfuse/Phoenix 记录每次调用的 prompt/响应/延迟/成本，是生产 LLM 应用的眼睛。
+tracks: [frontend-to-ai-engineer]
+phase: 4
+prerequisites: [eng.llm-eval-system]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  LLM trace ≈ 你做前端的 performance trace（Performance API/火焰图）：记录每次请求的全链路——
+  prompt 输入、token 用量、延迟、模型版本、中间步骤。区别是 LLM 调用是"黑盒概率"而非确定性计算，
+  没有日志就无法复现"为什么这次答错了"。你的可观测直觉直接适用。
+concepts:
+  - trace 三要素：input（prompt+context）/ output（response+usage）/ metadata（model/latency/cost/user）
+  - 链路追踪：RAG/Agent 的多步调用（检索→重排→生成）要串成一条 trace，而非孤立日志
+  - 成本可观测：每次调用的 token 成本落盘，按用户/功能/模型维度聚合
+  - 质量监控：抽样 trace 做人工/LLM 评分，监控 faithfulness/answer relevancy 漂移
+  - 告警：延迟 p99 / 错误率 / 成本突增 / 质量评分下降的阈值告警
+sourceIds: [langfuse-docs, phoenix-docs]
+gotchas:
+  - 只记 input/output 不记中间步骤——RAG 的检索结果、Agent 的 trajectory 不落盘就无法定位问题
+  - trace 全量记录成本高——高频调用要采样（如 1%）+ 错误全量记录
+  - PII 脱敏——trace 里的 prompt 可能含用户敏感信息，落盘前必须脱敏
+interview:
+  - q: 生产 LLM 应用要做哪些可观测？trace 要记什么？
+    answerSkeleton: >-
+      生产 LLM 可观测要记三类信号。第一，trace 三要素——input（prompt+上下文+检索结果）、output
+      （response+token usage）、metadata（model 版本/延迟/成本/user id），RAG/Agent 的多步调用要
+      串成一条链路 trace 而非孤立日志，否则无法定位"是检索召回差还是生成质量差"。第二，成本可观测
+      ——每次调用 token 成本落盘，按用户/功能/模型聚合，配告警（成本突增往往是被滥用或 bug）。第三，
+      质量监控——抽样 trace 做人工/LLM 评分，监控 faithfulness/answer relevancy 漂移（数据分布变了
+      质量会掉）。告警覆盖延迟 p99、错误率、成本突增、质量评分下降。关键工程点：trace 不能只记
+      input/output 还要记中间步骤（检索结果/Agent trajectory）；高频调用要采样（1%）+ 错误全量
+      记录平衡成本；prompt 可能含 PII 落盘前必须脱敏。前端迁移映射：trace ≈ performance 火焰图，
+      没有它等于盲飞。Tradeoff：全量记录成本高，采样+错误全量是务实平衡。
+    followups:
+      - RAG 链路 trace 怎么把检索和生成串起来？
+      - 怎么对 trace 做质量评分而不全靠人工？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 为一个 RAG+Agent 应用接入 Langfuse，记录全链路 trace + 成本聚合 + 质量采样评分，配 3 条告警
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,0 +1,43 @@
+id: rag.chunking-strategies
+title: 文本切分策略（Chunking）
+summary: 把长文档切成可检索的小块是 RAG 的第一道工序，切得好坏直接决定召回质量。固定窗口、语义切分、递归切分各有取舍。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [rag.embedding-fundamentals]
+estimatedMinutes: 90
+difficulty: 3
+frontendBridge: >-
+  chunking ≈ 前端的分页/虚拟列表：把大文档切成"刚好够用"的块。区别是这里的块大小要兼顾
+  embedding 模型的上下文窗口（通常 512-8192 token）与检索精度——块太大召回粗、块太小丢上下文。
+  你处理过"每页多少条"的权衡，这里只是维度从"渲染性能"换成"召回质量"。
+concepts:
+  - 固定窗口切分：按字符/token 数固定切，最简单但可能切断语义
+  - 重叠切分：相邻块共享一部分内容（如 overlap=200 token），避免边界信息丢失
+  - 语义切分：按段落/标题/句子边界切，保留语义完整性
+  - 递归切分：先按大结构（章/节）切，过大再按段落切，仍过大再按句子切（LangChain RecursiveCharacterTextSplitter）
+  - 块大小经验值：500-1000 token 是常见区间，太小召回准但上下文不足，太大召回粗但上下文全
+sourceIds: [langchain-rag, greg-kamradt-rag]
+gotchas:
+  - 块大小没有银弹：必须用真实文档测召回率，不同语料（代码/法律/对话）最优块大小不同
+  - 切分时丢失元数据（如文档标题、章节路径）会让检索结果失去来源——每个块要带 metadata
+  - 表格和代码块被切断是常见灾难——需要按结构识别特殊切分
+interview:
+  - q: RAG 里文本切分的块大小怎么选？太大太小各有什么问题？
+    answerSkeleton: >-
+      块大小是召回精度与上下文完整性的权衡。块太小（如 100 token）：召回准——查询能精确命中
+      讲某个细节的块，但上下文不足——模型只看到一句孤立的话，可能误判或无法生成完整答案。
+      块太大（如 4000 token）：上下文全，但召回粗——一个块里混杂多个主题，查询"某具体细节"
+      时这个块的 embedding 会被稀释，相似度排名下降，可能进不了 top-k。经验区间 500-1000 token，
+      加 10-20% overlap 防边界丢失。但真正的最优值必须用真实文档 + 评测集（已知 query → 应召回
+      的文档）做 A/B 测——不同语料（代码/法律/对话）最优值差异很大。前端迁移映射：这和分页大小
+      的权衡同构，只是优化目标从"渲染性能"换成"召回质量"。Tradeoff：递归切分（先章/节再段落再
+      句子）能在保留语义的同时控制大小，但实现复杂且切分点未必对齐语义边界。
+    followups:
+      - 怎么评测一个切分策略的好坏？
+      - 表格和代码块切分有什么特殊处理？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 实现 RecursiveCharacterTextSplitter，对一份 10 页技术文档切分，对比 chunk_size 500/1000/2000 的召回率（用 5 条已知 query）
+status: reviewed
+lastVerified: "2026-07-25"

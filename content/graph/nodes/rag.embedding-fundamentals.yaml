@@ -1,0 +1,41 @@
+id: rag.embedding-fundamentals
+title: Embedding 与向量空间基础
+summary: 把文本映射成高维向量，语义相似度 ≈ 向量距离。这是 RAG 检索的物理基础——没有 embedding 就没有"按语义找"。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [llm.transformer-intuition]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  embedding ≈ 把文本变成一个"语义指纹"数组（如 1536 维浮点数），相似内容的指纹在空间里靠得近。
+  你处理过颜色相似度（RGB 欧氏距离）——这里是 1536 维的同类问题，只是维度高到无法想象。
+  直觉：国王-男人+女人≈女王，向量加减法捕捉语义关系。
+concepts:
+  - embedding：文本 → 固定维度向量，语义距离 ≈ 向量距离（余弦相似度最常用）
+  - 维度与模型：text-embedding-3-small=1536 维，text-embedding-3-large=3072 维，开源 bge-large=1024 维
+  - 余弦相似度 vs 欧氏距离：余弦只看方向不看长度，对文本长度不敏感，RAG 默认用余弦
+  - 归一化：很多向量库要求 embedding 归一化到单位长度（L2 norm=1）
+sourceIds: [openai-embeddings, eugene-yan-rag]
+gotchas:
+  - 不同 embedding 模型维度不同，不能混用——切模型必须全量重建索引
+  - 中文 embedding 质量差异大：开源模型在中文上常落后于英文，必须用真实语料测召回率
+  - embedding 模型也有"知识截止"——2024 年后的新词（如新框架名）可能编码不准
+interview:
+  - q: 为什么 RAG 用余弦相似度而不是欧氏距离？
+    answerSkeleton: >-
+      余弦相似度只看向量方向不看长度，对文本长度不敏感——短句和长段落即使讲同一主题，
+      embedding 的"模长"会因信息量不同而不同，但"方向"（语义朝向）一致。欧氏距离会把长段落判为
+      与短句"远"，即使两者讲同一件事。RAG 场景下查询（短）与文档块（长）长度天然不等，余弦是
+      必然选择。其次，归一化后的余弦相似度 ≈ 向量点积，计算快、可在向量库里用内积索引加速。
+      前端迁移映射：这和你做颜色相似度（RGB 欧氏距离）的区别是维度从 3 升到 1536，且语义相似度
+      不像颜色那样有物理对应——必须靠模型学出来。Tradeoff：余弦忽略模长会丢失"信息量"信号，
+      但 RAG 要的是"主题相关"而非"信息量等价"，所以这是正确的取舍。
+    followups:
+      - embedding 维度越高越好吗？什么场景该降维？
+      - 不同 embedding 模型的向量能直接比较吗？
+masteryCheck:
+  level: V1
+  type: fsrs-cards
+  description: 用 OpenAI Embeddings API 对 10 段中英文文本生成向量，手算其中两对的余弦相似度，记录语义相似度排序
+status: reviewed
+lastVerified: "2026-07-25"

@@ -200,3 +200,142 @@ sources:
     tier: T2
     type: engineering-blog
     lastVerified: "2026-07-20"
+
+  # ---------- Phase 2 RAG ----------
+  - id: openai-embeddings
+    title: OpenAI Embeddings Guide
+    url: https://platform.openai.com/docs/guides/embeddings
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: pinecone-docs
+    title: Pinecone Vector Database Documentation
+    url: https://docs.pinecone.io
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: chroma-docs
+    title: Chroma Documentation
+    url: https://docs.trychroma.com
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: langchain-rag
+    title: LangChain RAG Tutorials
+    url: https://python.langchain.com/docs/tutorials/rag/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: greg-kamradt-rag
+    title: "Retrieval Augmented Generation (Greg Kamradt)"
+    url: https://github.com/gkamradt/langchain-rag
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-25"
+    note: 完整 RAG 流水线教学实现
+
+  - id: eugene-yan-rag
+    title: "Patterns for Building LLM-based Systems (RAG section, Eugene Yan)"
+    url: https://eugeneyan.com/writing/llm-patterns/#rag
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-25"
+
+  - id: jerry-liu-rag-eval
+    title: "Evaluating RAG Pipelines (LlamaIndex Jerry Liu)"
+    url: https://docs.llamaindex.ai/en/stable/optimizing/production_rag/
+    tier: T1
+    type: official-cookbook
+    lastVerified: "2026-07-25"
+
+  - id: cohere-rerank-docs
+    title: Cohere Rerank Documentation
+    url: https://docs.cohere.com/docs/reranking
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: bge-rerank-docs
+    title: BAAI/bge-reranker-large Model Card
+    url: https://huggingface.co/BAAI/bge-reranker-large
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-25"
+    note: 开源中文友好的 reranker，cross-encoder 实现
+
+  # ---------- Phase 3 Agent ----------
+  - id: langgraph-docs
+    title: LangGraph Documentation
+    url: https://langchain-ai.github.io/langgraph/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: langchain-agent-docs
+    title: LangChain Agent Documentation
+    url: https://python.langchain.com/docs/concepts/agents/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: anthropic-agents-guide
+    title: "What is an Agent? (Anthropic)"
+    url: https://www.anthropic.com/engineering/agents
+    tier: T2
+    type: engineering-blog
+    lastVerified: "2026-07-25"
+
+  - id: langchain-memory
+    title: LangChain Memory & State
+    url: https://python.langchain.com/docs/concepts/memory/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: openai-assistants
+    title: OpenAI Assistants API
+    url: https://platform.openai.com/docs/assistants/overview
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  # ---------- Phase 4 工程化 ----------
+  - id: langfuse-docs
+    title: Langfuse LLM Observability
+    url: https://langfuse.com/docs
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: phoenix-docs
+    title: Arize Phoenix LLM Tracing
+    url: https://docs.arize.com/phoenix
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"
+
+  - id: owasp-llm-top10
+    title: OWASP Top 10 for LLM Applications
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    tier: T0
+    type: spec
+    lastVerified: "2026-07-25"
+
+  - id: prompt-injection-paper
+    title: "Not what you've signed up for: Compromising Real-World LLM-integrated Apps"
+    url: https://arxiv.org/abs/2302.12173
+    tier: T0
+    type: paper
+    lastVerified: "2026-07-25"
+    note: Prompt 注入攻击的开山论文
+
+  - id: langchain-deploy
+    title: LangChain Deployment Guide
+    url: https://python.langchain.com/docs/production/deployment/
+    tier: T0
+    type: official-doc
+    lastVerified: "2026-07-25"

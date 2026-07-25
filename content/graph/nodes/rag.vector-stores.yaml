@@ -1,0 +1,43 @@
+id: rag.vector-stores
+title: 向量数据库与索引
+summary: 把 embedding 存进专门的数据库做高效近邻搜索。Pinecone/Chroma/Qdrant/PGVector 的选型与权衡，HNSW 索引的直觉。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [rag.embedding-fundamentals]
+estimatedMinutes: 120
+difficulty: 3
+frontendBridge: >-
+  向量库 ≈ 专门存"语义指纹"的数据库，按相似度而非精确匹配查询。传统 DB 你用 WHERE 精确查，
+  向量库你用"ORDER BY 相似度 LIMIT k"模糊查。HNSW 索引 ≈ 给向量建"快速跳表"，用空间换时间。
+  选型心智和你选 Redis/MySQL/ES 一样：按读写比、规模、延迟要求选。
+concepts:
+  - 精确近邻（kNN）vs 近似近邻（ANN）：精确 O(n) 太慢，ANN 牺牲少量精度换数量级提速
+  - HNSW（Hierarchical Navigable Small World）：分层图索引，主流向量库默认，查询 O(log n)
+  - 主流选型：Pinecone（托管 SaaS）/ Chroma（嵌入式，开发友好）/ Qdrant（开源，Rust 高性能）/ PGVector（Postgres 扩展，复用现有 DB）
+  - 元数据过滤：先按 metadata（如 source、date）过滤再向量搜索，生产 RAG 必备
+  - 索引参数：ef_construction（建图质量）/ ef_search（查询质量）—— 越高越准越慢
+sourceIds: [pinecone-docs, chroma-docs]
+gotchas:
+  - 嵌入式（Chroma）和托管（Pinecone）的边界：原型用嵌入式，生产上托管——迁移成本不只是改连接串
+  - HNSW 索引建好后不可增量更新最优——频繁新增数据会让图退化，需要定期重建
+  - 元数据过滤在向量搜索"之前"还是"之后"做差别巨大：pre-filter 省计算但可能丢候选，post-filter 精确但慢
+interview:
+  - q: 选向量数据库时考虑哪些因素？Pinecone vs Chroma vs PGVector 怎么选？
+    answerSkeleton: >-
+      选型按五个维度：一是规模——百万级以下 Chroma 嵌入式够用，亿级以上 Pinecone/Qdrant 才扛得住；
+      二是运维——Pinecone 全托管零运维但贵且数据出域，Chroma/Qdrant 自托管省成本但要自己保可用性，
+      PGVector 复用现有 Postgres 运维栈最省心；三是延迟——托管服务有网络往返，本地嵌入式微秒级；
+      四是元数据过滤能力——生产 RAG 必须支持 pre-filter，PGVector/Chroma 对此支持参差；五是成本——
+      Pinecone 按用量计费易超预算，自托管有固定硬件成本。前端迁移映射：这和选 Redis/MySQL/ES 的
+      心智同构，按读写比、规模、延迟、运维预算选。Tradeoff：PGVector 复用 Postgres 省运维但向量
+      搜索性能不如专用库；Pinecone 省事但贵且数据出域。原型期 Chroma，生产期按规模与合规二选
+      Pinecone/PGVector 是务实路径。
+    followups:
+      - HNSW 索引为什么查询快？牺牲了什么？
+      - 元数据过滤在向量搜索前还是后做？区别？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 Chroma 存 1000 条文档 embedding，实现带元数据过滤的 top-5 检索；再迁移到 PGVector 对比查询延迟
+status: reviewed
+lastVerified: "2026-07-25"

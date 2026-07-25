@@ -1,0 +1,43 @@
+id: agent.langgraph-orchestration
+title: LangGraph 编排（图结构状态机）
+summary: 用图结构定义 Agent 的状态流转：节点是 LLM 调用或工具，边是条件路由。LangGraph 是生产 Agent 编排的事实标准，比 ReAct 循环更可控。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [agent.fundamentals]
+estimatedMinutes: 150
+difficulty: 4
+frontendBridge: >-
+  LangGraph ≈ 给 Agent 画"流程图"：节点是动作（LLM 调用/工具执行），边是条件路由（if 工具结果
+  是 X 则走 A 边 else 走 B 边）。你画过状态机图——这里是代码化的状态机，每个节点可读可写共享
+  state。比 ReAct 的自由循环多了"显式拓扑"，可控性与可调试性大幅提升。
+concepts:
+  - StateGraph：节点（函数）+ 边（条件路由）+ 共享 State（TypedDict）
+  - 节点类型：LLM 节点（调模型）、Tool 节点（执行工具）、Router 节点（纯条件路由不调模型）
+  - 条件边：根据 State 字段决定下一个节点（如 tools_required → tool_node else → END）
+  - 持久化：checkpointer 把 State 落盘，支持中断恢复与时间旅行（回放历史状态）
+  - 人机回路（HITL）：在关键节点暂停，等人工确认后继续——危险操作的标配
+sourceIds: [langgraph-docs, langchain-agent-docs]
+gotchas:
+  - State 是共享可变的——多节点并发写同一字段会冲突，需用 reducer（如 list 合并）显式声明
+  - 条件边的判断函数必须是纯函数——不能有副作用，否则 checkpointer 重放会出错
+  - 图太复杂会失去可调试性——节点超过 10 个考虑拆子图
+interview:
+  - q: LangGraph 的 StateGraph 比纯 ReAct 循环强在哪？什么时候该用？
+    answerSkeleton: >-
+      StateGraph 比纯 ReAct 循环强在三点。第一，显式拓扑——ReAct 是"模型自由决定下一步"的黑盒循环，
+      StateGraph 是"节点+条件边"的白盒流程图，每个跳转都有明确条件，可控性与可审计性高。第二，共享
+      State——所有节点读写同一个 TypedDict，状态集中管理，不像 ReAct 把状态塞进 messages 上下文
+      容易膨胀。第三，持久化与 HITL——StateGraph 的 checkpointer 把 State 落盘支持中断恢复与时间
+      旅行，且能在关键节点暂停等人工确认（危险操作的标配），ReAct 循环做这些要侵入式改造。什么时候
+      该用：流程可枚举（如"研究→起草→审核→发布"）、需要 HITL、需要可恢复——上 StateGraph。流程
+      高度自由（如开放域问答）——ReAct 够用且更简单。前端迁移映射：StateGraph ≈ 代码化的状态机图，
+      checkpointer ≈ 状态持久化。Tradeoff：图结构增加开发成本，简单任务过度工程化。
+    followups:
+      - StateGraph 的 reducer 是什么？什么时候必须用？
+      - 怎么实现"在危险操作前暂停等人工确认"？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 LangGraph 实现"研究→起草→审核→发布"四节点图，含条件回退（审核不过回起草）与 HITL 暂停
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,0 +1,42 @@
+id: rag.reranking
+title: 重排序（Reranking）
+summary: 检索召回 top-20 后用更贵的模型重排出最相关的 top-5。两阶段检索是生产 RAG 的精度杠杆。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [rag.retrieval-strategies]
+estimatedMinutes: 60
+difficulty: 3
+frontendBridge: >-
+  reranking ≈ 你做列表时的"粗排 + 精排"：先用便宜的方法（向量检索）从一万条里捞 50 条粗排，
+  再用贵但准的方法（cross-encoder）从 50 条里精排出 5 条。两阶段是为了在精度与成本间找平衡——
+  全用 cross-encoder 太慢，全用向量检索不够准。
+concepts:
+  - 两阶段检索：召回（retrieve top-k，k=20-100，用 embedding 快）→ 重排（rerank top-n，n=3-5，用 cross-encoder 准）
+  - cross-encoder vs bi-encoder：bi-encoder 分别编码 query 和 doc 再算相似度（快但松）；cross-encoder 拼接 query+doc 一起编码（准但慢，无法预计算）
+  - 主流 reranker：Cohere Rerank（API）、bge-reranker-large（开源）、Jina Reranker
+  - 重排后通常只取 top-3 到 top-5 喂给 LLM——上下文不是越多越好，噪声会稀释注意力
+sourceIds: [cohere-rerank-docs, bge-rerank-docs]
+gotchas:
+  - reranker 模型与 embedding 模型是两回事——不能混用，reranker 是 cross-encoder 不产出向量
+  - 重排全部召回会拖慢响应——通常只重排 top-20，更多收益递减
+  - 中文 reranker 质量参差，bge-reranker 在中文上表现较好但需实测
+interview:
+  - q: 为什么 RAG 要用两阶段检索（召回+重排）而不是一步到位？
+    answerSkeleton: >-
+      一步到位的矛盾：要准就得用 cross-encoder（把 query 和 doc 拼一起编码），但它无法预计算
+      embedding，每次查询都要对全部文档重新编码，10 万文档就是 10 万次模型调用，延迟与成本爆炸。
+      bi-encoder（embedding）可以预计算存向量库，查询时只编码 query 一次，但要"分别编码再算相似度"
+      牺牲了 query 与 doc 的交互信息，精度不如 cross-encoder。两阶段检索的解法：召回阶段用 bi-encoder
+      从全库快速捞 top-20（O(log n) 向量搜索），重排阶段用 cross-encoder 对这 20 条精排（只 20 次模型
+      调用），取 top-3 喂 LLM。这样精度接近全库 cross-encoder，成本却只多 20 次调用。前端迁移映射：
+      这和列表的"粗排+精排"同构。Tradeoff：重排增加 100-300ms 延迟，对延迟敏感场景（实时聊天）要
+      权衡——但精度提升通常值这个延迟。
+    followups:
+      - bi-encoder 和 cross-encoder 的本质区别是什么？
+      - 重排后取 top-k 的 k 怎么定？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 在混合检索基础上加 bge-reranker 重排，用 10 条 query 对比 top-5 命中率（重排前后）
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,0 +1,45 @@
+id: project.rag-pipeline
+title: 里程碑项目 · 生产级 RAG 问答系统
+summary: Phase 2 出口项目：对一个真实文档集（如公司 wiki / 开源项目文档）构建端到端 RAG 问答系统，含增量索引、混合检索、重排、评测、可观测。这是求职的硬通货。
+tracks: [frontend-to-ai-engineer]
+phase: 2
+prerequisites: [rag.production-pipeline]
+estimatedMinutes: 480
+difficulty: 4
+frontendBridge: >-
+  这是 Phase 0-1 技能的集成 + RAG 全链路落地。你做过的前端工程化（模块化、缓存、错误边界、
+  监控）全部适用，只是数据流从"UI 状态"换成"文档→embedding→检索→生成"。重点不是炫技，
+  是把每个环节做扎实，附评测报告证明它真的好用。
+concepts:
+  - 端到端管线：文档摄入 → 切分 → embedding → 入库 → 查询改写 → 混合检索 → 重排 → 上下文组装 → LLM 生成
+  - 增量索引：文档 hash 变更队列，只更新变化的 chunk
+  - 评测闭环：50+ 条人工标注评测集，RAGAS 三维度评分，输出 baseline 报告
+  - 可观测：每步 trace 延迟，查询日志落盘供离线分析，召回率漂移监控
+  - 部署：API 服务（FastAPI）+ 向量库（Qdrant/PGVector）+ 前端问答 UI（可选）
+sourceIds: [langchain-rag, jerry-liu-rag-eval, eugene-yan-rag]
+lab: content/labs/rag-pipeline
+gotchas:
+  - 不要用 demo 数据集（如 LangChain 自带的 state_of_union）——用真实文档才能暴露切分/召回的真实问题
+  - 评测报告比功能演示更重要——面试官看的是"你能否用数据证明它好用"，不是"它能跑"
+  - 增量索引是加分项但别过度设计——文档规模小（<1000）时全量重建更简单可靠
+interview:
+  - q: 你的 RAG 系统在生产中召回率突然下降，怎么排查？
+    answerSkeleton: >-
+      召回率突降按"数据→索引→查询→模型"四层排查。第一层查数据：新入库的文档质量/分布是否变了
+      （如突然混入大量短文档稀释索引），用查询日志对比降前降后的召回 query。第二层查索引：embedding
+      模型是否升级了（升级必须全量重建，否则新旧向量不在同一空间）、向量库索引是否退化（HNSW
+      频繁增量后图结构变差，需重建）。第三层查查询：是否有查询改写环节出错（如 HyDE 生成质量下降）、
+      混合检索的 RRF 权重是否被改坏。第四层查模型：LLM 生成质量下降会被误判为召回问题——查
+      faithfulness 评分是否同步下降。关键是有 trace 可观测——每步延迟与中间结果必须可回放，否则
+      只能盲猜。前端迁移映射：这和线上 bug 排查同构，分层定位 + 可观测是核心。Tradeoff：全链路
+      trace 增加存储成本，但生产 RAG 没有它等于盲飞。
+    followups:
+      - 怎么区分是检索召回问题还是生成质量问题？
+      - embedding 模型升级怎么做无损切换？
+masteryCheck:
+  level: V3
+  type: project-checkpoint
+  description: 提交 GitHub 仓库 + 部署链接 + 评测报告（50 条 query 的 RAGAS 评分 + 召回率），AI 按评分细则审查
+  rubricId: project-rag-pipeline
+status: reviewed
+lastVerified: "2026-07-25"

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "builtAt": "2026-07-25T00:35:30.360Z",
+  "builtAt": "2026-07-25T01:00:57.857Z",
   "sources": {
     "openai-docs": {
       "id": "openai-docs",
@@ -222,9 +222,650 @@
       "tier": "T2",
       "type": "engineering-blog",
       "lastVerified": "2026-07-20"
+    },
+    "openai-embeddings": {
+      "id": "openai-embeddings",
+      "title": "OpenAI Embeddings Guide",
+      "url": "https://platform.openai.com/docs/guides/embeddings",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "pinecone-docs": {
+      "id": "pinecone-docs",
+      "title": "Pinecone Vector Database Documentation",
+      "url": "https://docs.pinecone.io",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "chroma-docs": {
+      "id": "chroma-docs",
+      "title": "Chroma Documentation",
+      "url": "https://docs.trychroma.com",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "langchain-rag": {
+      "id": "langchain-rag",
+      "title": "LangChain RAG Tutorials",
+      "url": "https://python.langchain.com/docs/tutorials/rag/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "greg-kamradt-rag": {
+      "id": "greg-kamradt-rag",
+      "title": "Retrieval Augmented Generation (Greg Kamradt)",
+      "url": "https://github.com/gkamradt/langchain-rag",
+      "tier": "T1",
+      "type": "canonical-repo",
+      "lastVerified": "2026-07-25",
+      "note": "完整 RAG 流水线教学实现"
+    },
+    "eugene-yan-rag": {
+      "id": "eugene-yan-rag",
+      "title": "Patterns for Building LLM-based Systems (RAG section, Eugene Yan)",
+      "url": "https://eugeneyan.com/writing/llm-patterns/#rag",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-25"
+    },
+    "jerry-liu-rag-eval": {
+      "id": "jerry-liu-rag-eval",
+      "title": "Evaluating RAG Pipelines (LlamaIndex Jerry Liu)",
+      "url": "https://docs.llamaindex.ai/en/stable/optimizing/production_rag/",
+      "tier": "T1",
+      "type": "official-cookbook",
+      "lastVerified": "2026-07-25"
+    },
+    "cohere-rerank-docs": {
+      "id": "cohere-rerank-docs",
+      "title": "Cohere Rerank Documentation",
+      "url": "https://docs.cohere.com/docs/reranking",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "bge-rerank-docs": {
+      "id": "bge-rerank-docs",
+      "title": "BAAI/bge-reranker-large Model Card",
+      "url": "https://huggingface.co/BAAI/bge-reranker-large",
+      "tier": "T1",
+      "type": "canonical-repo",
+      "lastVerified": "2026-07-25",
+      "note": "开源中文友好的 reranker，cross-encoder 实现"
+    },
+    "langgraph-docs": {
+      "id": "langgraph-docs",
+      "title": "LangGraph Documentation",
+      "url": "https://langchain-ai.github.io/langgraph/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "langchain-agent-docs": {
+      "id": "langchain-agent-docs",
+      "title": "LangChain Agent Documentation",
+      "url": "https://python.langchain.com/docs/concepts/agents/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "anthropic-agents-guide": {
+      "id": "anthropic-agents-guide",
+      "title": "What is an Agent? (Anthropic)",
+      "url": "https://www.anthropic.com/engineering/agents",
+      "tier": "T2",
+      "type": "engineering-blog",
+      "lastVerified": "2026-07-25"
+    },
+    "langchain-memory": {
+      "id": "langchain-memory",
+      "title": "LangChain Memory & State",
+      "url": "https://python.langchain.com/docs/concepts/memory/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "openai-assistants": {
+      "id": "openai-assistants",
+      "title": "OpenAI Assistants API",
+      "url": "https://platform.openai.com/docs/assistants/overview",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "langfuse-docs": {
+      "id": "langfuse-docs",
+      "title": "Langfuse LLM Observability",
+      "url": "https://langfuse.com/docs",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "phoenix-docs": {
+      "id": "phoenix-docs",
+      "title": "Arize Phoenix LLM Tracing",
+      "url": "https://docs.arize.com/phoenix",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
+    },
+    "owasp-llm-top10": {
+      "id": "owasp-llm-top10",
+      "title": "OWASP Top 10 for LLM Applications",
+      "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "tier": "T0",
+      "type": "spec",
+      "lastVerified": "2026-07-25"
+    },
+    "prompt-injection-paper": {
+      "id": "prompt-injection-paper",
+      "title": "Not what you've signed up for: Compromising Real-World LLM-integrated Apps",
+      "url": "https://arxiv.org/abs/2302.12173",
+      "tier": "T0",
+      "type": "paper",
+      "lastVerified": "2026-07-25",
+      "note": "Prompt 注入攻击的开山论文"
+    },
+    "langchain-deploy": {
+      "id": "langchain-deploy",
+      "title": "LangChain Deployment Guide",
+      "url": "https://python.langchain.com/docs/production/deployment/",
+      "tier": "T0",
+      "type": "official-doc",
+      "lastVerified": "2026-07-25"
     }
   },
   "nodes": [
+    {
+      "id": "agent.fundamentals",
+      "title": "Agent 基础（循环、工具、状态）",
+      "summary": "Agent = LLM + 工具调用 + 循环。模型自主决定下一步做什么，直到任务完成或中止。区别于单次 LLM 调用，Agent 有状态机与终止条件。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "llm-api.function-calling",
+        "rag.production-pipeline"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "Agent ≈ 一个带\"大脑\"（LLM）和\"手脚\"（工具）的事件循环。你写过 React 的状态机（idle/loading/ success/error），Agent 也是状态机：观察（看工具返回）→ 思考（LLM 决策）→ 行动（调工具）→ 循环， 直到\"完成\"或\"中止\"。区别是这里的\"状态转移函数\"是概率性的 LLM。",
+      "concepts": [
+        "Agent 三要素：LLM（决策）+ Tools（行动）+ Loop（循环直到终止）",
+        "ReAct 模式：Reason（思考）→ Act（调工具）→ Observe（看结果）→ 循环",
+        "终止条件：模型返回 finish / 达到 max_steps / 触发安全闸 / 超时",
+        "状态管理：每步的 thought + action + observation 组成 trajectory，作为下一步上下文",
+        "与 RAG 的区别：RAG 是\"检索一次生成一次\"，Agent 是\"多步行动+多轮检索+多轮生成\""
+      ],
+      "sourceIds": [
+        "anthropic-agents-guide",
+        "langchain-agent-docs",
+        "lilian-weng-agents"
+      ],
+      "gotchas": [
+        "Agent 不是\"更强的 LLM\"——是 LLM + 循环 + 工具，循环失控是最大风险（烧钱/死循环/危险操作）",
+        "max_steps 必须设——不然一个死循环能烧掉一个月预算",
+        "工具描述写不好 Agent 就不会用——Agent 读的是 description 不是源码"
+      ],
+      "interview": [
+        {
+          "q": "Agent 和单次 LLM 调用、RAG 的本质区别是什么？",
+          "answerSkeleton": "三者区别在\"自主性\"与\"循环\"。单次 LLM 调用：输入 → 输出，无状态、无工具、无循环，适合翻译/ 摘要等确定性任务。RAG：检索一次 → 生成一次，有\"外部知识\"但无\"多步行动\"，适合\"查文档答问题\"。 Agent：LLM + 工具 + 循环，模型自主决定下一步做什么（调哪个工具、传什么参），观察结果后再决策， 直到任务完成或中止——本质是一个以 LLM 为状态转移函数的状态机。Agent 的 ReAct 模式（Reason→ Act→Observe→Loop）每步的 thought+action+observation 组成 trajectory 作为下一步上下文。关键 区别是 Agent 有\"终止条件\"（finish/max_steps/安全闸/超时）与\"多步行动\"能力。前端迁移映射： Agent ≈ 带大脑的事件循环，状态机思维直接适用。Tradeoff：Agent 自主性强但失控风险高（烧钱/ 死循环/危险操作），max_steps 与安全闸是必须的工程保障，简单任务不该上 Agent。",
+          "followups": [
+            "什么场景该用 Agent，什么场景用 RAG 或单次调用就够？",
+            "Agent 的 trajectory 越来越长，上下文爆了怎么办？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "用 LangGraph 实现一个 ReAct Agent（3 个工具：搜索/计算/读文件），设 max_steps=10，附 trajectory 日志"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "agent.hitl-safety",
+      "title": "HITL 安全闸与护栏",
+      "summary": "Agent 自主性强但不可信——危险操作前必须人工确认。HITL（Human-in-the-Loop）是生产 Agent 的安全底线，不是可选功能。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "agent.langgraph-orchestration"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "HITL ≈ 你做表单的\"二次确认弹窗\"：删除/支付等危险操作前弹窗确认。Agent 的 HITL 更重要—— 因为决策者是概率性的 LLM，可能误判\"该删库\"或\"该发邮件\"。护栏（guardrails）≈ 输入输出的 校验中间件，和你在 API 层做的参数校验同构。",
+      "concepts": [
+        "HITL 触发点：危险工具调用前（写操作/外部通信/不可逆动作）暂停等人工确认",
+        "护栏类型：输入护栏（防 prompt 注入/越权请求）+ 输出护栏（防有害内容/敏感数据泄露）",
+        "速率限制：每用户/每工具的调用频率上限，防 Agent 失控烧钱",
+        "审计日志：每次工具调用记录 who/when/what/结果，可回溯",
+        "紧急停止：一键中止所有运行中 Agent 的开关"
+      ],
+      "sourceIds": [
+        "anthropic-agents-guide",
+        "owasp-llm-top10"
+      ],
+      "gotchas": [
+        "HITL 不能只靠 LLM 自我判断\"这个操作危不危险\"——必须用显式工具标签（如 dangerous=true）",
+        "输入护栏防不住所有 prompt 注入——深度防御，配合输出护栏与最小权限原则",
+        "审计日志不能事后补——必须同步写，否则事故时无据可查"
+      ],
+      "interview": [
+        {
+          "q": "生产 Agent 的安全闸怎么设计？哪些操作必须人工确认？",
+          "answerSkeleton": "生产 Agent 安全闸按\"纵深防御\"设计，四层缺一不可。第一层，工具分级——每个工具显式标注风险 等级（safe/dangerous），dangerous（写操作/外部通信/不可逆动作如删库/发邮件/支付）必须 HITL 确认，不能靠 LLM 自判危险性。第二层，输入护栏——拦截 prompt 注入与越权请求（如\"忽略之前 指令\"模式匹配 + LLM 二次审查），但防不住所有，需配合最小权限。第三层，输出护栏——校验生成 内容（防有害/防敏感数据泄露/防越权指令）。第四层，运行时管控——速率限制（每用户/每工具 频率上限防烧钱）、审计日志（同步写 who/when/what/结果，不能事后补）、紧急停止开关。必须人工 确认的：不可逆操作（删数据）、外部通信（发邮件/短信）、资金操作（支付）、权限变更。前端迁移 映射：HITL ≈ 危险操作二次确认弹窗，护栏 ≈ API 中间件校验。Tradeoff：HITL 增加延迟与人工成本， 但生产 Agent 没有它等于让概率模型掌控不可逆操作，风险不可接受。",
+          "followups": [
+            "怎么防止 prompt 注入绕过 HITL？",
+            "紧急停止开关怎么实现才能真的\"立即生效\"？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个含\"发邮件/删文件\"工具的 Agent 实现 HITL（工具分级 + 暂停确认 + 审计日志 + 速率限制）"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "agent.langgraph-orchestration",
+      "title": "LangGraph 编排（图结构状态机）",
+      "summary": "用图结构定义 Agent 的状态流转：节点是 LLM 调用或工具，边是条件路由。LangGraph 是生产 Agent 编排的事实标准，比 ReAct 循环更可控。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "agent.fundamentals"
+      ],
+      "estimatedMinutes": 150,
+      "difficulty": 4,
+      "frontendBridge": "LangGraph ≈ 给 Agent 画\"流程图\"：节点是动作（LLM 调用/工具执行），边是条件路由（if 工具结果 是 X 则走 A 边 else 走 B 边）。你画过状态机图——这里是代码化的状态机，每个节点可读可写共享 state。比 ReAct 的自由循环多了\"显式拓扑\"，可控性与可调试性大幅提升。",
+      "concepts": [
+        "StateGraph：节点（函数）+ 边（条件路由）+ 共享 State（TypedDict）",
+        "节点类型：LLM 节点（调模型）、Tool 节点（执行工具）、Router 节点（纯条件路由不调模型）",
+        "条件边：根据 State 字段决定下一个节点（如 tools_required → tool_node else → END）",
+        "持久化：checkpointer 把 State 落盘，支持中断恢复与时间旅行（回放历史状态）",
+        "人机回路（HITL）：在关键节点暂停，等人工确认后继续——危险操作的标配"
+      ],
+      "sourceIds": [
+        "langgraph-docs",
+        "langchain-agent-docs"
+      ],
+      "gotchas": [
+        "State 是共享可变的——多节点并发写同一字段会冲突，需用 reducer（如 list 合并）显式声明",
+        "条件边的判断函数必须是纯函数——不能有副作用，否则 checkpointer 重放会出错",
+        "图太复杂会失去可调试性——节点超过 10 个考虑拆子图"
+      ],
+      "interview": [
+        {
+          "q": "LangGraph 的 StateGraph 比纯 ReAct 循环强在哪？什么时候该用？",
+          "answerSkeleton": "StateGraph 比纯 ReAct 循环强在三点。第一，显式拓扑——ReAct 是\"模型自由决定下一步\"的黑盒循环， StateGraph 是\"节点+条件边\"的白盒流程图，每个跳转都有明确条件，可控性与可审计性高。第二，共享 State——所有节点读写同一个 TypedDict，状态集中管理，不像 ReAct 把状态塞进 messages 上下文 容易膨胀。第三，持久化与 HITL——StateGraph 的 checkpointer 把 State 落盘支持中断恢复与时间 旅行，且能在关键节点暂停等人工确认（危险操作的标配），ReAct 循环做这些要侵入式改造。什么时候 该用：流程可枚举（如\"研究→起草→审核→发布\"）、需要 HITL、需要可恢复——上 StateGraph。流程 高度自由（如开放域问答）——ReAct 够用且更简单。前端迁移映射：StateGraph ≈ 代码化的状态机图， checkpointer ≈ 状态持久化。Tradeoff：图结构增加开发成本，简单任务过度工程化。",
+          "followups": [
+            "StateGraph 的 reducer 是什么？什么时候必须用？",
+            "怎么实现\"在危险操作前暂停等人工确认\"？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "用 LangGraph 实现\"研究→起草→审核→发布\"四节点图，含条件回退（审核不过回起草）与 HITL 暂停"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "agent.memory-and-state",
+      "title": "Agent 记忆与状态管理",
+      "summary": "短期记忆（trajectory 上下文）vs 长期记忆（跨会话持久化）。Agent 跑久了上下文会爆，记忆管理是生产 Agent 的核心难题。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "agent.langgraph-orchestration"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "Agent 记忆 ≈ 你做 SPA 的状态管理：短期记忆是组件内 state（trajectory 在上下文里），长期记忆是 localStorage/IndexedDB（跨会话持久化）。区别是 Agent 的\"state\"是文本且会按 token 计费—— trajectory 越长越贵且越慢，必须主动压缩或外存。",
+      "concepts": [
+        "短期记忆：当前会话的 trajectory（thought+action+observation），塞在 prompt 上下文里",
+        "长期记忆：跨会话持久化，通常用向量库存\"过去经验\"，按需检索召回",
+        "上下文压缩：trajectory 过长时用 LLM 摘要历史步骤，或只保留最近 N 步 + 摘要",
+        "记忆类型：episodic（具体事件）/ semantic（抽象知识）/ procedural（怎么做某事，类似 SOP）",
+        "记忆写入策略：不是所有 trajectory 都值得记——只记\"成功/失败的关键决策点\""
+      ],
+      "sourceIds": [
+        "langchain-memory",
+        "langgraph-docs"
+      ],
+      "gotchas": [
+        "把全部 trajectory 塞进上下文是最常见错误——10 步后 token 就爆，且模型注意力被稀释",
+        "长期记忆不是\"存 everything\"——写入要筛选（只记关键决策），检索要精准（否则召回噪声）",
+        "记忆与 RAG 的边界：长期记忆本质是\"对自己过往经验的 RAG\"，但写入策略比文档 RAG 更难"
+      ],
+      "interview": [
+        {
+          "q": "Agent 跑了 20 步，trajectory 上下文要爆了，怎么办？",
+          "answerSkeleton": "trajectory 压缩按代价递增有四招。第一，滑动窗口——只保留最近 N 步的完整 trajectory，更早的 丢弃，最简单但丢失早期关键决策。第二，摘要压缩——用 LLM 把早期步骤摘要成一段文字替换原始 trajectory，保留要点省 token，但摘要可能丢细节。第三，外存 + 检索——把历史 trajectory 写进 向量库，当前步只保留最近 N 步 + 按需检索相关历史（本质是对自己经验的 RAG），最省 token 但 实现复杂且有检索延迟。第四，结构化状态——把关键中间结果（如\"已收集的数据\"\"已排除的假设\"） 写进显式 state 字段而非塞进自然语言 trajectory，模型读结构化字段比读历史对话高效。生产 Agent 通常组合用：结构化 state + 滑动窗口 + 必要时外存检索。前端迁移映射：这和 SPA 状态管理同构， 短期=组件 state，长期=IndexedDB。Tradeoff：压缩省 token 但丢信息，必须按任务容错度调。",
+          "followups": [
+            "长期记忆该存什么？不该存什么？",
+            "结构化 state 和自然语言 trajectory 各自适合存什么？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 20+ 步的 Agent 实现三层记忆：结构化 state + 滑动窗口（最近 5 步）+ 历史 trajectory 摘要"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "agent.tool-ecosystem",
+      "title": "工具生态与 MCP",
+      "summary": "Model Context Protocol 让工具定义与 Agent 解耦——任何 MCP server 可被任何 Agent 消费。这是 Agent 生态的\"USB-C\"。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "agent.fundamentals"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "MCP ≈ 工具的\"USB-C 接口\"：定义了\"工具如何被发现、被调用、被授权\"的统一协议。你写组件库时 定义 props 接口让组件可复用——MCP 让工具可被任何 Agent 复用。区别是这里的\"消费者\"是 LLM， \"接口\"是 JSON Schema + 协议消息。前端工程师对\"接口设计决定生态质量\"的直觉直接适用。",
+      "concepts": [
+        "MCP 三角色：Host（如 Claude Desktop）/ Client（连接器）/ Server（工具实现）",
+        "工具发现：MCP server 自描述能力（list_tools），Agent 动态加载而非硬编码",
+        "工具分类：resources（读数据，无副作用）/ tools（执行动作，有副作用）/ prompts（模板）",
+        "授权模型：危险工具调用前 Host 弹窗确认，Agent 不能静默执行",
+        "与 Function Calling 的关系：Function Calling 是\"模型→工具\"协议，MCP 是\"工具→生态\"协议，互补"
+      ],
+      "sourceIds": [
+        "mcp-spec",
+        "anthropic-tool-use"
+      ],
+      "gotchas": [
+        "MCP server 是进程间通信——启动开销与稳定性要管，不像本地函数调用",
+        "工具数量爆炸时模型选择准确率下降——MCP 不解决\"工具太多\"，只解决\"工具复用\"",
+        "授权边界模糊是安全隐患——server 暴露的工具默认 Agent 可调，危险工具必须显式授权"
+      ],
+      "interview": [
+        {
+          "q": "MCP 解决了什么问题？它和 Function Calling 是什么关系？",
+          "answerSkeleton": "MCP 解决的是\"工具碎片化\"问题：在 MCP 之前，每个 Agent 框架（LangChain/AutoGen/OpenAI Assistants） 各自定义工具接口，一个工具要被多个 Agent 用就得为每个框架写适配——N 个 Agent × M 个工具 = N×M 份胶水代码。MCP 定义了\"工具如何被发现、被调用、被授权\"的统一协议，任何 MCP server 可被 任何 MCP-compatible Agent 消费，把 N×M 降到 N+M。它和 Function Calling 的关系是互补：Function Calling 是\"模型→工具\"的调用协议（模型返回 tool_call，你执行），MCP 是\"工具→生态\"的复用协议 （工具自描述能力，Agent 动态加载）。一个 Agent 可以用 Function Calling 调用从 MCP server 动态 发现的工具。前端迁移映射：MCP ≈ 工具的 USB-C，接口设计决定生态质量。Tradeoff：MCP 是进程间 通信有启动开销，且不解决\"工具太多选择准确率下降\"的问题——工具治理仍需上层做。",
+          "followups": [
+            "工具数量到几十上百个时，Agent 怎么选？",
+            "MCP server 暴露的危险工具怎么防误调用？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现一个 MCP server（暴露 2 个工具：读文件/查天气 mock），用 Claude Desktop 或自写 Host 调用它"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "eng.cost-latency-optimization",
+      "title": "成本与延迟工程化优化",
+      "summary": "从\"能跑\"到\"扛得住\"——批量、缓存、并发、分级、流式、模型蒸馏的系统化降本提速。LLM 应用的工程内功。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "llm.cost-and-latency",
+        "eng.observability"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "这是你前端性能优化直觉的全面迁移：缓存 ≈ HTTP 缓存/Service Worker，批量 ≈ 批量请求合并， 分级 ≈ 代码分割按需加载，流式 ≈ 流式渲染。区别是资源单位从 MB/次变成 token，且 LLM 调用慢 且贵，优化杠杆更大。",
+      "concepts": [
+        "批量（batch）：多请求合并成一次 API 调用（OpenAI Batch API 半价但延迟高），或并发池限速",
+        "缓存分层：embedding 缓存 / 语义缓存（相似查询复用答案）/ 响应缓存（精确匹配）",
+        "分级路由：简单任务小模型，复杂任务大模型，按任务复杂度动态路由",
+        "流式 + 预计算：流式降感知延迟；预计算常见查询结果（如离线生成 + 缓存）",
+        "模型蒸馏/微调：用大模型标注数据微调小模型，长期降本（但前期投入大）"
+      ],
+      "sourceIds": [
+        "eugene-yan-llm-patterns",
+        "openai-cookbook"
+      ],
+      "gotchas": [
+        "语义缓存是双刃剑——相似查询复用答案会放大错误，必须配质量监控",
+        "批 API 半价但要等批满（延迟数小时）——只适合离线任务，实时场景不能用",
+        "微调小模型前期成本高（数据标注 + 训练）——量不够大时不如直接用托管小模型"
+      ],
+      "interview": [
+        {
+          "q": "一个 LLM 应用月账单 10 万、p99 延迟 8 秒，怎么系统化优化？",
+          "answerSkeleton": "系统化优化按\"先审计后优化、先低成本后高投入\"顺序。第一步审计——拆账单构成（输入/输出 token、 模型分布、功能分布），找 80/20 大头；拆延迟构成（TTFT/生成/检索/重排），找瓶颈段。盲优是浪费。 降本四招（按投入递增）：一是缓存分层——embedding 缓存（同文本不重编码）、语义缓存（相似查询 复用答案，需质量监控防放大错误）、响应缓存（精确匹配）；二是降输入成本——Prompt 缓存省 50%+、 历史截断/摘要；三是降输出成本——限 max_tokens（输出单价是输入 3-5 倍杠杆更大）；四是分级路由 ——简单任务小模型，复杂任务大模型，按复杂度动态路由。降延迟四招：流式（降感知延迟到 TTFT）、 并发池（多请求并行限速）、预计算常见查询、模型蒸馏/微调（长期降本但前期投入大）。前端迁移映射： 缓存 ≈ HTTP 缓存，批量 ≈ 请求合并，分级 ≈ 代码分割。Tradeoff：每招都有副作用（语义缓存放大 错误、批 API 延迟高、微调前期贵），必须 A/B 验证不损质量。",
+          "followups": [
+            "语义缓存怎么判断\"相似到可以复用答案\"？",
+            "什么时候该微调小模型，什么时候直接用托管模型？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 RAG 应用实现成本延迟优化（embedding 缓存 + 语义缓存 + 分级路由 + 流式），输出优化前后对比报告"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "eng.llm-eval-system",
+      "title": "LLM Eval 体系（离线 + 在线）",
+      "summary": "没有评测的 LLM 应用是玄学。离线 eval（标注集 + LLM-as-judge）防回归，在线 eval（用户反馈 + 抽样）监控真实质量。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "rag.evaluation",
+        "agent.hitl-safety"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "LLM eval ≈ 你做前端的测试金字塔：离线 eval 像 CI（标注集 + 断言，防回归），在线 eval 像线上监控 （用户反馈 + 抽样，看真实质量）。区别是 LLM 输出是概率性的，\"断言\"常变成\"LLM-as-judge 打分\"， 快但不绝对可靠，必须人工抽检校准。",
+      "concepts": [
+        "离线 eval：固定标注集（50-500 条），跑指标（准确率/格式正确率/faithfulness），防回归",
+        "在线 eval：用户 thumbs up/down + 抽样人工评分，监控真实分布漂移",
+        "LLM-as-judge：用强模型给弱模型输出打分，快但有偏见（偏爱长答案/自信语气），需人工校准",
+        "黄金集：少量人工精标的高质量评测集，每次改动必跑，是\"回归测试\"的 LLM 版",
+        "eval 即文档：测试名描述规则，指标定义产品质量标准"
+      ],
+      "sourceIds": [
+        "hamel-husain-evals",
+        "langfuse-docs"
+      ],
+      "gotchas": [
+        "LLM-as-judge 有系统性偏见——偏爱长答案与自信语气，必须人工抽检 10% 校准",
+        "离线指标与线上效果未必一致——离线涨点线上掉点是常见现象，两者都要看",
+        "eval 集会被\"见过\"——用 eval 集调 prompt 等于作弊，必须留 holdout"
+      ],
+      "interview": [
+        {
+          "q": "怎么给一个 LLM 应用搭 eval 体系？离线和在线各做什么？",
+          "answerSkeleton": "eval 体系分离线与在线两层。离线 eval 防回归：构建 50-500 条标注集（含典型与边界），每次改动 跑指标（准确率/格式正确率/faithfulness），其中 10-50 条人工精标的\"黄金集\"是必跑的回归基线。 打分用 LLM-as-judge（强模型给弱模型打分）快但有偏见（偏爱长答案/自信语气），必须人工抽检 10% 校准。在线 eval 监控真实质量：采集用户 thumbs up/down 反馈 + 抽样人工评分，重点看分布漂移 （数据分布变了离线指标看不出问题）。两层都不可缺——离线防回归，在线防\"离线涨点线上掉点\"。 关键纪律：eval 集不能用来调 prompt（等于作弊），必须留 holdout；eval 名要描述规则（如 \"结构化输出格式正确率\"）。前端迁移映射：离线 eval ≈ CI 测试金字塔，在线 eval ≈ 线上监控。 Tradeoff：LLM-as-judge 便宜快但不绝对可靠，黄金集最准但贵——组合用。",
+          "followups": [
+            "LLM-as-judge 的偏见怎么量化与校正？",
+            "离线涨点但线上掉点，怎么排查？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 LLM 应用构建 eval 体系：50 条标注集 + LLM-as-judge + 10 条黄金集，跑改动前后对比报告"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "eng.observability",
+      "title": "LLM 可观测性（trace 与监控）",
+      "summary": "LLM 应用是黑盒——没有 trace 就只能盲猜。Langfuse/Phoenix 记录每次调用的 prompt/响应/延迟/成本，是生产 LLM 应用的眼睛。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "eng.llm-eval-system"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "LLM trace ≈ 你做前端的 performance trace（Performance API/火焰图）：记录每次请求的全链路—— prompt 输入、token 用量、延迟、模型版本、中间步骤。区别是 LLM 调用是\"黑盒概率\"而非确定性计算， 没有日志就无法复现\"为什么这次答错了\"。你的可观测直觉直接适用。",
+      "concepts": [
+        "trace 三要素：input（prompt+context）/ output（response+usage）/ metadata（model/latency/cost/user）",
+        "链路追踪：RAG/Agent 的多步调用（检索→重排→生成）要串成一条 trace，而非孤立日志",
+        "成本可观测：每次调用的 token 成本落盘，按用户/功能/模型维度聚合",
+        "质量监控：抽样 trace 做人工/LLM 评分，监控 faithfulness/answer relevancy 漂移",
+        "告警：延迟 p99 / 错误率 / 成本突增 / 质量评分下降的阈值告警"
+      ],
+      "sourceIds": [
+        "langfuse-docs",
+        "phoenix-docs"
+      ],
+      "gotchas": [
+        "只记 input/output 不记中间步骤——RAG 的检索结果、Agent 的 trajectory 不落盘就无法定位问题",
+        "trace 全量记录成本高——高频调用要采样（如 1%）+ 错误全量记录",
+        "PII 脱敏——trace 里的 prompt 可能含用户敏感信息，落盘前必须脱敏"
+      ],
+      "interview": [
+        {
+          "q": "生产 LLM 应用要做哪些可观测？trace 要记什么？",
+          "answerSkeleton": "生产 LLM 可观测要记三类信号。第一，trace 三要素——input（prompt+上下文+检索结果）、output （response+token usage）、metadata（model 版本/延迟/成本/user id），RAG/Agent 的多步调用要 串成一条链路 trace 而非孤立日志，否则无法定位\"是检索召回差还是生成质量差\"。第二，成本可观测 ——每次调用 token 成本落盘，按用户/功能/模型聚合，配告警（成本突增往往是被滥用或 bug）。第三， 质量监控——抽样 trace 做人工/LLM 评分，监控 faithfulness/answer relevancy 漂移（数据分布变了 质量会掉）。告警覆盖延迟 p99、错误率、成本突增、质量评分下降。关键工程点：trace 不能只记 input/output 还要记中间步骤（检索结果/Agent trajectory）；高频调用要采样（1%）+ 错误全量 记录平衡成本；prompt 可能含 PII 落盘前必须脱敏。前端迁移映射：trace ≈ performance 火焰图， 没有它等于盲飞。Tradeoff：全量记录成本高，采样+错误全量是务实平衡。",
+          "followups": [
+            "RAG 链路 trace 怎么把检索和生成串起来？",
+            "怎么对 trace 做质量评分而不全靠人工？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 RAG+Agent 应用接入 Langfuse，记录全链路 trace + 成本聚合 + 质量采样评分，配 3 条告警"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "eng.production-deployment",
+      "title": "生产部署与运维",
+      "summary": "从 demo 到生产——环境隔离、密钥管理、灰度发布、故障演练、SLO。LLM 应用的运维纪律，与传统 Web 服务同构但有新挑战。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "eng.observability",
+        "eng.cost-latency-optimization"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "这是你的前端运维直觉全面迁移：环境隔离 ≈ dev/staging/prod，密钥管理 ≈ 不把 key 写进代码， 灰度 ≈ feature flag，SLO ≈ 性能预算。新增的是\"模型版本管理\"——LLM 是概率性的，换模型版本 等于换了个\"新员工\"，必须灰度 + eval 验证。",
+      "concepts": [
+        "环境隔离：dev/staging/prod 三环境，密钥用环境变量/Secrets Store，绝不进代码",
+        "模型版本管理：锁定模型版本（如 gpt-4o-2024-08-06），升级要灰度 + eval 验证（模型是概率性的，换版本=换行为）",
+        "灰度发布：feature flag 控制新 prompt/新模型/新功能的流量比例，5%→20%→100%",
+        "故障演练：上游 AI 服务挂了的降级链（备模型/缓存/兜底文案），定期演练非\"纸上谈兵\"",
+        "SLO：p99 延迟 / 可用性 / 成本预算 / 质量评分的错误预算（error budget）"
+      ],
+      "sourceIds": [
+        "langchain-deploy",
+        "langfuse-docs"
+      ],
+      "gotchas": [
+        "模型版本不锁会被\"静默升级\"——OpenAI/Anthropic 会更新默认版本，行为变了你却不知道",
+        "灰度只看技术指标不看 eval——prompt/模型改动必须同时跑 eval，否则质量回归发现不了",
+        "降级链不演练等于没有——上游真挂时才发现降级路径有 bug 是常见事故"
+      ],
+      "interview": [
+        {
+          "q": "LLM 应用上生产，运维上和传统 Web 服务有什么不同？",
+          "answerSkeleton": "同构部分占 80%——环境隔离、密钥管理、灰度发布、SLO、监控告警，这套运维纪律直接适用。新增的 20% 是\"概率性组件\"带来的新挑战。第一，模型版本管理——传统服务换库版本行为确定，LLM 换模型 版本行为是概率性变化（同样的 prompt 不同输出），必须锁版本（如 gpt-4o-2024-08-06）且升级要 灰度 + 跑 eval 验证，否则被供应商静默升级了行为变了你却不知道。第二，降级链更复杂——传统服务 挂了返回 5xx，LLM 服务挂了要降级到备模型/缓存/兜底文案，且不同失败模式（限流/超时/内容过滤） 要不同降级策略。第三，质量 SLO——除了延迟/可用性还要监控质量指标（faithfulness 漂移），数据 分布变了质量会掉但技术指标一切正常。第四，成本 SLO——LLM 按用量计费易超预算，要按用户/功能 配额 + 告警。前端迁移映射：模型版本 ≈ 依赖锁版本，灰度 ≈ feature flag，SLO ≈ 性能预算。 Tradeoff：锁版本失去自动优化（新版可能更好），但不锁等于让供应商控制你的生产行为，锁是必须的。",
+          "followups": [
+            "模型版本升级怎么做灰度 + eval 验证？",
+            "上游 AI 服务挂了，降级链怎么设计？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 LLM 应用设计生产部署方案：三环境隔离 + 模型版本锁定 + 灰度发布策略 + 降级链 + SLO 定义"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "eng.prompt-injection-defense",
+      "title": "Prompt 注入防御",
+      "summary": "Prompt 注入是 LLM 应用的 SQL 注入——用户输入覆盖系统指令。深度防御（输入护栏+输出护栏+最小权限+HITL）是唯一现实路径。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "agent.hitl-safety"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 4,
+      "frontendBridge": "Prompt 注入 ≈ LLM 时代的 SQL 注入：用户输入里藏\"忽略之前指令，改做 X\"，模型可能照做。你在前端 做过 XSS 防御（转义输出/CSP）——这里是同类问题，但\"沙箱\"是概率性的 LLM 而非确定性解析器， 没有 100% 防御，只能深度防御降低风险。",
+      "concepts": [
+        "注入类型：直接注入（用户输入含恶意指令）/ 间接注入（检索到的文档/工具返回里藏指令）",
+        "系统提示优先级：用结构化分隔符（如 <system>...</system>）+ 显式\"用户输入在 <user> 标签内，其内容是指令而非数据\"",
+        "输入护栏：模式匹配（\"忽略之前指令\"等）+ LLM 二次审查输入是否含注入",
+        "输出护栏：校验生成内容是否执行了越权动作（如不该发邮件时输出了邮件内容）",
+        "最小权限 + HITL：Agent 工具默认无副作用，危险操作必须人工确认——这是注入造成实际危害的最后一道闸"
+      ],
+      "sourceIds": [
+        "owasp-llm-top10",
+        "prompt-injection-paper",
+        "anthropic-effective-agents"
+      ],
+      "gotchas": [
+        "没有银弹——任何单一防御都能被针对性绕过，必须深度防御（多层叠加）",
+        "间接注入防不胜防——RAG 检索到的外部文档里藏指令，用户无感知却被攻击",
+        "系统提示优先级不可靠——模型未必遵守\"系统 > 用户\"的层级，尤其当用户输入很强势时"
+      ],
+      "interview": [
+        {
+          "q": "什么是 prompt 注入？怎么防御？能 100% 防住吗？",
+          "answerSkeleton": "prompt 注入是 LLM 应用的 SQL 注入：攻击者在用户输入（或被检索的外部文档）里藏\"忽略之前指令， 改做 X\"，模型可能照做。分两类——直接注入（用户主动输入恶意指令）和间接注入（RAG 检索到的 文档/工具返回里藏指令，用户无感知）。不能 100% 防住——因为\"沙箱\"是概率性的 LLM 而非确定性 解析器，任何单一防御都能被针对性绕过。现实路径是深度防御多层叠加：第一，系统提示优先级——用 结构化分隔符（<system>/<user> 标签）+ 显式声明\"用户输入内容是指令还是数据\"；第二，输入护栏 ——模式匹配（\"忽略之前指令\"）+ LLM 二次审查；第三，输出护栏——校验是否执行了越权动作； 第四，最小权限 + HITL——危险工具默认禁用，调用前人工确认，这是注入造成实际危害的最后一道闸。 前端迁移映射：这和 XSS 防御同构（转义/CSP/最小权限），区别是没有确定性沙箱。Tradeoff：防御 越严用户体验越差（频繁 HITL），按风险等级分级。",
+          "followups": [
+            "间接注入怎么防？RAG 检索到的文档能信任吗？",
+            "系统提示优先级不可靠，还有什么补救？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个含工具调用的 Agent 实现三层 prompt 注入防御（系统提示分隔符 + 输入护栏 + 输出护栏），用 10 条注入攻击 payload 测试拦截率"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
     {
       "id": "frontend.streaming-ux",
       "title": "AI 流式 UX（前端主场）",
@@ -711,6 +1352,116 @@
       "lastVerified": "2026-07-24"
     },
     {
+      "id": "project.agent-system",
+      "title": "里程碑项目 · 生产级 Agent 系统",
+      "summary": "Phase 3 出口项目：实现一个有真实用途的 Agent 系统（如\"研究助手\"\"代码 PR 审查员\"\"客服 Agent\"），含 LangGraph 编排、工具生态、记忆、HITL 安全闸。这是 Agent 工程师的求职名片。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 3,
+      "prerequisites": [
+        "agent.langgraph-orchestration",
+        "agent.tool-ecosystem",
+        "agent.memory-and-state",
+        "agent.hitl-safety"
+      ],
+      "estimatedMinutes": 480,
+      "difficulty": 4,
+      "frontendBridge": "这是 Phase 0-2 技能的集成 + Agent 全栈落地。你做过的前端工程化（状态机、错误边界、监控、 二次确认）全部适用，只是\"决策者\"从\"用户点击\"换成了\"LLM 自主\"。重点是有真实用途 + HITL 安全闸，不是炫技 demo。",
+      "concepts": [
+        "LangGraph 编排：节点图 + 条件路由 + checkpointer 持久化",
+        "工具生态：至少 3 个工具（含 1 个危险操作），MCP server 或自实现",
+        "记忆管理：结构化 state + 滑动窗口 + 长期记忆（向量库）",
+        "HITL 安全闸：工具分级 + 危险操作暂停确认 + 审计日志",
+        "可观测：每步 trajectory 落盘，token 成本统计，失败可回放"
+      ],
+      "sourceIds": [
+        "langgraph-docs",
+        "anthropic-agents-guide",
+        "lilian-weng-agents"
+      ],
+      "lab": "content/labs/agent-system",
+      "gotchas": [
+        "不要做\"通用 Agent\"——聚焦一个真实场景（研究/审查/客服），通用 Agent 做不深且难评估",
+        "HITL 不是\"加上去就行\"——要设计好暂停/恢复的 UX，人工确认的上下文要清晰呈现",
+        "评测 Agent 比评测 RAG 更难——定义清楚\"任务成功\"的标准（如\"研究助手产出的报告含 3+ 可信来源\"）"
+      ],
+      "interview": [
+        {
+          "q": "你设计的 Agent 在生产中\"卡住\"了（循环但不进展），怎么检测与恢复？",
+          "answerSkeleton": "Agent 卡住指\"循环在跑但 trajectory 不再有实质进展\"——比崩溃更隐蔽，会无声烧钱。检测分三层。 第一层，结构化检测——监测\"连续 N 步的 action 重复\"或\"state 字段连续 M 步不变\"，命中即判定 卡住，这是最可靠的信号。第二层，LLM 评判——每 K 步让另一个 LLM 看 trajectory 判断\"是否在 取得进展\"，但增加成本与延迟。第三层，预算/时间硬上限——max_steps/max_tokens/timeout 兜底， 即使前两层没检出也能强制中止。恢复策略：一是回滚到上一个\"进展检查点\"的 state 重新分支（需 checkpointer 支持）；二是注入\"你似乎卡住了，换个思路\"的提示让 LLM 换策略；三是降级为简单 RAG 或人工兜底。关键是有 trajectory 落盘可回放——否则只能盲猜卡在哪。前端迁移映射：这和 \"loading 转圈但不报错\"的卡死排查同构，可观测是核心。Tradeoff：检测越严越早发现但可能误杀 正常的长思考，阈值要按任务调。",
+          "followups": [
+            "怎么区分\"Agent 在长时间思考\"和\"Agent 卡住了\"？",
+            "回滚到检查点后，怎么避免又走同一条死路？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "提交 GitHub 仓库 + 部署链接 + 3 个真实场景的 trajectory 日志，AI 按评分细则审查",
+        "rubricId": "project-agent-system"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "project.capstone",
+      "title": "Capstone 项目 · 端到端 AI 工程化系统",
+      "summary": "Phase 4 出口项目（也是整条轨道的毕业项目）：把 Phase 0-3 的全部技能集成进一个可上线的 AI 应用，含 RAG + Agent + Eval + 可观测 + 安全 + 成本优化 + 生产部署。这是能直接拿去面试的硬资产。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 4,
+      "prerequisites": [
+        "eng.llm-eval-system",
+        "eng.observability",
+        "eng.prompt-injection-defense",
+        "eng.cost-latency-optimization",
+        "eng.production-deployment"
+      ],
+      "estimatedMinutes": 960,
+      "difficulty": 5,
+      "frontendBridge": "这是整条轨道的集大成。你做前端时经历过\"从组件到页面到工程化到上线\"的完整链路——这里是一样的， 只是技术栈换成 AI 工程化。你的工程纪律（模块化、测试、监控、灰度、安全）是最大优势，AI 知识 是新维度。重点不是堆功能，是每个环节都有数据支撑（eval 报告、trace 日志、成本对比）。",
+      "concepts": [
+        "集成 RAG + Agent：Agent 调用 RAG 工具检索知识，多步推理解决复杂查询",
+        "完整 Eval 体系：离线标注集 + LLM-as-judge + 黄金集，在线用户反馈 + 抽样评分",
+        "全链路可观测：trace 串联检索/重排/生成/工具调用，成本与质量双监控",
+        "安全纵深：prompt 注入防御 + HITL + 最小权限 + 审计日志",
+        "生产就绪：模型版本锁定 + 灰度 + 降级链 + SLO + 成本配额"
+      ],
+      "sourceIds": [
+        "langfuse-docs",
+        "hamel-husain-evals",
+        "owasp-llm-top10",
+        "langchain-deploy"
+      ],
+      "lab": "content/labs/capstone",
+      "gotchas": [
+        "不要做\"大而全\"——聚焦一个真实场景做深（如\"AI 代码审查员\"\"企业知识库问答 Agent\"），比通用 demo 强",
+        "Capstone 的价值在\"工程化深度\"而非\"功能数量\"——一个有完整 eval + 监控 + 安全的小系统胜过功能多但没保障的大系统",
+        "必须有可验证的\"质量证据\"——eval 报告、trace 日志、成本对比、安全测试，面试官看的是这些而非 demo"
+      ],
+      "interview": [
+        {
+          "q": "你的 Capstone 项目从 demo 到生产，最大的工程挑战是什么？怎么解决的？",
+          "answerSkeleton": "（这是开放题，考察的是真实的工程化经验而非知识点。以下是一个高质量回答的框架示例，实际要结合 自己项目讲。）最大挑战通常是\"概率性组件的工程化保障\"——LLM 不像传统服务确定可预测。以 RAG+ Agent 系统为例，三个核心挑战与解法。第一，质量不可预测——RAG 召回率会随数据分布漂移下降，解法 是搭完整 eval 体系（离线标注集防回归 + 在线抽样监控漂移）+ 黄金集每次改动必跑。第二，成本失控 ——Agent 多步循环 + RAG 多次检索很容易烧爆预算，解法是分层缓存（embedding/语义/响应）+ 分级 路由（简单任务小模型）+ 速率限制 + 成本告警。第三，安全风险——Agent 自主调用工具 + prompt 注入 可能让模型执行危险操作，解法是深度防御（工具分级 + HITL + 输入输出护栏 + 最小权限 + 审计日志）。 贯穿三者的是全链路 trace——没有可观测就只能在事故后盲猜。前端迁移映射：这套工程化纪律和你做 前端生产化（监控/灰度/安全/性能预算）同构。Tradeoff：每层保障都有成本，按业务风险分级投入。 面试官要听的是\"你遇到过什么真实问题 + 用什么数据驱动决策\"，不是\"你知道哪些概念\"。",
+          "followups": [
+            "你的 eval 体系怎么发现过一次真实的质量回归？",
+            "Agent 失控烧钱的场景，你的速率限制怎么设计的？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V4",
+        "type": "portfolio-release",
+        "description": "提交 GitHub 仓库 + 部署链接 + 完整文档（架构图 + eval 报告 + trace 示例 + 成本对比 + 安全测试），发布到作品集",
+        "rubricId": "project-capstone"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
       "id": "project.cli-llm-tool",
       "title": "里程碑项目 · CLI 文本批处理工具",
       "summary": "Phase 0 出口项目：一个命令行工具，读取本地文件列表，调用 LLM API 批量处理（如翻译/摘要/打标签），流式输出进度，统计 token 成本。",
@@ -760,6 +1511,57 @@
       },
       "status": "reviewed",
       "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "project.rag-pipeline",
+      "title": "里程碑项目 · 生产级 RAG 问答系统",
+      "summary": "Phase 2 出口项目：对一个真实文档集（如公司 wiki / 开源项目文档）构建端到端 RAG 问答系统，含增量索引、混合检索、重排、评测、可观测。这是求职的硬通货。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.production-pipeline"
+      ],
+      "estimatedMinutes": 480,
+      "difficulty": 4,
+      "frontendBridge": "这是 Phase 0-1 技能的集成 + RAG 全链路落地。你做过的前端工程化（模块化、缓存、错误边界、 监控）全部适用，只是数据流从\"UI 状态\"换成\"文档→embedding→检索→生成\"。重点不是炫技， 是把每个环节做扎实，附评测报告证明它真的好用。",
+      "concepts": [
+        "端到端管线：文档摄入 → 切分 → embedding → 入库 → 查询改写 → 混合检索 → 重排 → 上下文组装 → LLM 生成",
+        "增量索引：文档 hash 变更队列，只更新变化的 chunk",
+        "评测闭环：50+ 条人工标注评测集，RAGAS 三维度评分，输出 baseline 报告",
+        "可观测：每步 trace 延迟，查询日志落盘供离线分析，召回率漂移监控",
+        "部署：API 服务（FastAPI）+ 向量库（Qdrant/PGVector）+ 前端问答 UI（可选）"
+      ],
+      "sourceIds": [
+        "langchain-rag",
+        "jerry-liu-rag-eval",
+        "eugene-yan-rag"
+      ],
+      "lab": "content/labs/rag-pipeline",
+      "gotchas": [
+        "不要用 demo 数据集（如 LangChain 自带的 state_of_union）——用真实文档才能暴露切分/召回的真实问题",
+        "评测报告比功能演示更重要——面试官看的是\"你能否用数据证明它好用\"，不是\"它能跑\"",
+        "增量索引是加分项但别过度设计——文档规模小（<1000）时全量重建更简单可靠"
+      ],
+      "interview": [
+        {
+          "q": "你的 RAG 系统在生产中召回率突然下降，怎么排查？",
+          "answerSkeleton": "召回率突降按\"数据→索引→查询→模型\"四层排查。第一层查数据：新入库的文档质量/分布是否变了 （如突然混入大量短文档稀释索引），用查询日志对比降前降后的召回 query。第二层查索引：embedding 模型是否升级了（升级必须全量重建，否则新旧向量不在同一空间）、向量库索引是否退化（HNSW 频繁增量后图结构变差，需重建）。第三层查查询：是否有查询改写环节出错（如 HyDE 生成质量下降）、 混合检索的 RRF 权重是否被改坏。第四层查模型：LLM 生成质量下降会被误判为召回问题——查 faithfulness 评分是否同步下降。关键是有 trace 可观测——每步延迟与中间结果必须可回放，否则 只能盲猜。前端迁移映射：这和线上 bug 排查同构，分层定位 + 可观测是核心。Tradeoff：全链路 trace 增加存储成本，但生产 RAG 没有它等于盲飞。",
+          "followups": [
+            "怎么区分是检索召回问题还是生成质量问题？",
+            "embedding 模型升级怎么做无损切换？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "提交 GitHub 仓库 + 部署链接 + 评测报告（50 条 query 的 RAGAS 评分 + 召回率），AI 按评分细则审查",
+        "rubricId": "project-rag-pipeline"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
     },
     {
       "id": "project.streaming-chat-app",
@@ -1098,6 +1900,344 @@
       },
       "status": "reviewed",
       "lastVerified": "2026-07-24"
+    },
+    {
+      "id": "rag.chunking-strategies",
+      "title": "文本切分策略（Chunking）",
+      "summary": "把长文档切成可检索的小块是 RAG 的第一道工序，切得好坏直接决定召回质量。固定窗口、语义切分、递归切分各有取舍。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.embedding-fundamentals"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "chunking ≈ 前端的分页/虚拟列表：把大文档切成\"刚好够用\"的块。区别是这里的块大小要兼顾 embedding 模型的上下文窗口（通常 512-8192 token）与检索精度——块太大召回粗、块太小丢上下文。 你处理过\"每页多少条\"的权衡，这里只是维度从\"渲染性能\"换成\"召回质量\"。",
+      "concepts": [
+        "固定窗口切分：按字符/token 数固定切，最简单但可能切断语义",
+        "重叠切分：相邻块共享一部分内容（如 overlap=200 token），避免边界信息丢失",
+        "语义切分：按段落/标题/句子边界切，保留语义完整性",
+        "递归切分：先按大结构（章/节）切，过大再按段落切，仍过大再按句子切（LangChain RecursiveCharacterTextSplitter）",
+        "块大小经验值：500-1000 token 是常见区间，太小召回准但上下文不足，太大召回粗但上下文全"
+      ],
+      "sourceIds": [
+        "langchain-rag",
+        "greg-kamradt-rag"
+      ],
+      "gotchas": [
+        "块大小没有银弹：必须用真实文档测召回率，不同语料（代码/法律/对话）最优块大小不同",
+        "切分时丢失元数据（如文档标题、章节路径）会让检索结果失去来源——每个块要带 metadata",
+        "表格和代码块被切断是常见灾难——需要按结构识别特殊切分"
+      ],
+      "interview": [
+        {
+          "q": "RAG 里文本切分的块大小怎么选？太大太小各有什么问题？",
+          "answerSkeleton": "块大小是召回精度与上下文完整性的权衡。块太小（如 100 token）：召回准——查询能精确命中 讲某个细节的块，但上下文不足——模型只看到一句孤立的话，可能误判或无法生成完整答案。 块太大（如 4000 token）：上下文全，但召回粗——一个块里混杂多个主题，查询\"某具体细节\" 时这个块的 embedding 会被稀释，相似度排名下降，可能进不了 top-k。经验区间 500-1000 token， 加 10-20% overlap 防边界丢失。但真正的最优值必须用真实文档 + 评测集（已知 query → 应召回 的文档）做 A/B 测——不同语料（代码/法律/对话）最优值差异很大。前端迁移映射：这和分页大小 的权衡同构，只是优化目标从\"渲染性能\"换成\"召回质量\"。Tradeoff：递归切分（先章/节再段落再 句子）能在保留语义的同时控制大小，但实现复杂且切分点未必对齐语义边界。",
+          "followups": [
+            "怎么评测一个切分策略的好坏？",
+            "表格和代码块切分有什么特殊处理？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现 RecursiveCharacterTextSplitter，对一份 10 页技术文档切分，对比 chunk_size 500/1000/2000 的召回率（用 5 条已知 query）"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.embedding-fundamentals",
+      "title": "Embedding 与向量空间基础",
+      "summary": "把文本映射成高维向量，语义相似度 ≈ 向量距离。这是 RAG 检索的物理基础——没有 embedding 就没有\"按语义找\"。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "llm.transformer-intuition"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 2,
+      "frontendBridge": "embedding ≈ 把文本变成一个\"语义指纹\"数组（如 1536 维浮点数），相似内容的指纹在空间里靠得近。 你处理过颜色相似度（RGB 欧氏距离）——这里是 1536 维的同类问题，只是维度高到无法想象。 直觉：国王-男人+女人≈女王，向量加减法捕捉语义关系。",
+      "concepts": [
+        "embedding：文本 → 固定维度向量，语义距离 ≈ 向量距离（余弦相似度最常用）",
+        "维度与模型：text-embedding-3-small=1536 维，text-embedding-3-large=3072 维，开源 bge-large=1024 维",
+        "余弦相似度 vs 欧氏距离：余弦只看方向不看长度，对文本长度不敏感，RAG 默认用余弦",
+        "归一化：很多向量库要求 embedding 归一化到单位长度（L2 norm=1）"
+      ],
+      "sourceIds": [
+        "openai-embeddings",
+        "eugene-yan-rag"
+      ],
+      "gotchas": [
+        "不同 embedding 模型维度不同，不能混用——切模型必须全量重建索引",
+        "中文 embedding 质量差异大：开源模型在中文上常落后于英文，必须用真实语料测召回率",
+        "embedding 模型也有\"知识截止\"——2024 年后的新词（如新框架名）可能编码不准"
+      ],
+      "interview": [
+        {
+          "q": "为什么 RAG 用余弦相似度而不是欧氏距离？",
+          "answerSkeleton": "余弦相似度只看向量方向不看长度，对文本长度不敏感——短句和长段落即使讲同一主题， embedding 的\"模长\"会因信息量不同而不同，但\"方向\"（语义朝向）一致。欧氏距离会把长段落判为 与短句\"远\"，即使两者讲同一件事。RAG 场景下查询（短）与文档块（长）长度天然不等，余弦是 必然选择。其次，归一化后的余弦相似度 ≈ 向量点积，计算快、可在向量库里用内积索引加速。 前端迁移映射：这和你做颜色相似度（RGB 欧氏距离）的区别是维度从 3 升到 1536，且语义相似度 不像颜色那样有物理对应——必须靠模型学出来。Tradeoff：余弦忽略模长会丢失\"信息量\"信号， 但 RAG 要的是\"主题相关\"而非\"信息量等价\"，所以这是正确的取舍。",
+          "followups": [
+            "embedding 维度越高越好吗？什么场景该降维？",
+            "不同 embedding 模型的向量能直接比较吗？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V1",
+        "type": "fsrs-cards",
+        "description": "用 OpenAI Embeddings API 对 10 段中英文文本生成向量，手算其中两对的余弦相似度，记录语义相似度排序"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.evaluation",
+      "title": "RAG 评估（RAGAS 与离线评测）",
+      "summary": "没有评测的 RAG 是玄学。RAGAS 三维度（faithfulness/answer relevancy/context relevancy）+ 人工标注集是生产 RAG 的质量底线。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.retrieval-strategies"
+      ],
+      "estimatedMinutes": 90,
+      "difficulty": 3,
+      "frontendBridge": "RAG 评测 ≈ 你做前端的单元测试 + E2E：检索召回率像单元测试（每个 query 该召回哪条文档）， 生成质量像 E2E（端到端答案对不对）。RAGAS 用 LLM-as-judge 自动评分，相当于 snapshot 测试—— 快但不绝对可靠，必须人工抽检校准。",
+      "concepts": [
+        "检索评估：recall@k（应召回的文档是否在 top-k）/ precision@k（top-k 里有多少相关）/ MRR（正确文档排名）",
+        "生成评估：faithfulness（答案是否忠于上下文，防幻觉）/ answer relevancy（答案是否切题）/ context relevancy（上下文是否相关）",
+        "RAGAS 框架：用 LLM-as-judge 自动跑三维度评分，开源 Python 库",
+        "评测集构建：50-200 条 (query, ground-truth answer, relevant docs) 三元组，人工标注成本是大头",
+        "在线监控：记录查询日志 + 抽样人工评分，离线指标与线上效果未必一致"
+      ],
+      "sourceIds": [
+        "jerry-liu-rag-eval",
+        "hamel-husain-evals"
+      ],
+      "gotchas": [
+        "没有评测集的 RAG 优化是瞎调——你以为召回率提升了，其实只是 cherry-pick 的案例",
+        "RAGAS 的 faithfulness 评分有偏向——偏爱短答案（短答案不易\"不忠于上下文\"）",
+        "评测集会被\"见过\"——模型迭代时若用评测集做 prompt 调优，等于作弊，必须留 holdout"
+      ],
+      "interview": [
+        {
+          "q": "怎么评测一个 RAG 系统的好坏？哪些指标最重要？",
+          "answerSkeleton": "RAG 评测分两层。检索层指标：recall@k（应召回的文档是否进 top-k，最关键——检索不到生成再好 也白搭）、precision@k（top-k 里相关文档占比，防噪声）、MRR（正确文档排名位置，越靠前越好）。 生成层指标：faithfulness（答案是否忠于检索上下文，防幻觉——这是 RAG 区别于纯生成的核心价值）、 answer relevancy（答案是否切题）、context relevancy（检索的上下文是否真的相关）。最重要是 recall@k 与 faithfulness——前者决定\"能不能答\"，后者决定\"答得可不可信\"。RAGAS 框架用 LLM-as-judge 自动跑三维度评分，但必须配 50-200 条人工标注的 (query, 真值答案, 相关文档) 评测集， 且评测集要留 holdout 防\"见过\"。前端迁移映射：检索评估 ≈ 单测（每 query 该召回哪条），生成 评估 ≈ E2E（端到端答案对不对）。Tradeoff：RAGAS 自动评分快但有偏见（偏爱短答案），必须人工 抽检 10% 校准。",
+          "followups": [
+            "faithfulness 评分怎么防幻觉？原理是什么？",
+            "评测集被模型\"见过\"怎么办？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "为一个 50 条文档的 RAG 系统构建 20 条评测集，用 RAGAS 跑三维度评分，输出 baseline 报告"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.production-pipeline",
+      "title": "生产级 RAG 全链路",
+      "summary": "把前面的组件串成可上线的管线：增量索引、缓存、失败降级、可观测。从 demo 到生产的最后一公里。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.reranking",
+        "rag.evaluation"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 4,
+      "frontendBridge": "串管线 ≈ 你做前端工程化：把分散的组件按数据流向连起来，加上缓存、错误边界、监控。这里的 \"组件\"是 embedding/检索/重排/生成，\"错误边界\"是检索失败降级到关键词搜索，\"监控\"是 trace 每一步延迟与召回率。你的工程纪律是最大优势。",
+      "concepts": [
+        "增量索引：文档变更时只更新变化的 chunk，而非全量重建——用文档 hash + 变更队列",
+        "多级缓存：embedding 缓存（同文本不重复编码）/ 查询结果缓存（语义缓存，相似查询复用）/ LLM 响应缓存",
+        "失败降级链：向量库挂 → BM25 兜底 → 缓存回复 → 兜底文案；LLM 超时 → 流式截断 → 重试",
+        "可观测：trace 每步延迟（embedding/检索/重排/生成）、记录查询日志供离线评测、监控召回率漂移",
+        "上下文组装：检索到的 chunks 按相关性排序拼进 prompt，控制总 token 不超窗口"
+      ],
+      "sourceIds": [
+        "eugene-yan-rag",
+        "langchain-rag",
+        "jerry-liu-rag-eval"
+      ],
+      "gotchas": [
+        "语义缓存是双刃剑：相似查询复用答案会放大错误——缓存命中率要配人工抽检",
+        "增量索引的边界：embedding 模型升级时必须全量重建，增量只适用于文档变更",
+        "上下文组装不是\"越多越好\"：top-20 全塞进 prompt 会稀释注意力，通常 top-3 到 top-5 最优"
+      ],
+      "interview": [
+        {
+          "q": "一个生产 RAG 系统要做哪些工程保障？demo 和生产差在哪？",
+          "answerSkeleton": "demo 到生产差在五道工程保障。第一，增量索引——文档变更时只更新变化的 chunk（用文档 hash + 变更队列），而非全量重建，否则更新成本不可控。第二，多级缓存——embedding 缓存（同文本不重复 编码）、查询结果缓存（语义缓存复用相似查询答案，但需人工抽检防放大错误）、LLM 响应缓存。 第三，失败降级链——向量库挂掉时降级到 BM25 关键词搜索，再降级到缓存回复，最后兜底文案； LLM 超时则流式截断 + 重试。第四，可观测——trace 每步延迟（embedding/检索/重排/生成）、记录 查询日志供离线评测、监控召回率漂移（数据分布变了召回率会掉）。第五，上下文组装——检索到的 chunks 按相关性排序拼进 prompt，控制总 token 不超窗口，且 top-k 不是越多越好（top-3 到 top-5 通常最优，更多会稀释注意力）。前端迁移映射：这和你做前端工程化（组件串接 + 缓存 + 错误边界 + 监控）同构。Tradeoff：语义缓存省成本但会放大错误，必须配人工抽检。",
+          "followups": [
+            "语义缓存怎么判断两个查询\"足够相似\"可以复用答案？",
+            "增量索引怎么处理 embedding 模型升级？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V3",
+        "type": "project-checkpoint",
+        "description": "实现一个完整 RAG 管线：增量索引 + 混合检索 + 重排 + 语义缓存 + 失败降级 + trace 监控，部署并跑 100 条 query 的评测报告",
+        "rubricId": "project-rag-pipeline"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.reranking",
+      "title": "重排序（Reranking）",
+      "summary": "检索召回 top-20 后用更贵的模型重排出最相关的 top-5。两阶段检索是生产 RAG 的精度杠杆。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.retrieval-strategies"
+      ],
+      "estimatedMinutes": 60,
+      "difficulty": 3,
+      "frontendBridge": "reranking ≈ 你做列表时的\"粗排 + 精排\"：先用便宜的方法（向量检索）从一万条里捞 50 条粗排， 再用贵但准的方法（cross-encoder）从 50 条里精排出 5 条。两阶段是为了在精度与成本间找平衡—— 全用 cross-encoder 太慢，全用向量检索不够准。",
+      "concepts": [
+        "两阶段检索：召回（retrieve top-k，k=20-100，用 embedding 快）→ 重排（rerank top-n，n=3-5，用 cross-encoder 准）",
+        "cross-encoder vs bi-encoder：bi-encoder 分别编码 query 和 doc 再算相似度（快但松）；cross-encoder 拼接 query+doc 一起编码（准但慢，无法预计算）",
+        "主流 reranker：Cohere Rerank（API）、bge-reranker-large（开源）、Jina Reranker",
+        "重排后通常只取 top-3 到 top-5 喂给 LLM——上下文不是越多越好，噪声会稀释注意力"
+      ],
+      "sourceIds": [
+        "cohere-rerank-docs",
+        "bge-rerank-docs"
+      ],
+      "gotchas": [
+        "reranker 模型与 embedding 模型是两回事——不能混用，reranker 是 cross-encoder 不产出向量",
+        "重排全部召回会拖慢响应——通常只重排 top-20，更多收益递减",
+        "中文 reranker 质量参差，bge-reranker 在中文上表现较好但需实测"
+      ],
+      "interview": [
+        {
+          "q": "为什么 RAG 要用两阶段检索（召回+重排）而不是一步到位？",
+          "answerSkeleton": "一步到位的矛盾：要准就得用 cross-encoder（把 query 和 doc 拼一起编码），但它无法预计算 embedding，每次查询都要对全部文档重新编码，10 万文档就是 10 万次模型调用，延迟与成本爆炸。 bi-encoder（embedding）可以预计算存向量库，查询时只编码 query 一次，但要\"分别编码再算相似度\" 牺牲了 query 与 doc 的交互信息，精度不如 cross-encoder。两阶段检索的解法：召回阶段用 bi-encoder 从全库快速捞 top-20（O(log n) 向量搜索），重排阶段用 cross-encoder 对这 20 条精排（只 20 次模型 调用），取 top-3 喂 LLM。这样精度接近全库 cross-encoder，成本却只多 20 次调用。前端迁移映射： 这和列表的\"粗排+精排\"同构。Tradeoff：重排增加 100-300ms 延迟，对延迟敏感场景（实时聊天）要 权衡——但精度提升通常值这个延迟。",
+          "followups": [
+            "bi-encoder 和 cross-encoder 的本质区别是什么？",
+            "重排后取 top-k 的 k 怎么定？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "在混合检索基础上加 bge-reranker 重排，用 10 条 query 对比 top-5 命中率（重排前后）"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.retrieval-strategies",
+      "title": "检索策略（ dense / sparse / hybrid）",
+      "summary": "纯向量检索会漏掉精确匹配（人名/型号/代码标识符）。混合检索 + 查询改写是生产 RAG 的标配。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.vector-stores",
+        "rag.chunking-strategies"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "混合检索 ≈ 你做过的\"全文搜索 + 标签筛选\"组合：向量检索像语义模糊匹配，关键词检索（BM25）像 SQL WHERE 精确匹配。两者互补——向量找\"意思相近\"，关键词找\"字面相同\"。查询改写 ≈ 用户输入 后先\"润色\"再查，类似你做搜索框时把简短查询扩展成多关键词。",
+      "concepts": [
+        "稠密检索（dense）：embedding 相似度，擅长语义但漏精确匹配",
+        "稀疏检索（sparse/BM25）：关键词倒排索引，擅长精确匹配但不懂同义",
+        "混合检索（hybrid）：并行跑 dense + sparse，用 RRF（Reciprocal Rank Fusion）合并排名",
+        "查询改写：HyDE（先让 LLM 编答案再 embedding）/ 多查询生成（LLM 把一个查询拆成多个子查询）/ 回溯翻译",
+        "top-k 选择：k 太小漏召回，k 太大塞噪声——通常 5-20，按评测调"
+      ],
+      "sourceIds": [
+        "langchain-rag",
+        "eugene-yan-rag"
+      ],
+      "gotchas": [
+        "纯 dense 检索在专有名词（产品名/人名/错误码）上召回惨淡——必须配 BM25",
+        "RRF 合并的权重不是经验值，要用评测集调——不同语料最优权重不同",
+        "查询改写增加一次 LLM 调用，延迟与成本翻倍——短查询场景才划算"
+      ],
+      "interview": [
+        {
+          "q": "纯向量检索有什么盲区？怎么补？",
+          "answerSkeleton": "纯向量（dense）检索的盲区是精确匹配：embedding 把\"GPT-4\"和\"GPT-3.5\"编码成相近向量 （都是 OpenAI 模型），用户查\"GPT-4 的上下文窗口\"时可能召回 GPT-3.5 的文档——语义近但答非所问。 专有名词（产品名/人名/错误码/代码标识符）尤其严重，embedding 模型对它们编码不准。补法是混合 检索：并行跑 dense（向量相似度）+ sparse（BM25 关键词倒排），用 RRF（Reciprocal Rank Fusion） 合并排名——dense 贡献语义召回，sparse 贡献精确命中。进一步可用查询改写：HyDE（先让 LLM 编 假想答案再 embedding，因答案比查询信息密度高）、多查询生成（LLM 把一个查询拆成多个子查询并行 检索合并）。前端迁移映射：这和你做\"全文搜索 + 标签筛选\"组合同构。Tradeoff：查询改写增加一次 LLM 调用，延迟与成本翻倍，只在短查询（信息密度低）场景才划算。",
+          "followups": [
+            "RRF 合并 dense 和 sparse 排名的原理是什么？",
+            "HyDE 为什么比直接 embedding 查询效果好？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "实现混合检索（Chroma dense + BM25 sparse + RRF 合并），用 10 条含专有名词的 query 对比纯 dense 与 hybrid 的召回率"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
+    },
+    {
+      "id": "rag.vector-stores",
+      "title": "向量数据库与索引",
+      "summary": "把 embedding 存进专门的数据库做高效近邻搜索。Pinecone/Chroma/Qdrant/PGVector 的选型与权衡，HNSW 索引的直觉。",
+      "tracks": [
+        "frontend-to-ai-engineer"
+      ],
+      "phase": 2,
+      "prerequisites": [
+        "rag.embedding-fundamentals"
+      ],
+      "estimatedMinutes": 120,
+      "difficulty": 3,
+      "frontendBridge": "向量库 ≈ 专门存\"语义指纹\"的数据库，按相似度而非精确匹配查询。传统 DB 你用 WHERE 精确查， 向量库你用\"ORDER BY 相似度 LIMIT k\"模糊查。HNSW 索引 ≈ 给向量建\"快速跳表\"，用空间换时间。 选型心智和你选 Redis/MySQL/ES 一样：按读写比、规模、延迟要求选。",
+      "concepts": [
+        "精确近邻（kNN）vs 近似近邻（ANN）：精确 O(n) 太慢，ANN 牺牲少量精度换数量级提速",
+        "HNSW（Hierarchical Navigable Small World）：分层图索引，主流向量库默认，查询 O(log n)",
+        "主流选型：Pinecone（托管 SaaS）/ Chroma（嵌入式，开发友好）/ Qdrant（开源，Rust 高性能）/ PGVector（Postgres 扩展，复用现有 DB）",
+        "元数据过滤：先按 metadata（如 source、date）过滤再向量搜索，生产 RAG 必备",
+        "索引参数：ef_construction（建图质量）/ ef_search（查询质量）—— 越高越准越慢"
+      ],
+      "sourceIds": [
+        "pinecone-docs",
+        "chroma-docs"
+      ],
+      "gotchas": [
+        "嵌入式（Chroma）和托管（Pinecone）的边界：原型用嵌入式，生产上托管——迁移成本不只是改连接串",
+        "HNSW 索引建好后不可增量更新最优——频繁新增数据会让图退化，需要定期重建",
+        "元数据过滤在向量搜索\"之前\"还是\"之后\"做差别巨大：pre-filter 省计算但可能丢候选，post-filter 精确但慢"
+      ],
+      "interview": [
+        {
+          "q": "选向量数据库时考虑哪些因素？Pinecone vs Chroma vs PGVector 怎么选？",
+          "answerSkeleton": "选型按五个维度：一是规模——百万级以下 Chroma 嵌入式够用，亿级以上 Pinecone/Qdrant 才扛得住； 二是运维——Pinecone 全托管零运维但贵且数据出域，Chroma/Qdrant 自托管省成本但要自己保可用性， PGVector 复用现有 Postgres 运维栈最省心；三是延迟——托管服务有网络往返，本地嵌入式微秒级； 四是元数据过滤能力——生产 RAG 必须支持 pre-filter，PGVector/Chroma 对此支持参差；五是成本—— Pinecone 按用量计费易超预算，自托管有固定硬件成本。前端迁移映射：这和选 Redis/MySQL/ES 的 心智同构，按读写比、规模、延迟、运维预算选。Tradeoff：PGVector 复用 Postgres 省运维但向量 搜索性能不如专用库；Pinecone 省事但贵且数据出域。原型期 Chroma，生产期按规模与合规二选 Pinecone/PGVector 是务实路径。",
+          "followups": [
+            "HNSW 索引为什么查询快？牺牲了什么？",
+            "元数据过滤在向量搜索前还是后做？区别？"
+          ]
+        }
+      ],
+      "masteryCheck": {
+        "level": "V2",
+        "type": "code-challenge",
+        "description": "用 Chroma 存 1000 条文档 embedding，实现带元数据过滤的 top-5 检索；再迁移到 PGVector 对比查询延迟"
+      },
+      "status": "reviewed",
+      "lastVerified": "2026-07-25"
     }
   ],
   "tracks": [
@@ -1120,22 +2260,101 @@
         {
           "index": 2,
           "title": "生产级 RAG",
-          "goal": "全链路检索增强 + 评估驱动调优（待策展）"
+          "goal": "全链路检索增强 + 评估驱动调优（embedding/切分/向量库/混合检索/重排/评测/生产管线）"
         },
         {
           "index": 3,
           "title": "Agent 系统",
-          "goal": "LangGraph 编排、MCP 工具生态、HITL 安全闸（待策展）"
+          "goal": "LangGraph 编排、MCP 工具生态、记忆与状态、HITL 安全闸"
         },
         {
           "index": 4,
           "title": "工程化与交付",
-          "goal": "Eval 体系、可观测、安全、Capstone 端到端交付（待策展）"
+          "goal": "Eval 体系、可观测、安全、成本优化、生产部署、Capstone 端到端交付"
         }
       ]
     }
   ],
   "rubrics": [
+    {
+      "id": "project-agent-system",
+      "title": "生产级 Agent 系统 · 构建验证评分细则",
+      "criteria": [
+        {
+          "id": "orchestration",
+          "description": "LangGraph StateGraph 编排，节点图清晰，含条件路由与回退，非单线 ReAct 循环",
+          "weight": 20
+        },
+        {
+          "id": "tools",
+          "description": "至少 3 个工具含 1 个危险操作，工具描述清晰，参数校验完整",
+          "weight": 15
+        },
+        {
+          "id": "memory",
+          "description": "三层记忆（结构化 state + 滑动窗口 + 长期记忆），trajectory 不爆上下文",
+          "weight": 15
+        },
+        {
+          "id": "hitl-safety",
+          "description": "HITL 安全闸完整（工具分级 + 危险操作暂停确认 + 审计日志 + 速率限制）",
+          "weight": 20
+        },
+        {
+          "id": "stuck-detection",
+          "description": "卡住检测与恢复（结构化检测 + 预算硬上限 + 回滚或降级策略）",
+          "weight": 15
+        },
+        {
+          "id": "observability",
+          "description": "每步 trajectory 落盘可回放，token 成本统计，附 3 个真实场景的运行日志",
+          "weight": 15
+        }
+      ],
+      "passScore": 70
+    },
+    {
+      "id": "project-capstone",
+      "title": "端到端 AI 工程化系统 · Capstone 评分细则",
+      "criteria": [
+        {
+          "id": "integration",
+          "description": "RAG + Agent 集成（Agent 调用 RAG 工具多步推理），非孤立功能堆砌",
+          "weight": 15
+        },
+        {
+          "id": "eval-system",
+          "description": "完整 eval 体系（离线标注集 50+ + LLM-as-judge + 黄金集 10+），附改动前后对比报告",
+          "weight": 20
+        },
+        {
+          "id": "observability",
+          "description": "全链路 trace 串联检索/重排/生成/工具调用，成本与质量双监控，配告警",
+          "weight": 15
+        },
+        {
+          "id": "security",
+          "description": "安全纵深（prompt 注入防御 + HITL + 最小权限 + 审计日志），附 10 条注入攻击测试结果",
+          "weight": 15
+        },
+        {
+          "id": "cost-optimization",
+          "description": "成本优化（缓存分层 + 分级路由 + 速率限制），附优化前后成本对比数据",
+          "weight": 10
+        },
+        {
+          "id": "production-readiness",
+          "description": "生产就绪（模型版本锁定 + 灰度策略 + 降级链 + SLO 定义），附降级链演练记录",
+          "weight": 15
+        },
+        {
+          "id": "documentation",
+          "description": "完整文档（架构图 + 部署指南 + eval 报告 + 安全测试），可被面试官独立评审",
+          "weight": 10
+        }
+      ],
+      "passScore": 75
+    },
     {
       "id": "project-cli-llm-tool",
       "title": "CLI LLM 批处理工具 · 构建验证评分细则",
@@ -1164,6 +2383,43 @@
           "id": "cost-awareness",
           "description": "统计并输出 token 用量，有基本的成本控制意识",
           "weight": 10
+        }
+      ],
+      "passScore": 70
+    },
+    {
+      "id": "project-rag-pipeline",
+      "title": "生产级 RAG 问答系统 · 构建验证评分细则",
+      "criteria": [
+        {
+          "id": "retrieval-quality",
+          "description": "混合检索（dense + sparse）+ 重排，评测集 recall@5 >= 0.7，附评测报告",
+          "weight": 25
+        },
+        {
+          "id": "chunking",
+          "description": "切分策略针对文档类型定制（非默认固定窗口），附 chunk_size A/B 对比数据",
+          "weight": 15
+        },
+        {
+          "id": "incremental-index",
+          "description": "增量索引实现（文档 hash + 变更队列），或论证为何全量重建更优",
+          "weight": 10
+        },
+        {
+          "id": "evaluation",
+          "description": "50+ 条人工标注评测集，RAGAS 三维度评分（faithfulness/answer relevancy/context relevancy）报告",
+          "weight": 20
+        },
+        {
+          "id": "observability",
+          "description": "全链路 trace（每步延迟可回放），查询日志落盘，召回率漂移监控",
+          "weight": 15
+        },
+        {
+          "id": "production-readiness",
+          "description": "失败降级链（向量库挂→BM25→缓存→兜底），语义缓存，部署文档",
+          "weight": 15
         }
       ],
       "passScore": 70
