@@ -16,7 +16,7 @@
 //   - 全屏 Modal 打断用户流，与"专注工具应克制"的设计哲学冲突
 //   - ring（56px 圆环）= 专注中无打扰，card（280px 浮窗）= idle/completed 承载表单
 //   - hidden = 无 session 且用户未主动打开，不渲染任何浮窗（视觉零负担）
-//   - expanded = 用户主动放大查看（2026-07-25 新增），100%/80vh 贴底浮层，仍不使用 Modal
+//   - expanded = 用户主动放大查看（2026-07-25 新增），100%/100% 贴底浮层，仍不使用 Modal
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";

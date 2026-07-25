@@ -50,11 +50,12 @@ import { PomodoroFullContent } from "@/components/PomodoroFullContent";
  * Widget 四态：
  * - "hidden"：无 session 且用户未主动打开（不渲染任何浮窗）
  * - "ring"：圆环小浮窗（running session 时显示）
- * - "card"：卡片浮窗（idle/completed 时显示，承载表单）
- * - "expanded"：放大态浮窗（用户点"放大"后展开为大尺寸面板）
- *   - 2026-07-25 新增：用户反馈需要更大的番茄钟视图
- *   - 放大前记录原 left（position.x），放大后 width:100%/height:80vh/bottom:0/left:0
- *   - 缩小时还原原 left（position.x 未被修改，自然保留）
+ * - "card"：卡片浮窗（completed 时显示休息建议，无放大按钮）
+ * - "expanded"：放大态浮窗（用户主动打开时默认进入此态）
+ *   - 2026-07-25 用户需求：大弹框默认高度 100%（原 80vh），移除放大/缩小按钮，默认最大
+ *   - 触发方式：POMODORO_OPEN_EVENT → setMode("expanded")
+ *   - 尺寸：width:100% / height:100% / bottom:0 / left:0（全屏最大）
+ *   - 不再有"缩小"按钮，用户只能关闭（关闭后回到 ring/hidden）
  */
 type WidgetMode = "hidden" | "ring" | "card" | "expanded";
 
@@ -307,11 +308,12 @@ export function PomodoroWidget() {
   }, []);
 
   // 监听全局事件：HomeClient / TrainClient / CurrentTaskCard 派发 POMODORO_OPEN_EVENT
-  // → 唤醒 card 浮窗。即使无 running session 也能打开（PomodoroFullContent 内有 idle 表单）
+  // → 唤醒 expanded 浮窗（默认最大，100% 高度）。即使无 running session 也能打开
+  // 2026-07-25 用户需求：大弹框默认高度 100%，移除放大缩小按钮，默认最大
   useEffect(() => {
-    const openCard = () => setMode("card");
-    window.addEventListener(POMODORO_OPEN_EVENT, openCard);
-    return () => window.removeEventListener(POMODORO_OPEN_EVENT, openCard);
+    const openExpanded = () => setMode("expanded");
+    window.addEventListener(POMODORO_OPEN_EVENT, openExpanded);
+    return () => window.removeEventListener(POMODORO_OPEN_EVENT, openExpanded);
   }, []);
 
   // ring 模式下，从 card 切回时重新吸附（带 200ms transition）
@@ -550,24 +552,10 @@ export function PomodoroWidget() {
     }
   }, [session]);
 
-  // 放大：从 card 切到 expanded
-  // 放大前记录原 left（position.x），放大后 width:100%/height:80vh/bottom:0/left:0
-  // 实现说明：position 状态在 expanded 期间不被修改，所以原 left 自然保留；
-  // 这里用 ref 显式记录便于调试和未来扩展（如动画过渡需要原位置作起点）
-  const prevLeftRef = useRef<number | null>(null);
-  const handleExpand = useCallback(() => {
-    if (position) {
-      prevLeftRef.current = position.x;
-    }
-    setMode("expanded");
-  }, [position]);
-
-  // 缩小：从 expanded 切回 card，还原原 left
-  // position.x 在 expanded 期间未被修改，这里无需额外还原；
-  // 但若 prevLeftRef 有值则做一致性校验（防御性）
-  const handleShrink = useCallback(() => {
-    setMode("card");
-  }, []);
+  // 2026-07-25 用户需求：移除放大/缩小按钮，大弹框默认 100% 高度，默认最大
+  // CardWidget 不再有"放大"按钮，ExpandedWidget 不再有"缩小"按钮
+  // 用户打开 widget 默认进入 expanded 态（在 POMODORO_OPEN_EVENT 监听器中处理）
+  // expanded 期间不修改 position.x，关闭后回到 ring/hidden 时 position 自然保留
 
   // PomodoroFullContent 回调：用户点"开始专注"/"开始休息"后切回 ring
   const handleStart = useCallback(() => {
@@ -619,15 +607,14 @@ export function PomodoroWidget() {
   // hidden 态：不渲染
   if (mode === "hidden" || !position) return null;
 
-  // expanded 态：放大版浮窗（width:100%/height:80vh/bottom:0/left:0）
+  // expanded 态：放大版浮窗（width:100%/height:100%/bottom:0/left:0）
+  // 2026-07-25 用户需求：默认高度 100%（原 80vh），移除"缩小"按钮，默认最大
   // 与 card 共享 PomodoroFullContent，但容器尺寸不同
-  // 缩小按钮 → 切回 card，position.x 未被修改 → 原 left 自然还原
   if (mode === "expanded") {
     return (
       <ExpandedWidget
         widgetRef={widgetRef}
         onClose={handleCardClose}
-        onShrink={handleShrink}
       >
         <PomodoroFullContent
           onStart={handleStart}
@@ -638,13 +625,13 @@ export function PomodoroWidget() {
   }
 
   // card 态：渲染卡片浮窗 + PomodoroFullContent
+  // 2026-07-25：移除 onExpand（不再有"放大"按钮，card 仅在完成态展示，不可手动放大）
   if (mode === "card") {
     return (
       <CardWidget
         widgetRef={widgetRef}
         position={position}
         onClose={handleCardClose}
-        onExpand={handleExpand}
         onPointerDown={handleCardPointerDown}
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
@@ -887,13 +874,13 @@ function RingWidget({
 }
 
 // ============ CardWidget：卡片浮窗（替代原 large Modal）============
+// 2026-07-25：移除 onExpand / "放大"按钮（用户需求：移除放大缩小按钮，默认最大）
+// Card 仅在 session 完成态展示休息建议，用户若想看大视图可重新触发 POMODORO_OPEN_EVENT
 
 interface CardWidgetProps {
   widgetRef: React.RefObject<HTMLDivElement | null>;
   position: WidgetPosition;
   onClose: () => void;
-  /** 放大回调：切到 expanded 态 */
-  onExpand: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -905,7 +892,6 @@ function CardWidget({
   widgetRef,
   position,
   onClose,
-  onExpand,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -930,7 +916,7 @@ function CardWidget({
         maxHeight: `${CARD_MAX_HEIGHT}px`,
       }}
     >
-      {/* Header（可拖动区域）：标题 + 放大 + 关闭按钮 */}
+      {/* Header（可拖动区域）：标题 + 关闭按钮（2026-07-25 移除"放大"按钮） */}
       <div
         data-card-header
         className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing shrink-0"
@@ -942,20 +928,6 @@ function CardWidget({
           </h2>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            iconOnly
-            size="sm"
-            variant="ghost"
-            aria-label="放大"
-            title="放大"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpand();
-            }}
-            className="-mr-0.5"
-          >
-            <Icon name="maximize" className="w-4 h-4" />
-          </Button>
           <Button
             iconOnly
             size="sm"
@@ -981,27 +953,25 @@ function CardWidget({
 
 // ============ ExpandedWidget：放大态浮窗 ============
 // 2026-07-25 用户需求：
-//   - 大的番茄时钟宽度=100%，高度=80%，bottom=0，left=0
-//   - 缩小时还原原来的 left（position.x 在父组件中未被修改，自然保留）
+//   - 大的番茄时钟宽度=100%，高度=100%（原 80vh），bottom=0，left=0
+//   - 移除"缩小"按钮（默认最大，无需手动切换）
 //   - 不使用 Modal 组件（PomodoroWidget 守护测试禁止 JSX Modal），用 fixed 浮层实现
 //
 // 与 CardWidget 的差异：
-//   - 尺寸：100% width / 80vh height（vs CardWidget 280px / max 420px）
+//   - 尺寸：100% width / 100% height（vs CardWidget 280px / max 420px）
 //   - 定位：left:0, bottom:0（vs CardWidget 跟随 position 状态）
 //   - 圆角：仅顶部圆角（贴底显示，桌面端居中可考虑 sm: 居中）
-//   - Header：拖动禁用（贴底浮层不需要拖动），增加"缩小"按钮
+//   - Header：拖动禁用（贴底浮层不需要拖动），无"缩小"按钮
 
 interface ExpandedWidgetProps {
   widgetRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
-  onShrink: () => void;
   children: React.ReactNode;
 }
 
 function ExpandedWidget({
   widgetRef,
   onClose,
-  onShrink,
   children,
 }: ExpandedWidgetProps) {
   return (
@@ -1015,10 +985,10 @@ function ExpandedWidget({
         left: 0,
         bottom: 0,
         width: "100%",
-        height: "80vh",
+        height: "100%",
       }}
     >
-      {/* Header：标题 + 缩小 + 关闭按钮（不可拖动） */}
+      {/* Header：标题 + 关闭按钮（不可拖动，2026-07-25 移除"缩小"按钮） */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="tomato" className="w-4 h-4 text-red-500 shrink-0" />
@@ -1027,17 +997,6 @@ function ExpandedWidget({
           </h2>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            iconOnly
-            size="sm"
-            variant="ghost"
-            aria-label="缩小"
-            title="缩小"
-            onClick={onShrink}
-            className="-mr-0.5"
-          >
-            <Icon name="minimize" className="w-4 h-4" />
-          </Button>
           <Button
             iconOnly
             size="sm"

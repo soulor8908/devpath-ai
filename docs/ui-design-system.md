@@ -467,7 +467,7 @@ const DIFFICULTY_COLORS = {
 | 浮动按钮层 | `z-50` | `<FloatingChatButton>` | [components/FloatingChatButton.tsx](file:///workspace/components/FloatingChatButton.tsx) | 右下角 AI 对话入口（与 Nav 同层，靠 `bottom-20` 让位 Nav） |
 | 模态层 | `z-[60]` | 统一 `<Modal>` | [components/ui/Modal.tsx](file:///workspace/components/ui/Modal.tsx) | 内置 focus trap + ESC + 焦点恢复 + body lock；`mobilePosition="bottom"`（默认，贴底）/ `"center"`（居中，用于 ModelConfigModal 等配置类弹窗） |
 | 学习页脑图浮按钮 | `z-50` | `<Button>` fixed right-4 bottom-32 | `app/learn/[planId]/PlanDetailClient.tsx` | 脑图悬浮小图标，点击展开脑图 Modal |
-| 番茄 widget 浮窗层 | `z-[80]` | `<PomodoroWidget>` ring/card 态 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 三态浮窗：`hidden`（不渲染）/ `ring`（56px 圆环）/ `card`（280×420 卡片）；不再使用 Modal |
+| 番茄 widget 浮窗层 | `z-[80]` | `<PomodoroWidget>` ring/card/expanded 态 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 四态浮窗：`hidden`（不渲染）/ `ring`（56px 圆环）/ `card`（280×420 卡片，完成态）/ `expanded`（100%×100% 全屏，默认打开）；不再使用 Modal |
 | 番茄拖动遮罩 | `z-[90]` | card 拖动时的全屏透明遮罩 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 阻止拖动期间触发其他点击；仅在拖动中渲染 |
 | 番茄长按菜单 | `z-[100]` | card 长按弹出的操作菜单 | [components/PomodoroWidget.tsx](file:///workspace/components/PomodoroWidget.tsx) | 重置 / 切换模式 / 关闭 等操作；仅 card 态长按触发 |
 
