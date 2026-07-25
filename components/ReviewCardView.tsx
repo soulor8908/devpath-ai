@@ -14,6 +14,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { useAskAI } from "@/lib/hooks/use-ask-ai";
 import { openChatModal } from "@/lib/chat-modal-store";
+import { AnswerContent } from "@/components/CodeBlock";
 
 const RATINGS: { value: Rating; label: string; icon: IconName; color: string }[] = [
   { value: 1, label: "Again", icon: "frown", color: "bg-red-500" },
@@ -47,20 +48,23 @@ export function ReviewCardView({ card, onRate }: Props) {
   });
 
   // 答案区域：选文字问 AI（仅展开后渲染容器，hook 仍可无条件调用）
-  const backAsk = useAskAI({
-    onAskAI: (selectedText) => {
-      const prefill = `关于复习题「${card.front}」的答案片段：\n\n> ${selectedText}\n\n请帮我深入理解这段内容。`;
-      openChatModal({
-        prefill,
-        source: {
-          type: "question",
-          id: card.questionId,
-          title: card.front,
-          planId: card.planId,
-        },
-      });
-    },
-  });
+  // 2026-07-25 用户需求：复习题答案里的代码要用代码编辑器查看
+  // 改用 AnswerContent（已在 QuestionCard/TrainSessionFlow/KnowledgeBrief/ChatClient 复用）
+  // - 自动解析 ```lang ... ``` 代码块并用 CodeBlock 渲染（行号+高亮+折叠+复制）
+  // - 其余文本走轻量 markdown（标题/列表/引用/行内代码等）
+  // - 内置 useAskAI 浮层，与原 backAsk 行为一致，故不再单独 useAskAI
+  const backAskOnAI = (selectedText: string) => {
+    const prefill = `关于复习题「${card.front}」的答案片段：\n\n> ${selectedText}\n\n请帮我深入理解这段内容。`;
+    openChatModal({
+      prefill,
+      source: {
+        type: "question",
+        id: card.questionId,
+        title: card.front,
+        planId: card.planId,
+      },
+    });
+  };
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-sm">
@@ -84,14 +88,11 @@ export function ReviewCardView({ card, onRate }: Props) {
         </Button>
       ) : (
         <>
-          <div
-            id="review-answer-panel"
-            ref={backAsk.containerRef}
-            className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap mb-4 p-3 bg-gray-50 dark:bg-gray-900/60 rounded"
-          >
-            {card.back}
-            {backAsk.floatingButton}
-          </div>
+          <AnswerContent
+            text={card.back}
+            onAskAI={backAskOnAI}
+            className="text-sm text-gray-700 dark:text-gray-200 mb-4 p-3 bg-gray-50 dark:bg-gray-900/60 rounded"
+          />
           <div className="grid grid-cols-4 gap-2">
             {RATINGS.map((r) => (
               <Button
