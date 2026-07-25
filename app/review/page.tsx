@@ -11,7 +11,7 @@
 //   - 答错（Again）自动加入错题本
 //   - 完成后展示统计
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { listItems, setItem, delItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
@@ -53,6 +53,26 @@ const BIGTECH_OPTIONS: { value: ReviewFilters["bigTech"]; label: string }[] = [
 ];
 
 export default function ReviewPage() {
+  // 2026-07-25 修复发布失败：
+  // Next.js 15 要求使用 useSearchParams 的客户端组件必须被 <Suspense> 包裹，
+  // 否则静态生成（prerender）会报错 "useSearchParams() should be wrapped in a suspense boundary"。
+  // 这里把实际内容拆到 ReviewPageContent，外层用 Suspense 包裹。
+  // fallback 用简单的 loading 文案，避免白屏。
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[50vh] text-sm text-gray-400 dark:text-gray-500">
+          <Icon name="loader" className="w-5 h-5 mr-2 animate-spin" />
+          加载中...
+        </div>
+      }
+    >
+      <ReviewPageContent />
+    </Suspense>
+  );
+}
+
+function ReviewPageContent() {
   const searchParams = useSearchParams();
   // 2026-07-25 交互闭环：从首页/计划详情点进来的复习任务，
   // URL 会带 planId/nodeId/cardId/date 等场景参数，

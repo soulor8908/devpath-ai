@@ -1197,6 +1197,9 @@ export default function PlanDetailClient() {
           onClose={handleMindMapDismiss}
           size="xl"
           fillHeight
+          // 2026-07-25：脑图弹框最小高度 80vh，确保画布有足够空间展示节点
+          // Modal 默认 max-h-[90vh]，加 min-h-[80vh] 后高度区间 [80vh, 90vh]
+          className="min-h-[80vh]"
           title={
             <span className="flex items-center gap-2">
               <Icon name="target" className="w-5 h-5 text-blue-500" />
