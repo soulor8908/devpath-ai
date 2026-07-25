@@ -53,6 +53,10 @@ export const SYNC_PREFIXES = [
   KEY_PREFIXES.PROMPT,
   KEY_PREFIXES.REMINDER,
   KEY_PREFIXES.DAILY_LOG,
+  // V3/V4 课程验证层：掌握状态、项目评审、作品集跨设备同步
+  KEY_PREFIXES.MASTERY_STATE,
+  KEY_PREFIXES.PROJECT_REVIEW,
+  KEY_PREFIXES.PORTFOLIO,
 ] as const;
 
 // 不在前缀体系内但需要同步的独立 key

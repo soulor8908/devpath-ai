@@ -4,7 +4,7 @@
 // 本地开发/测试：无 env.KV 时降级为内存 Map（mock）
 
 import type { KVNamespace } from "../ai/cloudflare-env";
-import type { PublicProfile, UserBackup, Achievement } from "../types";
+import type { PublicProfile, UserBackup, Achievement, PublicPortfolio } from "../types";
 
 export interface PublicStats {
   username: string;
@@ -56,6 +56,16 @@ export interface KVStore {
    * @returns 自增后的新计数
    */
   incrementRateLimitCount(userId: string, scene: string, date: string): Promise<number>;
+  /**
+   * 读取某用户的公开作品集（V4 发布的项目）。
+   * 不存在返回 null（用户尚未发布任何作品）。
+   */
+  getPortfolio(username: string): Promise<PublicPortfolio | null>;
+  /**
+   * 覆盖写入某用户的公开作品集（整体替换）。
+   * 客户端维护完整列表后整体上传（与 setPublicAchievements 同构）。
+   */
+  setPortfolio(username: string, portfolio: PublicPortfolio): Promise<void>;
 }
 
 interface KVLike {
@@ -179,6 +189,18 @@ export function createKVStore(envKV?: KVLike): KVStore {
       const next = current + 1;
       await kv.put(`ratelimit:${userId}:${scene}:${date}`, String(next));
       return next;
+    },
+    async getPortfolio(username) {
+      const raw = await kv.get(`portfolio:${username}`);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as PublicPortfolio;
+      } catch {
+        return null;
+      }
+    },
+    async setPortfolio(username, portfolio) {
+      await kv.put(`portfolio:${username}`, JSON.stringify(portfolio));
     },
   };
 }

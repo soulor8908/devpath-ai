@@ -63,4 +63,20 @@ export const KEY_PREFIXES = {
    * 排除同步：静态资源人人相同，同步会污染 KV backup 配额（见 lib/sync.ts SYNC_PREFIXES）。
    */
   KB_INDEX: "kb_index:",
+  /**
+   * 课程节点掌握状态（V1-V4 验证）：mastery_state:<nodeId>
+   * 存 MasteryStateRecord（state + 各级验证历史）。
+   * 对应 lib/curriculum/verification.ts 的 MasteryState 状态机。
+   */
+  MASTERY_STATE: "mastery_state:",
+  /**
+   * V3 项目评审记录：project_review:<id>
+   * 存 ProjectReviewRecord（提交内容 + AI 按 Rubric 评分 + 通过判定）。
+   */
+  PROJECT_REVIEW: "project_review:",
+  /**
+   * V4 作品集条目：portfolio:<id>
+   * 存 PortfolioEntry（项目元信息 + 关联节点 + 发布状态）。
+   */
+  PORTFOLIO: "portfolio:",
 } as const;

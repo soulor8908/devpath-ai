@@ -16,3 +16,4 @@ export * from "./engine";
 export * from "./achievement";
 export * from "./constants";
 export * from "./curriculum";
+export * from "./portfolio";
