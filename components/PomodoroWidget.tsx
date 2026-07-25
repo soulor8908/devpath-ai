@@ -47,17 +47,16 @@ import { Icon } from "@/components/Icon";
 import { PomodoroFullContent } from "@/components/PomodoroFullContent";
 
 /**
- * Widget 四态：
+ * Widget 三态（2026-07-25 用户需求：删除中弹框态，只保留小图和全屏两态）：
  * - "hidden"：无 session 且用户未主动打开（不渲染任何浮窗）
- * - "ring"：圆环小浮窗（running session 时显示）
- * - "card"：卡片浮窗（completed 时显示休息建议，无放大按钮）
- * - "expanded"：放大态浮窗（用户主动打开时默认进入此态）
- *   - 2026-07-25 用户需求：大弹框默认高度 100%（原 80vh），移除放大/缩小按钮，默认最大
- *   - 触发方式：POMODORO_OPEN_EVENT → setMode("expanded")
+ * - "ring"：圆环小浮窗（running session 时显示，可拖动，位置持久化）
+ * - "expanded"：全屏浮窗（用户主动打开 / 倒计时归零完成时显示）
+ *   - 触发方式：POMODORO_OPEN_EVENT / ring 点击 / 倒计时归零自动完成
  *   - 尺寸：width:100% / height:100% / bottom:0 / left:0（全屏最大）
- *   - 不再有"缩小"按钮，用户只能关闭（关闭后回到 ring/hidden）
+ *   - expanded 期间不修改 position，关闭后回到 ring 时小图位置自然保留
+ *   - 关闭逻辑：有 running session → ring；无 → hidden
  */
-type WidgetMode = "hidden" | "ring" | "card" | "expanded";
+type WidgetMode = "hidden" | "ring" | "expanded";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -177,9 +176,7 @@ function snapToNearestEdge(
 
 /** ring 模式尺寸：直径 56px */
 const RING_SIZE = 56;
-/** card 模式尺寸：宽 280px，最大高度 420px（idle 表单 + 今日统计） */
-const CARD_WIDTH = 280;
-const CARD_MAX_HEIGHT = 420;
+// 2026-07-25：card 态已删除（CARD_WIDTH / CARD_MAX_HEIGHT 不再需要）
 
 export function PomodoroWidget() {
   const [session, setSession] = useState<PomodoroSession | null>(null);
@@ -207,16 +204,21 @@ export function PomodoroWidget() {
   const completingRef = useRef<string | null>(null);
 
   // 单一事实源（卡帕西视角）：
-  // 把"倒计时归零 → 完成 → 切 card 浮窗"状态机收归到 widget，
-  // ring / card 两种形态共享同一套生命周期。
+  // 把"倒计时归零 → 完成 → 切 expanded 浮窗"状态机收归到 widget，
+  // ring / expanded 两种形态共享同一套生命周期。
   //
-  // 2026-07-23 UI 重设计后的状态机：
+  // 2026-07-25 用户需求：删除中弹框（card 态），只保留小图（ring）和全屏（expanded）两态
+  //   原状态机：
   //   - focus 完成（归零）→ notify + completeSession + setMode("card")
-  //     （不自动创建 break，让用户在 card 的 completed 视图主动选择"开始休息"或"再来一个"）
   //   - break 完成（归零）→ notify + completeSession + setMode("card")
-  //     （让用户在 card 的 idle 视图主动开始下一个 focus）
   //   - ring 态：focus/break running/paused 时显示
   //   - card 态：idle/completed 时显示
+  //   新状态机：
+  //   - focus 完成（归零）→ notify + completeSession + setMode("expanded")
+  //   - break 完成（归零）→ notify + completeSession + setMode("expanded")
+  //   - ring 态：focus/break running/paused 时显示（小图）
+  //   - expanded 态：用户主动唤起 / 倒计时归零完成时显示（全屏）
+  //   expanded 期间不修改 position.x，关闭后回到 ring 时 position 自然保留（小图位置不变）
   const refresh = useCallback(async () => {
     const active = await getActiveSession();
 
@@ -247,10 +249,11 @@ export function PomodoroWidget() {
         // 1.2 完成 session（写 LearnLog、清 current flag、派发 change 事件）
         await completeSession(active.id);
 
-        // 1.3 切到 card 态让用户看 completed 视图（focus）或 idle 视图（break）
-        // 不再自动创建 break session：用户在 card 的 completed 视图主动点"开始休息"
+        // 1.3 切到 expanded 态让用户看 completed 视图（focus）或 idle 视图（break）
+        // 2026-07-25 改动：原 setMode("card") 改为 setMode("expanded")
+        // 原因：删除 card 态，统一用 expanded（全屏）展示完成态
         // PomodoroFullContent 重新挂载后会检测"10s 内完成的 focus session"→ completed 视图
-        setMode("card");
+        setMode("expanded");
       } catch (e) {
         console.error("[pomodoro-widget] auto-complete failed:", e);
       } finally {
@@ -264,10 +267,10 @@ export function PomodoroWidget() {
     if (latest) {
       setRemainingMs(computeRemainingMs(latest));
       setProgress(computeProgress(latest));
-      // 有 running session 时自动切到 ring（除非用户正在 card 里操作）
-      // 但如果当前是 card 态且 session 是 running，说明用户刚点了"开始专注"
+      // 有 running session 时自动切到 ring（除非用户正在 expanded 里操作）
+      // 但如果当前是 expanded 态且 session 是 running，说明用户刚点了"开始专注"
       // → 此时应该切到 ring（PomodoroFullContent 的 onStart 回调已处理）
-      // 这里不强制切换，避免覆盖用户主动打开 card 的意图
+      // 这里不强制切换，避免覆盖用户主动打开 expanded 的意图
     } else {
       notifiedRef.current = null;
     }
@@ -348,7 +351,8 @@ export function PomodoroWidget() {
 
   /**
    * Pointer Events 拖动（ring 态）：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素。
-   * 拖动距离 < 5px 视为点击（触发 card 浮窗）。
+   * 拖动距离 < 5px 视为点击（触发 expanded 全屏浮窗）。
+   * 2026-07-25 改动：原 setMode("card") 改为 setMode("expanded")，删除中弹框态
    */
   const handleRingPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -404,9 +408,10 @@ export function PomodoroWidget() {
       }
       dragStateRef.current = null;
 
-      // 拖动距离 < 5px → 视为点击 → 打开 card 浮窗
+      // 拖动距离 < 5px → 视为点击 → 打开 expanded 全屏浮窗
+      // 2026-07-25 改动：原 setMode("card") 改为 setMode("expanded")
       if (!dragMovedRef.current) {
-        setMode("card");
+        setMode("expanded");
         return;
       }
 
@@ -444,106 +449,15 @@ export function PomodoroWidget() {
     [],
   );
 
-  /**
-   * Pointer Events 拖动（card 态）：与 ring 类似，但尺寸不同。
-   * 拖动距离 < 5px 视为点击（不触发任何操作，card 内部有自己的交互）。
-   */
-  const handleCardPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      // 仅在 header 区域启动拖动（避免拖动冲突内部按钮/输入）
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-card-header]")) return;
-      if (!position) return;
-      if (e.button !== 0 && e.pointerType === "mouse") return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      dragMovedRef.current = false;
-      dragStateRef.current = {
-        pointerId: e.pointerId,
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startWidgetX: position.x,
-        startWidgetY: position.y,
-      };
-    },
-    [position],
-  );
+  // 2026-07-25 用户需求：删除中弹框（card 态），只保留小图（ring）和全屏（expanded）两态
+  // - ring 点击 → expanded（全屏）
+  // - 倒计时归零 → expanded（全屏，展示 completed 视图）
+  // - 用户主动派发 POMODORO_OPEN_EVENT → expanded
+  // - expanded 关闭：有 running session → ring；无 → hidden
+  // - expanded 期间不修改 position.x，关闭后回到 ring 时 position 自然保留（小图位置不变）
+  // 已删除：CardWidget 组件、handleCardPointerDown/Move/Up 拖拽逻辑、card 渲染分支
 
-  const handleCardPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragStateRef.current;
-      if (!drag || drag.pointerId !== e.pointerId) return;
-      const dx = e.clientX - drag.startClientX;
-      const dy = e.clientY - drag.startClientY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-        dragMovedRef.current = true;
-      }
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      // card 高度用当前实际高度（从 DOM 读取）
-      const cardH = widgetRef.current?.offsetHeight ?? CARD_MAX_HEIGHT;
-      const next = clampPosition(
-        { x: drag.startWidgetX + dx, y: drag.startWidgetY + dy },
-        vw,
-        vh,
-        CARD_WIDTH,
-        cardH,
-      );
-      if (widgetRef.current) {
-        widgetRef.current.style.left = `${next.x}px`;
-        widgetRef.current.style.top = `${next.y}px`;
-      }
-    },
-    [],
-  );
-
-  const handleCardPointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragStateRef.current;
-      if (!drag || drag.pointerId !== e.pointerId) return;
-      try {
-        e.currentTarget.releasePointerCapture(drag.pointerId);
-      } catch {
-        /* ignore */
-      }
-      dragStateRef.current = null;
-      if (!dragMovedRef.current) return; // 点击不处理
-
-      const left = widgetRef.current?.style.left;
-      const top = widgetRef.current?.style.top;
-      if (left && top) {
-        const x = parseFloat(left);
-        const y = parseFloat(top);
-        if (Number.isFinite(x) && Number.isFinite(y)) {
-          const vw = window.innerWidth;
-          const vh = window.innerHeight;
-          if (widgetRef.current) {
-            const cardH = widgetRef.current.offsetHeight;
-            const snapped = snapToNearestEdge(
-              { x, y },
-              vw,
-              vh,
-              CARD_WIDTH,
-              cardH,
-            );
-            widgetRef.current.style.transition =
-              "left 200ms ease-out, top 200ms ease-out";
-            widgetRef.current.style.left = `${snapped.x}px`;
-            widgetRef.current.style.top = `${snapped.y}px`;
-            setPosition(snapped);
-            savePosition(snapped);
-            window.setTimeout(() => {
-              if (widgetRef.current) {
-                widgetRef.current.style.transition = "";
-              }
-            }, 220);
-          }
-        }
-      }
-    },
-    [],
-  );
-
-  // card 关闭：若有 running session → 切 ring；否则 → hidden
+  // expanded/ring 关闭逻辑：若有 running session → 切 ring；否则 → hidden
   const handleCardClose = useCallback(() => {
     if (session && session.status !== "completed") {
       setMode("ring");
@@ -551,11 +465,6 @@ export function PomodoroWidget() {
       setMode("hidden");
     }
   }, [session]);
-
-  // 2026-07-25 用户需求：移除放大/缩小按钮，大弹框默认 100% 高度，默认最大
-  // CardWidget 不再有"放大"按钮，ExpandedWidget 不再有"缩小"按钮
-  // 用户打开 widget 默认进入 expanded 态（在 POMODORO_OPEN_EVENT 监听器中处理）
-  // expanded 期间不修改 position.x，关闭后回到 ring/hidden 时 position 自然保留
 
   // PomodoroFullContent 回调：用户点"开始专注"/"开始休息"后切回 ring
   const handleStart = useCallback(() => {
@@ -607,9 +516,12 @@ export function PomodoroWidget() {
   // hidden 态：不渲染
   if (mode === "hidden" || !position) return null;
 
-  // expanded 态：放大版浮窗（width:100%/height:100%/bottom:0/left:0）
-  // 2026-07-25 用户需求：默认高度 100%（原 80vh），移除"缩小"按钮，默认最大
-  // 与 card 共享 PomodoroFullContent，但容器尺寸不同
+  // expanded 态：全屏浮窗（width:100%/height:100%/bottom:0/left:0）
+  // 2026-07-25 用户需求：删除中弹框态，统一用全屏展示完成态
+  // - 用户主动唤起（POMODORO_OPEN_EVENT）→ expanded
+  // - 倒计时归零自动完成 → expanded（展示 completed 视图）
+  // - ring 小图点击 → expanded
+  // expanded 期间不修改 position，关闭后回到 ring 时小图位置自然保留
   if (mode === "expanded") {
     return (
       <ExpandedWidget
@@ -621,27 +533,6 @@ export function PomodoroWidget() {
           onStartBreak={handleStartBreak}
         />
       </ExpandedWidget>
-    );
-  }
-
-  // card 态：渲染卡片浮窗 + PomodoroFullContent
-  // 2026-07-25：移除 onExpand（不再有"放大"按钮，card 仅在完成态展示，不可手动放大）
-  if (mode === "card") {
-    return (
-      <CardWidget
-        widgetRef={widgetRef}
-        position={position}
-        onClose={handleCardClose}
-        onPointerDown={handleCardPointerDown}
-        onPointerMove={handleCardPointerMove}
-        onPointerUp={handleCardPointerUp}
-        onPointerCancel={handleCardPointerUp}
-      >
-        <PomodoroFullContent
-          onStart={handleStart}
-          onStartBreak={handleStartBreak}
-        />
-      </CardWidget>
     );
   }
 
@@ -873,95 +764,13 @@ function RingWidget({
   );
 }
 
-// ============ CardWidget：卡片浮窗（替代原 large Modal）============
-// 2026-07-25：移除 onExpand / "放大"按钮（用户需求：移除放大缩小按钮，默认最大）
-// Card 仅在 session 完成态展示休息建议，用户若想看大视图可重新触发 POMODORO_OPEN_EVENT
-
-interface CardWidgetProps {
-  widgetRef: React.RefObject<HTMLDivElement | null>;
-  position: WidgetPosition;
-  onClose: () => void;
-  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerCancel: (e: React.PointerEvent<HTMLDivElement>) => void;
-  children: React.ReactNode;
-}
-
-function CardWidget({
-  widgetRef,
-  position,
-  onClose,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  children,
-}: CardWidgetProps) {
-  return (
-    <div
-      ref={widgetRef}
-      role="dialog"
-      aria-modal="false"
-      aria-label="番茄专注"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      className="fixed z-[80] touch-none select-none bg-white dark:bg-gray-800 rounded-card shadow-floating border border-gray-200 dark:border-gray-700 flex flex-col animate-slide-up"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: `${CARD_WIDTH}px`,
-        maxHeight: `${CARD_MAX_HEIGHT}px`,
-      }}
-    >
-      {/* Header（可拖动区域）：标题 + 关闭按钮（2026-07-25 移除"放大"按钮） */}
-      <div
-        data-card-header
-        className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing shrink-0"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <Icon name="tomato" className="w-4 h-4 text-red-500 shrink-0" />
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-            番茄专注
-          </h2>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            iconOnly
-            size="sm"
-            variant="ghost"
-            aria-label="关闭"
-            onClick={onClose}
-            className="-mr-1"
-          >
-            <Icon name="x" className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-      {/* 内容区：可滚动，不响应拖动（避免与内部交互冲突） */}
-      <div
-        className="flex-1 min-h-0 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 touch-auto"
-        style={{ touchAction: "auto" }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// ============ ExpandedWidget：放大态浮窗 ============
+// ============ ExpandedWidget：全屏浮窗 ============
 // 2026-07-25 用户需求：
-//   - 大的番茄时钟宽度=100%，高度=100%（原 80vh），bottom=0，left=0
-//   - 移除"缩小"按钮（默认最大，无需手动切换）
+//   - 删除中弹框（card）态，只保留小图（ring）和全屏（expanded）两态
+//   - 大的番茄时钟宽度=100%，高度=100%，bottom=0，left=0
 //   - 不使用 Modal 组件（PomodoroWidget 守护测试禁止 JSX Modal），用 fixed 浮层实现
-//
-// 与 CardWidget 的差异：
-//   - 尺寸：100% width / 100% height（vs CardWidget 280px / max 420px）
-//   - 定位：left:0, bottom:0（vs CardWidget 跟随 position 状态）
-//   - 圆角：仅顶部圆角（贴底显示，桌面端居中可考虑 sm: 居中）
-//   - Header：拖动禁用（贴底浮层不需要拖动），无"缩小"按钮
+//   - expanded 期间不修改 position，关闭后回到 ring 时小图位置自然保留
+//   - 倒计时归零自动完成时也用 expanded 展示 completed 视图（原 card 态的职责）
 
 interface ExpandedWidgetProps {
   widgetRef: React.RefObject<HTMLDivElement | null>;
