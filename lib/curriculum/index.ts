@@ -6,3 +6,5 @@ export * from "./loader";
 export * from "./graph";
 export * from "./path-engine";
 export * from "./verification";
+export * from "./mastery-store";
+export * from "./portfolio-store";
