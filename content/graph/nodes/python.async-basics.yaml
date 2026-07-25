@@ -26,21 +26,52 @@ gotchas:
 interview:
   - q: asyncio 和 JS 的 Promise 模型有什么本质区别？
     answerSkeleton: >-
-      asyncio 与 JS Promise 模型有四处本质差异：第一，语法同源但调度不同——JS 的 Promise 创建即执行，
-      asyncio 的协程是惰性的，必须显式 await 或 asyncio.create_task 才会调度，忘 await 会静默不执行
-      （只 RuntimeWarning）；第二，生态割裂——Python 同步/异步是两个世界，在协程里调 time.sleep 或
-      requests 会冻结整个事件循环，必须用 asyncio.sleep / httpx，而 JS 的 async 是统一生态；第三，
-      GIL 限制——asyncio 只解决 IO 密集，CPU 密集任务要 multiprocessing 或 offload；第四，并发原语对应
-      ——asyncio.gather ≈ Promise.all，asyncio.create_task ≈ 启动后台 Promise，但错误处理不同
-      （gather 默认传播首个异常，其余仍跑，要 return_exceptions=True 显式控制）。适用场景一致：都是 IO
-      密集型的吞吐量优化。前端迁移映射：心智模型直接平移，但"两套库"是最大坑——记住在 async 函数里
-      调阻塞 IO 会冻结整个事件循环。
+      【分层原理】四处本质差异。一是调度模型：JS 的 Promise 创建即急切执行，Python 协程是惰性
+      的——调用 async 函数只返回一个协程对象，必须显式 await 或 create_task 才会被调度；忘
+      await 不报错，只静默不执行（一个常被忽略的 RuntimeWarning），这是 JS 里没有对应物的最
+      危险差异。二是生态割裂：JS 的 async 是统一生态，Python 同步/异步是两个平行世界——协程
+      里调 time.sleep 或 requests 会冻结整个事件循环，必须换 asyncio.sleep / httpx。三是并发
+      边界：GIL 之下 asyncio 只解决 IO 密集，CPU 密集任务放协程里跑和同步没区别，得上
+      multiprocessing 或 run_in_executor。四是原语对应但语义有别：gather ≈ Promise.all，但
+      默认传播首个异常、其余任务照跑，要 return_exceptions=True 才等价于 allSettled。
+      【实际案例】我在 LLM 网关服务里做批量评测：100 条 prompt 并发打模型。第一版用 for 循环
+      逐个 await，总耗时 210 秒——协程惰性意味着根本没并发，是串行；改 asyncio.gather 后降到
+      28 秒，接近最慢单条。接着踩第二坑：其中一条超时抛异常，gather 默认把它直接抛上来，其余
+      99 条的结果全丢；改 return_exceptions=True 再按异常类型分流，才把"部分失败"处理对，
+      评测报告从"全或无"变成逐条记录状态。【举一反三】心智平移前端：create_task ≈ 启动一个
+      不用等的后台 Promise，gather ≈ Promise.all，Semaphore ≈ p-limit。事件循环阻塞则完全
+      对应前端"长任务卡主线程"——只是 Python 里的凶手通常是同步库而不是重计算。【扣分点对照】
+      背八股的会背"协程是轻量级线程"；真写过的能讲出 for 循环假并发、gather 异常传播语义坑，
+      以及同步库冻结事件循环的具体事故形态。
     followups:
-      - 为什么 CPU 密集任务用 asyncio 没收益？该用什么？
-      - gather 与 TaskGroup 的错误处理差异？
+      - 为什么 CPU 密集任务用 asyncio 没收益？该用什么？（提示：GIL 与单线程事件循环）
+      - gather 与 asyncio.TaskGroup 的错误处理差异？（提示：结构化并发、异常组）
+      - 怎么限制并发数？（提示：Semaphore，类比前端的 p-limit）
+  - q: 在 async 函数里调了同步阻塞库会发生什么？讲一个真实事故。
+    answerSkeleton: >-
+      【分层原理】事件循环是单线程协作式调度：所有协程跑在同一线程上，靠 await 主动让出控制权
+      实现"你方唱罢我登场"。一旦某个协程执行同步阻塞调用（requests.get、time.sleep、大文件
+      同步读写），它不会让出——整个线程被占住，事件循环里排队的所有协程全部饿死。表现不是
+      报错，而是系统"慢慢卡死"：延迟飙升、健康检查超时，但 CPU 占用可能并不高（线程阻塞在
+      IO 等待上）。这正是它的阴险之处：功能测试一切正常，压力一上来才现形，且重启能暂时
+      缓解，极具迷惑性。【实际案例】我们的 FastAPI 对话服务上线第一周，p99 延迟每到晚高峰就
+      从 400ms 飙到 8 秒，重启就好。翻监控发现事件循环 lag 尖峰和"查询用户画像"接口的调用
+      完全重合——那个接口实现里用了 requests 调内部用户服务。一个请求阻塞 2 秒，期间整个
+      worker 上几百个 SSE 流式响应全部停住，用户看到的就是"打字打到一半卡住"。修复是换
+      httpx.AsyncClient，并加事件循环 lag 监控告警，p99 回落到 500ms 以内再没复发。从此
+      Code Review 清单第一条：async 路径里出现 requests/urllib/time.sleep 一律打回。
+      【举一反三】这和前端"长任务阻塞主线程、动画掉帧"是同构事故，解法也同构：要么换异步
+      版本（fetch ≈ httpx），要么把阻塞任务扔出主线程（Web Worker ≈ run_in_executor）。CPU
+      密集任务同理——asyncio 救不了大文件解析，得 ProcessPool。【扣分点对照】背题答案是
+      "会阻塞事件循环"一句话；真处理过事故的能讲出"功能正常、高峰期 p99 爆炸、重启缓解"
+      的迷惑性表现，以及用事件循环 lag 监控定位根因的方法论。
+    followups:
+      - 怎么检测事件循环被阻塞了？（提示：loop lag 监控、slow_callback_duration 类指标）
+      - 第三方库只有同步版本怎么办？（提示：run_in_executor 的代价与线程池大小）
+      - httpx 和 aiohttp 怎么选？（提示：同步/异步双 API、生态与维护状态）
 masteryCheck:
   level: V2
   type: code-challenge
   description: 用 httpx + asyncio.gather 并发请求 10 个 URL，要求总耗时接近最慢单个请求而非总和，并正确处理部分失败
 status: reviewed
-lastVerified: "2026-07-24"
+lastVerified: "2026-07-25"

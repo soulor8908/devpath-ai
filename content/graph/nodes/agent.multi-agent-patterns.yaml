@@ -1,0 +1,75 @@
+id: agent.multi-agent-patterns
+title: 多 Agent 编排模式
+summary: 单 Agent 能解决的别上多 Agent——多 Agent 是复杂度与调试成本的跃迁。值得上的场景：上下文必须隔离、能力边界清晰、可并行。模式就三种：supervisor、handoff、pipeline。
+tracks: [frontend-to-ai-engineer]
+phase: 3
+prerequisites: [agent.langgraph-orchestration]
+estimatedMinutes: 120
+difficulty: 4
+frontendBridge: >-
+  多 Agent ≈ 前端从"单页面大组件"拆成"微前端"。拆分理由不是"显得高级"，而是
+  边界清晰（各自上下文）、独立演进（各自 prompt/模型）、并行执行。代价也一样：
+  通信协议、状态一致性、调试链路全都变复杂。
+concepts:
+  - Supervisor 模式：一个调度 Agent 分派任务给专家 Agent，专家只做被分配的事——中心化管理
+  - Handoff 模式：Agent 之间按规则移交对话控制权（如客服里售前→售后），像状态机流转
+  - Pipeline 模式：固定流水线（检索Agent→写作Agent→审校Agent），无自主调度，最可预测
+  - 何时值得多 Agent：上下文需隔离（各自焦点不被稀释）/ 能力边界清晰 / 子任务可并行
+  - 何时别用：任务本身线性简单——多 Agent 的错误率、成本、调试难度都高于单 Agent
+sourceIds: [langgraph-docs, anthropic-effective-agents]
+gotchas:
+  - 多 Agent 的错误会级联放大：A 判断错了，B 在错误前提上继续做——层间要有校验与熔断
+  - Agent 间传递原始长上下文会抵消隔离收益——传"结论 + 必要证据"而非全部历史
+  - 并行 Agent 的结果合并是隐性难点：冲突结论的仲裁策略要在设计期定好
+interview:
+  - q: 什么时候该用多 Agent 架构？单 Agent 和多 Agent 的边界在哪里？
+    answerSkeleton: >-
+      【分层原理】判断标准三条，满足两条以上才值得。一是上下文隔离需求：一个
+      Agent 处理"代码审查 + 文案写作 + 数据分析"时，三类任务的上下文互相稀释，
+      拆开各自专注；二是能力边界清晰：子任务需要的工具集、prompt、甚至模型都
+      不同（检索用小模型快、写作用大模型好）；三是可并行：子任务无依赖可同时
+      跑，延迟收益真实存在。反过来，线性简单的任务（查个数据写段总结）上单
+      Agent 就够——多 Agent 把一次调用变成 N 次调度，成本、延迟、错误率、
+      调试难度全面上升。Anthropic 的工程建议也是这个口径：从最简单的方案
+      起步，能单 Agent 不编排，编排里能 pipeline 不 supervisor。【实际案例】
+      我做过一个投研助手，最初是单 Agent 挂 12 个工具，bad case 集中在"用错
+      工具"和"前面查新闻的结论污染后面财务分析"。拆成 supervisor + 三个专家
+      （新闻/财务/写作）后：专家各自只挂 3-4 个工具，工具误用率从 14% 降到
+      3%；上下文隔离让财务分析不再被新闻情绪带偏。代价是调度层要多跑一次
+      LLM，整体成本涨 40%——我们用"简单查询 supervisor 直接答、不派发"
+      把涨幅压回 15%。【举一反三】这和前端组件拆分判断同构：不是"大就该拆"，
+      而是"状态互相污染、职责各自演进、可并行渲染"才拆。【扣分点对照】把
+      多 Agent 当架构银弹的是追热点；能说出三条判断标准、级联错误风险和
+      调度成本的，才是权衡过的人。
+    followups:
+      - Supervisor 本身的判断错了怎么办？怎么校验调度质量？
+      - 多 Agent 系统的调试链路怎么搭（一个最终结果错了，怎么定位是哪个 Agent 的锅）？
+  - q: Supervisor、Handoff、Pipeline 三种编排模式有什么区别？各适合什么业务？
+    answerSkeleton: >-
+      【分层原理】三者的控制权分布不同。Pipeline：流程写死，A→B→C 依次执行，
+      无自主决策——最可预测、最好调试，适合步骤固定的内容生产（检索→写作→
+      审校发布）；Supervisor：中心调度器看任务决定派给谁、派几个、何时收尾
+      ——灵活但调度器是单点智能瓶颈，适合任务类型多但每个专家边界清晰的
+      场景（投研助手、数据分析平台）；Handoff：对话控制权在 Agent 间按规则
+      移交，当前 Agent 判断"这不该我管"就转交——适合有明确流程状态的业务
+      （客服：售前咨询→下单→售后工单；审批流 Agent）。【实际案例】我在客服
+      项目里用 Handoff：售前 Agent 发现用户问"我的订单怎么还没发票"时，按
+      规则转交售后 Agent，并把对话中的订单号、用户诉求压缩成"交接摘要"传给
+      下一个——注意不是把全部历史丢过去，而是交接摘要，否则上下文隔离就
+      白做了。踩过的坑是"乒乓移交"：两个 Agent 互相判定该对方管，用户被
+      踢来踢去。解法是给移交加最大次数 + 移交历史记录，出现环路就兜底转
+      人工。【举一反三】三种模式在前端对应三种状态管理：Pipeline ≈ 中间件
+      链（Express/Koa），Supervisor ≈ 中央 store 调度（Redux），Handoff ≈
+      状态机（XState）——选型逻辑一模一样：流程固定用链式，决策复杂用
+      中央调度，状态明确用状态机。【扣分点对照】背三个名词定义的没搭过；
+      能讲出交接摘要、乒乓移交兜底、调度器是智能瓶颈这些细节的，才是
+      真编排过。
+    followups:
+      - Handoff 的"交接摘要"应该包含什么？丢什么信息会出事？
+      - 并行 Agent 的结论冲突时，仲裁策略有哪些？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 设计一个电商客服多 Agent 系统：画出 supervisor/handoff 选择理由、Agent 划分与工具边界、交接摘要结构、乒乓移交与级联错误的防护方案
+status: reviewed
+lastVerified: "2026-07-25"

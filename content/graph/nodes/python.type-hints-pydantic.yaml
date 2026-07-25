@@ -25,21 +25,54 @@ gotchas:
 interview:
   - q: 为什么 Python 有了 type hints 还需要 Pydantic？
     answerSkeleton: >-
-      Python 有了 type hints 还需要 Pydantic 的根本原因是 type hints 只在静态检查（mypy/pyright）时生效，
-      运行时完全不强制——而真实世界的运行时数据（网络响应、用户输入、LLM 输出）从来不可信。type hints 是
-      "文档 + lint"，Pydantic 是"运行时闸门"：它提供 BaseModel 声明式 schema、运行时校验、类型 coercion
-      （可配置严格度）、序列化（model_dump / model_validate）、错误结构化（ValidationError）。在 AI 工程中
-      Pydantic 是 LLM 输出的第一道类型闸门——配合 Structured Outputs 用 schema 约束生成，再用 Pydantic
-      校验解析结果，失败时把 ValidationError 信息回喂模型重试。生态集成是关键：FastAPI、LangChain 全部建立
-      在 Pydantic 之上。前端迁移映射：type hints ≈ TypeScript 类型标注，Pydantic ≈ Zod——你在前端用 Zod
-      校验 API 响应的心智直接平移，区别是 Pydantic 在 Python 生态渗透更深。Tradeoff：strict 模式不自动
-      coercion，处理 LLM 输出要明确选择严格还是宽松。
+      【分层原理】因为两者工作在不同阶段、解决不同问题。静态层：type hints 是 mypy/pyright 的
+      输入，在 CI 里把类型错误挡在运行之前，但运行时完全不生效——def f(x: int) 传个字符串
+      照样跑。运行时层：程序边界处的数据（网络响应、用户输入、LLM 输出）从来不可信，type
+      hints 管不着；Pydantic 的 BaseModel 提供声明式 schema、运行时校验与类型 coercion、
+      结构化错误（ValidationError）、显式序列化边界（model_validate/model_dump）。一句话：
+      type hints 保证"我自己写的代码类型自洽"，Pydantic 保证"外部进来的数据符合我的假设"。
+      在 AI 工程里它还有第三个角色：LLM 输出的第一道类型闸门——先用 schema 约束生成
+      （Structured Outputs），再用 Pydantic 校验解析结果。【实际案例】我做"从工单文本抽
+      结构化字段"功能时，LLM 返回 JSON，我们定义 TicketModel（priority 枚举、due_date 日期、
+      tags 列表）。上线前抽查发现 12% 的输出字段类型漂移——日期给成"下周三"、priority 自创
+      中文枚举值。靠 Pydantic 校验拦下漂移、把 ValidationError 的错误路径回喂模型重试，两轮
+      后合格率从 88% 提到 99.2%；没有校验的基线版本则是脏数据直接写库，下游报表错了一周才被
+      发现。【举一反三】前端映射就是 Zod：你用 Zod 校验 API 响应的心智完全平移，区别是
+      Pydantic 在 Python 生态渗透更深——FastAPI 的请求校验、LangChain 的输出解析全建在它
+      之上。strict 模式的选择也对应 Zod 的 strict：处理 LLM 输出建议 lax（"1" 转 1 是特性），
+      处理金融数据建议 strict。【扣分点对照】背八股的答案是"type hints 是注释、Pydantic 做
+      校验"一句带过；真做过的能讲清静态层/运行时层的分工，并举出 LLM 输出漂移被校验拦下、
+      错误回喂重试的具体闭环。
     followups:
-      - Pydantic 校验失败的错误信息结构是怎样的？怎么用于 LLM 输出重试？
-      - strict 模式与 lax 模式各自适合什么场景？
+      - Pydantic 校验失败的错误结构长什么样？（提示：errors() 的 loc/msg/type 三要素）
+      - strict 与 lax 模式各自适合什么场景？（提示：LLM 输出 vs 金融数据）
+      - v1 迁 v2 最大的坑是什么？（提示：parse_obj→model_validate、validator 装饰器重写）
+  - q: 怎么让 LLM 稳定输出合法的结构化数据？校验失败怎么办？
+    answerSkeleton: >-
+      【分层原理】稳定结构化输出是四层防御体系，不是一句"让它输出 JSON"。第一层生成约束：用
+      Structured Outputs/response_format 把 JSON Schema 注入解码过程，模型在 token 级别就被
+      限制只能生成合法结构——这是最强的一层。第二层运行时校验：Pydantic model_validate 解析
+      结果，捕获"结构对但语义错"的情况（枚举越界、数值离谱、日期漂移）。第三层重试闭环：
+      校验失败时把 ValidationError 的 errors()（loc 字段路径、msg 错误消息）格式化成自然语言
+      回喂模型，让它针对性修正，通常两到三轮收敛。第四层兜底降级：重试耗尽仍失败时落人工队列
+      或返回降级结果，绝不让脏数据进库。【实际案例】我做的简历解析服务，最初只在 prompt 里写
+      "请输出 JSON"，合格率只有 81%，剩下 19% 是 markdown 代码块包裹、字段漂移、枚举自创值。
+      上 Structured Outputs 后结构错误归零，但语义错误还在——把"3 年经验"解析成 30 年。加
+      Pydantic 校验加错误回喂重试（最多 2 轮），合格率到 98.7%，平均 token 消耗只涨 11%。
+      关键细节：回喂的错误要转成模型能懂的自然语言路径（"work_experience 第 2 条的 years
+      应为整数"），直接把 ValidationError 原文丢给它，修正成功率差一大截。【举一反三】这就是
+      前端表单校验的全链路思维：生成约束 ≈ input type=number（输入时就限制）、Pydantic ≈ Zod
+      提交前校验、重试闭环 ≈ 校验失败标红让用户改、兜底 ≈ 禁用提交。"永不信任外部输入"的
+      肌肉记忆，在 LLM 时代只是换了个数据源。【扣分点对照】背八股只说"让它输出 JSON 再
+      try-except"；真做过的能分清四层防御各自的职责，讲出 Structured Outputs 与 Pydantic 解决
+      的是不同层级的错误，以及重试时错误信息格式化的工程细节。
+    followups:
+      - 重试最多几轮合适？重试的成本雪球怎么控制？（提示：边际收益递减、token 计费）
+      - 模型不支持 Structured Outputs 怎么办？（提示：few-shot 加校验重试兜底）
+      - 结构对但语义错的数据怎么进一步拦截？（提示：业务规则 validator、抽样人工复核）
 masteryCheck:
   level: V2
   type: code-challenge
   description: 定义 3 个 Pydantic 模型校验一组含脏数据的 JSON，编写 pytest 断言校验行为与错误消息
 status: reviewed
-lastVerified: "2026-07-24"
+lastVerified: "2026-07-25"

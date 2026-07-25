@@ -25,21 +25,51 @@ gotchas:
 interview:
   - q: Python 的列表和元组有什么区别？工程上怎么选？
     answerSkeleton: >-
-      list 与 tuple 的本质差异是可变性：list 可变（append/pop/in-place 修改），tuple 不可变。
-      由此派生两个工程意义：一是 tuple 在元素全部可哈希时可哈希，能作为 dict 的 key 或 set 的元素
-      （注意是"元素全部可哈希"才成立——tuple 里套 list 照样不可哈希，这是资深面试官爱挖的坑），
-      list 不行；二是语义约定——tuple 表"固定结构的记录"（如坐标、数据库行），list 表"同质集合"。
-      性能上 tuple 略快且内存更省，但这是微优化不应作为首选依据。选择规则：字段位置稳定、长度不变
-      用 tuple；需要增删或长度可变用 list。前端迁移映射：tuple ≈ TypeScript 的 readonly tuple 类型
-      （如 [string, number]），list ≈ T[]。Tradeoff：不可变带来 hashable 与线程安全，但失去灵活性
-      ——这也是 React 状态要用不可变更新的同源理由。坑点：可变默认参数（def f(x=[])）会在多次调用间
-      共享状态，是经典面试陷阱，用 None + 内部赋值规避。
+      【分层原理】list 与 tuple 的本质差异是可变性，由此派生三个层面。行为层：list 可变
+      （append/pop/原地改），tuple 创建后不可改，所以 tuple 在元素全部可哈希时可哈希，能做
+      dict 的 key 和 set 的元素——注意是"元素全部可哈希"才成立，tuple 里套 list 照样抛
+      unhashable 错误，这是资深面试官爱挖的边界。语义层：tuple 表"固定结构的记录"（坐标、
+      数据库行、函数多返回值），list 表"同质集合"，读代码的人一看容器类型就知道意图。性能层：
+      tuple 内存更省、创建略快，但这是微优化，不该作为选型依据。【实际案例】我在数据管道项目里
+      用 dict 做去重缓存，key 是 (user_id, date) 二元组，一切正常；后来需求加了标签维度，同事
+      图省事把 key 改成嵌了 list 的 tuple，直接 TypeError: unhashable type 打爆线上日志。更隐蔽
+      的一次是缓存的 value 存了 list 引用，别处原地 append 了一个元素，缓存命中率从 92% 掉到
+      71%，排查半天才发现 key 没变但 value 被"隔空改了"——从此团队约定：跨函数传递的固定结构
+      一律 tuple 或 NamedTuple，返回值多于一个时不塞 list 充数。【举一反三】这个可变性思维映射回
+      前端就是 TypeScript 的 readonly tuple vs T[]，也是 React 状态必须不可变更新的同源理由——
+      不可变换来可哈希、可比较、可预测。另一个迁移点：Python 函数 return a, b, c 实际返回的是
+      tuple，这就是能 a, b, c = f() 解包的原因。【扣分点对照】背八股的答案是"list 可变 tuple
+      不可变"一句话加"tuple 更快"；真踩过坑的能讲出 unhashable 的具体报错场景、可变容器引用
+      共享引发的缓存污染，以及"tuple 套 list 仍不可哈希"这种边界条件。
     followups:
-      - 不可变对象作为函数默认参数为什么安全？
-      - 深拷贝与浅拷贝在嵌套 list 上的行为差异？
+      - 不可变对象作为函数默认参数为什么安全？（提示：对比 def f(x=[]) 定义时只求值一次的坑）
+      - 深拷贝与浅拷贝在嵌套 list 上的行为差异？（提示：copy.copy 只拷外层，内层仍是引用）
+      - tuple 里套 list 能当 dict 的 key 吗？为什么？（提示：哈希是否递归到所有元素）
+  - q: 用 JS 的思维写 Python，最容易踩的坑有哪些？
+    answerSkeleton: >-
+      【分层原理】JS 工程师转 Python 的坑集中在三处。第一处是可变默认参数：Python 的默认参数
+      在函数定义时只求值一次、所有调用共享同一个对象，def f(item, box=[]) 里那个 list 跨调用
+      共享——而 JS 的默认参数每次调用都重新求值，思维直接平移必中招。第二处是 is vs ==：is
+      比较对象身份（内存地址），== 比较值；小整数和短字符串因驻留机制 is 偶然为真，让人误以为
+      is 能当 == 用，换台机器、换个数据规模就翻车。第三处是闭包与作用域：Python 没有块级
+      作用域，循环里定义闭包捕获的是同一个变量——对应 JS 里 var 时代 for 循环包 setTimeout
+      的经典题。【实际案例】我在 Flask 后端项目里写过 def collect_tags(tag, tags=[]) 的辅助
+      函数，本地单测怎么跑都对——因为每个测试用例进程独立。上线后用户反馈"别人的标签串到了
+      我的文章上"，排查发现那个默认 list 在多请求间累积，两天污染了三百多篇文章的标签。改成
+      def collect_tags(tag, tags=None) 内部再初始化才根治，并补了 flake8-bugbear 的 B006 规则
+      做团队级防线。is 的坑也踩过：if role is "admin" 在测试环境恰好为真，预发环境就是假，
+      改 == 才稳定。【举一反三】这些坑和 JS 的 var 闭包题同构——都是"绑定时机"理解偏差，
+      解法也同构：用默认参数把循环变量在定义时固定下来。映射回 TS：Python 没有 const 概念，
+      "约定不改"全靠纪律，这正是 tuple 和 NamedTuple 存在的意义。【扣分点对照】背题答案只会
+      复述"可变默认参数有坑"；真写过的能讲出"单测不复现、上线才爆"的状态污染形态，以及用
+      lint 规则把个人教训变成团队防线的工程闭环。
+    followups:
+      - GIL 是什么？它对 Python 并发模型的真实影响是什么？（提示：IO 密集 vs CPU 密集的不同答案）
+      - 装饰器的本质是什么？你写过什么装饰器解决过实际问题？（提示：语法糖 + 闭包 + 函数是一等公民）
+      - 推导式和 map/filter 链在工程上怎么选？（提示：可读性、惰性求值、生成器表达式省内存）
 masteryCheck:
   level: V1
   type: fsrs-cards
   description: 完成 20 张语法对照卡片（TS → Python 映射），FSRS 连续 3 天准确率 ≥85%
 status: reviewed
-lastVerified: "2026-07-24"
+lastVerified: "2026-07-25"

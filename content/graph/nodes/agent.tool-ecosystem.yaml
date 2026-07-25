@@ -24,17 +24,48 @@ gotchas:
 interview:
   - q: MCP 解决了什么问题？它和 Function Calling 是什么关系？
     answerSkeleton: >-
-      MCP 解决的是"工具碎片化"问题：在 MCP 之前，每个 Agent 框架（LangChain/AutoGen/OpenAI Assistants）
-      各自定义工具接口，一个工具要被多个 Agent 用就得为每个框架写适配——N 个 Agent × M 个工具 =
-      N×M 份胶水代码。MCP 定义了"工具如何被发现、被调用、被授权"的统一协议，任何 MCP server 可被
-      任何 MCP-compatible Agent 消费，把 N×M 降到 N+M。它和 Function Calling 的关系是互补：Function
-      Calling 是"模型→工具"的调用协议（模型返回 tool_call，你执行），MCP 是"工具→生态"的复用协议
-      （工具自描述能力，Agent 动态加载）。一个 Agent 可以用 Function Calling 调用从 MCP server 动态
-      发现的工具。前端迁移映射：MCP ≈ 工具的 USB-C，接口设计决定生态质量。Tradeoff：MCP 是进程间
-      通信有启动开销，且不解决"工具太多选择准确率下降"的问题——工具治理仍需上层做。
+      【分层原理】MCP 解决"工具生态碎片化"。在它之前，每个 Agent 框架自定义工具接口，一个工具想被
+      多个 Agent 用就得写 N 份适配——N 个 Agent×M 个工具=N×M 份胶水代码。MCP 用统一协议规定三件
+      事：工具怎么被发现（server 自描述 list_tools）、怎么被调用（JSON Schema 定义参数与返回）、
+      怎么被授权（Host 层确认），把 N×M 降到 N+M。三角色分工：Host 是 Agent 宿主（如 IDE、桌面
+      应用），Client 是 Host 内与 server 保持一对一连接的协议层，Server 是工具的真正实现（读数据库、
+      调 API）。和 Function Calling 是互补的两层：Function Calling 是"模型→宿主"的调用协议（模型
+      输出 tool_call，宿主执行），管的是"模型怎么表达想调工具"；MCP 是"宿主→工具生态"的供给
+      协议，管的是"工具从哪来、怎么接入"。一个 Host 完全可以把 MCP server 发现的工具转成 Function
+      Calling 的 tools 参数喂给模型。【实际案例】我在内部数据平台项目里体会过 N×M 的痛：三个
+      Agent（报表、客服、巡检）各自硬编码了同一套数据库查询工具，SQL 方言升级要改三处，还漏改一处
+      导致线上报错。抽成 MCP server 后工具只维护一份，三个 Agent 动态发现，新接一个 Agent 从两天
+      缩到半小时。也踩过坑：MCP server 是独立进程，进程崩了 Agent 侧报"工具不存在"，我们给 server
+      加了健康检查+自动重启，并在 Agent 侧做工具可用性兜底提示，才达到生产可用。【举一反三】前端
+      视角秒懂：MCP ≈ 组件库的 props 接口规范，Function Calling ≈ 组件的实际调用语法——规范让生态
+      可复用，语法让单次调用成立。你写组件库时"接口设计决定生态质量"的直觉完全适用。
+      【扣分点对照】把 MCP 说成"新的函数调用方式、替代 Function Calling"的是概念都没理清；能讲出
+      N×M→N+M、三角色分工、以及 server 进程稳定性治理的，才是真接过 MCP。
     followups:
       - 工具数量到几十上百个时，Agent 怎么选？
       - MCP server 暴露的危险工具怎么防误调用？
+  - q: Agent 调工具返回了几万 token 的结果，会出什么问题？怎么处理？
+    answerSkeleton: >-
+      【分层原理】问题有三层。一是上下文预算：一次返回 5 万 token 可能直接撑爆窗口，trajectory
+      后续步骤被截断。二是注意力稀释：模型在长而杂的工具返回里找不到关键字段，决策质量下降——
+      这是比爆窗更隐蔽的杀手。三是成本：工具返回每轮都在上下文里重复计费，Agent 跑 10 步，这一步
+      的大返回就被付了 10 次钱。处理手法按位置分四招。工具侧：返回结构化摘要而非原始全量（搜索
+      工具只回 top5 标题+摘要，全文要再用专门工具按 id 取），分页/截断参数设计成必填。Agent 侧：
+      大返回落盘或进外存，上下文里只放引用（如文件路径+关键行号），模型需要细节再调工具取——
+      这就是"references not payloads"原则。此外工具权限要最小化：能读就别给写，能查单条就别给
+      全表扫，返回数据按调用方角色过滤——大返回往往和过大权限是同一个病根。【实际案例】我在
+      日志分析 Agent 里实测过：最初 grep 工具直接返回全部匹配行，一次查询返回 3 万多 token，
+      Agent 第 4 步就开始"失忆"，把第 1 步已排除的假设又捡回来分析，且单轮成本涨了 7 倍。改成
+      三段式：grep 只回"匹配数+前 20 行+文件位置"，另加 fetch_lines(file, range) 工具按需取原文，
+      再在 prompt 里写明"先判断需要哪段再取"。改后平均 trajectory 长度降 55%，任务完成率反而从
+      71% 升到 86%——上下文干净了，模型决策就准了。【举一反三】这就是前端列表页"先给摘要、点
+      进去看详情"的交互模式搬到了工具协议上，也是 GraphQL"按需取字段"思想的 Agent 版——别让
+      数据提供方决定粒度，让消费方按需索取。【扣分点对照】只会说"截断一下"的是 Demo 思维；能
+      讲出注意力稀释、重复计费、references-not-payloads 和权限最小化是一套组合拳的，才是真被账单
+      和 bad case 毒打过。
+    followups:
+      - 工具返回的"摘要"由谁生成？工具侧规则摘要和模型侧二次摘要各有什么坑？
+      - 工具权限最小化具体怎么落地（按角色？按会话？）？
 masteryCheck:
   level: V2
   type: code-challenge
