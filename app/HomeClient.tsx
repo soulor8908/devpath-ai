@@ -297,10 +297,19 @@ export default function HomeClient() {
       {/* ============ 2. KPI 三宫格（第 2 阶段：学习+复习合并为单一队列）
           需求 4：第一格「今日学习清单」可点击进入学习（队列第一项或 /learn/new 兜底）
           2026-07-23 优化：第 1 格视觉强化——蓝色渐变背景 + 右上角箭头 + "进入学习"提示，
-          与第 2/3 格（纯展示）形成视觉区分，让"可点击"更明显 ============ */}
+          与第 2/3 格（纯展示）形成视觉区分，让"可点击"更明显
+          2026-07-25 用户需求：学习计划都完成后（队列空），点击应进入「我的学习列表」
+          而不是直接跳新建计划——让用户能选已有知识库做全量学习。
+          规则：队列非空 → 第一项；队列空 + hasPlans → /learn/list；队列空 + !hasPlans → /learn/new ============ */}
       <section className="mb-5 grid grid-cols-3 gap-3">
         <Link
-          href={studyQueue[0] ? (studyQueue[0].type === "review" ? buildSceneUrl("/review", studyQueue[0], "home") : buildSceneUrl(`/learn/${studyQueue[0].planId ?? ""}`, studyQueue[0], "home")) : "/learn/new"}
+          href={
+            studyQueue[0]
+              ? (studyQueue[0].type === "review"
+                  ? buildSceneUrl("/review", studyQueue[0], "home")
+                  : buildSceneUrl(`/learn/${studyQueue[0].planId ?? ""}`, studyQueue[0], "home"))
+              : (hasPlans ? "/learn/list" : "/learn/new")
+          }
           aria-label={`今日学习清单 ${studyQueue.length} 项，点击进入学习`}
           className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/40 dark:to-gray-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all group relative"
         >
@@ -311,7 +320,9 @@ export default function HomeClient() {
           />
           <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{studyQueue.length}</p>
           <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">今日学习清单</p>
-          <p className="text-2xs text-blue-500 dark:text-blue-400 mt-0.5">点击进入学习</p>
+          <p className="text-2xs text-blue-500 dark:text-blue-400 mt-0.5">
+            {studyQueue.length > 0 ? "点击进入学习" : (hasPlans ? "查看学习列表" : "创建学习计划")}
+          </p>
         </Link>
         <div
           aria-label={`今日已完成 ${todayCompletedCount} 项`}
@@ -441,21 +452,35 @@ export default function HomeClient() {
 
       {/* ============ 6. 今日学习队列（需求 4：移到最下面，作为详细视图）
           第 2 阶段：studyQueue 渲染——合并待学+待复习，按 priority 排序
-          需求 3：header 右侧新增「+ 新建计划」入口，跳 /learn/new ============ */}
+          需求 3：header 右侧新增「+ 新建计划」入口，跳 /learn/new
+          2026-07-25 用户需求：当学习列表有数据时（hasPlans），header 入口变为
+          「我的学习列表」→ /learn/list；无数据时保持「+ 新建计划」→ /learn/new。
+          这样用户在做今日队列时也能一键进入全量知识库列表 ============ */}
       <section className="mb-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
             <Icon name="calendar-check" className="w-4 h-4" />
             今日学习队列
           </h2>
-          <Link
-            href="/learn/new"
-            aria-label="新建学习计划"
-            className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
-          >
-            <Icon name="plus" className="w-3.5 h-3.5" />
-            新建计划
-          </Link>
+          {hasPlans ? (
+            <Link
+              href="/learn/list"
+              aria-label="我的学习列表"
+              className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
+            >
+              <Icon name="list" className="w-3.5 h-3.5" />
+              我的学习列表
+            </Link>
+          ) : (
+            <Link
+              href="/learn/new"
+              aria-label="新建学习计划"
+              className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
+            >
+              <Icon name="plus" className="w-3.5 h-3.5" />
+              新建计划
+            </Link>
+          )}
         </div>
 
         {studyQueue.length > 0 ? (
