@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createKVStore } from "../lib/storage/kv";
 import type { PublicProfile } from "../lib/types";
 
@@ -35,5 +35,32 @@ describe("kv", () => {
     await kv.updateStats("bob", { streakDays: 5, totalMinutes: 100 } as any);
     const stats = await kv.getStats("bob");
     expect(stats?.streakDays).toBe(5);
+  });
+
+  it("getUsernameOwner 未绑定时返回 null", async () => {
+    const kv = createKVStore();
+    expect(await kv.getUsernameOwner("alice")).toBeNull();
+  });
+
+  it("claimUsername 后 getUsernameOwner 返回绑定的 userId", async () => {
+    const kv = createKVStore();
+    await kv.claimUsername("alice", "user-1");
+    expect(await kv.getUsernameOwner("alice")).toBe("user-1");
+  });
+
+  it("claimUsername 幂等：同一 userId 重复认领不报错", async () => {
+    const kv = createKVStore();
+    await kv.claimUsername("alice", "user-1");
+    await kv.claimUsername("alice", "user-1");
+    expect(await kv.getUsernameOwner("alice")).toBe("user-1");
+  });
+
+  it("不同 username 的所有权互相隔离", async () => {
+    const kv = createKVStore();
+    await kv.claimUsername("alice", "user-1");
+    await kv.claimUsername("bob", "user-2");
+    expect(await kv.getUsernameOwner("alice")).toBe("user-1");
+    expect(await kv.getUsernameOwner("bob")).toBe("user-2");
+    expect(await kv.getUsernameOwner("carol")).toBeNull();
   });
 });

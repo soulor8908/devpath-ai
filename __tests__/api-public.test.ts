@@ -35,4 +35,20 @@ describe("api-public (via KV mock)", () => {
     const got = await kv.getProfile("ghost");
     expect(got).toBeNull();
   });
+
+  // IDOR 越权防护（Round 3 修复）：
+  // 路由层 PUT 前执行 —— owner = getUsernameOwner(username)
+  //   owner && owner !== session.userId → 403
+  //   !owner → claimUsername(username, session.userId)（首次认领）
+  it("IDOR 防护：username 被认领后，其他 userId 的写入应被路由层拒绝", async () => {
+    const kv = createKVStore();
+    // user-1 首次写入 → 认领 alice
+    await kv.claimUsername("alice", "user-1");
+    // user-2 尝试写入：路由层读 owner 比对 → 不一致 → 403
+    const owner = await kv.getUsernameOwner("alice");
+    expect(owner).toBe("user-1");
+    expect(owner !== "user-2").toBe(true);
+    // user-1 本人写入：owner === session.userId → 放行
+    expect(owner === "user-1").toBe(true);
+  });
 });
