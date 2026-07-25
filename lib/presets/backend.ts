@@ -1,5 +1,5 @@
 // lib/presets/backend.ts
-// 后端工程师（含 AI 后端方向）预设：30 知识节点 + 210 道高频面试题 + 学习计划
+// 后端工程师（含 AI 后端方向）预设：30 知识节点 + 215 道高频面试题 + 学习计划
 // 覆盖：语言基础（Java/Python/Go）→ 数据存储（MySQL/Redis/MQ/NoSQL/ES）→
 //       架构与设计（微服务/分布式/系统设计/高并发/高可用/API）→
 //       运维与工程（容器/CI-CD/监控）→ AI 后端方向（推理/管线/网关/成本/评估）
@@ -310,7 +310,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
   },
 ];
 
-// ===== 面试题（210 道）=====
+// ===== 面试题（215 道）=====
 
 const BACKEND_QUESTIONS: Question[] = [
   // ========== be-java-core（be-1 ~ be-7） ==========
@@ -593,6 +593,47 @@ Deque<Integer> queue = new ArrayDeque<>(); // 比 LinkedList 快
     followUps: ["ArrayList 扩容机制？", "fail-fast 和 fail-safe 区别？"],
     favorited: false,
   },
+  {
+    id: "be-211",
+    nodeId: "be-java-core",
+    question: "epoll 为什么比 select/poll 高效？零拷贝如何减少数据拷贝？",
+    bigTech: true,
+    answer: `select/poll 两大瓶颈：1）每次调用需把全量 fd 集合从用户态拷贝到内核态；2）内核 O(n) 遍历所有 fd 找就绪。epoll 解决：epoll_create 建红黑树，epoll_ctl 注册一次，epoll_wait 只将就绪 fd 放入就绪链表返回（O(就绪数) 而非 O(总数)）。
+触发模式：LT 水平触发（未读完下次还通知，编程简单）；ET 边缘触发（只在状态变化时通知一次，必须非阻塞+循环读到 EAGAIN，性能高）。
+零拷贝：传统 read+write 需 4 次拷贝（磁盘→内核→用户→socket→网卡）+4 次上下文切换；sendfile 数据不经过用户态（内核缓冲区直接拷到 socket 缓冲区）；mmap+write 少一次内核→用户拷贝。应用：Kafka 用 sendfile 投递消息、Nginx 开 sendfile、Netty FileRegion 包装 transferTo。
+
+\`\`\`c
+// epoll 基本用法（C）
+int epfd = epoll_create1(0);
+struct epoll_event ev, events[1024];
+ev.events = EPOLLIN | EPOLLET;  // ET 模式
+ev.data.fd = listen_fd;
+epoll_ctl(epfd, EPOLL_CTL_ADD, listen_fd, &ev);
+while (1) {
+    int n = epoll_wait(epfd, events, 1024, -1); // 只返回就绪 fd
+    for (int i = 0; i < n; i++) {
+        if (events[i].data.fd == listen_fd) accept_conn(epfd);
+        else handle_read(events[i].data.fd); // ET 模式须循环 read 到 EAGAIN
+    }
+}
+// sendfile 零拷贝（内核态直接转发）
+sendfile(out_fd, in_fd, NULL, file_size);
+\`\`\`
+\`\`\`java
+// Java 对应：FileChannel.transferTo 底层即 sendfile（零拷贝）
+FileChannel src = FileChannel.open(Paths.get("a.log"));
+src.transferTo(0, src.size(), socketChannel);
+
+// Nginx 开启零拷贝
+// sendfile on;
+// tcp_nopush on;   // 与 sendfile 配合，攒满包再发
+\`\`\`
+
+踩坑：ET 模式必须配非阻塞 fd 且读到 EAGAIN（否则漏事件）；epoll 在大量短连接场景优势减小（epoll_ctl 开销）；sendfile 不能加密（HTTPS 场景需在用户态加密，零拷贝失效——这也是 QUIC/内核 TLS kTLS 的动机）；select 有 FD_SETSIZE 1024 上限，poll 无但仍是 O(n)。`,
+    keyPoints: ["epoll 红黑树+就绪链表", "ET 边缘触发需读到 EAGAIN", "sendfile 内核态零拷贝"],
+    followUps: ["ET 和 LT 如何选？", "Netty 零拷贝有哪些手段？"],
+    favorited: false,
+  },
 
   // ========== be-java-concurrent（be-8 ~ be-14） ==========
   {
@@ -849,9 +890,9 @@ try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
 }
 \`\`\`
 
-踩坑：synchronized 持锁期间 IO 阻塞会钉住载体线程（pin），要用 ReentrantLock 替代；ThreadLocal 在虚拟线程下可能内存泄漏（百万线程×ThreadLocal）；不要池化虚拟线程，用完即弃。`,
-    keyPoints: ["JVM 调度在载体线程上", "IO 阻塞自动 unmount", "百万级线程"],
-    followUps: ["虚拟线程和 Go goroutine 区别？", "pinning 问题如何排查？"],
+踩坑：JDK 24（JEP 491）已解决 synchronized 钉住载体线程（pin）的问题，老版本才需换 ReentrantLock；ThreadLocal 在虚拟线程下内存开销大且不可跨作用域传递，应改用 ScopedValue（JDK 25 正式转正，JEP 506）——一次绑定、作用域内只读共享，自动随作用域销毁；不要池化虚拟线程，用完即弃。`,
+    keyPoints: ["JVM 调度在载体线程上", "IO 阻塞自动 unmount", "ScopedValue 替代 ThreadLocal"],
+    followUps: ["虚拟线程和 Go goroutine 区别？", "ScopedValue 与 ThreadLocal 差异？"],
     favorited: false,
   },
   {
@@ -1131,7 +1172,7 @@ arthas -> watch com.example.UserService getUser '{params, returnObj}' -x 2
     id: "be-20",
     nodeId: "be-jvm",
     question: "JIT 编译优化有哪些？逃逸分析做了什么？",
-    answer: `JIT（Just-In-Time）将热点代码编译为本地机器码。C1（Client）快速编译，C2（Client）激进优化。热点探测：方法调用计数+回边计数超过阈值（-XX:CompileThreshold=10000）。
+    answer: `JIT（Just-In-Time）将热点代码编译为本地机器码。C1（Client 编译器）快速编译、优化少，C2（Server 编译器）激进优化、编译慢。热点探测：方法调用计数+回边计数超过阈值（-XX:CompileThreshold=10000）。
 优化：内联（方法体嵌入）、逃逸分析（标量替换/栈上分配/同步消除）、循环展开、死代码消除。
 逃逸分析：分析对象作用域，未逃逸的对象可栈上分配（不进堆）、标量替换（拆为基本类型）、消除不必要锁。
 
@@ -4345,7 +4386,7 @@ client := pb.NewOrderServiceClient(conn)
 order, _ := client.GetOrder(ctx, &pb.GetOrderReq{Id: 1})
 \`\`\`
 
-踩坑：gRPC 默认用 HTTP/2（多路复用），不支持 HTTP/1.1；Protobuf 不向前兼容（新增字段用新编号）；大消息用流式避免内存压力。`,
+踩坑：gRPC 默认用 HTTP/2（多路复用），不支持 HTTP/1.1；Protobuf 只要遵守字段编号规则就前后兼容——新增字段必须用未占用的新编号、不得改动或复用旧编号（删除字段用 reserved 声明编号防复用），这样旧代码读新数据忽略未知字段、新代码读旧数据走默认值；大消息用流式避免内存压力。`,
     keyPoints: ["Unary/Server/Client/Bidirectional", "Protobuf 二进制变长编码", "HTTP/2 多路复用"],
     followUps: ["gRPC 拦截器如何实现？", "gRPC 和 REST 何时选？"],
     favorited: false,
@@ -4603,6 +4644,39 @@ func (h *Hub) run() {
     followUps: ["多实例 WebSocket 如何广播？", "WebSocket 如何鉴权？"],
     favorited: false,
   },
+  {
+    id: "be-212",
+    nodeId: "be-go-web",
+    question: "TCP 四次挥手过程？为什么需要 TIME_WAIT？拥塞控制如何工作？",
+    bigTech: true,
+    answer: `四次挥手：主动方发 FIN → 对端 ACK → 对端发 FIN → 主动方 ACK。TIME_WAIT 持续 2MSL（报文最大生存时间的 2 倍），作用有二：1）保证最后一个 ACK 丢失时可重传对端 FIN；2）让旧连接的迟到报文在网络中消散，防止污染新连接（同四元组）。
+拥塞控制四阶段：慢启动（cwnd 指数增长至 ssthresh）→ 拥塞避免（线性增长）→ 快重传（收到 3 个重复 ACK 立即重传，不等超时）→ 快恢复（cwnd 降为 ssthresh 而非 1）。算法演进：Reno → CUBIC（Linux 默认，三次函数窗口增长）→ BBR（Google，测量瓶颈带宽+RTT 主动 pacing，高丢包长肥链路表现更好）。
+
+\`\`\`text
+// 四次挥手状态流转
+主动方: ESTABLISHED → FIN_WAIT_1 → FIN_WAIT_2 → TIME_WAIT → CLOSED
+被动方: ESTABLISHED → CLOSE_WAIT → LAST_ACK → CLOSED
+        （被动方若有数据未发完，ACK 与 FIN 分两次发，所以是 4 次）
+
+// 大量 TIME_WAIT 排查（短连接高并发场景常见）
+ss -ant | grep TIME_WAIT | wc -l
+\`\`\`
+\`\`\`bash
+# TIME_WAIT 治理（优先应用层方案）
+# 1. 根因治理：短连接改长连接/连接池（HTTP Keep-Alive）
+# 2. 让客户端先关连接（TIME_WAIT 留在客户端侧，服务端无压力）
+# 3. 内核参数（谨慎，先评估）：
+net.ipv4.tcp_max_tw_buckets = 262144     # 超过则直接销毁并告警
+net.ipv4.tcp_tw_reuse = 1                # 仅对出站连接安全复用（需开启 timestamps）
+# 4. 切换拥塞控制算法（需内核支持 BBR）
+net.ipv4.tcp_congestion_control = bbr
+\`\`\`
+
+踩坑：tcp_tw_recycle 已在较新内核移除（NAT 环境下会导致丢连接，不要开）；TIME_WAIT 本身不是病，只有占满端口/内存才需治理；CLOSE_WAIT 堆积是应用没 close 连接（代码 bug）；BBR 需要双方支持才生效的说法不对——BBR 是发送方单边算法，部署在自己侧即可受益。`,
+    keyPoints: ["TIME_WAIT 2MSL 两个作用", "慢启动/拥塞避免/快重传/快恢复", "CUBIC 默认/BBR 单边生效"],
+    followUps: ["为什么挥手是四次不是三次？", "CLOSE_WAIT 过多如何排查？"],
+    favorited: false,
+  },
 
   // ========== be-mysql（be-78 ~ be-84） ==========
   {
@@ -4617,7 +4691,10 @@ func (h *Hub) run() {
 -- B+ 树结构
 -- 非叶子节点: [key1|ptr1|key2|ptr2|...|keyN|ptrN]（只存索引+指针）
 -- 叶子节点:   [data1]→[data2]→[data3]→...（双向链表，存完整数据）
--- 3 层 B+ 树: 可存 16KB/117 * 16KB/117 * 16KB/1KB ≈ 2000 万行
+-- 扇出估算: InnoDB 页 16KB，主键 bigint 8B + 页内指针 6B ≈ 14B/条
+--   非叶子节点扇出 ≈ 16KB / 14B ≈ 1170
+--   假设每行数据 1KB，叶子页可存 16 行
+-- 3 层 B+ 树容量: 1170 × 1170 × 16 ≈ 2190 万行（这就是"3 层存千万级"的由来）
 
 -- 聚簇索引 vs 非聚簇索引
 -- 聚簇索引: 叶子节点存完整行数据（主键索引）
@@ -4724,8 +4801,9 @@ SET SESSION transaction_isolation = 'REPEATABLE-READ';
 -- 锁定 age>20 的间隙，其他事务无法插入 age>20 的行
 \`\`\`
 
-踩坑：InnoDB RR 通过 MVCC+间隙锁解决大部分幻读；SERIALIZABLE 性能差几乎不用；Oracle 默认 RC，MySQL 默认 RR（主从复制兼容性）。`,
-    keyPoints: ["RU脏读/RC不可重复读/RR幻读/Serializable", "InnoDB 默认 RR", "间隙锁防幻读"],
+踩坑：InnoDB RR 通过 MVCC+间隙锁解决大部分幻读；SERIALIZABLE 性能差几乎不用；Oracle 默认 RC，MySQL 默认 RR（历史原因：早期 binlog STATEMENT 格式在 RC 下主从不一致）。
+生产选型：互联网大厂普遍用 RC + ROW 格式 binlog——RC 无间隙锁、死锁概率低、锁持有时间短、并发度高；ROW 格式 binlog 记录行级变化，RC 下主从复制依然一致。RR 只在金融级强一致场景（防幻读）或兼容老代码时使用，且要付出间隙锁带来的并发代价。`,
+    keyPoints: ["RU脏读/RC不可重复读/RR幻读/Serializable", "生产普遍 RC+ROW binlog", "间隙锁防幻读"],
     followUps: ["MVCC 如何解决不可重复读？", "间隙锁和 Next-Key 锁区别？"],
     favorited: false,
   },
@@ -4786,8 +4864,10 @@ EXPLAIN SELECT * FROM users WHERE name=123;
     nodeId: "be-mysql",
     question: "美团外卖面试题：订单系统分库分表方案？如何选分片键？",
     bigTech: true,
-    answer: `美团外卖订单系统分库分表：按 user_id 哈希分 64 库 × 64 表 = 4096 张表。分片键选 user_id（用户维度查询最多），保证同一用户订单在同一库表。
+    answer: `美团外卖订单系统分库分表：按 user_id 哈希分库分表（示例规模 64 库 × 64 表 = 4096 张表，实际按容量估算定）。分片键选 user_id（用户维度查询最多），保证同一用户订单在同一库表。
+容量估算（为什么分这么多片）：单表建议控制在千万行级（如 1000 万~2000 万行，B+ 树 3 层以内）；总数据量 = 日单量 × 保留天数（如日 4000 万单 × 365 天 ≈ 146 亿行），146 亿 / 1000 万 ≈ 1460 张表 → 向上取 2 的幂并预留扩容空间 → 1024~4096 张表。
 挑战：跨用户查询（商家看订单）用异构索引/ES；分页跨表用游标分页；分布式事务用最终一致。
+扩容方案：1）预分片——一次性建足够多分片，扩容只迁移分片到新机器（不增分片数，应用无感）；2）一致性哈希——增减节点只迁移约 1/N 数据；3）避免取模扩容（64→128 库需全量数据重哈希迁移，成本极高）。
 
 \`\`\`java
 // ShardingSphere 分库分表配置
@@ -4830,8 +4910,8 @@ List<String> ids = esClient.search("merchant_id:" + merchantId);
 List<Order> orders = orderMapper.selectByIds(ids);
 \`\`\`
 
-踩坑：分片键选错导致跨库查询频繁（选最常用的查询维度）；分页跨表用游标分页（WHERE id>last_id LIMIT 10）；扩容用一致性哈希或预分表（64 库预留扩展到 128）；分布式 ID 用雪花算法。`,
-    keyPoints: ["user_id 哈希分库分表", "异构索引解跨维度查询", "游标分页解跨表"],
+踩坑：分片键选错导致跨库查询频繁（选最常用的查询维度）；分页跨表用游标分页（WHERE id>last_id LIMIT 10）；扩容首选预分片（建库时一次分够）或一致性哈希，避免取模式扩容的全量迁移；分布式 ID 用雪花算法。`,
+    keyPoints: ["user_id 哈希分库分表", "容量估算定分片数", "预分片/一致性哈希扩容"],
     followUps: ["分库分表如何扩容？", "分布式 ID 如何生成？"],
     favorited: false,
   },
@@ -4933,6 +5013,41 @@ ALTER TABLE orders ADD INDEX idx_status (status), ALGORITHM=INPLACE, LOCK=NONE;
     followUps: ["如何在线加索引不锁表？", "大表如何加字段？"],
     favorited: false,
   },
+  {
+    id: "be-213",
+    nodeId: "be-mysql",
+    question: "PostgreSQL 为什么近年复兴？pgvector 与专用向量库如何选型？",
+    bigTech: true,
+    answer: `PG 复兴原因：1）功能全——JSONB 文档能力（GIN 索引可查内部字段）、CTE/window/递归查询、丰富索引类型（B-tree/GIN/GiST/BRIN）；2）扩展生态——PostGIS（地理）、TimescaleDB（时序）、pgvector（向量）、Citus（分布式）；3）开源协议宽松（类 BSD），云厂商纷纷托管（Aurora/Supabase/Neon），社区活跃；4）AI 浪潮——pgvector 让"关系数据+向量"同库查询，省去两套系统。
+pgvector 选型：向量规模百万级以内、需与业务表 JOIN 过滤（先 SQL 过滤再向量召回）、团队已用 PG → pgvector 足够（新版本支持 HNSW 索引，召回质量与性能显著提升）；亿级向量、纯向量高 QPS、需 GPU 加速/复杂标量-向量混合 → 专用库（Milvus/Qdrant/ES）。
+
+\`\`\`sql
+-- pgvector 建表与检索
+CREATE EXTENSION vector;
+CREATE TABLE docs (
+    id BIGSERIAL PRIMARY KEY,
+    content TEXT,
+    embedding vector(1536)  -- 维度与 embedding 模型一致
+);
+-- HNSW 索引（召回质量优于 IVFFlat，构建慢、内存大）
+CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
+-- 混合查询：先业务过滤，再向量 TopK（一个 SQL 完成）
+SELECT id, content, embedding <=> :query_vec AS distance
+FROM docs
+WHERE tenant_id = 42            -- 关系过滤
+ORDER BY embedding <=> :query_vec  -- 余弦距离
+LIMIT 10;
+
+-- PG 逻辑复制（CDC 场景对比 MySQL binlog）
+CREATE PUBLICATION docs_pub FOR TABLE docs;
+-- 订阅端: CREATE SUBSCRIPTION ... CONNECTION '...' PUBLICATION docs_pub;
+\`\`\`
+
+踩坑：MySQL vs PG 选型看团队——互联网生态 MySQL 资料多、中间件全（Canal/ShardingSphere），PG 功能强但运维生态稍弱；pgvector 建 HNSW 索引内存开销大（m/ef_construction 参数需调）；向量维度变更需重建列；PG 无主键表逻辑复制受限（REPLICA IDENTITY 需配置）。`,
+    keyPoints: ["PG 扩展生态+协议宽松", "pgvector HNSW 混合查询", "百万级 PG/亿级专用库"],
+    followUps: ["MySQL 和 PG 的 MVCC 差异？", "向量索引 HNSW vs IVFFlat？"],
+    favorited: false,
+  },
 
   // ========== be-redis（be-85 ~ be-91） ==========
   {
@@ -4950,7 +5065,7 @@ long count = redis.opsForValue().increment("like:count:" + videoId);
 
 // 2. 用户是否点赞 — Bitmap（省内存）
 redis.opsForValue().setBit("like:users:" + videoId, userId, true);
-Boolean liked = redis.opsForValue().getBit("like:count:" + videoId, userId);
+Boolean liked = redis.opsForValue().getBit("like:users:" + videoId, userId);
 
 // 3. 点赞列表 — ZSet（按时间排序）
 redis.opsForZSet().add("like:list:" + videoId, userId, System.currentTimeMillis());
@@ -5085,7 +5200,7 @@ ZRANGEBYSCORE ranking 85 95  # Bob Charlie（范围查询）
 ZREVRANGE ranking 0 2     # Alice Bob Charlie（Top 3）
 \`\`\`
 
-踩坑：跳表层数随机生成（P=0.5 升级概率），最高 32 层；ZSet 元素数<128 且值<64B 时用 ziplist（紧凑存储）；跳表范围查询比红黑树高效（链表连续遍历）。`,
+踩坑：跳表层数随机生成，Redis 实现升级概率为 0.25（ZSKIPLIST_P，即 1/4），最高 32 层（ZSKIPLIST_MAXLEVEL）；ZSet 元素数<128 且值<64B 时用 ziplist（紧凑存储）；跳表范围查询比红黑树高效（链表连续遍历）。`,
     keyPoints: ["多层链表 O(logN)", "跳表+哈希表", "范围查询高效"],
     followUps: ["跳表 vs B+ 树？", "ZSet 何时用 ziplist？"],
     favorited: false,
@@ -5166,8 +5281,8 @@ SET {user:100}:name "Alice"  # {user:100} 决定槽位
 SET {user:100}:age 30        # 同一槽，支持 MGET/事务
 \`\`\`
 
-踩坑：Cluster 不支持跨槽事务/多 key 操作（用 Hash Tag 解决）；扩容迁移时 ASK 重定向不影响正确性但增加延迟；节点故障时从节点升级为主（故障检测+选举）。`,
-    keyPoints: ["CRC16 % 16384 分槽", "MOVED/ASK 重定向", "Hash Tag 跨 key 同槽"],
+踩坑：Cluster 不支持跨槽事务/多 key 操作（用 Hash Tag 解决）；主从切换可能丢数据——Redis 复制是异步的，主节点写入后尚未同步到从节点就宕机，从升主后这批写丢失（WAIT 命令可阻塞等 N 个副本确认，牺牲性能）；cluster-require-full-coverage 默认 yes——只要有槽位未覆盖整个集群拒写（一个主从组全挂则全集群不可用），可设为 no 换取部分可用（其余槽可读写）；扩容迁移时 ASK 重定向不影响正确性但增加延迟；节点故障时从节点升级为主（故障检测+选举）。`,
+    keyPoints: ["CRC16 % 16384 分槽", "异步复制主从切换丢数据", "MOVED/ASK 重定向", "Hash Tag 跨 key 同槽"],
     followUps: ["故障转移如何工作？", "Cluster 和 Codis 区别？"],
     favorited: false,
   },
@@ -5183,8 +5298,8 @@ SET {user:100}:age 30        # 同一槽，支持 MGET/事务
 // 阿里 Cache Aside + 延迟双删
 @Transactional
 public void updateUser(User user) {
-    redis.del("user:" + user.getId());       // 1. 先删缓存
-    userDao.update(user);                     // 2. 更新 DB
+    userDao.update(user);                     // 1. 先更新 DB
+    redis.del("user:" + user.getId());        // 2. 再删缓存
     // 3. 延迟再删（防并发读旧值写回缓存）
     scheduledExecutor.schedule(() -> {
         redis.del("user:" + user.getId());
@@ -5266,8 +5381,8 @@ public String getSharded(String hotKey) {
     nodeId: "be-mq",
     question: "字节面试题：Kafka 架构？为什么高吞吐？",
     bigTech: true,
-    answer: `Kafka 架构：Broker/Topic/Partition/Replica。高吞吐原因：1）顺序写磁盘（600MB/s vs 随机写 100KB/s）；2）零拷贝 sendfile（数据不经过用户空间）；3）批量发送+压缩；4）分区并行。
-字节场景：抖音日志收集用 Kafka，单集群 10w+ Partition，日处理万亿条消息。
+    answer: `Kafka 架构：Broker/Topic/Partition/Replica。高吞吐主因（按贡献排序）：1）Page Cache——写入先落 OS 页缓存异步刷盘，消费命中页缓存，读写大多在内存完成（第一主因）；2）顺序 IO——追加写日志，避免随机寻道（机械盘顺序写可达数百 MB/s 级，比随机写高一个数量级以上）；3）批量发送+压缩（攒批减少网络/IO 次数，压缩降带宽）；4）零拷贝 sendfile（数据不经过用户空间）；5）Partition 并行。
+字节场景：抖音日志收集用 Kafka，单集群上万 Partition，日处理万亿条消息。
 
 \`\`\`bash
 # Kafka 架构
@@ -5307,7 +5422,7 @@ producer.send(new ProducerRecord<>("order-events", orderId, eventJson));
 \`\`\`
 
 踩坑：acks=all 最安全但延迟高（等待所有 ISR 确认）；min.insync.replicas=2 配合 acks=all 防数据丢失；分区数不是越多越好（越多元数据开销越大）。`,
-    keyPoints: ["顺序写+零拷贝+批量", "Partition 并行", "ISR 同步副本"],
+    keyPoints: ["Page Cache 第一主因", "顺序 IO+批量+压缩+零拷贝", "ISR 同步副本"],
     followUps: ["Kafka 如何保证不丢消息？", "分区数如何选择？"],
     favorited: false,
   },
@@ -5363,9 +5478,33 @@ public void process(String msg) {
     doBusiness(msg);
 }
 \`\`\`
+\`\`\`java
+// RocketMQ 对等实现（阿里系常用）
+// 1. 生产者 — 同步发送 + 失败重试
+DefaultMQProducer producer = new DefaultMQProducer("order_group");
+producer.setRetryTimesWhenSendFailed(3);
+SendResult result = producer.send(msg); // 同步等 SendStatus.SEND_OK
+// 更可靠：事务消息（half 消息 + 本地事务 + 回查），保证本地事务与发消息一致
 
-踩坑：自动提交 offset 处理失败时消息丢失（已提交但没处理完）；retries>1 时 max.in.flight>1 可能乱序（设为 1 保顺序）；死信队列要有监控告警。`,
-    keyPoints: ["acks=all+重试", "min.insync.replicas≥2", "手动提交 offset+死信队列"],
+// 2. Broker — 同步刷盘 + 同步复制（牺牲吞吐换可靠）
+// broker.conf:
+// flushDiskType=SYNC_FLUSH      # 默认 ASYNC_FLUSH（宕机可能丢未刷盘数据）
+// brokerRole=SYNC_MASTER        # 默认 ASYNC_MASTER（主从异步复制，主宕机丢数据）
+
+// 3. 消费者 — 业务处理成功才返回 CONSUME_SUCCESS
+consumer.registerMessageListener((MessageListenerConcurrently) (msgs, ctx) -> {
+    try {
+        for (MessageExt m : msgs) process(m);
+        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS; // 失败返回 RECONSUME_LATER
+    } catch (Exception e) {
+        return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+    }
+});
+// 重试 16 次仍失败 → 自动进 %DLQ%topic 死信队列
+\`\`\`
+
+踩坑：自动提交 offset 处理失败时消息丢失（已提交但没处理完）；retries>1 时 max.in.flight>1 可能乱序（设为 1 保顺序）；RocketMQ 默认异步刷盘+异步复制，金融级可靠需改同步；死信队列要有监控告警。`,
+    keyPoints: ["acks=all+重试", "min.insync.replicas≥2", "手动提交 offset+死信队列", "RocketMQ 同步刷盘/同步复制"],
     followUps: ["如何保证消息顺序？", "消费者如何实现幂等？"],
     favorited: false,
   },
@@ -5404,9 +5543,32 @@ while (true) {
     }
 }
 \`\`\`
+\`\`\`java
+// RocketMQ 顺序消息（对等实现，阿里订单链路常用）
+// 1. 生产端 — MessageQueueSelector 按 shardingKey 选队列，同一 key 进同一队列
+producer.send(msg, new MessageQueueSelector() {
+    @Override
+    public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
+        Long orderId = (Long) arg;
+        int idx = (int) (orderId % mqs.size());
+        return mqs.get(idx); // 同一 orderId 始终路由到同一队列
+    }
+}, orderId);
 
-踩坑：max.in.flight.requests.per.connection>1 + retries 可能乱序（设为 1 保顺序）；多线程消费 offset 提交复杂（所有线程处理完才能提交）；全局有序性能差（单 Partition）。`,
-    keyPoints: ["同一 key 同一 Partition", "单线程或按 key 分线程", "max.in.flight=1 保顺序"],
+// 2. 消费端 — MessageListenerOrderly：队列级加锁（Broker 锁 + 本地锁）
+//    保证同一队列同一时刻只被一个线程消费，天然有序
+consumer.registerMessageListener((MessageListenerOrderly) (msgs, ctx) -> {
+    for (MessageExt m : msgs) {
+        process(m); // 单线程顺序处理
+    }
+    return ConsumeOrderlyStatus.SUCCESS;
+    // 失败返回 SUSPEND_CURRENT_QUEUE_A_MOMENT（挂起当前队列稍后重试，不跳过）
+});
+// 注意：顺序消费失败会阻塞该队列（重试间隔递增），需设最大重试次数+告警
+\`\`\`
+
+踩坑：max.in.flight.requests.per.connection>1 + retries 可能乱序（设为 1 保顺序）；多线程消费 offset 提交复杂（所有线程处理完才能提交）；全局有序性能差（单 Partition）；RocketMQ 顺序消费消费失败会卡住队列，必须配重试上限与监控。`,
+    keyPoints: ["同一 key 同一 Partition", "单线程或按 key 分线程", "max.in.flight=1 保顺序", "RocketMQ 队列选择器+Orderly 监听"],
     followUps: ["RocketMQ 顺序消息如何实现？", "如何监控消费延迟？"],
     favorited: false,
   },
@@ -5651,8 +5813,8 @@ sh.shardCollection("orderdb.users", { userId: 1 });
 sh.shardCollection("orderdb.events", { type: 1, _id: "hashed" });
 \`\`\`
 
-踩坑：片键不可更改（4.2 后部分支持）；范围分片易热点（单调递增 id）；哈希分片不支持范围查询；跨片查询走 mongos 散播（scatter-gather）性能差。`,
-    keyPoints: ["mongos/config/shard 架构", "哈希 vs 范围分片", "片键不可变"],
+踩坑：片键选定后不能直接改——4.4 起可 refineCollectionShardKey 给片键加后缀字段，5.0 起 reshardCollection 支持在线更换片键（数据重新分片，期间可读写但耗资源，大集合需规划窗口期）；范围分片易热点（单调递增 id）；哈希分片不支持范围查询；跨片查询走 mongos 散播（scatter-gather）性能差。`,
+    keyPoints: ["mongos/config/shard 架构", "哈希 vs 范围分片", "5.0 reshardCollection 在线换片键"],
     followUps: ["如何在线变更片键？", "跨片事务如何处理？"],
     favorited: false,
   },
@@ -6256,8 +6418,19 @@ public interface PaymentTCC {
 }
 \`\`\`
 
-踩坑：AT 模式有全局锁（写隔离影响并发）；TCC 需实现三个接口（开发量大）；Saga 补偿需幂等；全局事务超时默认 60s。`,
-    keyPoints: ["AT 无侵入 undo log", "TCC 三阶段补偿", "Saga 长事务"],
+\`\`\`text
+// 选型决策表
+// 场景                | 推荐方案      | 理由
+// -------------------|--------------|---------------------------
+// 普通微服务跨库写     | Seata AT     | 无侵入，undo log 自动补偿
+// 资金/支付类强一致    | TCC          | 资源预留可控，粒度细
+// 长流程（订单履约）   | Saga         | 补偿式，避免长锁
+// 单 DB 多数据源       | XA           | 强一致但吞吐差，少用
+// 可异步化的最终一致   | 本地消息表/MQ | 性能最好，需幂等+对账
+\`\`\`
+
+踩坑：AT 模式的全局锁是最大坑——分支事务持有 DB 行锁直到全局提交，另一个全局事务改同一行必须等待全局锁，热点行（如库存扣减）并发冲突会大量超时；规避：热点行走 TCC/异步扣减、缩短全局事务范围、必要时 SELECT FOR UPDATE 前先查全局锁。TCC 需实现三个接口（开发量大）且要处理空回滚/悬挂；Saga 补偿需幂等；全局事务超时默认 60s。`,
+    keyPoints: ["AT 无侵入 undo log", "AT 全局锁热点行冲突", "TCC 三阶段补偿", "选型决策表"],
     followUps: ["Seata 全局锁如何工作？", "TCC 空回滚/悬挂问题？"],
     favorited: false,
     bigTech: true,
@@ -6339,8 +6512,19 @@ try {
 // Lua 脚本保证释放时校验 uuid
 \`\`\`
 
-踩坑：SET NX 必须加 PX（防死锁）；解锁必须用 Lua 校验 value（防误删）；Redis 主从切换可能丢锁（Redlock 方案有争议）；锁粒度尽量细。`,
-    keyPoints: ["Redis SET NX PX + Lua", "Redisson 看门狗续期", "ZK 临时顺序节点"],
+\`\`\`java
+// fencing token（防 GC 停顿后旧持锁者继续写）
+// 场景：客户端 A 持锁 → Full GC 停顿 30s+ → 锁过期 → 客户端 B 获得锁
+//       → A 的 GC 恢复，仍以为持锁，继续写 → 双写数据错乱
+// 方案：锁服务（ZK/etcd 自增 zxid、Redis INCR）颁发单调递增 token，
+//       资源侧校验 token，拒绝小于已见最大 token 的写入
+long token = redis.incr("fence:order:" + orderId); // 每次取锁先拿递增 token
+// 写入时携带 token，存储层检查：
+// UPDATE account SET balance=?, fence_token=? WHERE id=? AND fence_token < ?
+\`\`\`
+
+踩坑：SET NX 必须加 PX（防死锁）；解锁必须用 Lua 校验 value（防误删）；锁过期但业务未执行完是分布式锁根本缺陷（GC 停顿/网络延迟），关键资源需 fencing token 兜底；Redis 主从切换可能丢锁（Redlock 方案有争议）；锁粒度尽量细。`,
+    keyPoints: ["Redis SET NX PX + Lua", "Redisson 看门狗续期", "fencing token 防旧持锁者"],
     followUps: ["Redlock 是否可靠？", "锁续期失败怎么办？"],
     favorited: false,
     bigTech: true,
@@ -6466,8 +6650,10 @@ resp, err := cli.Put(context.Background(), "foo", "bar")
 getResp, err := cli.Get(context.Background(), "foo")
 \`\`\`
 
-踩坑：选举抖动（网络抖动频繁切主）；脑裂分区时少数派不可写（保证一致性牺牲可用性）；日志压缩用快照（避免日志无限增长）。`,
-    keyPoints: ["Leader 单写+多数派确认", "随机超时选举", "term 保证安全性"],
+进阶三点：1）PreVote（预投票）——节点发起正式选举前先预投票探测自己是否可能获多数支持，避免网络分区恢复的节点用更高 term 打断正常 Leader（不引入 PreVote 时，分区节点 term 会无限增大，恢复后引发无谓选举）；2）ReadIndex 线性一致读——读请求不必走日志复制，Leader 记录当前 commit index 并向多数派确认自己仍是 Leader（一轮心跳），然后等状态机应用到该 index 后直接读，开销远小于走 Raft 日志；3）快照压缩（Snapshot）——日志无限增长时，将状态机某时刻状态打成快照，快照前的日志全部删除，新 Follower 落后太多时直接发快照追平。
+
+踩坑：选举抖动（网络抖动频繁切主，用 PreVote 缓解）；脑裂分区时少数派不可写（保证一致性牺牲可用性）；日志压缩用快照（避免日志无限增长）；线性一致读走 ReadIndex 或 Lease Read（依赖时钟有脑裂风险，生产多用 ReadIndex）。`,
+    keyPoints: ["Leader 单写+多数派确认", "PreVote 防分区节点干扰选举", "ReadIndex 线性一致读", "快照压缩日志"],
     followUps: ["Raft 脑裂如何处理？", "Multi-Raft 如何分片？"],
     favorited: false,
     bigTech: true,
@@ -6552,11 +6738,11 @@ return 1  -- 放行
 \`\`\`java
 // Cache Aside：先更 DB 再删缓存 + 延迟双删
 public void updateProduct(Product product) {
-    // 1. 先删缓存
-    redis.del("product:" + product.getId());
-    // 2. 更新数据库
+    // 1. 先更新数据库
     productMapper.update(product);
-    // 3. 延迟双删（异步）
+    // 2. 再删缓存
+    redis.del("product:" + product.getId());
+    // 3. 延迟双删（防并发读旧值写回缓存）
     executor.schedule(() -> {
         redis.del("product:" + product.getId());
     }, 500, TimeUnit.MILLISECONDS);
@@ -6580,6 +6766,44 @@ public void onBinlogChange(BinlogEvent event) {
     favorited: false,
     bigTech: true,
   },
+  {
+    id: "be-214",
+    nodeId: "be-distributed",
+    question: "本地事务与发消息如何保持一致？Outbox 模式与 CDC 如何落地？",
+    bigTech: true,
+    answer: `问题：业务写 DB 后要发 MQ 通知下游——先写 DB 再发 MQ（发失败丢消息），先发 MQ 再写 DB（DB 失败产生脏消息），双写无法保证原子性。
+三种方案：1）本地消息表——消息与业务数据同事务落库，定时任务扫描投递（简单但轮询有延迟+扫表压力）；2）RocketMQ 事务消息——half 消息+本地事务+回查（依赖特定 MQ）；3）Outbox + CDC——消息作为 outbox 表数据同事务写入，CDC 工具（Canal 订阅 MySQL binlog / Debezium 支持 MySQL binlog 与 PG logical replication）捕获变更转发 Kafka，无业务侵入、无轮询、延迟低（秒级以内）。
+
+\`\`\`sql
+-- Outbox 表设计（与业务表同库）
+CREATE TABLE outbox (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    aggregate_type VARCHAR(64),   -- 聚合类型: order
+    aggregate_id VARCHAR(64),     -- 聚合 ID: order_id
+    event_type VARCHAR(64),       -- 事件: OrderCreated
+    payload JSON,                 -- 事件内容
+    created_at DATETIME(3)
+);
+-- 业务代码只做一件事：一个事务里写业务表 + outbox 表
+-- BEGIN; INSERT INTO orders ...; INSERT INTO outbox ...; COMMIT;
+\`\`\`
+\`\`\`yaml
+# Debezium MySQL Connector（Kafka Connect 配置）
+name: outbox-connector
+connector.class: io.debezium.connector.mysql.MySqlConnector
+database.hostname: mysql
+database.include.list: orderdb
+table.include.list: orderdb.outbox   # 只订阅 outbox 表
+transforms: outbox
+transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+# 事件自动路由到 topic: outbox.event.order
+\`\`\`
+
+踩坑：CDC 链路有延迟（binlog→MQ 秒级），强实时场景本地消息表+立即投递更合适；消费端必须幂等（CDC 至少一次投递，可能重复）；outbox 表需定期清理已投递记录；schema 演进要保证 CDC 解析兼容；Debezium 全量快照与增量衔接期间需防事件乱序；MQ 事务消息方案把一致性耦合到特定 MQ，跨云/换 MQ 时 Outbox 更通用。`,
+    keyPoints: ["双写不一致问题", "Outbox 同事务落库", "Canal/Debezium CDC 转发"],
+    followUps: ["CDC 与双写 ES 有何异同？", "消费端幂等如何保证？"],
+    favorited: false,
+  },
   // ===== be-system-design：系统设计（短链/秒杀/Feed/推送）=====
   {
     id: "be-127",
@@ -6599,7 +6823,7 @@ public class ShortUrlService {
     public String createShortUrl(String longUrl) {
         // 1. 发号器获取唯一 ID（雪花算法）
         long id = snowflakeGenerator.nextId();
-        // 2. Base62 编码（6 位可表示 621 亿）
+        // 2. Base62 编码（6 位可表示 62^6 ≈ 568 亿个组合）
         String shortCode = encodeBase62(id);
         // 3. 存储映射（MySQL + Redis 缓存）
         urlMappingMapper.insert(shortCode, longUrl);
@@ -6663,9 +6887,27 @@ public void onMessage(SeckillMessage msg) {
     orderService.createOrder(msg.getUserId(), msg.getSkuId());
 }
 \`\`\`
+\`\`\`java
+// 4. 库存预热 + 对账兜底
+// 预热：活动开始前将 DB 库存一次性加载到 Redis（禁止活动中改预热值，
+//       运营调整走独立通道同步双写并加分布式锁）
+// 对账：定时任务比对 Redis 库存 vs DB 库存 vs 已创建订单数
+//       （Redis 扣减成功数 + DB 剩余库存 + 异常回滚数 应恒等）
+//       发现不一致 → 告警 + 以 DB 为准回刷 Redis，必要时暂停活动
+@Scheduled(fixedDelay = 60_000)
+public void reconcileStock() {
+    for (String skuId : redis.opsForSet().members("seckill:skus")) {
+        int redisStock = Integer.parseInt(redis.get("seckill:stock:" + skuId));
+        int dbStock = skuMapper.getStock(Long.parseLong(skuId));
+        if (redisStock != dbStock) {  // 允许消费在途误差，超阈值告警
+            alarmService.alert("库存不一致 sku=" + skuId);
+        }
+    }
+}
+\`\`\`
 
-踩坑：Redis 扣减用 Lua 保证原子（防超卖）；MQ 消费失败需回滚 Redis；防黄牛（设备指纹+IP 限频）；热点 key 分片（拆成 10 个 key 并行扣）。`,
-    keyPoints: ["Redis Lua 预扣库存", "MQ 异步下单削峰", "DB 乐观锁兜底"],
+踩坑：Redis 扣减用 Lua 保证原子（防超卖）；MQ 消费失败需回滚 Redis；库存预热是前提（活动开始才查 DB 会打崩 DB），改库存必须双写同步；对账兜底防 Redis/MQ 异常导致卖超或卖少；防黄牛（设备指纹+IP 限频）；热点 key 分片（拆成 10 个 key 并行扣）。`,
+    keyPoints: ["Redis Lua 预扣库存", "MQ 异步下单削峰", "库存预热+对账兜底"],
     followUps: ["热点 key 如何拆分？", "如何防止黄牛刷单？"],
     favorited: false,
     bigTech: true,
@@ -6767,8 +7009,27 @@ public class FeedService {
 }
 \`\`\`
 
-踩坑：大 V 写扩散风暴（千万粉丝写入爆炸）；收件箱用 Redis List + LTRIM 截断；时间线排序用 Timeline（时间戳）；冷数据落 DB。`,
-    keyPoints: ["推模式写扩散/拉模式读扩散", "大 V 拉普通用户推", "收件箱 List+LTRIM"],
+\`\`\`java
+// Feed 分页：cursor 游标分页（不能用 OFFSET）
+// OFFSET 分页在新帖不断写入时会重复/漏读（数据位移动）
+// cursor = 上一页最后一条的 (发布时间, postId)，严格单调
+public FeedPage getFeedByCursor(Long userId, String cursor, int size) {
+    long lastTime = cursor == null ? Long.MAX_VALUE : parseTime(cursor);
+    long lastId = cursor == null ? Long.MAX_VALUE : parseId(cursor);
+    // 收件箱按 (time, id) 倒序，WHERE (time, id) < (lastTime, lastId)
+    List<Post> posts = feedMapper.pageAfter(userId, lastTime, lastId, size + 1);
+    String nextCursor = posts.size() > size ? buildCursor(posts.get(size - 1)) : null;
+    return new FeedPage(posts.subList(0, Math.min(size, posts.size())), nextCursor);
+}
+
+// 冷数据存储选型
+// 热数据（最近收件箱，如 1000 条）: Redis List/ZSet
+// 温数据（近 30 天全量）: MySQL 分库分表按 user_id+time
+// 冷数据（历史归档）: 列存/对象存储（HBase/ClickHouse/OB），只支持异步导出查询
+\`\`\`
+
+踩坑：大 V 写扩散风暴（千万粉丝写入爆炸）；收件箱用 Redis List + LTRIM 截断；Feed 分页必须用 cursor（OFFSET 分页新帖写入时重复/漏读），cursor 由 (time, postId) 组成保证严格单调；冷热分层：热数据 Redis、温数据 MySQL 分库分表、冷数据列存/对象存储归档；时间线排序用 Timeline（时间戳）。`,
+    keyPoints: ["推模式写扩散/拉模式读扩散", "大 V 拉普通用户推", "cursor 游标分页", "冷热数据分层"],
     followUps: ["如何处理写扩散延迟？", "Feed 流如何分页？"],
     favorited: false,
     bigTech: true,
@@ -6930,7 +7191,8 @@ public class MultiLevelCache {
         // L3: DB + 回填 Redis
         Product product = productMapper.getById(id);
         if (product != null) {
-            redis.setex(key, 3600 + ThreadLocalRandom.current().nextInt(600), json);
+            redis.setex(key, 3600 + ThreadLocalRandom.current().nextInt(600),
+                JSON.toJSONString(product));
         }
         return product;
     }
@@ -7036,7 +7298,7 @@ public ThreadPoolExecutor bizThreadPool() {
     id: "be-137",
     nodeId: "be-high-concurrency",
     question: "数据库连接池原理？HikariCP 为什么快？",
-    answer: `结论：连接池核心是复用连接（避免频繁建连）。HikariCP 快的原因——ConcurrentBag 无锁获取、FastList 替代 ArrayList（无 range check）、字节码优化（CGLIB 代理 Statement）。Druid 优势在监控+SQL 防火墙。
+    answer: `结论：连接池核心是复用连接（避免频繁建连）。HikariCP 快的原因——ConcurrentBag 无锁获取、FastList 替代 ArrayList（无 range check）、字节码优化（Javassist 生成代理替代 JDK 动态代理）。Druid 优势在监控+SQL 防火墙。
 
 案例：Spring Boot 2.x 默认 HikariCP（高性能）；阿里系用 Druid（SQL 监控+慢查询分析+SQL 注入防护）。
 
@@ -7239,8 +7501,21 @@ public class UnitRouter {
 // my.cnf: rpl_semi_sync_master_enabled=1, rpl_semi_sync_master_timeout=1000
 \`\`\`
 
-踩坑：跨机房延迟影响写入（半同步降级为异步）；脑裂风险（用多数派仲裁）；数据回环（单元间同步需去重）；切换需验证数据一致性。`,
-    keyPoints: ["同城双活 <2ms 延迟", "单元化异地多活", "半同步复制+自动切换"],
+\`\`\`text
+// 跨机房数据同步（DTS）
+// 工具：阿里 DTS / 腾讯 DTS / otter（阿里开源）/ Canal+自研
+// 链路：源库 binlog → DTS 解析 → 目标库回放（增量），全量走快照+增量追平
+// 关键能力：断点续传、数据校验（全量+增量对账）、双向同步防回环（打标过滤）
+// MySQL 原生复制跨机房可用，但 DTS 支持异构（MySQL→ES/Redis）与过滤变换
+
+// GSLB 全局流量调度
+// 基于 DNS 的智能解析：按用户地理位置/运营商返回最近机房 IP
+// 健康检查：机房故障时摘除其解析记录，流量切到存活机房
+// 局限：DNS TTL 生效慢（分钟级），端内可用 HTTPDNS 加速生效
+\`\`\`
+
+踩坑：跨机房延迟影响写入（半同步降级为异步）；脑裂风险（用多数派仲裁）；数据回环（单元间同步需去重打标）；切换需验证数据一致性；跨机房同步靠 DTS/otter 类 binlog 订阅，切勿业务双写（双写难保一致）；GSLB 基于 DNS 生效慢，需配合 HTTPDNS 与端侧重试。`,
+    keyPoints: ["同城双活 <2ms 延迟", "单元化异地多活", "DTS 跨机房同步", "GSLB 全局流量调度"],
     followUps: ["异地多活数据如何同步？", "如何保证切换数据不丢？"],
     favorited: false,
     bigTech: true,
@@ -7880,20 +8155,60 @@ public class OrderController {
     followUps: ["如何生成多语言 SDK？", "API Mock 如何实现？"],
     favorited: false,
   },
+  {
+    id: "be-215",
+    nodeId: "be-api-design",
+    question: "TLS 1.3 相比 TLS 1.2 优化了什么？HTTP/3 为什么基于 QUIC？",
+    bigTech: true,
+    answer: `TLS 1.3 核心优化：1）握手 1-RTT（1.2 需 2-RTT），复用会话可 0-RTT（有重放风险，只用于幂等请求）；2）安全性——废除 RSA 密钥交换/静态 DH、CBC、SHA-1 等老旧算法，只保留 AEAD 套件（AES-GCM/ChaCha20-Poly1305），密钥交换强制前向安全（ECDHE）；3）握手消息更多加密（1.2 证书明文传输，1.3 证书也加密）。
+HTTP/3 用 QUIC（基于 UDP）解决 TCP 三大痛点：1）队头阻塞——TCP 一个包丢失阻塞所有流，QUIC 多流独立、单流丢包不影响其他流；2）握手开销——QUIC 内建 TLS 1.3，传输+加密握手合并，新连接 1-RTT、重连 0-RTT；3）连接迁移——用 Connection ID 标识连接（而非四元组），WiFi 切 4G 连接不断。
+
+\`\`\`text
+// TLS 握手对比
+TLS 1.2: Client → ServerHello → 证书 → 密钥交换 → Finished (2-RTT 后才有数据)
+TLS 1.3: Client 直接带密钥共享 → Server 一次往返完成 (1-RTT)
+         会话复用: 0-RTT（客户端首包即加密数据，需防重放）
+
+// HTTP 各版本对比
+HTTP/1.1: 文本协议，队头阻塞（一个连接串行），靠多连接缓解
+HTTP/2:   二进制分帧多路复用，但 TCP 层队头阻塞仍在
+HTTP/3:   QUIC 流级独立，无队头阻塞，连接迁移，0-RTT 重连
+\`\`\`
+\`\`\`bash
+# Nginx 启用 HTTP/3（较新版本支持，保守表述：需确认所用版本）
+# listen 443 quic reuseport;
+# http3 on;
+# 告知客户端支持 HTTP/3
+# add_header Alt-Svc 'h3=":443"; ma=86400';
+
+# 验证服务端 TLS 1.3 与 HTTP/3
+openssl s_client -connect example.com:443 -tls1_3
+curl --http3 -I https://example.com   # 需 curl 编译进 HTTP/3 支持
+\`\`\`
+
+踩坑：0-RTT 有重放攻击风险（只用于幂等请求，服务端需防重放票据）；QUIC 在用户态实现，CPU 开销高于内核态 TCP（高并发网关需实测）；运营商/中间盒可能限速 UDP（需回退 TCP 的 Happy Eyeballs 竞速）；HTTP/3 普及是渐进过程，Alt-Svc 头引导升级，TCP 兜底必须保留；TLS 1.3 的 0-RTT 与 HTTP/3 的 0-RTT 重放风险同理。`,
+    keyPoints: ["TLS 1.3 握手 1-RTT+前向安全", "QUIC 解队头阻塞", "连接迁移 Connection ID"],
+    followUps: ["HTTP/2 队头阻塞在哪一层？", "0-RTT 重放如何防护？"],
+    favorited: false,
+  },
   // ===== be-container：容器技术（Docker 原理/Dockerfile/网络/安全）=====
   {
     id: "be-155",
     nodeId: "be-container",
     question: "Docker 原理？Namespace/Cgroups/UnionFS 各起什么作用？",
-    answer: `结论：Docker 本质是 Linux 容器技术的封装。Namespace 提供隔离（PID/NET/IPC/MNT/UTS/USER），Cgroups 提供资源限制（CPU/内存/IO），UnionFS（OverlayFS）提供分层文件系统。
+    answer: `结论：Docker 本质是 Linux 容器技术的封装。Namespace 提供隔离（共 8 种：PID/NET/IPC/MNT/UTS/USER/CGROUP/TIME），Cgroups 提供资源限制（CPU/内存/IO），UnionFS（OverlayFS）提供分层文件系统。
 
 案例：抖音推荐服务容器化部署——Namespace 隔离进程/网络，Cgroups 限制 CPU 2 核+内存 4G，OverlayFS 分层存储镜像（基础层+应用层）。
 
 \`\`\`bash
 # Namespace 隔离（Docker run 时创建）
 docker run -it --name app ubuntu:22.04
-# 底层调用：
-# unshare --pid --net --ipc --mnt --uts --user ...
+# 底层调用（8 种 namespace）：
+# unshare --pid --net --ipc --mnt --uts --user --cgroup --time ...
+#   PID: 进程树隔离    NET: 网络栈隔离      IPC: 进程间通信隔离
+#   MNT: 挂载点隔离    UTS: 主机名隔离      USER: 用户 UID/GID 映射
+#   CGROUP: cgroup 视图隔离（容器内看不到宿主机 cgroup 配置）
+#   TIME: 时钟隔离（容器可独立设置时间，不影响宿主机）
 # 验证隔离
 docker exec app ps aux    # PID 隔离（容器内 PID 从 1 开始）
 docker exec app ip addr   # 网络隔离（独立 veth）
@@ -7912,7 +8227,7 @@ docker image inspect ubuntu:22.04
 \`\`\`
 
 踩坑：容器不是虚拟机（共享内核）；容器内 PID 1 需处理信号（否则 SIGTERM 不生效）；Cgroups v1 vs v2 差异（v2 统一层级）；root 用户在容器内有特权风险。`,
-    keyPoints: ["Namespace 隔离 6 种", "Cgroups 限制 CPU/内存", "OverlayFS 分层存储"],
+    keyPoints: ["Namespace 隔离 8 种", "Cgroups 限制 CPU/内存", "OverlayFS 分层存储"],
     followUps: ["容器与虚拟机区别？", "Cgroups v1 vs v2？"],
     favorited: false,
     bigTech: true,
@@ -8917,7 +9232,7 @@ SLO: 99.9%（月可用率）
 \`\`\`bash
 # vLLM 部署（推荐，高吞吐）
 python -m vllm.entrypoints.api_server \
-  --model meta-llama/Llama-2-7b-chat-hf \
+  --model Qwen/Qwen2.5-7B-Instruct \
   --tensor-parallel-size 2 \
   --gpu-memory-utilization 0.9 \
   --max-model-len 4096
@@ -8925,11 +9240,11 @@ python -m vllm.entrypoints.api_server \
 # TGI 部署（HuggingFace，易用）
 docker run --gpus all -p 8080:80 \
   ghcr.io/huggingface/text-generation-inference:latest \
-  --model meta-llama/Llama-2-7b-chat-hf
+  --model Qwen/Qwen2.5-7B-Instruct
 
 # TensorRT-LLM（NVIDIA，极致性能）
 # 1. 转换模型
-python convert_llama.py --model_dir ./llama-7b --output_dir ./trt-engine
+python convert_checkpoint.py --model_dir ./qwen-7b --output_dir ./trt-engine
 # 2. 部署
 python -m tensorrt_llm.run --engine_dir ./trt-engine
 \`\`\`
@@ -8949,15 +9264,14 @@ python -m tensorrt_llm.run --engine_dir ./trt-engine
 案例：抖音豆包推理用 PagedAttention 减少 KV Cache 碎片（显存利用率从 40% 提升至 90%）；通义千问用 GQA（Grouped Query Attention）减少 KV Cache 大小。
 
 \`\`\`python
-# KV Cache 显存计算
-# Llama-2-7b: layers=32, hidden=4096, heads=32
-# FP16: 2 bytes
+# KV Cache 显存计算（以典型 7B 级模型为例：layers=32, hidden=4096, FP16）
+# 不同模型结构参数不同（GQA 模型 KV heads 更少，Cache 更小），按实际 config 代入
 kv_cache_mem = (2 * 32 * seq_len * 4096 * batch * 2)  # bytes
 # seq_len=2048, batch=8: ~8.6 GB
 
 # vLLM PagedAttention（分页管理）
 from vllm import LLM
-llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct",
           enable_prefix_caching=True,  # 前缀共享
           gpu_memory_utilization=0.9)
 
@@ -8984,21 +9298,21 @@ llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
 \`\`\`python
 # AWQ 量化（推荐，精度与速度均衡）
 from awq import AutoAWQForCausalLM
-model = AutoAWQForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-model.quantize("./llama-7b-awq", quant_config={
+model = AutoAWQForCausalLM.from_pretrained("Qwen/Qwen2.5-7B-Instruct")
+model.quantize("./qwen-7b-awq", quant_config={
     "zero_point": True, "q_group_size": 128, "w_bit": 4
 })
 
 # GPTQ 量化（精度好，但量化过程慢）
 from auto_gptq import AutoGPTQForCausalLM
 model = AutoGPTQForCausalLM.from_pretrained(
-    "meta-llama/Llama-2-7b-chat-hf",
+    "Qwen/Qwen2.5-7B-Instruct",
     quantize_config={"bits": 4, "group_size": 128, "desc_act": True}
 )
 
-# vLLM 加载量化模型
+# vLLM 加载量化模型（官方/社区发布的 AWQ 权重）
 python -m vllm.entrypoints.api_server \
-  --model TheBloke/Llama-2-7B-Chat-AWQ \
+  --model Qwen/Qwen2.5-7B-Instruct-AWQ \
   --quantization awq
 \`\`\`
 
@@ -9031,7 +9345,7 @@ python -m vllm.entrypoints.api_server \
 
 # vLLM 使用 PagedAttention
 from vllm import LLM, SamplingParams
-llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct",
           block_size=16,  # 每块 16 token
           gpu_memory_utilization=0.9)
 # Continuous Batching + PagedAttention
@@ -9069,7 +9383,7 @@ outputs = llm.generate(prompts, SamplingParams(max_tokens=512))
 
 # vLLM 配置 Continuous Batching
 from vllm import LLM, SamplingParams
-llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct",
           max_num_seqs=256,  # 最大并发序列
           max_num_batched_tokens=8192)  # 每批最大 token 数
 \`\`\`
@@ -9090,7 +9404,7 @@ llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
 \`\`\`text
 // Triton 模型仓库结构
 model_repository/
-├── llama-7b/
+├── qwen-7b/
 │   ├── 1/                    # 版本号
 │   │   └── model.plan        # TensorRT 引擎
 │   └── config.pbtxt          # 模型配置
@@ -9101,7 +9415,7 @@ model_repository/
 \`\`\`
 \`\`\`text
 // config.pbtxt（模型配置）
-name: "llama-7b"
+name: "qwen-7b"
 backend: "tensorrtllm"
 max_batch_size: 32
 input [ { name: "input_ids" data_type: TYPE_INT32 dims: [ -1 ] } ]
@@ -9119,7 +9433,7 @@ docker run --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 \
   nvcr.io/nvidia/tritonserver:23.12-py3 \
   tritonserver --model-repository=/models
 # 客户端请求
-python client.py --url localhost:8000 --model llama-7b
+python client.py --url localhost:8000 --model qwen-7b
 \`\`\`
 
 踩坑：Triton 配置复杂（需理解 config.pbtxt）；动态批处理延迟-吞吐权衡（max_queue_delay）；多模型共享 GPU 需合理分配显存；监控指标（Triton 暴露 Prometheus metrics）。`,
@@ -9138,24 +9452,24 @@ python client.py --url localhost:8000 --model llama-7b
 \`\`\`python
 # 1. Prefix Cache（优化 TTFT，复用 System Prompt KV Cache）
 from vllm import LLM
-llm = LLM(model="meta-llama/Llama-2-7b-chat-hf",
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct",
           enable_prefix_caching=True)
 # System Prompt 的 KV Cache 复用，TTFT 降低 50%+
 
-# 2. Speculative Decoding（小模型草拟+大模型验证）
+# 2. Speculative Decoding（小模型草拟+大模型验证，需同族同 tokenizer）
 from vllm import LLM, SamplingParams
-llm = LLM(model="meta-llama/Llama-2-70b-chat-hf",
-          speculative_model="meta-llama/Llama-2-7b-chat-hf",  # 草稿模型
+llm = LLM(model="Qwen/Qwen2.5-72B-Instruct",
+          speculative_model="Qwen/Qwen2.5-7B-Instruct",  # 草稿模型
           num_speculative_tokens=5)
-# 7B 草拟 5 token，70B 验证（并行），加速 2-3x
+# 7B 草拟 5 token，72B 验证（并行），吞吐可提升数倍
 
 # 3. Tensor Parallel（多 GPU 分摊）
-llm = LLM(model="meta-llama/Llama-2-70b-chat-hf",
+llm = LLM(model="Qwen/Qwen2.5-72B-Instruct",
           tensor_parallel_size=4)  # 4 卡并行
 # TPOT 降低（每卡计算量减少）
 
 # 4. 量化（减少计算+显存）
-llm = LLM(model="TheBloke/Llama-2-7B-Chat-AWQ", quantization="awq")
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct-AWQ", quantization="awq")
 \`\`\`
 
 踩坑：Speculative Decoding 需草稿模型与主模型兼容（同 tokenizer）；Prefix Cache 需前缀完全匹配；Tensor Parallel 增加通信开销（NVLink 优于 PCIe）；batch 增大影响 TTFT（排队延迟）。`,
@@ -9582,7 +9896,7 @@ response = client.chat.completions.create(
 # 调用本地 vLLM（OpenAI 兼容）
 client = OpenAI(api_key="empty", base_url="http://localhost:8000/v1")
 response = client.chat.completions.create(
-    model="meta-llama/Llama-2-7b-chat-hf",
+    model="Qwen/Qwen2.5-7B-Instruct",
     messages=[{"role": "user", "content": "你好"}]
 )
 
@@ -10021,12 +10335,14 @@ class TokenCostOptimizer:
 \`\`\`
 
 \`\`\`text
-成本对比（每百万 Token）：
-GPT-4:      $60 (input)  / $120 (output)
-GPT-4o:     $5  (input)  / $15  (output)
-Qwen-72B:   $0.5 (自部署)
-Qwen-7B:    $0.05 (自部署)
-Batch API:  50% 折扣（24h 内返回）
+成本估算方法论（不背具体价格，价格随厂商调价变化）：
+1. API 模式: 月成本 = QPS × 86400 × 30 × 平均Token数 × 单价（区分 input/output 单价）
+   - input 单价通常低于 output；长 prompt 场景 input 是大头
+   - Batch API 通常有显著折扣（代价是小时级延迟）
+2. 自部署模式: 月成本 = GPU 卡数 × 单卡月租 / (GPU 吞吐Token/秒 × 86400 × 30)
+   - 结合利用率折算：实际吞吐通常只到理论峰值的 30%~50%
+3. 对比决策: 先算出"每百万 Token 综合成本"，再横向对比 API vs 自部署
+   - 量小选 API（无运维成本），量大且稳定选自部署（摊薄 GPU 成本）
 \`\`\`
 
 踩坑：语义缓存需阈值（过高误命中，过低无效果）；模型分级需评估质量（小模型能力边界）；Batch API 有 24h 延迟（不适合实时）；Prompt 精简可能丢失上下文。`,

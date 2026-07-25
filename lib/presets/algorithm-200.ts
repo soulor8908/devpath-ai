@@ -1,5 +1,5 @@
 // lib/presets/algorithm-200.ts
-// LeetCode 200 题全攻略预设：14 知识节点 + 156 道精选题（去重后）+ 14 天学习计划
+// LeetCode 200 题全攻略预设：14 知识节点 + 163 道精选题（去重后）+ 14 天学习计划
 // 数据来源：主项目 algorithm/leetcode-checklist.md
 // 覆盖：Phase1 基础筑基 / Phase2 进阶突破 / Phase3 冲刺保温
 // 跳过"（重）"标记重复题及 Phase3 空白模拟面试部分
@@ -141,7 +141,7 @@ const ALGORITHM_200_NODES: KnowledgeNode[] = [
     prerequisites: ["p1-array-string", "p1-linkedlist", "p1-tree"],
     frequency: "高",
     bigTech: true,
-    summary: "面试最高频：最大子数组和、回文链表、相交链表、LCA、螺旋矩阵、KMP 等。必须秒杀。",
+    summary: "面试最高频：最大子数组和、回文链表、相交链表、LCA、螺旋矩阵等必须秒杀；前缀和、二分答案为 2026 大厂新高频重点掌握；KMP 了解原理即可。",
     mastery: 0,
     customOrder: 12,
   },
@@ -175,7 +175,7 @@ const ALGORITHM_200_NODES: KnowledgeNode[] = [
 // ============================================================
 
 const ALGORITHM_200_QUESTIONS: Question[] = [
-  // ===== Phase 1：数组与字符串（18题）=====
+  // ===== Phase 1：数组与字符串（20题）=====
   {
     id: "algo-1",
     nodeId: "p1-array-string",
@@ -274,6 +274,10 @@ func moveZeroes(nums []int) {
     answer: `// 思路：双指针从两端向内，每次移动较矮的一边
 // 时间 O(n)，空间 O(1)
 // 关键：贪心——移动较矮边才可能找到更大面积
+// 排除法论证：设 height[l] < height[r]，当前面积由较矮的 height[l] 决定。
+// 若移动高边 r--，宽度必减小，而高度上限仍是 height[l]（新边再高也没用，
+// 更矮则更小），面积只会更小——即 (l, r-1), (l, r-2)... 这些组合都不可能
+// 更优，可安全排除。因此每次排除较矮边参与的所有剩余组合不会漏掉最优解。
 
 func maxArea(height []int) int {
     l, r, maxW := 0, len(height)-1, 0
@@ -591,6 +595,8 @@ func findKthLargest(nums []int, k int) int {
     return nums[l]
 }
 func partition(nums []int, l, r int) int {
+    ri := l + rand.Intn(r-l+1) // 随机选 pivot 换到末尾，避免有序数组退化为 O(n²)
+    nums[ri], nums[r] = nums[r], nums[ri]
     pivot := nums[r]
     i := l
     for j := l; j < r; j++ {
@@ -603,8 +609,50 @@ func partition(nums []int, l, r int) int {
     followUps: ["用堆怎么解？时间复杂度？", "如何保证 O(n) 最坏？"],
     favorited: false,
   },
+  {
+    id: "algo-523",
+    nodeId: "p1-array-string",
+    question: "523. 连续的子数组和（LeetCode 523）\n是否存在长度至少为 2、和为 k 的倍数的连续子数组。",
+    answer: `// 思路：前缀和 + 同余——(pre[j]-pre[i]) % k == 0 ⟺ pre[j] ≡ pre[i] (mod k)
+// 时间 O(n)，空间 O(min(n,k))
+// 关键：哈希表存"余数 → 最早下标"，下标差 ≥2 才有效（子数组长度至少 2）
 
-  // ===== Phase 1：哈希表（3题，跳过重题）=====
+func checkSubarraySum(nums []int, k int) bool {
+    modIndex := map[int]int{0: -1} // 空前缀和为 0，下标记为 -1
+    pre := 0
+    for i, x := range nums {
+        pre = (pre + x) % k
+        if j, ok := modIndex[pre]; ok {
+            if i-j >= 2 { return true }
+        } else {
+            modIndex[pre] = i // 只保留最早下标，后面同余的跨度更大
+        }
+    }
+    return false
+}`,
+    keyPoints: ["前缀和 + 同余", "哈希存余数的最早下标", "子数组长度至少 2"],
+    followUps: ["为什么只存最早下标？", "与 LC 560 的前缀和思路有何异同？"],
+    favorited: false,
+  },
+  {
+    id: "algo-136",
+    nodeId: "p1-array-string",
+    question: "136. 只出现一次的数字（LeetCode 136）\n数组中除一个元素只出现一次外，其余均出现两次，找出那个元素。",
+    answer: `// 思路：异或——a^a=0、a^0=a，所有元素异或后成对的全部抵消，剩下的即答案
+// 时间 O(n)，空间 O(1)
+// 关键：异或满足交换律、结合律，与顺序无关
+
+func singleNumber(nums []int) int {
+    res := 0
+    for _, x := range nums { res ^= x }
+    return res
+}`,
+    keyPoints: ["异或性质 a^a=0、a^0=a", "成对抵消", "O(1) 空间"],
+    followUps: ["两个只出现一次的数怎么找（LC 260）？", "其余数出现三次怎么办（LC 137）？"],
+    favorited: false,
+  },
+
+  // ===== Phase 1：哈希表（4题，跳过重题）=====
   {
     id: "algo-347",
     nodeId: "p1-hash",
@@ -658,32 +706,74 @@ func findDisappearedNumbers(nums []int) []int {
     question: "146. LRU 缓存（LeetCode 146）\n设计 O(1) get 和 put 的 LRU 缓存。",
     answer: `// 思路：哈希表 + 双向链表，访问即移到头部，满则删尾部
 // 时间 O(1)，空间 O(capacity)
-// 关键：哈希表存节点指针，双向链表维护顺序
+// 关键：哈希表存节点指针，双向链表维护顺序；哨兵 head/tail 简化边界
 
 type DLinkedNode struct {
-    key, val  int
+    key, val   int
     prev, next *DLinkedNode
 }
 type LRUCache struct {
-    cap int
-    cache map[int]*DLinkedNode
-    head, tail *DLinkedNode // 哨兵
+    cap        int
+    cache      map[int]*DLinkedNode
+    head, tail *DLinkedNode // 哨兵：head.next 是最近使用，tail.prev 是最久未用
 }
-func (c *LRUCache) moveToHead(node *DLinkedNode) { /* 摘出+插头 */ }
-func (c *LRUCache) removeTail() *DLinkedNode { /* 删尾 */ }
-func (c *LRUCache) get(key int) int {
+func Constructor(capacity int) LRUCache {
+    c := LRUCache{cap: capacity, cache: map[int]*DLinkedNode{}, head: &DLinkedNode{}, tail: &DLinkedNode{}}
+    c.head.next = c.tail // 哨兵接线：空表时 head 与 tail 直连
+    c.tail.prev = c.head
+    return c
+}
+func (c *LRUCache) addToHead(node *DLinkedNode) {
+    node.prev = c.head
+    node.next = c.head.next
+    c.head.next.prev = node
+    c.head.next = node
+}
+func (c *LRUCache) removeNode(node *DLinkedNode) {
+    node.prev.next = node.next
+    node.next.prev = node.prev
+}
+func (c *LRUCache) moveToHead(node *DLinkedNode) { c.removeNode(node); c.addToHead(node) }
+func (c *LRUCache) removeTail() *DLinkedNode {
+    node := c.tail.prev
+    c.removeNode(node)
+    return node
+}
+func (c *LRUCache) Get(key int) int {
     if node, ok := c.cache[key]; ok { c.moveToHead(node); return node.val }
     return -1
 }
-func (c *LRUCache) put(key, val int) {
+func (c *LRUCache) Put(key, val int) {
     if node, ok := c.cache[key]; ok { node.val = val; c.moveToHead(node); return }
     node := &DLinkedNode{key: key, val: val}
     c.cache[key] = node
-    // 插入头部
+    c.addToHead(node) // 新节点必须接入链表头部，否则链表与哈希表脱节
     if len(c.cache) > c.cap { tail := c.removeTail(); delete(c.cache, tail.key) }
 }`,
     keyPoints: ["哈希表 + 双向链表", "哨兵节点简化边界", "访问移头、满则删尾"],
     followUps: ["LFU 怎么实现？", "用 LinkedHashMap 简化怎么做？"],
+    favorited: false,
+  },
+  {
+    id: "algo-560",
+    nodeId: "p1-hash",
+    question: "560. 和为 K 的子数组（LeetCode 560）\n统计数组中和为 k 的连续子数组个数。字节/美团第一高频。",
+    answer: `// 思路：前缀和 + 哈希表——pre[j]-pre[i]=k ⟺ pre[i]=pre[j]-k
+// 时间 O(n)，空间 O(n)
+// 关键：遍历到 j 时查询前缀和 pre-k 出现过几次；先查询再入库，避免空子数组
+
+func subarraySum(nums []int, k int) int {
+    cnt := map[int]int{0: 1} // 空前缀和 0 出现 1 次（处理从 0 开始的子数组）
+    pre, res := 0, 0
+    for _, x := range nums {
+        pre += x
+        res += cnt[pre-k]
+        cnt[pre]++
+    }
+    return res
+}`,
+    keyPoints: ["前缀和转两数之和", "哈希存前缀和出现次数", "先查询再入库", "字节/美团第一高频"],
+    followUps: ["为什么 cnt[0] 初始为 1？", "和为 K 的最长子数组怎么做？"],
     favorited: false,
   },
 
@@ -920,22 +1010,52 @@ func copyRandomList(head *Node) *Node {
     id: "algo-148",
     nodeId: "p1-linkedlist",
     question: "148. 排序链表（LeetCode 148）\n对链表排序，要求 O(n logn) 时间 O(1) 空间。",
-    answer: `// 思路：归并排序，快慢指针找中点 + 合并
-// 时间 O(n logn)，空间 O(logn) 递归栈
-// 关键：快慢指针找中点，递归归并
+    answer: `// 思路：归并排序——自底向上迭代，满足题目 O(1) 空间要求（递归版需 O(logn) 栈空间）
+// 时间 O(n logn)，空间 O(1)
+// 关键：按步长 1,2,4... 两两合并相邻有序段，每轮扫一遍链表
 
 func sortList(head *ListNode) *ListNode {
-    if head == nil || head.Next == nil { return head }
-    // 找中点
-    slow, fast := head, head.Next
-    for fast != nil && fast.Next != nil { slow = slow.Next; fast = fast.Next.Next }
-    mid := slow.Next
-    slow.Next = nil
-    // 递归排序 + 合并
-    return merge(sortList(head), sortList(mid))
+    n := 0
+    for p := head; p != nil; p = p.Next { n++ }
+    dummy := &ListNode{Next: head}
+    for step := 1; step < n; step *= 2 {
+        prev, cur := dummy, dummy.Next
+        for cur != nil {
+            h1 := cur
+            h2 := split(h1, step) // h1 段长 step，返回第二段头
+            next := split(h2, step)
+            merged, tail := merge2(h1, h2)
+            prev.Next = merged
+            prev = tail
+            cur = next
+        }
+    }
+    return dummy.Next
+}
+
+// split：切出以 head 开头、长度 n 的一段，返回下一段的头
+func split(head *ListNode, n int) *ListNode {
+    for i := 1; head != nil && i < n; i++ { head = head.Next }
+    if head == nil { return nil }
+    next := head.Next
+    head.Next = nil
+    return next
+}
+
+// merge2：合并两个有序链表，返回 (头, 尾)
+func merge2(h1, h2 *ListNode) (*ListNode, *ListNode) {
+    dummy := &ListNode{}
+    tail := dummy
+    for h1 != nil && h2 != nil {
+        if h1.Val < h2.Val { tail.Next = h1; h1 = h1.Next } else { tail.Next = h2; h2 = h2.Next }
+        tail = tail.Next
+    }
+    if h1 != nil { tail.Next = h1 } else { tail.Next = h2 }
+    for tail.Next != nil { tail = tail.Next }
+    return dummy.Next, tail
 }`,
-    keyPoints: ["归并排序", "快慢指针找中点", "合并两个有序链表"],
-    followUps: ["自底向上迭代怎么实现 O(1) 空间？", "快速排序能排链表吗？"],
+    keyPoints: ["归并排序", "自底向上迭代 O(1) 空间", "按步长两两合并", "快慢指针找中点（递归版）"],
+    followUps: ["递归版为什么不是 O(1) 空间？", "快速排序能排链表吗？"],
     favorited: false,
   },
 
@@ -997,7 +1117,9 @@ func (s *MinStack) GetMin() int { return s.minStack[len(s.minStack)-1] }`,
     nodeId: "p1-stack-queue",
     question: "394. 字符串解码（LeetCode 394）\n解码如 3[a2[c]] → accaccacc 的字符串。",
     answer: `// 思路：双栈——数字栈和字符串栈
-// 时间 O(n)，空间 O(n)
+// 时间 O(输出长度)，空间 O(输出长度)
+// 注：嵌套解码会让输出远长于输入，如 3[a10[b]] 输入 9 字符、输出 33 字符，
+//     嵌套时输出随重复次数乘积膨胀，故按输出长度衡量更准确
 // 关键：遇到 [ 压栈，遇到 ] 出栈拼接
 
 func decodeString(s string) string {
@@ -1562,7 +1684,7 @@ func exist(board [][]byte, word string) bool {
     favorited: false,
   },
 
-  // ===== Phase 1：排序与二分（6题）=====
+  // ===== Phase 1：排序与二分（7题）=====
   {
     id: "algo-33",
     nodeId: "p1-sort-binary",
@@ -1707,8 +1829,34 @@ func findMedianSortedArrays(nums1, nums2 []int) float64 {
     followUps: ["第 K 小怎么求？", "如果允许 O(m+n) 怎么做？"],
     favorited: false,
   },
+  {
+    id: "algo-875",
+    nodeId: "p1-sort-binary",
+    question: "875. 爱吃香蕉的珂珂（LeetCode 875）\n每小时吃 k 根香蕉，求在 h 小时内吃完所有堆的最小速度 k。",
+    answer: `// 思路：二分答案——速度 k 越大耗时越少，单调可二分；"最大值最小化"范式
+// 时间 O(n·log max(piles))，空间 O(1)
+// 关键：判定函数 hours(k) = ∑⌈p/k⌉ 单调递减，二分满足 hours(k) <= h 的最小 k
 
-  // ===== Phase 2：动态规划（20题）=====
+func minEatingSpeed(piles []int, h int) int {
+    lo, hi := 1, 0
+    for _, p := range piles { if p > hi { hi = p } } // 上界：最快一堆一小时
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if hours(piles, mid) <= h { hi = mid } else { lo = mid + 1 }
+    }
+    return lo // lo == hi 即最小可行速度
+}
+func hours(piles []int, k int) int {
+    t := 0
+    for _, p := range piles { t += (p + k - 1) / k } // 向上取整
+    return t
+}`,
+    keyPoints: ["二分答案：最大值最小化", "判定函数单调", "向上取整 (p+k-1)/k"],
+    followUps: ["为什么 lo==hi 时就是答案？", "同范式题：LC 1011 船运货物？"],
+    favorited: false,
+  },
+
+  // ===== Phase 2：动态规划（21题）=====
   {
     id: "algo-70",
     nodeId: "p2-dp",
@@ -2162,8 +2310,27 @@ func longestValidParentheses(s string) int {
     followUps: ["用栈怎么解？", "O(1) 空间双向扫描怎么解？"],
     favorited: false,
   },
+  {
+    id: "algo-338",
+    nodeId: "p2-dp",
+    question: "338. 比特位计数（LeetCode 338）\n对 0~n 的每个数，求其二进制表示中 1 的个数。",
+    answer: `// 思路：DP + 位运算——x 右移一位抹掉最低位，1 的个数只差 x&1
+// 时间 O(n)，空间 O(1)（不计返回数组）
+// 关键：dp[x] = dp[x>>1] + (x&1)，子问题已算出；另解 dp[x] = dp[x&(x-1)] + 1
 
-  // ===== Phase 2：图论（10题）=====
+func countBits(n int) []int {
+    dp := make([]int, n+1)
+    for x := 1; x <= n; x++ {
+        dp[x] = dp[x>>1] + (x & 1)
+    }
+    return dp
+}`,
+    keyPoints: ["dp[x]=dp[x>>1]+(x&1)", "另解：x&(x-1) 消去最低位 1", "DP 复用子问题"],
+    followUps: ["x&(x-1) 版本怎么理解？", "逐位 O(n·32) 为什么不够优？"],
+    favorited: false,
+  },
+
+  // ===== Phase 2：图论（11题）=====
   {
     id: "algo-200",
     nodeId: "p2-graph",
@@ -2453,6 +2620,52 @@ func findCheapestPrice(n int, flights [][]int, src, dst, k int) int {
     followUps: ["Dijkstra 怎么解？", "如果允许负权呢？"],
     favorited: false,
   },
+  {
+    id: "algo-743",
+    nodeId: "p2-graph",
+    question: "743. 网络延迟时间（LeetCode 743）\n信号从节点 k 出发沿有向边传播，求所有节点收到信号的最早时间。",
+    answer: `// 思路：Dijkstra 最短路——求 k 到所有点的最短距离，答案为其中的最大值
+// 时间 O(E log V)，空间 O(V+E)
+// 关键：小顶堆按距离弹出，节点首次弹出时距离即最短（边权非负）
+
+func networkDelayTime(times [][]int, n int, k int) int {
+    graph := make([][][2]int, n+1) // 邻接表：[终点, 权重]
+    for _, t := range times { graph[t[0]] = append(graph[t[0]], [2]int{t[1], t[2]}) }
+    dist := make([]int, n+1)
+    for i := range dist { dist[i] = -1 } // -1 = 未确定
+    h := &minHeap743{} // 小顶堆元素：{距离, 节点}
+    heap.Push(h, [2]int{0, k})
+    for h.Len() > 0 {
+        cur := heap.Pop(h).([2]int)
+        d, u := cur[0], cur[1]
+        if dist[u] != -1 { continue } // 已有更短路径，跳过
+        dist[u] = d
+        for _, e := range graph[u] { heap.Push(h, [2]int{d + e[1], e[0]}) }
+    }
+    res := 0
+    for i := 1; i <= n; i++ {
+        if dist[i] == -1 { return -1 } // 存在不可达节点
+        if dist[i] > res { res = dist[i] }
+    }
+    return res
+}
+
+// 基于 container/heap 的小顶堆
+type minHeap743 [][2]int
+func (h minHeap743) Len() int            { return len(h) }
+func (h minHeap743) Less(i, j int) bool  { return h[i][0] < h[j][0] }
+func (h minHeap743) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *minHeap743) Push(x interface{}) { *h = append(*h, x.([2]int)) }
+func (h *minHeap743) Pop() interface{} {
+    old := *h
+    x := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return x
+}`,
+    keyPoints: ["Dijkstra + 小顶堆", "首次弹出即最短路", "答案为各点最短距离的最大值"],
+    followUps: ["Bellman-Ford 怎么写（LC 787）？", "为什么弹出的点无需再更新？"],
+    favorited: false,
+  },
 
   // ===== Phase 2：堆与优先队列（4题，跳过重题）=====
   {
@@ -2552,7 +2765,7 @@ func findMaximizedCapital(k, w int, profits, capital []int) int {
     favorited: false,
   },
 
-  // ===== Phase 2：贪心（7题，跳过重题）=====
+  // ===== Phase 2：贪心（8题，跳过重题）=====
   {
     id: "algo-55",
     nodeId: "p2-greedy",
@@ -2670,9 +2883,13 @@ func reconstructQueue(people [][]int) [][]int {
     id: "algo-621",
     nodeId: "p2-greedy",
     question: "621. 任务调度器（LeetCode 621）\n相同任务间需间隔 n 个冷却，求最少时间。",
-    answer: `// 思路：找出现次数最多的任务，用公式计算
+    answer: `// 思路：找出现次数最多的任务作为框架，插空填其他任务
 // 时间 O(n)，空间 O(26)
-// 关键：(maxCount-1)*(n+1) + maxCountTasks，与总任务数取大
+// 公式推导：设最多任务出现 maxCount 次，把它排成 maxCount 行，每行占 n+1 个槽
+// （1 个任务 + n 个冷却位）。前 maxCount-1 行共 (maxCount-1)*(n+1) 个槽；
+// 最后一行只需放"次数同样为 maxCount"的任务，共 maxTasks 个（它们同排互不冲突）。
+// 其余任务插入框架空槽即满足冷却；若任务总数超过框架槽数，说明槽可全填满
+// 无需空闲，答案就是 len(tasks)。故取两者较大值。
 
 func leastInterval(tasks []byte, n int) int {
     cnt := [26]int{}
@@ -2706,6 +2923,30 @@ func candy(ratings []int) int {
 }`,
     keyPoints: ["两次遍历", "左到右+右到左", "取两次结果的最大值"],
     followUps: ["O(1) 空间怎么解？", "环形怎么办？"],
+    favorited: false,
+  },
+  {
+    id: "algo-435",
+    nodeId: "p2-greedy",
+    question: "435. 无重叠区间（LeetCode 435）\n给定区间集合，求最少移除多少区间可使剩余互不重叠。",
+    answer: `// 思路：区间贪心——按右端点升序排序，优先保留右端点小的，给后面留更多空间
+// 时间 O(n logn)，空间 O(logn)（排序栈）
+// 关键：顺序扫描，起点 >= 当前右端点则保留并更新，否则移除计数
+
+func eraseOverlapIntervals(intervals [][]int) int {
+    sort.Slice(intervals, func(i, j int) bool { return intervals[i][1] < intervals[j][1] })
+    removed, end := 0, math.MinInt32
+    for _, iv := range intervals {
+        if iv[0] >= end {
+            end = iv[1] // 保留：更新已占用的右端点
+        } else {
+            removed++ // 重叠：移除右端点更大的当前区间（移除它对后续最有利）
+        }
+    }
+    return removed
+}`,
+    keyPoints: ["按右端点排序", "重叠时移除右端点大的", "等价于求最多保留的不重叠区间数"],
+    followUps: ["为什么按右端点而不是左端点排序？", "LC 452 射气球是同一思路吗？"],
     favorited: false,
   },
 
@@ -2820,9 +3061,12 @@ func oddEvenList(head *ListNode) *ListNode {
     id: "algo-236",
     nodeId: "p2-highfreq",
     question: "236. 二叉树最近公共祖先（LeetCode 236）\n找两个节点的最近公共祖先。",
-    answer: `// 思路：递归，左右子树分别找 p 和 q
+    answer: `// 思路：递归后序遍历，左右子树分别找 p 和 q
 // 时间 O(n)，空间 O(h)
-// 关键：左有右有则当前是 LCA，左有返回左，右有返回右
+// 返回值语义：lowestCommonAncestor(root) 表示"root 子树中是否含 p/q"——
+// 子树含 p 或 q 之一就返回该节点；都不含返回 nil；
+// 若左右返回值均非 nil，说明 p、q 分属当前节点两侧，当前节点即 LCA。
+// 后序自底向上汇总，第一个左右均非空的节点就是最近公共祖先。
 
 func lowestCommonAncestor(root, p, q *TreeNode) *TreeNode {
     if root == nil || root == p || root == q { return root }
@@ -3031,7 +3275,8 @@ func buildNext(s string) []int {
     nodeId: "p2-highfreq",
     question: "151. 反转字符串中的单词（LeetCode 151）\n将字符串中的单词顺序反转。",
     answer: `// 思路：整体反转 + 逐词反转 + 去多余空格
-// 时间 O(n)，空间 O(1)（Go 需转 []byte）
+// 时间 O(n)，空间 O(n)：Go 字符串不可变，必须转 []byte，实质需要 O(n) 额外空间
+// 注：C++ 等字符串可变的语言可原地做到 O(1) 空间
 // 关键：三次反转
 
 func reverseWords(s string) string {
@@ -3229,10 +3474,8 @@ func corpFlightBookings(bookings [][]int, n int) []int {
         diff[b[0]] += b[2]; diff[b[1]+1] -= b[2]
     }
     res := make([]int, n)
-    for i := 1; i <= n; i++ { res[i-1] = res[i-1] + diff[i]; if i > 1 { res[i-1] += res[i-2] } }
-    // 简化：前缀和还原
     cur := 0
-    for i := 1; i <= n; i++ { cur += diff[i]; res[i-1] = cur }
+    for i := 1; i <= n; i++ { cur += diff[i]; res[i-1] = cur } // 前缀和还原
     return res
 }`,
     keyPoints: ["差分数组", "区间加减 O(1)", "前缀和还原"],
@@ -3372,18 +3615,77 @@ func isWildcardMatch(s, p string) bool {
     id: "algo-460",
     nodeId: "p3-bytedance-tencent",
     question: "460. LFU 缓存（LeetCode 460）\n设计 O(1) 的 LFU 缓存。",
-    answer: `// 思路：频率→双向链表集合 + key→节点哈希
+    answer: `// 思路：key→节点哈希 + freq→双向链表哈希，同频率内新节点在头（LRU）
 // 时间 O(1) 每操作，空间 O(capacity)
-// 关键：minFreq 维护，同频率按 LRU 排序
+// 关键：minFreq 指针——get/put 命中时节点频率 +1 并移到新链表头部；
+//       旧频率链表空了且等于 minFreq 时 minFreq++；put 新节点时 minFreq 重置为 1
+
+type LFUNode struct {
+    key, val, freq int
+    prev, next     *LFUNode
+}
+type freqList struct {
+    head, tail *LFUNode // 哨兵
+    size       int
+}
+func newFreqList() *freqList {
+    l := &freqList{head: &LFUNode{}, tail: &LFUNode{}}
+    l.head.next = l.tail
+    l.tail.prev = l.head
+    return l
+}
+func (l *freqList) addToHead(n *LFUNode) {
+    n.prev = l.head
+    n.next = l.head.next
+    l.head.next.prev = n
+    l.head.next = n
+    l.size++
+}
+func (l *freqList) remove(n *LFUNode) {
+    n.prev.next = n.next
+    n.next.prev = n.prev
+    l.size--
+}
+func (l *freqList) removeTail() *LFUNode {
+    n := l.tail.prev
+    l.remove(n)
+    return n
+}
 
 type LFUCache struct {
-    cap, minFreq, size int
-    keyToNode map[int]*LFUNode
-    freqToList map[int]*DLinkedList
+    cap, minFreq int
+    keyToNode    map[int]*LFUNode
+    freqToList   map[int]*freqList
 }
-// get: 更新频率，从旧链表移到新链表
-// put: 满了则删 minFreq 链表尾部，新节点加 freq=1 链表头部
-// minFreq: get 时+1，put 新节点时设为 1，淘汰时需更新`,
+func ConstructorLFU(capacity int) LFUCache {
+    return LFUCache{cap: capacity, keyToNode: map[int]*LFUNode{}, freqToList: map[int]*freqList{}}
+}
+// touch：节点频率 +1，从旧频率链表摘出、插入新频率链表头部
+func (c *LFUCache) touch(n *LFUNode) {
+    old := c.freqToList[n.freq]
+    old.remove(n)
+    if old.size == 0 && n.freq == c.minFreq { c.minFreq++ }
+    n.freq++
+    if c.freqToList[n.freq] == nil { c.freqToList[n.freq] = newFreqList() }
+    c.freqToList[n.freq].addToHead(n)
+}
+func (c *LFUCache) Get(key int) int {
+    if n, ok := c.keyToNode[key]; ok { c.touch(n); return n.val }
+    return -1
+}
+func (c *LFUCache) Put(key, val int) {
+    if c.cap == 0 { return }
+    if n, ok := c.keyToNode[key]; ok { n.val = val; c.touch(n); return }
+    if len(c.keyToNode) == c.cap { // 淘汰 minFreq 链表尾部（最久未用）
+        victim := c.freqToList[c.minFreq].removeTail()
+        delete(c.keyToNode, victim.key)
+    }
+    n := &LFUNode{key: key, val: val, freq: 1}
+    c.keyToNode[key] = n
+    if c.freqToList[1] == nil { c.freqToList[1] = newFreqList() }
+    c.freqToList[1].addToHead(n)
+    c.minFreq = 1 // 新节点插入后最小频率必为 1
+}`,
     keyPoints: ["频率→双向链表", "key→节点哈希", "同频率内 LRU"],
     followUps: ["LRU 和 LFU 的区别？", "如何 O(1) 维护 minFreq？"],
     favorited: false,
@@ -3392,18 +3694,33 @@ type LFUCache struct {
     id: "algo-466",
     nodeId: "p3-bytedance-tencent",
     question: "466. 统计重复个数（LeetCode 466）\n求 S 在 [s1, n1] 次重复后的串中作为 [s2, n2] 出现的最大次数。",
-    answer: `// 思路：找循环节
-// 时间 O(s1·s2)，空间 O(s2)
-// 关键：统计 s1 中每个 s2 字符的匹配位置，找循环节
+    answer: `// 思路：模拟 + 循环节检测 + 数学跳跃（纯模拟 O(n1·|s1|) 在 n1≤10^6 时必 TLE）
+// 时间 O(|s1|·|s2|)：idx2 最多 |s2| 种取值，|s2| 轮内必出现重复状态进入跳跃；空间 O(|s2|)
+// 关键：记录每轮结束时的 (idx2, count)，状态重复即找到循环节，剩余轮数用乘法跳过
 
 func getMaxRepetitions(s1 string, n1 int, s2 string, n2 int) int {
-    // 统计每轮 s1 匹配 s2 的次数和 s2 的位置
-    // 找到循环节后用数学计算
-    // 简化思路：模拟 + 循环节优化
-    idx2, count := 0, 0
-    for i := 0; i < n1; i++ {
+    idx2, count := 0, 0               // idx2: s2 匹配到的位置；count: 已完整匹配 s2 的次数
+    type state struct{ count, round int }
+    recall := map[int]state{}         // idx2 -> 该状态首次出现时的 (count, round)
+    round := 0
+    for round < n1 {
+        round++
         for j := 0; j < len(s1); j++ {
-            if s1[j] == s2[idx2] { idx2++; if idx2 == len(s2) { idx2 = 0; count++ } }
+            if s1[j] == s2[idx2] {
+                idx2++
+                if idx2 == len(s2) { idx2 = 0; count++ }
+            }
+        }
+        if prev, ok := recall[idx2]; ok {
+            // 找到循环节：每 cycleRound 轮 s1 可多匹配 cycleCount 个 s2
+            cycleRound := round - prev.round
+            cycleCount := count - prev.count
+            jump := (n1 - round) / cycleRound
+            count += jump * cycleCount
+            round += jump * cycleRound
+            recall = map[int]state{} // 跳跃后剩余不足一个周期，无需再检测
+        } else {
+            recall[idx2] = state{count, round}
         }
     }
     return count / n2
@@ -3476,15 +3793,49 @@ func maxNumber(nums1, nums2 []int, k int) []int {
     var res []int
     for i := 0; i <= k && i <= len(nums1); i++ {
         if k-i > len(nums2) { continue }
-        sub1 := maxSubsequence(nums1, i)
-        sub2 := maxSubsequence(nums2, k-i)
-        merged := merge(sub1, sub2)
+        merged := merge(maxSubsequence(nums1, i), maxSubsequence(nums2, k-i))
         if greater(merged, res) { res = merged }
     }
     return res
 }
-// maxSubsequence: 单调栈取长度为 k 的最大子序列
-// merge: 贪心合并，每次取较大的前缀`,
+
+// maxSubsequence：单调栈取长度为 k、保持相对顺序的最大子序列
+// drop 记录还能丢弃几个元素，栈顶小于当前元素时弹出
+func maxSubsequence(nums []int, k int) []int {
+    drop := len(nums) - k
+    stack := make([]int, 0, k)
+    for _, x := range nums {
+        for drop > 0 && len(stack) > 0 && stack[len(stack)-1] < x {
+            stack = stack[:len(stack)-1]
+            drop--
+        }
+        stack = append(stack, x)
+    }
+    return stack[:k]
+}
+
+// merge：贪心合并，每步从"剩余字典序更大"的序列取头元素
+// 注意：两序列当前元素相等时不能随意取，必须向后比较第一个不同元素，
+//       例如 a=[6,7], b=[6,0,4]，取 a 的 6 后面跟 7 更优
+func merge(a, b []int) []int {
+    res := make([]int, 0, len(a)+len(b))
+    for len(a) > 0 || len(b) > 0 {
+        if greater(a, b) {
+            res = append(res, a[0]); a = a[1:]
+        } else {
+            res = append(res, b[0]); b = b[1:]
+        }
+    }
+    return res
+}
+
+// greater：字典序比较 a > b（前缀相等时剩余更长的更大）
+func greater(a, b []int) bool {
+    for i := 0; i < len(a) && i < len(b); i++ {
+        if a[i] != b[i] { return a[i] > b[i] }
+    }
+    return len(a) > len(b)
+}`,
     keyPoints: ["枚举分配数量", "单调栈取最大子序列", "贪心合并"],
     followUps: ["最大子序列怎么取？", "合并时相同前缀怎么处理？"],
     favorited: false,
@@ -3792,8 +4143,8 @@ func nthSuperUglyNumber(n int, primes []int) int {
     pointers := make([]int, len(primes))
     for i := 1; i < n; i++ {
         dp[i] = 1 << 31 - 1
-        for j := range primes { dp[i] = min(dp[i], dp[points[j]]*primes[j]) }
-        for j := range primes { if dp[i] == dp[points[j]]*primes[j] { points[j]++ } }
+        for j := range primes { dp[i] = min(dp[i], dp[pointers[j]]*primes[j]) }
+        for j := range primes { if dp[i] == dp[pointers[j]]*primes[j] { pointers[j]++ } }
     }
     return dp[n-1]
 }`,
@@ -3859,20 +4210,52 @@ func ladderLength(beginWord, endWord string, wordList []string) int {
     id: "algo-126",
     nodeId: "p3-ali-meituan",
     question: "126. 单词接龙 II（LeetCode 126）\n返回所有最短转换序列。",
-    answer: `// 思路：BFS + DFS 回溯
-// 时间 O(n·L²)，空间 O(n·L)
-// 关键：BFS 建图找最短层，DFS 回溯所有路径
+    answer: `// 思路：BFS 分层建有向图 + DFS 回溯所有最短路径
+// 时间 O(n·26·L²)，空间 O(n·L)
+// 关键：每层开始前先把本层词从 wordSet 删除，杜绝同层连边；
+//       children 只记录指向下一层的边，DFS 沿图走天然无环
 
 func findLadders(beginWord, endWord string, wordList []string) [][]string {
-    // 1. BFS 建立每个词的下一层邻居
-    // 2. DFS 从 beginWord 回溯到 endWord 的所有最短路径
-    // BFS 记录 children map，DFS 收集路径
+    var res [][]string
     wordSet := map[string]bool{}
     for _, w := range wordList { wordSet[w] = true }
-    if !wordSet[endWord] { return nil }
-    // BFS 建图...
-    // DFS 回溯...
-    return nil // 简化：核心是 BFS+DFS 两步走
+    if !wordSet[endWord] { return res }
+    // 1. BFS 建图：children[x] = x 在下一层的所有邻居
+    children := map[string][]string{}
+    queue := []string{beginWord}
+    found := false
+    for len(queue) > 0 && !found {
+        for _, w := range queue { delete(wordSet, w) } // 本层词先删
+        next := map[string]bool{}
+        for _, word := range queue {
+            for i := 0; i < len(word); i++ {
+                for c := byte('a'); c <= 'z'; c++ {
+                    if c == word[i] { continue }
+                    nb := word[:i] + string(c) + word[i+1:]
+                    if wordSet[nb] {
+                        children[word] = append(children[word], nb)
+                        next[nb] = true
+                        if nb == endWord { found = true }
+                    }
+                }
+            }
+        }
+        queue = queue[:0]
+        for w := range next { queue = append(queue, w) }
+    }
+    // 2. DFS 回溯：沿 children 从 beginWord 走到 endWord
+    path := []string{beginWord}
+    var dfs func(word string)
+    dfs = func(word string) {
+        if word == endWord { res = append(res, append([]string{}, path...)); return }
+        for _, nb := range children[word] {
+            path = append(path, nb)
+            dfs(nb)
+            path = path[:len(path)-1]
+        }
+    }
+    dfs(beginWord)
+    return res
 }`,
     keyPoints: ["BFS 建图", "DFS 回溯所有路径", "避免重复访问"],
     followUps: ["如何避免超时？", "双向 BFS 优化？"],
@@ -3923,10 +4306,12 @@ func slidingPuzzle(board [][]int) int {
     answer: `// 思路：Trie + DFS 回溯
 // 时间 O(m·n·4^L)，空间 O(字典大小)
 // 关键：Trie 存字典，DFS 搜索时沿 Trie 走
+// 注意：需在 algo-208 的 Trie 节点上扩展 word string 字段，
+//       Insert 时在结尾节点记录完整单词，命中时 O(1) 取词，无需回溯拼接路径
 
 func findWords(board [][]byte, words []string) []string {
-    trie := &Trie{}
-    for _, w := range words { trie.Insert(w) }
+    trie := &Trie{} // 扩展版 Trie：type Trie struct { children [26]*Trie; isEnd bool; word string }
+    for _, w := range words { trie.Insert(w) } // Insert 末尾需 node.word = w
     m, n := len(board), len(board[0])
     var res []string
     var dfs func(i, j int, node *Trie)
@@ -4058,38 +4443,39 @@ func findMinHeightTrees(n int, edges [][]int) []int {
 function buildSchedule(): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   // 拓扑顺序：Phase1 → Phase2 → Phase3
+  // 时间预算：learn ≈ 每题 30 分钟，review ≈ 每题 15 分钟（按各节点实际题量估算）
   const order: [string, "learn" | "review", number][] = [
     // Phase 1
-    ["p1-array-string", "learn", 40],
-    ["p1-array-string", "review", 20],
-    ["p1-hash", "learn", 25],
-    ["p1-hash", "review", 15],
-    ["p1-linkedlist", "learn", 35],
-    ["p1-linkedlist", "review", 20],
-    ["p1-stack-queue", "learn", 30],
-    ["p1-stack-queue", "review", 15],
-    ["p1-tree", "learn", 40],
-    ["p1-tree", "review", 20],
-    ["p1-backtrack", "learn", 35],
-    ["p1-backtrack", "review", 20],
-    ["p1-sort-binary", "learn", 30],
-    ["p1-sort-binary", "review", 15],
+    ["p1-array-string", "learn", 600], // 20 题
+    ["p1-array-string", "review", 300],
+    ["p1-hash", "learn", 120], // 4 题
+    ["p1-hash", "review", 60],
+    ["p1-linkedlist", "learn", 300], // 10 题
+    ["p1-linkedlist", "review", 150],
+    ["p1-stack-queue", "learn", 180], // 6 题
+    ["p1-stack-queue", "review", 90],
+    ["p1-tree", "learn", 360], // 12 题
+    ["p1-tree", "review", 180],
+    ["p1-backtrack", "learn", 180], // 6 题
+    ["p1-backtrack", "review", 90],
+    ["p1-sort-binary", "learn", 210], // 7 题
+    ["p1-sort-binary", "review", 105],
     // Phase 2
-    ["p2-dp", "learn", 50],
-    ["p2-dp", "review", 30],
-    ["p2-graph", "learn", 40],
-    ["p2-graph", "review", 20],
-    ["p2-heap", "learn", 25],
-    ["p2-heap", "review", 15],
-    ["p2-greedy", "learn", 30],
-    ["p2-greedy", "review", 15],
-    ["p2-highfreq", "learn", 45],
-    ["p2-highfreq", "review", 25],
+    ["p2-dp", "learn", 630], // 21 题
+    ["p2-dp", "review", 315],
+    ["p2-graph", "learn", 330], // 11 题
+    ["p2-graph", "review", 165],
+    ["p2-heap", "learn", 120], // 4 题
+    ["p2-heap", "review", 60],
+    ["p2-greedy", "learn", 240], // 8 题
+    ["p2-greedy", "review", 120],
+    ["p2-highfreq", "learn", 690], // 23 题
+    ["p2-highfreq", "review", 345],
     // Phase 3
-    ["p3-bytedance-tencent", "learn", 50],
-    ["p3-bytedance-tencent", "review", 30],
-    ["p3-ali-meituan", "learn", 40],
-    ["p3-ali-meituan", "review", 20],
+    ["p3-bytedance-tencent", "learn", 570], // 19 题
+    ["p3-bytedance-tencent", "review", 285],
+    ["p3-ali-meituan", "learn", 360], // 12 题
+    ["p3-ali-meituan", "review", 180],
   ];
 
   order.forEach(([nodeId, type, minutes], idx) => {

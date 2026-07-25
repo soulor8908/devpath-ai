@@ -100,7 +100,7 @@ const LLM_APP_NODES: KnowledgeNode[] = [
     prerequisites: ["llm-fundamentals"],
     frequency: "高",
     bigTech: true,
-    summary: "Chat Completions、Function Calling、Vision、Embeddings、Streaming SSE、Rate Limit 退避重试、Assistants API、结构化响应。",
+    summary: "Chat Completions、Responses API、Function Calling、Vision、Embeddings、Streaming SSE、Rate Limit 退避重试、结构化响应。",
     mastery: 0,
   },
   {
@@ -401,7 +401,7 @@ function trimHistory(messages: Msg[], maxTokens: number, countTokens: (s: string
 const prompt = [\`参考材料:\\n\${retrievedDocs}\`, userQuestion];
 \`\`\`
 
-踩坑：长上下文单价更高（OpenAI 128K 输入价是 8K 的 4 倍），能用 RAG 切片就别塞全量。`,
+踩坑：长上下文按 token 同价计费——单价不变，但量增价增，塞全量成本随 token 数线性上涨，能用 RAG 切片就别塞全量。`,
     keyPoints: ["窗口=输入+输出 token 上限", "超限报错或静默截断", "Lost in the Middle 致中段内容易丢"],
     followUps: ["如何实现对话历史摘要压缩？", "Needle in a Haystack 测试怎么做？"],
     favorited: false,
@@ -413,7 +413,7 @@ const prompt = [\`参考材料:\\n\${retrievedDocs}\`, userQuestion];
     question: "回顾 Transformer 自注意力机制？为什么 LLM 推理时 KV Cache 能加速？",
     answer: `结论：自注意力对 Q/K/V 做 softmax(QK^T/√d)V，每生成一个 token 需关注历史所有 token 的 K/V；推理时历史 K/V 不变，缓存后避免重复计算，这是 KV Cache 加速核心。
 
-实战案例：vLLM、TGI 等推理框架默认启用 KV Cache，Claude 3.5 服务端 Prompt Caching 让相同前缀的 API 调用延迟降低 5-10 倍、成本降 90%。
+实战案例：vLLM、TGI 等推理框架默认启用 KV Cache。Anthropic Prompt Caching 对长前缀重复调用可显著降低首 token 延迟（官方口径最高约 85%）且缓存读取 token 单价更低；OpenAI 则对达到长度阈值的重复前缀自动启用前缀缓存并打折，无需显式声明，可作为零成本对照方案。
 
 \`\`\`python
 import torch
@@ -521,10 +521,12 @@ resp = client.chat.completions.create(
     logprobs=True, top_logprobs=3,  # 返回每个位置 top 3 token 概率
     max_tokens=2,
 )
+import math
 for tok in resp.choices[0].logprobs.content[:1]:
-    print(f"token={tok.token} prob={tok.probability:.3f}")
+    # API 返回的是 logprob（对数概率），需 math.exp() 还原为概率
+    print(f"token={tok.token} prob={math.exp(tok.logprob):.3f}")
     for alt in tok.top_logprobs:
-        print(f"  alt={alt.token} prob={alt.probability:.3f}")
+        print(f"  alt={alt.token} prob={math.exp(alt.logprob):.3f}")
 # 若 "正" 概率 0.92 → 高置信；<0.6 → 转人工
 \`\`\`
 
@@ -991,7 +993,7 @@ def forward_pass(input_ids):
     question: "Eagle / Medusa / Lookahead Decoding 这些投机解码变体有何区别？",
     answer: `结论：Eagle 用一个"特征预测"小模型（输入隐状态预测下一 token）接受率最高；Medusa 在大模型上加多个并行 head 一次预测多 token；Lookahead 不用草稿模型，靠 Jacobi 迭代并行解码。
 
-实战案例：Meta Eagle 在 Llama 3 70B 上接受率 80%+ 加速 3×；Medusa 训练简单但接受率较低；NVIDIA TensorRT-LLM 集成 Medusa。
+实战案例：Eagle/Medusa 等投机解码变体已在 vLLM、TensorRT-LLM、SGLang 等主流推理框架落地，生产上通常带来 1.5-3× 吞吐提升，具体收益取决于接受率与 batch 负载。
 
 \`\`\`python
 # Eagle 草稿模型：输入 hidden state 预测下一 token
@@ -1026,7 +1028,7 @@ class EagleDraftModel(nn.Module):
     question: "MT-Bench、AlpacaEval、Arena 哪个更可信？为什么有 LLM-as-a-Judge 偏置？",
     answer: `结论：MT-Bench 用多轮对话+GPT-4 评分（自动但偏 GPT-4）；AlpacaEval 用胜率统计（简单但短答偏置）；Arena 用真实人类盲评 ELO（最可信但慢且贵）；LLM-as-a-Judge 有位置偏置、长度偏置、自我偏好偏置。
 
-实战案例：LMSYS Arena 是当前公认最权威排名；Qwen 2.5/DeepSeek V3 都优先发 Arena 分；Anthropic 发现 Claude 评分时偏好 Claude 输出。
+实战案例：LMArena（原 LMSYS Chatbot Arena）真人盲评 ELO 仍是重要参考，但近年出现"刷分"争议——有厂商被曝提交大量私有变体后只公开最高分版本，官方随后收紧了政策；代码能力则更多看 SWE-bench Verified（人工核验的真实 GitHub issue 子集）。LLM-as-a-Judge 存在自我偏好偏置（模型倾向给自家输出高分）。
 
 \`\`\`python
 # LLM-as-a-Judge 简化实现
@@ -1102,22 +1104,22 @@ def faithfulness_check(answer, retrieved_docs):
     question: "MMLU、CMMLU、C-Eval、AGIEval 这些中文 benchmark 区别？",
     answer: `结论：MMLU 是英文多任务（57 学科）；CMMLU 是中文本地化版（67 学科）；C-Eval 用中国高考/考研/公务员题目；AGIEval 聚焦高难度任务（SAT/法考/高考）。中文场景应同时跑 CMMLU + C-Eval。
 
-实战案例：Qwen2.5 在 CMMLU 排中文模型前列；DeepSeek V3 报告同时给 MMLU/CMMLU/C-Eval；百度文心一言在 AGIEval 中文法考表现亮眼。
+实战案例：Qwen3、DeepSeek-V3 系等头部中文模型都会同时报告 MMLU/CMMLU/C-Eval；GLM 系列在中文政务、法考类题目上表现突出。
 
 \`\`\`bash
 # 用 lm-evaluation-harness 跑 benchmark
 pip install lm-eval
 
 # 跑 CMMLU（5-shot）
-lm_eval --model hf --model_args pretrained=Qwen/Qwen2.5-7B-Instruct \\
+lm_eval --model hf --model_args pretrained=Qwen/Qwen3-8B \\
     --tasks cmmlu --num_fewshot 5 --batch_size 8
 
 # 跑 C-Eval
-lm_eval --model hf --model_args pretrained=Qwen/Qwen2.5-7B-Instruct \\
+lm_eval --model hf --model_args pretrained=Qwen/Qwen3-8B \\
     --tasks ceval-validation --num_fewshot 5
 
 # 跑 MMLU
-lm_eval --model hf --model_args pretrained=Qwen/Qwen2.5-7B-Instruct \\
+lm_eval --model hf --model_args pretrained=Qwen/Qwen3-8B \\
     --tasks mmlu --num_fewshot 5
 \`\`\`
 
@@ -1132,7 +1134,7 @@ lm_eval --model hf --model_args pretrained=Qwen/Qwen2.5-7B-Instruct \\
     question: "HumanEval、MBPP 代码评估怎么做？pass@k 指标含义？",
     answer: `结论：HumanEval 用 164 道函数签名+单元测试题；MBPP 用 974 道基础编程题；pass@k 表示采样 k 次至少 1 次通过测试的概率，衡量模型"上界"能力；要用 sandbox 执行代码避免恶意代码。
 
-实战案例：DeepSeek-Coder 在 HumanEval pass@1 90%+；Qwen2.5-Coder 也接近 SOTA；字节豆包代码模型在内部 LeetCode 题集做扩展评估。
+实战案例：HumanEval/MBPP 已趋饱和且有污染争议，2026 年代码能力事实标准转向 SWE-bench Verified——在真实 GitHub issue 上端到端修 bug，主流旗舰模型与 Agentic coding 工具都以它为核心榜单；HumanEval 更多作为入门冒烟测试，大厂还会在内部真实工单集上做扩展评估防过拟合。
 
 \`\`\`python
 # pass@k 计算
@@ -1317,19 +1319,19 @@ class GroupedQueryAttention(nn.Module):
   {
     id: "llm-30",
     nodeId: "llm-opensource",
-    question: "Qwen 2.5 系列特点？为何在中文场景表现好？",
-    answer: `结论：Qwen 2.5 由阿里通义实验室发布，覆盖 0.5B-72B 全尺寸，中文词表 15W+，预训练数据中文占比高，且用 MMLU/CMMLU/C-Eval 多 benchmark 对齐，是国产开源 SOTA。
+    question: "Qwen3 系列特点？为何在中文场景表现好？",
+    answer: `结论：Qwen3 是阿里通义新一代开源系列，覆盖小尺寸稠密到大尺寸 MoE 全谱系，支持思考/非思考混合推理模式切换，中文词表与语料优化深入，长期处于中文开源第一梯队。
 
-实战案例：Qwen 2.5 72B 在 Arena 中文排名前列，常用作国产替代；阿里魔搭社区提供完整微调工具链（swift/DiT）；通义实验室公开技术报告可复现。
+实战案例：Qwen3 与 DeepSeek-V3 系、Kimi K2、GLM 系列共同构成 2026 年国产开源主力阵容；魔搭社区提供完整微调工具链（ms-swift 等），官方技术报告可复现，企业私有化部署采纳率高。
 
 \`\`\`bash
 # 用 transformers 加载
 pip install transformers accelerate
 python -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer
-tok = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-7B-Instruct')
+tok = AutoTokenizer.from_pretrained('Qwen/Qwen3-8B')
 model = AutoModelForCausalLM.from_pretrained(
-    'Qwen/Qwen2.5-7B-Instruct',
+    'Qwen/Qwen3-8B',
     torch_dtype='auto', device_map='auto'
 )
 msgs = [{'role':'user','content':'你好'}]
@@ -1340,12 +1342,12 @@ print(tok.decode(out[0]))
 
 # 用 vLLM 部署
 # python -m vllm.entrypoints.openai.api_server \\
-#     --model Qwen/Qwen2.5-7B-Instruct --port 8000
+#     --model Qwen/Qwen3-8B --port 8000
 \`\`\`
 
-踩坑：Qwen 2.5 不同尺寸 system prompt 处理略有差异；72B 单卡跑不动需 TP≥2 或量化。`,
-    keyPoints: ["0.5B-72B 全尺寸覆盖", "中文词表 15W+", "国产开源 SOTA"],
-    followUps: ["Qwen 2.5 和 Llama 3 哪个更适合中文？", "如何微调 Qwen？"],
+踩坑：Qwen3 思考模式与非思考模式的 prompt 模板和采样参数不同，混用会劣化输出；大尺寸 MoE 需多卡 TP 或量化部署。`,
+    keyPoints: ["稠密+MoE 全尺寸覆盖", "思考/非思考混合推理", "中文开源第一梯队"],
+    followUps: ["Qwen3 与 DeepSeek-V3 系如何选型？", "如何微调 Qwen3？"],
     favorited: false,
     bigTech: true,
   },
@@ -1521,41 +1523,40 @@ print(out["choices"][0]["text"])
   {
     id: "llm-35",
     nodeId: "llm-opensource",
-    question: "国产开源模型对比：Qwen/DeepSeek/GLM/ Yi/ Baichuan 怎么选？",
-    answer: `结论：Qwen 综合最强（全尺寸+多模态+工具调用）；DeepSeek V3/R1 推理与代码 SOTA；GLM-4 中文场景与 Function Calling 强；Yi 长上下文好；Baichuan 中文垂直领域有积累。
+    question: "国产开源模型对比：Qwen3/DeepSeek/Kimi K2/GLM 怎么选？",
+    answer: `结论：2026 年国产开源主力是 Qwen3（综合+生态）、DeepSeek-V3 系（推理与代码）、Kimi K2（Agent 与长上下文）、GLM 系列（中文+工具调用+政企落地）；Yi/Baichuan 等早期系列已淡出主流选型。
 
-实战案例：阿里云魔搭主推 Qwen；智谱 GLM 在企业知识库落地多；零一万物 Yi 长上下文 RAG 受欢迎；DeepSeek API 价格低适合成本敏感场景。
+实战案例：DeepSeek-V3 系以强推理和极低开源权重成本成为私有化首选之一；Kimi K2 在 Agentic 任务（工具调用、编码）上口碑好；Qwen3 生态最全（多模态/嵌入/全尺寸）；智谱 GLM 在政企知识库与合规场景落地多。
 
 \`\`\`bash
 # 各家模型下载与部署对比
-# 1. Qwen（推荐默认）
-ollama pull qwen2.5:7b
-# 2. DeepSeek（推理任务）
-ollama pull deepseek-r1:7b
-# 3. GLM（中文+工具调用）
+# 1. Qwen3（默认推荐，生态最全）
+ollama pull qwen3:8b
+# 2. DeepSeek（推理/代码任务）
+ollama pull deepseek-r1:8b
+# 3. GLM（中文+工具调用+政企）
 ollama pull glm4:9b
-# 4. Yi（长上下文）
-# vLLM 部署 Yi-34B-200K
-# python -m vllm.entrypoints.openai.api_server --model 01-ai/Yi-34B-200K
+# 4. Kimi K2（Agent/长上下文，MoE 大模型，建议 vLLM 多卡部署）
+# python -m vllm.entrypoints.openai.api_server --model moonshotai/Kimi-K2-Instruct
 \`\`\`
 
 \`\`\`python
 # 选型决策树
 def choose_model(task, budget, gpu_mem_gb, need_chinese=True):
     if task == "reasoning":  # 推理/数学/代码
-        return "deepseek-r1" if budget == "low" else "o1"
-    if task == "tool_use":  # Function Calling
-        return "qwen2.5" if need_chinese else "llama3.1"
+        return "deepseek-v3 系"  # 推理强、开源权重
+    if task == "agent":  # Agent/工具调用密集
+        return "kimi-k2" if gpu_mem_gb > 200 else "qwen3"
     if task == "long_context":  # 长文档 RAG
-        return "yi-34b-200k" if gpu_mem_gb > 80 else "qwen2.5-32k"
+        return "kimi-k2" if budget != "low" else "qwen3"
     if task == "general":
-        return "qwen2.5"  # 综合最强
-    if task == "vertical":  # 垂直行业
-        return "glm-4"  # 中文工具调用强
+        return "qwen3"  # 综合+生态最全
+    if task == "enterprise_compliance":  # 政企合规
+        return "glm"
 \`\`\`
 
-踩坑：不要只看 benchmark 分数，业务场景实测更重要；社区活跃度影响工具链成熟度。`,
-    keyPoints: ["Qwen 综合最强", "DeepSeek 推理 SOTA", "GLM 中文+工具强", "Yi 长上下文好"],
+踩坑：不要只看 benchmark 分数，业务场景实测更重要；社区活跃度与许可证（商用条款）直接影响可维护性。`,
+    keyPoints: ["Qwen3 综合+生态最全", "DeepSeek-V3 系推理强", "Kimi K2 擅长 Agent", "GLM 政企落地多"],
     followUps: ["如何对比评估多个开源模型？", "国产模型出海如何选？"],
     favorited: false,
   },
@@ -2003,7 +2004,7 @@ print(self_consistency(q, n=10))  # 23, 12
     question: "ReAct 范式（Reasoning + Acting）原理？为什么是 Agent 基础？",
     answer: `结论：ReAct 让 LLM 交替生成"思考（Thought）→ 行动（Action）→ 观察（Observation）"循环，让模型边推理边调用工具；是几乎所有 Agent 框架（LangChain/AutoGen/CrewAI）的基础范式。
 
-实战案例：Google 论文首次提出 ReAct；OpenAI Function Calling 是 ReAct 工程化；字节豆包 Agent、阿里通义 Agent 都基于 ReAct 变体；LangGraph 默认 AgentExecutor 用 ReAct。
+实战案例：Google 论文首次提出 ReAct；OpenAI Function Calling 是 ReAct 工程化；字节豆包 Agent、阿里通义 Agent 都基于 ReAct 变体；LangChain/LangGraph 的预置 Agent 均以 ReAct 循环为骨架。
 
 \`\`\`python
 from openai import OpenAI
@@ -2046,7 +2047,7 @@ def react_agent(question, max_steps=5):
     return "达到最大步数"
 \`\`\`
 
-踩坑：ReAct 在工具调用失败时容易陷入死循环，必须设 max_steps + 错误恢复；prompt 中要明确"任务完成后停止调用工具"。`,
+踩坑：ReAct 在工具调用失败时容易陷入死循环，必须设 max_steps + 错误恢复；prompt 中要明确"任务完成后停止调用工具"。另外每轮都要把全量 history（含全部 Observation）重发给模型，token 随步数平方级膨胀——长任务必须做 compaction：摘要压缩早期 Observation、只保留最近 N 步细节，这是 context engineering 的核心权衡（信息保留 vs 成本与 context rot）。`,
     keyPoints: ["Thought→Action→Observation 循环", "Function Calling 是 ReAct 工程化", "Agent 框架基础范式"],
     followUps: ["ReAct 与 Planner-Executor 区别？", "如何防止 Agent 死循环？"],
     favorited: false,
@@ -2750,7 +2751,7 @@ console.log(resp.choices[0].message.content);
 console.log(resp.usage); // {prompt_tokens, completion_tokens, total_tokens}
 \`\`\`
 
-踩坑：max_tokens 包含输入+输出，过长会报错；stream=true 时返回结构不同（chunk 流）。`,
+踩坑：max_tokens 只限制输出 token 数（不含输入）；需保证 prompt token + max_tokens ≤ 模型上下文窗口，否则报 context_length_exceeded；stream=true 时返回结构不同（chunk 流）。`,
     keyPoints: ["messages 数组按顺序传", "4 种角色 system/user/assistant/tool", "兼容豆包/通义/Kimi"],
     followUps: ["如何处理 token 限制？", "如何复现结果？"],
     favorited: false,
@@ -2817,9 +2818,9 @@ if (toolCall) {
     id: "llm-60",
     nodeId: "llm-openai-api",
     question: "Vision API 怎么用？图片 token 怎么算？",
-    answer: `结论：Vision API 在 messages 中加 image_url 类型，支持 URL 或 base64；图片 token 计算 = (width×height)/750 自动折算，1080p 图片约 765 tokens。
+    answer: `结论：Vision API 在 messages 中加 image_url 类型，支持 URL 或 base64；图片 token 按 tile 机制计算（detail:"high"）：先缩放到 2048px 以内、短边对齐 768px，再切成 512px tile，每 tile 170 token + 固定 85 token。例：1024×1024 → 缩放为 768×768 → 2×2=4 tile → 4×170+85=765 token。
 
-实战案例：GPT-4o、Claude 3.5、Gemini 1.5 都支持 Vision；阿里通义 Qwen-VL、字节豆包 Vision 同样兼容；Kimi 长文档理解支持图片识别。
+实战案例：OpenAI 多模态旗舰、Claude 系、Gemini 系都支持 Vision；阿里通义 Qwen-VL、字节豆包 Vision 同样兼容；Kimi 长文档理解支持图片识别。
 
 \`\`\`typescript
 import OpenAI from "openai";
@@ -2854,7 +2855,7 @@ const resp2 = await client.chat.completions.create({
 \`\`\`
 
 踩坑：图片 token 不可控，大图建议先压缩；OCR 任务用 high detail 但成本高 2 倍。`,
-    keyPoints: ["image_url 支持 URL/base64", "图片 token=(w×h)/750", "detail 控制成本"],
+    keyPoints: ["image_url 支持 URL/base64", "512px tile×170+85 计费", "detail 控制成本"],
     followUps: ["如何优化图片 token？", "多图理解怎么做？"],
     favorited: false,
   },
@@ -2962,51 +2963,41 @@ class TokenBucket {
   {
     id: "llm-63",
     nodeId: "llm-openai-api",
-    question: "Assistants API 和 Chat Completions 区别？什么时候用？",
-    answer: `结论：Chat Completions 是无状态单次调用；Assistants API 是有状态完整 Agent 框架，内置 Thread（对话历史）+ File（文件上传）+ Code Interpreter + RAG；适合复杂助手，但锁定 OpenAI 生态。
+    question: "Responses API 与 Chat Completions 区别？为什么新应用优先用 Responses API？",
+    answer: `结论：Chat Completions 是无状态单次调用（仍长期支持）；Responses API 是 OpenAI 新一代主 API，input 取代 messages、内置 web_search/file_search/computer_use/code_interpreter 等工具、支持 previous_response_id 状态化会话；Assistants API 已被 Responses API 取代并计划下线，存量需迁移。
 
-实战案例：OpenAI GPTs Store 基于 Assistants API；阿里通义、字节豆包都提供类似 Assistant 概念；多 Agent 框架（LangChain/LlamaIndex）通常直接用 Chat Completions 自己管理状态。
+实战案例：OpenAI 官方推荐新项目直接用 Responses API，Agent 类应用配合官方 Agents SDK；阿里通义、字节豆包也提供类似"托管 Agent"概念；跨厂商/自管状态的多 Agent 框架（LangGraph 等）仍基于 Chat Completions 自建。
 
 \`\`\`typescript
 import OpenAI from "openai";
 const client = new OpenAI();
 
-// Assistants API 流程
-// 1. 创建 Assistant（一次性配置）
-const assistant = await client.beta.assistants.create({
-  name: "数据分析助手",
+// Responses API：input 代替 messages，一次调用自带内置工具
+const resp = await client.responses.create({
   model: "gpt-4o",
-  instructions: "你是数据分析专家",
-  tools: [{ type: "code_interpreter" }, { type: "file_search" }],
+  input: "查一下今天的 AI 行业新闻并总结",
+  tools: [{ type: "web_search_preview" }],  // 内置联网搜索，无需自己接搜索引擎
+});
+console.log(resp.output_text);
+
+// 状态化会话：previous_response_id 串起多轮，无需重传全部历史
+const followUp = await client.responses.create({
+  model: "gpt-4o",
+  previous_response_id: resp.id,
+  input: "展开讲讲第二条",
 });
 
-// 2. 创建 Thread（对话历史）
-const thread = await client.beta.threads.create();
-
-// 3. 加消息
-await client.beta.threads.messages.create(thread.id, {
-  role: "user", content: "分析这个 CSV",
+// 内置文件检索（替代 Assistants 的 file_search）
+const withFile = await client.responses.create({
+  model: "gpt-4o",
+  input: "这份文档的核心观点是什么？",
+  tools: [{ type: "file_search", vector_store_ids: ["vs_xxx"] }],
 });
-
-// 4. 运行（自动调用工具）
-const run = await client.beta.threads.runs.create(thread.id, {
-  assistant_id: assistant.id,
-});
-
-// 5. 轮询状态
-while (run.status !== "completed") {
-  await sleep(1000);
-  const r = await client.beta.threads.runs.retrieve(thread.id, run.id);
-  if (r.status === "completed") break;
-}
-
-// 6. 获取结果
-const messages = await client.beta.threads.messages.list(thread.id);
 \`\`\`
 
-踩坑：Assistants API 锁定 OpenAI，跨厂商迁移成本高；建议生产用 Chat Completions 自管状态更可控。`,
-    keyPoints: ["Chat 无状态/Assistant 有状态", "Assistant 内置 Code/RAG/Thread", "锁定 OpenAI 生态"],
-    followUps: ["如何自管 Thread？", "Assistants 与 GPTs 关系？"],
+踩坑：Assistants API 已弃用（OpenAI 公告 2026 年内下线），存量代码需迁移到 Responses；Chat Completions 不会下线但新特性（内置工具、computer use）只上 Responses；状态化会话数据存于 OpenAI 侧，合规敏感场景需评估或用 store:false 自管状态。`,
+    keyPoints: ["Responses 内置 web/file/computer use 工具", "previous_response_id 状态化会话", "Assistants 已弃用需迁移"],
+    followUps: ["store:false 自管状态怎么做？", "Responses 与 Agents SDK 关系？"],
     favorited: false,
   },
   {
@@ -4125,9 +4116,9 @@ async function streamStructuredChat(messages: any[], schema: any) {
 }
 
 // 用 jsonrepair 修复损坏 JSON
-import { JSONRepair } from "jsonrepair";
+import { jsonrepair } from "jsonrepair";
 const broken = '{"name":"iPhone", price: 8999,}';  // 引号缺失、尾逗号
-const repaired = JSON.parse(JSONRepair(broken));
+const repaired = JSON.parse(jsonrepair(broken));
 \`\`\`
 
 踩坑：部分解析返回的对象可能"突变"（字段消失又出现）；schema 校验只能在完整后做。`,
@@ -4914,9 +4905,29 @@ def choose_approach(needs):
     if needs.knowledge_volume == "large":  # 知识量大
         return "rag"  # fine-tuning 装不下
     return "rag + fine_tuning"  # 组合用
+
+# 检索失败兜底
+def rag_with_fallback(question, vector_db, threshold=0.5):
+    docs = vector_db.search(get_embedding(question), top_k=3)
+    if not docs or max(d.score for d in docs) < threshold:
+        # 兜底链：query 改写重试 → 放宽 top_k → 关键词/BM25 混合检索 → 拒答/转人工
+        docs = vector_db.search(get_embedding(rewrite_query(question)), top_k=5)
+    if not docs or max(d.score for d in docs) < threshold:
+        return {"answer": "这个问题超出了我的知识范围，为您转人工。", "fallback": True}
+    return rag_chat(question, vector_db)
+
+# 长上下文直读 vs RAG 决策树
+def rag_or_longctx(corpus_tokens, qps, update_freq):
+    if corpus_tokens > 1_000_000:
+        return "rag"               # 超窗口只能 RAG
+    if update_freq == "high" or qps == "high":
+        return "rag"               # 更新频繁/高并发：RAG + 前缀缓存更省
+    if corpus_tokens < 100_000 and qps == "low":
+        return "long_context_direct"  # 小规模静态语料直读全文，省检索链路
+    return "hybrid"                # 先 RAG 粗筛，再长上下文精读
 \`\`\`
 
-踩坑：RAG 检索质量决定效果上限；低温度+明确"不知道就说不知道"可降幻觉。`,
+踩坑：RAG 检索质量决定效果上限；低温度+明确"不知道就说不知道"可降幻觉；检索低分时必须走兜底链（改写→放宽召回→拒答/转人工），别让模型硬编；长上下文普及后小规模静态知识库可直读省掉检索，大规模/高频更新仍是 RAG 主场。`,
     keyPoints: ["检索→拼 prompt→生成", "知识更新无需重训", "可溯源+成本可控"],
     followUps: ["RAG 检索失败怎么办？", "RAG 适合什么场景？"],
     favorited: false,
@@ -5392,7 +5403,7 @@ def self_rag(question):
     return answer
 \`\`\`
 
-踩坑：多次 LLM 调用增加延迟和成本；适合高准确率场景。`,
+踩坑：每个问题需多次 LLM 调用（检索判断+逐文档相关性评估+答案自检），调用成本约为普通 RAG 的 3-5×、延迟同步上升；降本路径：评估步骤换小模型，或按原论文思路做蒸馏——把反思判断能力 SFT 进生成模型一次出结果；只有高价值、高准确率场景值得全量上。`,
     keyPoints: ["模型自判断是否检索", "过滤低质文档", "答案自检是否被支持"],
     followUps: ["如何降低 Self-RAG 成本？", "Self-RAG 训练方法？"],
     favorited: false,
@@ -5957,7 +5968,7 @@ class CostEfficientEval:
     question: "什么是 LLM Agent？与传统 Chatbot 的核心区别？ReAct 范式如何工作？",
     answer: `结论：Agent = LLM + 工具调用 + 循环推理，能自主规划、调用工具、根据反馈调整策略。ReAct = Reasoning + Acting 交替（Thought → Action → Observation 循环），比纯 Chatbot 多了"行动力"和"环境感知"。
 
-实战案例：字节豆包 Function Calling 场景中，用户问"北京明天天气"，Agent 推理需要调天气 API → 执行调用 → 观察返回 → 生成最终回答。OpenAI Assistants API 内部即 ReAct 实现。
+实战案例：字节豆包 Function Calling 场景中，用户问"北京明天天气"，Agent 推理需要调天气 API → 执行调用 → 观察返回 → 生成最终回答。OpenAI Responses API 的托管 Agent 循环内部即 ReAct 实现。
 
 \`\`\`python
 # ReAct 循环实现
@@ -5974,8 +5985,8 @@ def react_agent(query, tools, llm, max_steps=5):
     return "达到最大步数"
 \`\`\`
 
-踩坑：Agent 容易陷入死循环（反复调同一工具）；需设 max_steps + 重复检测；工具描述不清导致幻觉调用。`,
-    keyPoints: ["Agent = LLM + 工具 + 循环", "ReAct = Thought→Action→Observation", "需循环终止与错误恢复"],
+踩坑：三大失败模式——①规划跑偏：长任务目标漂移，每步都"合理"但整体偏航，需定期对照原始目标校验；②工具幻觉：工具描述不清时模型编造调用/参数，Schema 写清边界+调用前校验；③上下文污染：失败尝试与冗余 Observation 堆积毒化后续推理，需及时清理压缩。死循环需 max_steps+重复检测。何时不用 Agent：步骤固定可枚举的流程用确定性 Workflow 更稳；单次调用能解决的别套循环；延迟/成本敏感且无需工具的场景直接 Chat。`,
+    keyPoints: ["Agent = LLM + 工具 + 循环", "ReAct = Thought→Action→Observation", "失败模式：跑偏/工具幻觉/上下文污染", "固定流程用 Workflow 而非 Agent"],
     followUps: ["Planner-Executor 和 ReAct 的区别？", "如何防止 Agent 死循环？"],
     favorited: false,
     bigTech: true,
@@ -6261,8 +6272,29 @@ graph.addEdge("code_agent", END);
 const app = graph.compile();
 \`\`\`
 
-踩坑：状态设计要包含所有需要传递的字段；条件路由逻辑复杂时要画流程图先验证；图太深时调试困难。`,
-    keyPoints: ["StateGraph+Node+Edge", "条件路由动态跳转", "显式状态管理可调试"],
+\`\`\`typescript
+// 生产细节：checkpointer 持久化 + 中断恢复 + 子图复用
+import { MemorySaver } from "@langchain/langgraph"; // 生产换 PostgresSaver
+
+// 1. checkpointer：每步状态落库，崩溃/重启后可从断点恢复
+const checkpointer = new MemorySaver();
+const prodApp = graph.compile({ checkpointer });
+
+// 2. 中断恢复：在人工审批节点前暂停，批准后从断点续跑
+const approvalApp = graph.compile({
+  checkpointer,
+  interruptBefore: ["approve"],
+});
+await approvalApp.invoke(input, { configurable: { thread_id: "t-123" } });
+// ...人工审批通过...
+await approvalApp.invoke(null, { configurable: { thread_id: "t-123" } }); // 续跑
+
+// 3. 子图：复用子流程封装为 subgraph，嵌入主图当普通节点
+graph.addNode("rag_flow", subGraph.compile());
+\`\`\`
+
+踩坑：状态设计要包含所有需要传递的字段；生产必须上 checkpointer（如 PostgresSaver）否则重启丢状态、长任务无法断点续跑；条件路由逻辑复杂时要画流程图先验证；图太深时调试困难，子图拆分可缓解。`,
+    keyPoints: ["StateGraph+Node+Edge", "条件路由动态跳转", "checkpointer 持久化+中断恢复", "子图复用降复杂度"],
     followUps: ["LangGraph 如何实现人工审批？", "如何做图的状态持久化？"],
     favorited: false,
     bigTech: true,
@@ -6270,36 +6302,33 @@ const app = graph.compile();
   {
     id: "llm-129",
     nodeId: "llm-agent-framework",
-    question: "AutoGen 多 Agent 对话模式？GroupChat 如何工作？",
-    answer: `结论：AutoGen 核心是 AssistantAgent + UserProxyAgent 对话模式，GroupChat 通过 GroupChatManager 管理多 Agent 轮转发言，manager 根据上下文决定下一个发言者。适合需要多角色讨论的复杂任务。
+    question: "多 Agent 框架现状：LangGraph/CrewAI/AutoGen 怎么选？",
+    answer: `结论：2026 年多 Agent 框架三强——LangGraph（状态图精细控制+checkpointer 持久化，生产首选）、CrewAI（声明式角色协作，上手最快）、AutoGen（微软出品，v0.4 起重写为异步事件驱动架构，与早期 v0.2 API 不兼容，后续向统一的 Agent Framework 演进）；选型核心看"控制粒度 vs 开发速度"。
 
-实战案例：微软 AutoGen 在代码审查场景：Coder Agent 写代码 → Reviewer Agent 审查 → Coder 修改循环；阿里通义千问多 Agent 在数据分析场景用 GroupChat 让"分析师+程序员+测试"协作。
+实战案例：生产级复杂工作流多用 LangGraph（持久化+人工中断恢复）；营销/内容团队用 CrewAI 快速搭角色流水线；微软生态团队跟进 AutoGen 新版；字节、阿里内部多为自研编排层，框架只作参考。
 
 \`\`\`python
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+# Supervisor 模式（框架无关思想）：一个调度 Agent 决定下一个执行者
+class Supervisor:
+    def __init__(self, agents, llm):
+        self.agents = agents  # {"researcher": ..., "coder": ..., "reviewer": ...}
+        self.llm = llm
 
-# 创建多个 Agent
-coder = AssistantAgent("coder", llm_config=config, 
-    system_message="你是程序员，负责写代码")
-reviewer = AssistantAgent("reviewer", llm_config=config,
-    system_message="你是代码审查员，找出问题")
-tester = AssistantAgent("tester", llm_config=config,
-    system_message="你是测试工程师，写测试用例")
-user = UserProxyAgent("user", human_input_mode="NEVER")
-
-# GroupChat 管理轮转
-group_chat = GroupChat(agents=[coder, reviewer, tester, user],
-    messages=[], max_round=10)
-manager = GroupChatManager(group_chat, llm_config=config)
-
-# 发起任务
-user.initiate_chat(manager, message="写一个二分查找并测试")
-# manager 自动决定: coder写→reviewer审→coder改→tester测试→完成
+    async def run(self, task, max_rounds=8):
+        state = {"task": task, "history": []}
+        for _ in range(max_rounds):
+            # Supervisor 根据上下文选下一个发言者
+            nxt = await self.llm.decide_next(state, list(self.agents))
+            if nxt == "FINISH":
+                break
+            result = await self.agents[nxt].act(state)
+            state["history"].append({"agent": nxt, "result": result})
+        return state
 \`\`\`
 
-踩坑：max_round 太小任务没完成就停；manager 选错发言者导致"两个人来回说"；Agent 角色定义冲突。`,
-    keyPoints: ["AssistantAgent+UserProxyAgent", "GroupChatManager 管理轮转", "适合多角色讨论场景"],
-    followUps: ["如何自定义发言者选择策略？", "GroupChat vs 串行对话的区别？"],
+踩坑：多 Agent 不是银弹——通信成本高（消息爆炸）、错误级联（一个错全队错）、调试困难；能单 Agent+好工具解决的别上多 Agent；框架 API 迭代快（AutoGen v0.2→v0.4 为大改写），生产环境锁版本+自封装抽象层。`,
+    keyPoints: ["LangGraph 生产首选", "CrewAI 声明式上手快", "AutoGen 已重写演进", "多 Agent 非银弹"],
+    followUps: ["Supervisor 与 GroupChat 模式区别？", "如何评估多 Agent 必要性？"],
     favorited: false,
     bigTech: true,
   },
@@ -7366,8 +7395,8 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 \`\`\`
 
-踩坑：MCP 生态早期工具少（需自己写 Server）；调试困难（stdio 通信不易排查）；安全风险（MCP Server 可访问用户数据）。`,
-    keyPoints: ["MCP=标准化LLM连接外部工具协议", "一次实现Server多Client通用", "比Function Calling更上层"],
+踩坑：远程 Server 需按规范做 OAuth 授权与 scope 最小化，避免明文 token 传递；Server 只暴露必需工具（最小权限）；与 Agent Skills 的关系——Skills 教 Agent"怎么做"（流程性知识与提示词包），MCP 提供"能调什么"（工具/数据连接），二者互补叠加；调试推荐官方 MCP Inspector。`,
+    keyPoints: ["MCP=标准化LLM连接外部工具协议", "一次实现Server多Client通用", "远程需OAuth+最小权限", "与Agent Skills互补"],
     followUps: ["MCP Server 如何部署？", "MCP 安全如何保障？"],
     favorited: false,
     bigTech: false,
@@ -7436,10 +7465,10 @@ server.setRequestHandler("prompts/get", async (req) => ({
   {
     id: "llm-151",
     nodeId: "llm-mcp",
-    question: "MCP Server 如何部署？stdio vs SSE 两种传输模式？",
-    answer: `结论：MCP 两种传输模式：1) stdio（标准输入输出）适合本地部署（Claude Desktop 直接启动子进程），简单但只能本地 2) SSE（Server-Sent Events）适合远程部署（HTTP+流式），支持多客户端但需处理认证。生产环境用 SSE，开发用 stdio。
+    question: "MCP Server 如何部署？stdio 与 Streamable HTTP 两种传输模式？",
+    answer: `结论：MCP 两种传输模式：1) stdio（标准输入输出）适合本地部署（Claude Desktop 直接启动子进程），简单但只能本地 2) Streamable HTTP 适合远程部署——单端点承载 POST 消息与可选的服务端流式推送，支持会话恢复；早期 HTTP+SSE 传输已废弃，新 Server 应直接用 Streamable HTTP。生产远程用 Streamable HTTP，本地开发用 stdio。
 
-实战案例：Claude Desktop 用 stdio 模式启动本地 MCP Server（如文件系统访问）；企业内部用 SSE 模式部署远程 MCP Server（多客户端共享）。
+实战案例：Claude Desktop 用 stdio 模式启动本地 MCP Server（如文件系统访问）；企业内部用 Streamable HTTP 部署远程 MCP Server（多客户端共享+OAuth 鉴权+断线恢复）。
 
 \`\`\`typescript
 // MCP Server 两种部署模式
@@ -7454,31 +7483,29 @@ async function startStdio() {
   // 进程间通过 stdin/stdout 通信
 }
 
-// 模式2: SSE（远程，HTTP+流式）
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse";
+// 模式2: Streamable HTTP（远程，单端点 /mcp）
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
 
-async function startSSE() {
+async function startHTTP() {
   const app = express();
-  const transports = new Map();  // 多客户端
-  
-  app.get("/sse", (req, res) => {
-    const transport = new SSEServerTransport("/messages", res);
-    const sessionId = transport.sessionId;
-    transports.set(sessionId, transport);
-    
-    const server = createServer();
-    server.connect(transport);
-    
-    res.on("close", () => transports.delete(sessionId));
+  app.use(express.json());
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  app.post("/mcp", async (req, res) => {
+    // 按 mcp-session-id 复用会话；新会话创建 transport
+    const sid = req.headers["mcp-session-id"] as string;
+    let transport = sid ? transports.get(sid) : undefined;
+    if (!transport) {
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+      });
+      transports.set(transport.sessionId!, transport);
+      await createServer().connect(transport);
+    }
+    await transport.handleRequest(req, res, req.body);
   });
-  
-  app.post("/messages", (req, res) => {
-    const sessionId = req.query.sessionId as string;
-    const transport = transports.get(sessionId);
-    transport.handlePostMessage(req, res);
-  });
-  
+  // GET /mcp：服务端→客户端的流式通知通道（可选）
   app.listen(3001);
 }
 
@@ -7489,9 +7516,9 @@ function createServer() {
 }
 \`\`\`
 
-踩坑：stdio 模式 Server 崩溃后 Claude Desktop 不会自动重启；SSE 模式要做认证（否则任何人都能调用）；SSE 长连接可能被代理超时断开。`,
-    keyPoints: ["stdio本地+简单", "SSE远程+多客户端", "生产用SSE开发用stdio"],
-    followUps: ["SSE 模式如何做认证？", "如何做 MCP Server 负载均衡？"],
+踩坑：stdio 模式 Server 崩溃后宿主不会自动重启；远程模式必须做 OAuth 认证与鉴权（否则任何人都能调用）；Streamable HTTP 取代了旧 SSE 传输，两端 SDK 版本要配套升级；长连接仍可能被代理超时断开，需会话恢复机制。`,
+    keyPoints: ["stdio 本地+简单", "Streamable HTTP 远程+多客户端", "旧 SSE 传输已废弃"],
+    followUps: ["远程 MCP 如何做 OAuth？", "如何做 MCP Server 负载均衡？"],
     favorited: false,
     bigTech: false,
   },
@@ -7499,7 +7526,7 @@ function createServer() {
     id: "llm-152",
     nodeId: "llm-mcp",
     question: "Claude Desktop 如何配置 MCP Server？连接外部工具？",
-    answer: `结论：Claude Desktop 通过 claude_desktop_config.json 配置 MCP Server，支持 stdio（本地命令启动）和 SSE（远程 URL）两种连接方式。配置后 Claude 自动发现 Server 提供的工具/资源/模板，用户在对话中即可使用。
+    answer: `结论：Claude Desktop 通过 claude_desktop_config.json 配置 MCP Server，支持 stdio（本地命令启动）和远程 URL（Streamable HTTP，支持 OAuth）两种连接方式。配置后 Claude 自动发现 Server 提供的工具/资源/模板，用户在对话中即可使用。
 
 实战案例：开发者配置 GitHub MCP Server 后，在 Claude Desktop 中说"帮我创建一个 Issue"，Claude 自动调用 create_issue 工具。
 
@@ -7520,7 +7547,7 @@ function createServer() {
       "env": {}
     },
     "remote-db": {
-      "url": "https://mcp.example.com/sse",
+      "url": "https://mcp.example.com/mcp",
       "headers": {
         "Authorization": "Bearer token_xxx"
       }
@@ -7538,8 +7565,8 @@ function createServer() {
 # 在对话中输入 "/" 可看到可用工具列表
 \`\`\`
 
-踩坑：环境变量（如 GITHUB_TOKEN）要正确配置；stdio 模式 command 要在 PATH 中可找到；配置文件 JSON 格式错误 Claude 不会报错（静默忽略）。`,
-    keyPoints: ["claude_desktop_config.json配置", "stdio命令+SSE URL两种连接", "重启后生效"],
+踩坑：环境变量（如 GITHUB_TOKEN）要正确配置；stdio 模式 command 要在 PATH 中可找到；配置文件 JSON 格式错误 Claude 不会报错（静默忽略）；远程 Server 端点用 Streamable HTTP 路径（如 /mcp），旧 SSE 端点（/sse）已废弃。`,
+    keyPoints: ["claude_desktop_config.json配置", "stdio命令+远程URL两种连接", "重启后生效"],
     followUps: ["如何调试 MCP 连接问题？", "如何开发自定义 MCP Server？"],
     favorited: false,
     bigTech: false,
@@ -7716,9 +7743,9 @@ new DatabaseMCPServer(process.env.DATABASE_URL).start();
     id: "llm-155",
     nodeId: "llm-mcp",
     question: "MCP 生态现状与未来？哪些场景适合用 MCP？",
-    answer: `结论：MCP 目前处于早期阶段但增长迅速，Anthropic 主导、OpenAI/Google 尚未支持。适合场景：开发工具链（GitHub/文件系统/数据库）、企业内部工具集成、个人助手扩展。不适合：高频调用（SSE 开销大）、需要严格 SLA 的生产系统。
+    answer: `结论：MCP 由 Anthropic 于 2024 年底开源，2025 年起成为事实标准——OpenAI（ChatGPT/Agents SDK/Responses API）、Google（Gemini）、微软（Copilot Studio）及主流 IDE/编程工具均已接入，生态成熟（官方 Server Registry，覆盖 GitHub/数据库/云服务等大量现成 Server）。适合：开发工具链集成、企业内部工具统一、个人助手扩展；不适合：极致性能敏感、需严格 SLA 的核心链路（多一跳网络开销）。
 
-实战案例：Cursor/Cline 等编程工具已支持 MCP 连接外部工具；企业用 MCP 统一内部 API（一次适配多 Client 通用）。
+实战案例：Claude Desktop/Code、Cursor、ChatGPT 均可直接挂载 MCP Server；企业用 MCP 统一内部 API（一次适配多 Client 通用）；官方 Registry 大幅降低 Server 发现与接入成本。
 
 \`\`\`typescript
 // MCP 适用场景评估
@@ -7745,16 +7772,16 @@ function shouldUseMCP(scenario) {
 }
 
 // MCP vs Native Function Calling 对比
-// 特性          MCP              Native FC
-// 标准化        高（协议级）      低（API 级）
-// 性能          中（SSE 开销）    高（直连）
-// 生态          早期增长中        成熟
-// 多 Client     支持             需逐个适配
-// 调试          MCP Inspector    API 调试
+// 特性          MCP                 Native FC
+// 标准化        高（协议级）         低（API 级）
+// 性能          中（多一跳 HTTP）    高（直连）
+// 生态          成熟（Registry）     各厂商自建
+// 多 Client     支持                需逐个适配
+// 调试          MCP Inspector       API 调试
 \`\`\`
 
-踩坑：MCP 生态早期工具质量参差不齐；SSE 模式性能不如直连 API；OpenAI 尚未支持 MCP（可能成为 Beta 格式）。`,
-    keyPoints: ["适合工具集成/企业统一/助手扩展", "不适合高频实时调用", "早期生态但增长快"],
+踩坑：Server 质量参差不齐（优先官方/高星 Server，注意供应链安全）；远程传输已从 SSE 升级为 Streamable HTTP（旧传输废弃），两端 SDK 版本要配套；核心生产链路建议保留直连 API 兜底。`,
+    keyPoints: ["主流厂商均已支持，生态成熟", "适合工具集成/企业统一/助手扩展", "远程传输为 Streamable HTTP"],
     followUps: ["MCP 会成为行业标准吗？", "如何从 Function Calling 迁移到 MCP？"],
     favorited: false,
     bigTech: false,
@@ -7764,32 +7791,34 @@ function shouldUseMCP(scenario) {
     id: "llm-156",
     nodeId: "llm-langchain",
     question: "LCEL（LangChain Expression Language）是什么？与传统 Chain 的区别？",
-    answer: `结论：LCEL 是 LangChain 的声明式链编排语法，用管道符 | 串联组件，支持流式/异步/批量/回退。比传统 LLMChain 更灵活（声明式而非命令式），天然支持 streaming 和 async。
+    answer: `结论：LCEL 是 LangChain 的声明式链编排语法，Python 用管道符 |、JS/TS 用 .pipe() 串联组件，支持流式/异步/批量/回退。比传统 LLMChain 更灵活（声明式而非命令式），天然支持 streaming 和 async。
 
-实战案例：通义千问 RAG 链用 LCEL 编排：retriever | prompt | llm | parser，一行代码完成 RAG 流程。字节豆包用 LCEL 的 RunnablePassthrough 做上下文传递。
+实战案例：通义千问 RAG 链用 LCEL 编排：retriever → prompt → llm → parser，一条链完成 RAG 流程。字节豆包用 LCEL 的 RunnablePassthrough 做上下文传递。
 
 \`\`\`typescript
-// LCEL vs 传统 Chain 对比
+// LCEL 声明式链（JS/TS 用 .pipe()，无 | 运算符）
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnablePassthrough, RunnableSequence } from "@langchain/core/runnables";
 
-// LCEL 声明式链
 const prompt = ChatPromptTemplate.fromTemplate("回答: {question}");
 const llm = new ChatOpenAI({ model: "gpt-4o" });
 const parser = new StringOutputParser();
 
-// 管道符串联
+// 管道串联
 const chain = prompt.pipe(llm).pipe(parser);
-// 等价写法
-const chain2 = prompt | llm | parser;
 
-// RAG 链示例
-const ragChain = {
-  context: retriever.pipe(formatDocs),  // 检索文档并格式化
-  question: new RunnablePassthrough(),  // 原样传递
-} | prompt | llm | parser;
+// RAG 链示例（多输入合并用 RunnableSequence.from）
+const ragChain = RunnableSequence.from([
+  {
+    context: retriever.pipe(formatDocs),  // 检索文档并格式化
+    question: new RunnablePassthrough(),  // 原样传递
+  },
+  prompt,
+  llm,
+  parser,
+]);
 
 // 执行
 const result = await ragChain.invoke("什么是 RAG？");
@@ -7800,8 +7829,8 @@ for await (const chunk of stream) {
 }
 \`\`\`
 
-踩坑：LCEL 链调试困难（错误信息不直观）；复杂链路性能不如手写（抽象开销）；RunnablePassthrough 混淆初学者。`,
-    keyPoints: ["LCEL=管道符声明式编排", "天然支持streaming/async", "比传统Chain灵活"],
+踩坑：JS/TS 不支持 Python 的 | 管道符，必须用 .pipe() 或 RunnableSequence；LCEL 链调试困难（错误信息不直观）；复杂链路性能不如手写（抽象开销）；RunnablePassthrough 易混淆初学者。`,
+    keyPoints: ["LCEL=声明式链编排", "JS 用 .pipe()，Python 用 |", "天然支持streaming/async"],
     followUps: ["LCEL 如何做错误回退？", "LCEL 如何做批量并行？"],
     favorited: false,
     bigTech: true,
@@ -7809,58 +7838,43 @@ for await (const chunk of stream) {
   {
     id: "llm-157",
     nodeId: "llm-langchain",
-    question: "LangChain Memory 类型有哪些？如何选择？",
-    answer: `结论：LangChain Memory 类型：1) ConversationBufferMemory（全量保留）2) ConversationBufferWindowMemory（最近N轮）3) ConversationSummaryMemory（摘要）4) ConversationSummaryBufferMemory（摘要+窗口混合）5) VectorStoreRetrieverMemory（向量检索）。选择：短对话用 Buffer，长对话用 Summary，跨会话用 Vector。
+    question: "LangChain/LangGraph 中 Memory 怎么管？短期与长期记忆方案？",
+    answer: `结论：LangChain v1 起旧的 langchain.memory（ConversationBufferMemory 等）已废弃；新范式：短期记忆用 LangGraph checkpointer（按 thread_id 持久化消息历史），长期/跨会话记忆用 Store（键值+语义检索），窗口裁剪与摘要压缩作为上下文工程手段自行组合。选择：短对话窗口裁剪，长对话摘要+窗口，跨会话用 Store。
 
-实战案例：豆包客服用 ConversationSummaryBufferMemory（最近5轮全保留+更早的摘要）；通义千问用 VectorStoreRetrieverMemory 实现跨会话记忆。
+实战案例：豆包客服用"最近 5 轮全保留+更早摘要"的混合策略；通义千问跨会话记忆走向量检索；LangGraph 官方推荐 checkpointer（短期）+ Store（长期）组合。
 
 \`\`\`python
-from langchain.memory import (
-    ConversationBufferMemory,
-    ConversationBufferWindowMemory,
-    ConversationSummaryMemory,
-    ConversationSummaryBufferMemory,
-    VectorStoreRetrieverMemory
-)
+# LangGraph 持久化记忆（新范式）
+from langgraph.checkpoint.memory import MemorySaver
+# 生产：from langgraph.checkpoint.postgres import PostgresSaver
 
-# 1. Buffer：全量保留（短对话）
-buffer = ConversationBufferMemory(return_messages=True)
-# messages = [所有历史消息]
+checkpointer = MemorySaver()
+graph = builder.compile(checkpointer=checkpointer)
 
-# 2. Window：最近N轮（控制token）
-window = ConversationBufferWindowMemory(k=5)  # 只保留最近5轮
-# 适合：不需要远期历史的场景
+# thread_id 标识会话，历史消息自动按 thread 存取
+config = {"configurable": {"thread_id": "user-123"}}
+graph.invoke({"messages": [("user", "我的名字是张三")]}, config)
+graph.invoke({"messages": [("user", "我叫什么？")]}, config)  # → "张三"
 
-# 3. Summary：全量摘要（长对话）
-summary = ConversationSummaryMemory(llm=llm)
-# 自动将历史摘要为1-2句
-# 适合：需要整体上下文但token有限
+# 窗口裁剪：只保留最近 N 轮（prompt 层控 token）
+from langchain_core.messages import trim_messages
+trimmed = trim_messages(messages, max_tokens=2000, strategy="last",
+                        token_counter=len, include_system=True)
 
-# 4. Summary+Buffer：混合（生产推荐）
-summary_buffer = ConversationSummaryBufferMemory(
-    llm=llm,
-    max_token_limit=2000  # 超过自动摘要
-)
-# 最近的保留，更早的摘要
-# 适合：生产环境长对话
+# 摘要压缩：超阈值时把早期历史摘要成一条 system 消息
+def compact(messages, threshold=20):
+    if len(messages) <= threshold:
+        return messages
+    summary = llm.invoke(f"摘要以下对话要点：{messages[:-5]}").content
+    return [SystemMessage(f"早前对话摘要：{summary}"), *messages[-5:]]
 
-# 5. Vector Memory：向量检索（跨会话）
-from langchain.vectorstores import Chroma
-vector_memory = VectorStoreRetrieverMemory(
-    retriever=Chroma.as_retriever(search_kwargs={"k": 3})
-)
-# 每条消息存入向量库，检索相关历史
-# 适合：跨会话记忆、大量历史
-
-# 使用示例
-chain = ConversationChain(llm=llm, memory=summary_buffer)
-response = chain.predict(input="我的名字是张三")
-response = chain.predict(input="我叫什么？")  # "张三"
+# 跨会话长期记忆：Store 存用户画像/偏好，新会话启动时注入 system prompt
+# store.put(("users", user_id), "profile", {"name": "张三", "偏好": "简洁回答"})
 \`\`\`
 
-踩坑：Summary Memory 摘要可能丢信息；Vector Memory 召回噪声多；max_token_limit 设太小频繁摘要消耗 token。`,
-    keyPoints: ["Buffer/Window/Summary/Vector四种", "短用Buffer长用Summary跨会话用Vector", "混合模式生产推荐"],
-    followUps: ["如何自定义 Memory？", "Memory 如何持久化？"],
+踩坑：摘要压缩可能丢细节；窗口裁剪会"忘记"早期信息，关键事实要落 Store；thread 历史无限增长需定期 compact，否则 token 成本与 context rot 齐升。`,
+    keyPoints: ["checkpointer 管短期 thread 历史", "Store 管跨会话长期记忆", "窗口裁剪+摘要压缩控 token"],
+    followUps: ["如何自定义压缩策略？", "Store 如何做语义检索？"],
     favorited: false,
     bigTech: true,
   },
@@ -7873,9 +7887,16 @@ response = chain.predict(input="我叫什么？")  # "张三"
 实战案例：企业知识库用 LlamaIndex（文档解析+索引+查询一条龙）；AI 助手用 LangChain（需要 Agent+Memory+工具调用）。
 
 \`\`\`python
-# LlamaIndex RAG 示例
-from llama_index import VectorStoreIndex, ServiceContext
-from llama_index.node_parser import SentenceSplitter
+# LlamaIndex RAG 示例（v0.10+ 统一 llama_index.core 入口）
+from llama_index.core import (
+    VectorStoreIndex, SimpleDirectoryReader, Settings,
+)
+from llama_index.core.node_parser import SentenceSplitter
+
+# 0. 全局配置（替代废弃的 ServiceContext）
+Settings.chunk_size = 512
+Settings.chunk_overlap = 50
+# Settings.llm / Settings.embed_model 同理全局设置
 
 # 1. 文档加载+解析
 documents = SimpleDirectoryReader("./docs").load_data()
@@ -7885,7 +7906,7 @@ splitter = SentenceSplitter(chunk_size=512, chunk_overlap=50)
 nodes = splitter.get_nodes_from_documents(documents)
 
 # 3. 索引（LlamaIndex 自动管理）
-index = VectorStoreIndex(nodes, service_context=service_context)
+index = VectorStoreIndex(nodes)
 
 # 4. 查询引擎
 query_engine = index.as_query_engine(
@@ -7922,8 +7943,7 @@ print(response.source_nodes)  # 来源
 实战案例：豆包用 Callbacks 记录每步 token 消耗和延迟，上报到监控平台；通义千问用 LangSmith Callback 做全链路追踪。
 
 \`\`\`python
-from langchain.callbacks import BaseCallbackHandler
-from langchain.callbacks.tracers import LangChainTracer
+from langchain_core.callbacks import BaseCallbackHandler
 
 # 自定义 Callback Handler
 class MyCallbackHandler(BaseCallbackHandler):
@@ -7948,16 +7968,11 @@ class MyCallbackHandler(BaseCallbackHandler):
     def on_tool_end(self, output, **kwargs):
         print(f"工具结果: {output}")
 
-# 使用
-chain = ConversationChain(
-    llm=llm,
-    memory=memory,
-    callbacks=[MyCallbackHandler()]  # 注册回调
-)
+# 使用：通过 config 传入（新版 Runnable 接口）
+result = chain.invoke(input, config={"callbacks": [MyCallbackHandler()]})
 
-# LangSmith 追踪
-tracer = LangChainTracer(project_name="my-rag-app")
-chain.invoke("什么是RAG？", config={"callbacks": [tracer]})
+# LangSmith 追踪：设环境变量即可自动上报，无需手动传 tracer
+# LANGSMITH_TRACING=true / LANGSMITH_API_KEY=ls__xxx / LANGSMITH_PROJECT=my-rag-app
 # 在 LangSmith 平台可看到完整执行链路
 \`\`\`
 
@@ -7976,8 +7991,7 @@ chain.invoke("什么是RAG？", config={"callbacks": [tracer]})
 实战案例：豆包 RAG 问答用 LCEL Chain（检索→生成固定流程）；豆包智能助手用 Agent（根据用户意图动态选择工具）。
 
 \`\`\`python
-from langchain.chains import LLMChain
-from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.agents import create_agent  # LangChain v1 新 API（底层基于 LangGraph）
 
 # LCEL Chain：确定性流程（RAG 示例）
 rag_chain = (
@@ -7991,8 +8005,12 @@ rag_chain = (
 
 # Agent：动态决策（工具调用）
 tools = [search_tool, calculator_tool, weather_tool]
-agent = create_openai_tools_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    system_prompt="你是智能助手，按需调用工具",
+)
+result = agent.invoke({"messages": [{"role": "user", "content": "北京明天天气如何？"}]})
 # 模型自主决定：用哪个工具？调用几次？何时结束？
 # 适合：需要"决策"的复杂任务
 
@@ -8013,7 +8031,7 @@ def choose_chain_or_agent(task):
 # - 客服 → Agent (需判断意图路由)
 \`\`\`
 
-踩坑：简单任务用 Agent 杀鸡用牛刀（Agent 有决策开销）；复杂任务用 Chain 灵活性不够；Agent 调试比 Chain 难。`,
+踩坑：简单任务用 Agent 杀鸡用牛刀（Agent 有决策开销）；复杂任务用 Chain 灵活性不够；Agent 调试比 Chain 难；LangChain v1 的 create_agent 取代旧 AgentExecutor（已废弃），老代码需迁移。`,
     keyPoints: ["Chain=确定性管道", "Agent=动态决策", "固定流程用Chain需决策用Agent"],
     followUps: ["如何从 Chain 升级到 Agent？", "Agent 如何做流式输出？"],
     favorited: false,
@@ -8029,20 +8047,10 @@ def choose_chain_or_agent(task):
 
 \`\`\`python
 import os
-from langchain.callbacks.tracers import LangChainTracer
-
-# 配置 LangSmith（只需环境变量）
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_API_KEY"] = "ls__xxx"
-os.environ["LANGCHAIN_PROJECT"] = "my-rag-app"
-
-# 方式1：全局追踪（自动）
-from langchain.globals import set_llm_cache, set_debug
-# 所有 LangChain 调用自动上报 LangSmith
-
-# 方式2：按需追踪
-tracer = LangChainTracer(project_name="debug-session")
-result = chain.invoke("什么是RAG？", config={"callbacks": [tracer]})
+# 配置 LangSmith（只需环境变量，设置后 LangChain/LangGraph 调用自动上报）
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "ls__xxx"
+os.environ["LANGSMITH_PROJECT"] = "my-rag-app"
 
 # LangSmith 平台功能：
 # 1. Trace 可视化：看到每一步（检索→prompt→LLM→解析）
@@ -8052,21 +8060,21 @@ result = chain.invoke("什么是RAG？", config={"callbacks": [tracer]})
 # 5. 评估：对 trace 评分（好/坏/需改进）
 # 6. 数据集：从 trace 提取测试用例
 
-# 离线评估
-from langchain.evaluation import EvaluatorType
-from langchain.smith import RunEvalConfig
+# 离线评估（langsmith SDK）
+from langsmith import Client
+from langsmith.evaluation import evaluate
 
-eval_config = RunEvalConfig(
-    evaluators=[
-        EvaluatorType.QA,  # 问答准确性
-        EvaluatorType.CONTEXT_RELEVANCE,  # 上下文相关性
-    ]
-)
-# 批量评估数据集
-results = client.run_on_dataset(
-    dataset_name="rag-test-set",
-    llm_or_chain_factory=rag_chain,
-    evaluation=eval_config
+ls_client = Client()
+
+def qa_accuracy(run, example):
+    """自定义评估器：答案 vs 参考答案"""
+    score = llm_judge(run.outputs["output"], example.outputs["reference"])
+    return {"key": "qa_accuracy", "score": score}
+
+results = evaluate(
+    lambda inputs: rag_chain.invoke(inputs["question"]),
+    data="rag-test-set",        # LangSmith 数据集
+    evaluators=[qa_accuracy],   # 可挂多个评估器（准确性/上下文相关性等）
 )
 \`\`\`
 
@@ -8245,30 +8253,30 @@ const resp3 = await openai.chat.completions.create({
     id: "llm-165",
     nodeId: "llm-multimodal",
     question: "Stable Diffusion / DALL-E 图像生成如何工作？如何控制生成质量？",
-    answer: `结论：Stable Diffusion 用扩散模型（加噪→去噪）生成图像，通过 text encoder 编码 prompt 引导去噪方向。DALL-E 用自回归方式生成图像 token。控制质量：prompt 工程+负面提示+ControlNet+采样步数。
+    answer: `结论：Stable Diffusion 系用扩散模型（加噪→去噪）生成图像，通过 text encoder 编码 prompt 引导去噪方向；DALL-E 3 同为扩散模型（前置 LLM 重写增强 prompt 后送入扩散模型）。控制质量：prompt 工程+负面提示+ControlNet+采样步数。
 
-实战案例：字节即梦 AI 用 SD + ControlNet 生成营销素材；腾讯混元用 DALL-E 类模型做文生图。
+实战案例：开源代表模型已迭代到 FLUX.1/SD3.5 级别（MMDiT 架构，文字渲染与 prompt 遵循度显著提升）；字节即梦 AI 用扩散模型+ControlNet 生成营销素材；腾讯混元文生图走自研 DiT 架构。
 
 \`\`\`python
-# Stable Diffusion 图像生成
-from diffusers import StableDiffusionPipeline
+# SD 3.5 图像生成（FLUX.1 同理，换 FluxPipeline）
+from diffusers import StableDiffusion3Pipeline
 import torch
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
+pipe = StableDiffusion3Pipeline.from_pretrained(
+    "stabilityai/stable-diffusion-3.5-large",
+    torch_dtype=torch.bfloat16
 ).to("cuda")
 
 # 基础生成
 image = pipe(
     prompt="一只在月球上弹吉他的猫, 赛博朋克风格, 高质量, 4k",
     negative_prompt="低质量, 模糊, 变形",  # 负面提示排除不需要的
-    num_inference_steps=50,  # 采样步数：多=质量好但慢
-    guidance_scale=7.5,  # CFG：高=更遵循prompt但可能过饱和
-    width=512, height=512
+    num_inference_steps=40,  # 采样步数：多=质量好但慢
+    guidance_scale=7.0,  # CFG：高=更遵循prompt但可能过饱和
+    width=1024, height=1024
 ).images[0]
 
-# ControlNet：用参考图控制构图
+# ControlNet：用参考图控制构图（SD1.5/SDXL 生态最成熟）
 from diffusers import StableDiffusionControlNetPipeline, ControlNetModel
 controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny")
 pipe_control = StableDiffusionControlNetPipeline.from_pretrained(
@@ -8285,8 +8293,8 @@ image = pipe_control(
     num_inference_steps=30
 ).images[0]
 
-# DALL-E 3 API（更简单但付费）
-# openai.images.generate({ model: "dall-e-3", prompt: "...", size: "1024x1024" })
+# DALL-E 3 API（托管服务，更简单但付费）
+# client.images.generate({ model: "dall-e-3", prompt: "...", size: "1024x1024" })
 \`\`\`
 
 踩坑：prompt 太复杂模型"理解不了"（拆分为关键要素）；guidance_scale 过高导致图像过饱和；SD 对中文 prompt 支持差（需翻译或用中文微调模型）。`,
@@ -8305,17 +8313,18 @@ image = pipe_control(
 
 \`\`\`python
 # Whisper 语音识别
-import openai
+from openai import OpenAI
+client = OpenAI()
 
-# 方式1：API 调用
-audio_file = open("meeting.mp3", "rb")
-result = openai.Audio.transcribe(
-    model="whisper-1",
-    file=audio_file,
-    language="zh",  # 指定语言更准确
-    response_format="verbose_json",  # 带时间戳
-    timestamp_granularities=["word", "segment"]
-)
+# 方式1：API 调用（openai>=1.0 新接口）
+with open("meeting.mp3", "rb") as audio_file:
+    result = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=audio_file,
+        language="zh",  # 指定语言更准确
+        response_format="verbose_json",  # 带时间戳
+        timestamp_granularities=["word", "segment"]
+    )
 print(result.text)  # 转录文本
 print(result.segments)  # 分段时间戳
 
@@ -8327,8 +8336,8 @@ print(result["text"])
 # 大模型更准但慢：large-v3 多语言最强
 
 # TTS 文本转语音
-# 方式1：OpenAI TTS（质量最高）
-response = openai.Audio.speech.create(
+# 方式1：OpenAI TTS（质量高）
+response = client.audio.speech.create(
     model="tts-1",  # "tts-1-hd" 高清
     voice="alloy",  # alloy/echo/fable/onyx/nova/shimmer
     input="你好，世界！"
@@ -8553,7 +8562,7 @@ class MultimodalRAG:
     question: "设计一个 LLM 智能客服系统？架构和关键模块？",
     answer: `结论：智能客服系统架构：用户输入 → 意图分类 → 路由（FAQ/知识库/人工/闲聊）→ RAG 检索 → LLM 生成 → 安全审核 → 人工兜底。关键模块：意图分类器、RAG 引擎、对话管理、安全过滤、人工接管。
 
-实战案例：阿里通义千问客服系统日均百万请求，意图分类准确率 95%+，70% 问题由 AI 自动解决，30% 转人工。字节豆包客服用多 Agent 路由（售前/售后/退款）。
+实战案例：头部大厂客服系统普遍做到大部分问题 AI 自动解决、少数复杂/投诉类转人工（量级参考）；字节豆包客服用多 Agent 路由（售前/售后/退款）。意图分类落地方案：冷启动期用 LLM few-shot 直接分类（零标注），同时埋点收集"路由错误+人工纠正"样本；积累数千条后用数据微调小模型（BERT 级或 7B 级）降本，意图类别多时改"LLM 粗分+小模型细分"两级。
 
 \`\`\`typescript
 // 智能客服系统架构
@@ -8586,7 +8595,7 @@ class CustomerServiceSystem {
 // SLA：P95<3s, 可用性99.9%
 \`\`\`
 
-踩坑：意图分类错误导致路由到错误模块（需fallback）；RAG召回不准答非所问（需reranking）；成本控制（小模型分类+大模型生成）。`,
+踩坑：意图分类错误导致路由到错误模块（需 fallback）；RAG 召回不准答非所问（需 reranking）；成本控制（小模型分类+大模型生成）；冷启动标注数据来自：历史客服工单聚类+人工抽样标注+LLM 生成同义问法扩增。`,
     keyPoints: ["意图分类→路由→RAG→审核→人工兜底", "70%AI+30%人工", "P95<3s可用性99.9%"],
     followUps: ["如何做意图分类？", "如何评估客服系统效果？"],
     favorited: false,
@@ -8598,7 +8607,7 @@ class CustomerServiceSystem {
     question: "设计一个 AI 搜索引擎？与传统搜索引擎的区别？",
     answer: `结论：AI 搜索引擎 = 传统搜索 + LLM 摘要 + 引用溯源。流程：查询理解 → 混合检索（关键词+向量）→ Reranking → LLM 生成摘要 → 引用来源。核心区别：直接给答案而非链接列表。
 
-实战案例：Perplexity 是 AI 搜索标杆；Kimi 搜索用通义千问+自研搜索做实时问答；百度文心一言搜索整合百度搜索+LLM 摘要。
+实战案例：Perplexity 是 AI 搜索标杆；Kimi 搜索用月之暗面自研模型+联网检索做实时问答；百度文心一言搜索整合百度搜索+LLM 摘要。
 
 \`\`\`python
 # AI 搜索引擎架构
@@ -8681,7 +8690,7 @@ class EnterpriseKnowledgeBase {
     question: "如何设计一个 AI Copilot（编程助手）？上下文如何管理？",
     answer: `结论：AI Copilot 核心：代码上下文管理（文件/光标/选区/项目结构）+ 代码理解 + 代码生成 + 安全过滤。关键挑战是"在有限 token 内提供最相关的代码上下文"。
 
-实战案例：GitHub Copilot 用 Codex 做代码补全；Cursor 用 RAG 检索项目代码+多文件编辑；通义灵码（阿里）针对中文场景优化。
+实战案例：GitHub Copilot 已进入多模型时代（GPT 系/Claude 系等可按任务切换，补全与 Agent 模式用不同模型）；Cursor 用 RAG 检索项目代码+多文件编辑，模型同样多家混用；通义灵码（阿里）针对中文场景优化。
 
 \`\`\`typescript
 class CodeCopilot {
@@ -8914,7 +8923,7 @@ const observedOpenAI = observeOpenAI(openai);
     question: "LLM 延迟优化策略？如何降低 TTFT 和 TPS？",
     answer: `结论：LLM 延迟指标：TTFT（Time To First Token，首 token 延迟）和 TPS（Tokens Per Second，生成速度）。优化策略：1) 模型选择（小模型更快）2) Prompt 压缩 3) 流式响应（降低 TTFT 感知）4) KV Cache 5) 批处理（提高吞吐）。
 
-实战案例：豆包 API 优化 TTFT 从 2s 降到 500ms（用更短的 system prompt+流式）；通义千问用 PagedAttention 提高 TPS 3 倍。
+实战案例：豆包 API 通过精简 system prompt+流式把 TTFT 从秒级压到亚秒级（量级参考）；vLLM/SGLang 的 PagedAttention 与 continuous batching 是开源侧提升 TPS 的标配手段。
 
 \`\`\`python
 # LLM 延迟优化策略
@@ -8964,14 +8973,14 @@ class LatencyOptimizer:
         )
         return enhanced
 
-# 延迟指标对比
+# 延迟指标对比（量级参考，非实测）
 # 模型      TTFT    TPS     成本
 # mini     300ms   100/s   ¥0.001/1K
 # standard 800ms   50/s    ¥0.01/1K
 # max      2000ms  20/s    ¥0.1/1K
 \`\`\`
 
-踩坑：TTFT 影响用户体验感知（>1s 用户觉得卡）；批处理提高吞吐但增加单请求延迟（需权衡）；KV Cache 占用显存。`,
+踩坑：TTFT 影响用户体验感知（>1s 用户觉得卡）；reasoning 模型（o1/R1 系）的思考 token 会先产生大量"不可见"生成，TTFT 与总延迟被显著拉高——交互式场景慎用高推理档，或流式展示思考过程降低感知；批处理提高吞吐但增加单请求延迟（需权衡）；KV Cache 占用显存。`,
     keyPoints: ["TTFT+TPS两个核心指标", "模型分级+Prompt压缩+流式+KVCache", "检索生成并行化"],
     followUps: ["如何做延迟监控？", "如何优化 RAG 延迟？"],
     favorited: false,
@@ -9688,58 +9697,61 @@ spec:
   {
     id: "llm-190",
     nodeId: "llm-model-deploy",
-    question: "开源模型部署实战：Llama/Qwen/DeepSeek 如何选择和部署？",
-    answer: `结论：开源模型选择：中文场景 Qwen > DeepSeek > Llama；英文场景 Llama > Qwen；推理场景 DeepSeek-R1 > Qwen-QwQ > o1。部署方式统一用 vLLM，差异在模型加载和优化参数。
+    question: "开源模型部署实战：Qwen/DeepSeek/Kimi/GLM 如何选择和部署？",
+    answer: `结论：2026 年选型：中文通用 Qwen3/GLM 优先；推理与代码场景 DeepSeek-V3 系（含 R1 蒸馏）优先；Agent/长上下文场景 Kimi K2（月之暗面自研）口碑好；政企合规多看 GLM。部署统一用 vLLM/SGLang，差异在显存与并行参数。
 
-实战案例：字节豆包基于开源模型微调；月之暗面用 DeepSeek-R1 做推理增强；创业团队用 Qwen-7B 做低成本部署。
+实战案例：企业私有化主流用 Qwen3 与 DeepSeek-V3 系；小团队用 7B-9B 级模型单卡低成本部署；MoE 大模型（Kimi K2/DeepSeek-V3）需多卡 TP，中小团队直接调 API 更划算。
 
 \`\`\`bash
-# Qwen2.5 部署（中文最强开源模型）
+# Qwen3 部署（中文开源第一梯队）
 python -m vllm.entrypoints.openai.api_server \\
-    --model Qwen/Qwen2.5-7B-Instruct \\
+    --model Qwen/Qwen3-8B \\
     --max-model-len 32768 \\
     --gpu-memory-utilization 0.9 \\
     --tensor-parallel-size 1
 
-# Llama 3.2 部署（英文强，中文需微调）
+# GLM 部署（中文+工具调用+政企场景）
 python -m vllm.entrypoints.openai.api_server \\
-    --model meta-llama/Llama-3.2-8B-Instruct \\
+    --model zai-org/GLM-4-9B-Chat \\
     --max-model-len 128000
 
-# DeepSeek-R1 部署（推理增强）
+# DeepSeek-R1 蒸馏版部署（推理增强，单卡可跑）
 python -m vllm.entrypoints.openai.api_server \\
     --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B \\
     --max-model-len 32768
 
+# Kimi K2 / DeepSeek-V3（MoE 大模型，需多卡 TP）
+# python -m vllm.entrypoints.openai.api_server \\
+#     --model moonshotai/Kimi-K2-Instruct --tensor-parallel-size 8
+
 # 模型选择决策
 # 场景              推荐模型              理由
-# 中文对话           Qwen2.5-7B/14B       中文最强
-# 英文对话           Llama-3.2-8B         英文最强
-# 推理任务(数学/代码) DeepSeek-R1-Distill  推理增强
-# 多语言             Qwen2.5              支持29种语言
-# 长文档              Qwen2.5-32B         128K上下文
-# 边缘设备           Qwen2.5-0.5B/1.5B   小模型
+# 中文对话           Qwen3 系列            中文开源第一梯队
+# 推理任务(数学/代码) DeepSeek-R1-Distill  推理增强蒸馏
+# Agent/工具密集     Kimi-K2-Instruct      Agentic 强（需多卡）
+# 政企合规           GLM 系列              中文+合规落地多
+# 边缘设备           Qwen3 小尺寸          端侧可跑
 \`\`\`
 
 \`\`\`python
 # 统一调用接口（OpenAI兼容，更换模型只需改model名）
-import openai
-client = openai.OpenAI(base_url="http://localhost:8000/v1", api_key="vllm")
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="vllm")
 
 # 中文场景
 resp = client.chat.completions.create(
-    model="Qwen/Qwen2.5-7B-Instruct",
+    model="Qwen/Qwen3-8B",
     messages=[{"role": "user", "content": "你好"}]
 )
-# 英文场景
+# 推理场景
 resp = client.chat.completions.create(
-    model="meta-llama/Llama-3.2-8B-Instruct",
-    messages=[{"role": "user", "content": "Hello"}]
+    model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    messages=[{"role": "user", "content": "证明根号2是无理数"}]
 )
 \`\`\`
 
-踩坑：Llama 中文能力弱（需用中文数据微调）；DeepSeek-R1 推理慢（思维链很长）；大模型部署成本高（70B 需多卡）。`,
-    keyPoints: ["中文Qwen英文Llama推理DeepSeek", "vLLM统一部署", "OpenAI兼容接口"],
+踩坑：MoE 大模型（Kimi K2/DeepSeek-V3）总参数量大需多卡部署，别按激活参数估显存；推理模型思维链长导致延迟高，交互场景慎用；OpenAI 兼容接口让换模型只需改名，建议抽象一层 model 路由。`,
+    keyPoints: ["中文Qwen/GLM，推理DeepSeek，Agent选Kimi K2", "vLLM/SGLang统一部署", "OpenAI兼容接口+模型路由"],
     followUps: ["如何微调开源模型？", "如何评估开源模型效果？"],
     favorited: false,
     bigTech: true,
@@ -9751,7 +9763,7 @@ resp = client.chat.completions.create(
     question: "Token 用量如何管理？如何估算和监控 API 成本？",
     answer: `结论：Token 成本管理：1) 用 tiktoken 精确计算 2) 按模型分级（简单用 mini 复杂用 max）3) 设日预算上限 4) 实时监控告警 5) 用户配额管理。核心是"用最便宜的模型解决最多的问题"。
 
-实战案例：豆包 API 成本从月 50 万降到 10 万（70% 流量切到 mini 模型）；通义千问按 token 计费+用户配额防滥用。
+实战案例：某内容平台把大部分简单流量切到 mini 级模型后 API 成本下降一个量级（量级参考）；通义千问按 token 计费+用户配额防滥用。
 
 \`\`\`typescript
 // Token 成本管理系统

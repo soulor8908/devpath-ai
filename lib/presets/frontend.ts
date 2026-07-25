@@ -467,15 +467,16 @@ export const metadata = {
 
 \`\`\`js
 // Chrome DevTools → Elements → Accessibility 面板可查看
-// display:none 的元素不出现在 a11y 树，但 visibility:hidden 仍在
+// display:none 与 visibility:hidden 一样，都会从 a11y 树中剔除
 <div style="display:none">隐藏</div>     <!-- 不在 a11y 树 -->
-<div style="visibility:hidden">隐藏</div> <!-- 在树里但不可见 -->
-<div aria-hidden="true">装饰</div>        <!-- 被剔除 -->
+<div style="visibility:hidden">隐藏</div> <!-- 同样不在 a11y 树 -->
+<div style="opacity:0">隐藏</div>        <!-- 仍在树中、可聚焦、可被读出 -->
+<div aria-hidden="true">装饰</div>        <!-- 被显式剔除 -->
 \`\`\`
 
-踩坑：visibility:hidden 仍占 a11y 位置但读屏不读，逻辑混乱；用 opacity:0 隐藏的元素仍可聚焦被读出，需配 aria-hidden 或 tabindex="-1"。`,
-    keyPoints: ["a11y 树由 DOM 衍生", "display:none 剔除节点", "aria-hidden 显式剔除"],
-    followUps: ["visibility:hidden 和 display:none 对 a11y 的区别？", "如何用 DevTools 调试可访问性树？"],
+踩坑：visibility:hidden 与 display:none 一样从可访问性树剔除，"看不见但仍占布局"；真正需要对比的是 opacity:0——元素仍在 a11y 树、可聚焦、会被读屏读出，视觉隐藏场景需配 aria-hidden 或 tabindex="-1"。`,
+    keyPoints: ["a11y 树由 DOM 衍生", "display:none 与 visibility:hidden 均剔除节点", "opacity:0 仍在树中可聚焦", "aria-hidden 显式剔除"],
+    followUps: ["opacity:0 与 visibility:hidden 对 a11y 和焦点行为的区别？", "如何用 DevTools 调试可访问性树？"],
     favorited: false,
   },
 
@@ -637,6 +638,38 @@ html { box-sizing: border-box; }
 踩坑：第三方组件库可能假设 content-box，全局 border-box 会导致其布局错位，需用 :where() 降低优先级或局部重置；margin 不计入 width 但会影响外部占位，margin 负值能实现满屏溢出效果。`,
     keyPoints: ["border-box 含 padding+border", "全局重置用 border-box", "margin 不计入 width"],
     followUps: ["margin 折叠发生在什么场景？", "box-sizing 如何继承给组件？"],
+    favorited: false,
+  },
+  {
+    id: "fe-213",
+    nodeId: "fe-css-layout",
+    question: ":has() 选择器和 Container Queries 有哪些实战场景？",
+    bigTech: true,
+    answer: `:has() 是"父选择器"——按子元素状态反向选中祖先，把很多原来要 JS 干的活收回 CSS。Container Queries（@container）让组件按自身容器尺寸而非视口响应，是组件级响应式的正解。两者 2023 年起主流浏览器（Chrome/Edge/Safari/Firefox）均已支持，可放心用于生产（老浏览器做渐进增强）。
+
+\`\`\`css
+/* :has() 实战 */
+/* 1. 表单校验：输入非法时给整个 field 标红 */
+.field:has(input:invalid) { border-color: red; }
+/* 2. 卡片有图时改布局 */
+.card:has(img) { grid-template-columns: 120px 1fr; }
+/* 3. 全局态：弹窗打开时锁滚动（免 JS 加 class） */
+body:has(dialog[open]) { overflow: hidden; }
+/* 4. 兄弟联动：hover 某行时淡化其他行 */
+tr:hover ~ tr, tbody:has(tr:hover) tr:not(:hover) { opacity: 0.5; }
+
+/* Container Queries 实战：同一卡片在侧栏窄、在主区宽 */
+.sidebar, .main { container-type: inline-size; }
+@container (min-width: 400px) {
+  .product-card { display: flex; } /* 按容器宽度而非 viewport */
+}
+/* 容器查询单位 cqw/cqi：按容器宽度定字号 */
+.card-title { font-size: clamp(1rem, 5cqi, 2rem); }
+\`\`\`
+
+踩坑：:has() 不能选中 :has() 内部再嵌套:has()（防止循环）；container-type 会建立包含上下文，布局隔离要注意（固定定位子元素参照变化）；@container 查询的是声明了 container-type 的最近祖先，组件库应自带容器声明；媒体查询管页面宏观布局，容器查询管组件微观布局，两者互补不替代。`,
+    keyPoints: [":has() 按子状态反选祖先", "表单校验/条件布局免 JS", "@container 组件级响应式", "cqw/cqi 容器单位"],
+    followUps: [":has() 为什么性能曾是问题？", "container-type 的副作用有哪些？"],
     favorited: false,
   },
 
@@ -1310,14 +1343,17 @@ const cache = new WeakMap(); cache.set(domEl, data);
 console.log(1);
 setTimeout(() => console.log(2));            // 宏任务
 Promise.resolve().then(() => console.log(3)); // 微任务
-requestAnimationFrame(() => console.log(4));  // 渲染前
+requestAnimationFrame(() => console.log(4));  // 渲染前回调
 console.log(5);
-// 输出：1 5 3 4 2（同步→微→raf→宏）
+// 前三个输出确定：1 5 3（同步→微任务）
+// 但 rAF 回调与 setTimeout(0) 的先后【不保证】：
+// 渲染插入在两个宏任务之间的时机取决于帧调度，
+// 可能输出 1 5 3 4 2，也可能输出 1 5 3 2 4。
 \`\`\`
 
-踩坑：await 后续代码相当于 .then 微任务；每轮宏任务执行完都清空所有微任务，微任务中产生的新微任务当轮清空；process.nextTick（Node）优先级高于所有微任务，浏览器无此 API。`,
-    keyPoints: ["同步→微任务→渲染→宏任务", "每轮宏任务后清空全部微任务", "await 后续是微任务"],
-    followUps: ["requestAnimationFrame 在哪个阶段执行？", "Node 事件循环和浏览器有何不同？"],
+踩坑：rAF 回调与 setTimeout(0) 没有确定的先后关系——浏览器在每帧开始时按"取一个宏任务→清微任务→（若到帧时机）执行 rAF 回调并渲染"的循环调度，setTimeout(0) 实际有最小延迟且可能与渲染时机交错，不能依赖其顺序写逻辑；await 后续代码相当于 .then 微任务；微任务中产生的新微任务当轮清空。`,
+    keyPoints: ["同步→微任务→（到帧时）渲染→宏任务循环", "每轮宏任务后清空全部微任务", "rAF 与 setTimeout(0) 先后不保证", "await 后续是微任务"],
+    followUps: ["requestAnimationFrame 与 setTimeout(0) 谁先执行有定论吗？", "Node 事件循环和浏览器有何不同？"],
     favorited: false,
   },
   {
@@ -1348,7 +1384,11 @@ Promise.resolve(1).then().then(v => console.log(v)); // 1
     nodeId: "js-async",
     question: "async/await 的原理是什么？相比 Promise 有什么优势？",
     bigTech: true,
-    answer: `async 函数返回 Promise，await 暂停函数等待 Promise 决议，本质是 Generator + 自动执行器的语法糖。优势：写法像同步、try/catch 能捕获、调试栈清晰。
+    answer: `async 函数返回 Promise，await 暂停函数等待 Promise 决议，本质是 Generator + 自动执行器的语法糖：每个 await 对应一次 yield，执行器（如 co 库）拿到 yield 出的 Promise 后注册 then，决议时把值塞回 next() 驱动下一步。
+
+Babel 降级形态：目标是旧环境（无 Generator）时，@babel/plugin-transform-regenerator 会把 async 函数编译成 regeneratorRuntime 驱动的 switch-case 状态机（函数体被拆成 case 0/1/2…，用 _context.next 记录当前步骤）；配 @babel/preset-env 且 targets 包含现代浏览器时则保留原生 async，体积更小、栈更清晰。
+
+优势：写法像同步、try/catch 能捕获、调试栈清晰。
 
 \`\`\`js
 // async/await 等价于 Promise 链
@@ -1367,8 +1407,8 @@ async function loadAll() {
 }
 \`\`\`
 
-踩坑：循环中逐个 await 是串行（慢），并发用 Promise.all；await 后的代码是微任务；顶层 await（模块内）会阻塞依赖该模块的代码。`,
-    keyPoints: ["async 返回 Promise", "await 暂停等决议", "Generator+自动执行语法糖"],
+踩坑：循环中逐个 await 是串行（慢），并发用 Promise.all——tradeoff：串行时总耗时是各请求之和但失败即停、时序确定；Promise.all 并发总耗时约等于最慢者，但任一失败即整体 reject（要容错用 allSettled），且全部请求同时发出可能触达并发上限，需要时再叠加并发池；await 后的代码是微任务；顶层 await（模块内）会阻塞依赖该模块的代码。`,
+    keyPoints: ["async 返回 Promise", "await 暂停等决议", "Generator+自动执行器语法糖（Babel 降级为 regenerator 状态机）", "串行 await vs 并发 Promise.all 的 tradeoff"],
     followUps: ["for...of 中 await 是串行还是并发？", "顶层 await 有什么限制？"],
     favorited: false,
   },
@@ -1607,7 +1647,8 @@ function myInstanceof(obj, Fn) {
 myInstanceof([], Array);  // true
 myInstanceof(5, Number);  // false（原始值无原型链）
 // 跨 realm：iframe 内的数组
-iframe.contentWindow.[].constructor === Array; // false（不同 Array）
+iframe.contentWindow.Array === Array; // false（两个 realm 的 Array 是不同构造器）
+// 所以 iframe 里创建的数组 instanceof Array 在主 realm 里是 false
 \`\`\`
 
 踩坑：跨 iframe 用 Array.isArray 而非 instanceof；Symbol.hasInstance 可自定义 instanceof 行为；null instanceof 任何都是 false（无原型链）。`,
@@ -1678,25 +1719,31 @@ Admin.create("A"); // 继承自 User
     nodeId: "js-modules",
     question: "ESM 和 CommonJS 有什么区别？为什么现代前端用 ESM？",
     bigTech: true,
-    answer: `CommonJS：运行时加载（require 同步）、值为拷贝、可动态、Node 主用。ESM：编译时确定依赖（静态结构）、值为引用（导出变化反映）、支持 Tree Shaking、顶层 this 是 undefined。
+    answer: `CommonJS：运行时加载（require 同步）、exports 是模块执行后的一次性快照、可动态、Node 主用。ESM：编译时确定依赖（静态结构）、值为活绑定引用（导出变化反映）、支持 Tree Shaking、顶层 this 是 undefined。
+
+CJS"值拷贝"要分两层说：require 拿到的 module.exports 是普通对象快照——原始值（number/string）拷贝后不再随模块内部变化；但对象/数组/函数是共享引用，模块内改对象属性两边都可见（只是重新赋值整个导出不影响已引用的旧对象）。
 
 \`\`\`js
-// CommonJS：值的拷贝
+// CommonJS：原始值快照，对象共享引用
 // lib.js
-let count = 0; module.exports = { count, inc() { count++; } };
+let count = 0;
+const state = { n: 0 };
+module.exports = { count, state, inc() { count++; state.n++; } };
 // main.js
-const { count, inc } = require("./lib");
-inc(); console.log(count); // 0（拷贝，不变）
-// ESM：值的引用
+const { count, state, inc } = require("./lib");
+inc();
+console.log(count);   // 0（原始值快照，不变）
+console.log(state.n); // 1（对象共享引用，可见变化）
+// ESM：活绑定引用
 // lib.mjs
 export let count = 0; export function inc() { count++; }
 // main.mjs
 import { count, inc } from "./lib.mjs";
-inc(); console.log(count); // 1（引用，反映变化）
+inc(); console.log(count); // 1（绑定反映变化）
 \`\`\`
 
 踩坑：ESM 顶层 await 可用，CJS 不行；ESM 文件 .mjs 或 package.json type:module；循环依赖 ESM 通过引用可能拿到未初始化值（TDZ 报错），CJS 拿到部分导出。`,
-    keyPoints: ["CJS 运行时+值拷贝 / ESM 编译时+值引用", "ESM 支持 Tree Shaking", "ESM 顶层 await"],
+    keyPoints: ["CJS 原始值快照+对象共享引用 / ESM 活绑定", "ESM 支持 Tree Shaking", "ESM 顶层 await"],
     followUps: ["ESM 循环依赖为什么会 TDZ？", "package.json 的 type:module 有什么影响？"],
     favorited: false,
   },
@@ -1906,7 +1953,12 @@ sessionStorage.setItem("draft", JSON.stringify(form));
 const db = await indexedDB.open("mail", 1);
 db.onsuccess = () => db.result.transaction("mails", "readwrite").objectStore("mails").add(mail);
 // Cookie：鉴权 token（httpOnly 防 XSS）
-document.cookie = "token=xxx; Path=/; Secure; SameSite=Strict";
+// httpOnly 只能由服务端通过 Set-Cookie 响应头设置，document.cookie 设置会被浏览器忽略
+// 服务端响应示例（如 Express）：
+//   HTTP/1.1 200 OK
+//   Set-Cookie: token=xxx; Path=/; HttpOnly; Secure; SameSite=Strict
+// 前端可读的非敏感 cookie 才能用 document.cookie：
+document.cookie = "theme=dark; Path=/; SameSite=Lax";
 \`\`\`
 
 踩坑：localStorage 同步会阻塞主线程，大数据用 IndexedDB；Cookie httpOnly 前端读不到（防 XSS 偷 token），需后端设置；localStorage 跨子域不共享，需用 iframe+postMessage 中转或后端。`,
@@ -2800,6 +2852,38 @@ setInterval(() => console.log(latest.current), 1000);
     followUps: ["为什么 useEffect 闭包读旧值？", "useRef 如何绕过闭包？"],
     favorited: false,
   },
+  {
+    id: "fe-211",
+    nodeId: "react-hooks",
+    question: "React 19 的 use() 是什么？和普通 Hook 有什么区别？",
+    bigTech: true,
+    answer: `use() 是 React 19 引入的新 API，在渲染中直接读取 Promise 或 Context 的值。最大特点：它不是传统 Hook——可以在条件分支、循环中调用，不受"Hook 必须在顶层"规则约束。
+
+\`\`\`tsx
+// 读 Promise：配合 Suspense，Promise pending 时组件挂起
+function Comments({ commentsPromise }) {
+  const comments = use(commentsPromise); // resolve 后拿到值
+  return comments.map(c => <Comment key={c.id} {...c} />);
+}
+// 上层用 Suspense 包裹，父组件可在服务端创建 Promise 传入
+<Suspense fallback={<Spinner />}>
+  <Comments commentsPromise={fetchComments()} />
+</Suspense>
+// 读 Context：可条件调用（useContext 做不到）
+function Button({ theme }) {
+  if (theme === "auto") {
+    const ctx = use(ThemeContext); // 条件分支里调用也合法
+    return <button className={ctx.mode}>…</button>;
+  }
+  return <button className={theme}>…</button>;
+}
+\`\`\`
+
+踩坑：use() 读 Promise 要求 Promise 在渲染间稳定（每次渲染新建 Promise 会导致重复挂起，应由服务端组件/缓存创建）；客户端组件中 use() 的 Promise 建议配合缓存（如 React 的 cache()）；use() 替代了部分 useContext 场景，但订阅高频变化的状态仍用 useSyncExternalStore。顺带：React 19 配套的 React Compiler（自动记忆化）逐步落地后，useMemo/useCallback 手写优化大量场景可省略，但 use() 的语义不受其影响。`,
+    keyPoints: ["渲染中读 Promise/Context", "可在条件/循环中调用", "配合 Suspense 挂起", "Promise 需跨渲染稳定"],
+    followUps: ["use() 和 useContext 如何选？", "React Compiler 带来什么变化？"],
+    favorited: false,
+  },
   // ===== 15. react-patterns React 模式 =====
   {
     id: "fe-99",
@@ -3015,7 +3099,7 @@ function useFetch() { return useContext(FetchCtx); }
     nodeId: "react-concurrent",
     question: "React Fiber 架构解决了什么问题？时间切片如何工作？",
     bigTech: true,
-    answer: `Fiber 把渲染工作拆成可中断/恢复的单元（fiber 节点链表），让大渲染任务能分片到多帧执行，避免长时间阻塞主线程。时间切片：每个帧空闲时间（5ms）执行 work，到期让出，下帧继续。
+    answer: `Fiber 把渲染工作拆成可中断/恢复的单元（fiber 节点链表），让大渲染任务能分片到多帧执行，避免长时间阻塞主线程。时间切片：React 的 Scheduler 包给每个工作循环约 5ms 预算（scheduler 内部的 yieldInterval，由 MessageChannel 调度，非浏览器 API），到期 shouldYield() 返回 true 让出主线程，下轮宏任务继续。
 
 \`\`\`jsx
 // Fiber 前：递归渲染不可中断，大列表卡 100ms 掉帧
@@ -3026,14 +3110,14 @@ function useFetch() { return useContext(FetchCtx); }
   child: fiberA, sibling: fiberB, return: parentFiber,
   pendingProps: {}, memoizedState: {}, flags: 0,
 }
-// 调度：shouldYield() 检查时间片到期则让出
+// 调度：shouldYield() 检查 5ms 预算到期则让出（scheduler 内部实现）
 while (nextUnitOfWork && !shouldYield()) {
   nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
 }
 \`\`\`
 
-踩坑：Fiber 让 useTransition/useDeferredValue 成为可能；中断恢复需处理优先级（lane 模型）；fiber 节点是内部实现，业务代码不应直接操作。`,
-    keyPoints: ["Fiber 可中断恢复渲染", "时间切片 5ms 让出", "fiber 链表 child/sibling/return"],
+踩坑：5ms 是 React Scheduler 的默认预算常量而非规范要求，实现细节可能调整；Fiber 让 useTransition/useDeferredValue 成为可能；中断恢复需处理优先级（lane 模型），被高优先级打断后已做的 render 工作可能作废重做（所以渲染必须纯，重复执行无副作用）；fiber 节点是内部实现，业务代码不应直接操作。`,
+    keyPoints: ["Fiber 可中断恢复渲染", "Scheduler 5ms 预算（MessageChannel 调度）", "打断后 render 可能重做（须纯）", "fiber 链表 child/sibling/return"],
     followUps: ["lane 优先级模型是什么？", "Fiber 如何处理中断恢复的状态？"],
     favorited: false,
   },
@@ -3071,9 +3155,11 @@ function fetchUser(id) {
   {
     id: "fe-108",
     nodeId: "react-concurrent",
-    question: "React Server Components（RSC）的原理和优势？",
+    question: "React Server Components（RSC）的原理、优势与代价？",
     bigTech: true,
     answer: `RSC 在服务端渲染成序列化描述发送到客户端，不发送组件代码（零 JS），可直接访问后端资源。客户端组件（"use client"）可水合交互。优势：减少 bundle、直接查 DB、流式渲染。
+
+代价与心智成本：缓存复杂度上升——服务端渲染结果、数据请求、路由缓存多层叠加（如 Next.js 的 Full Route Cache / Data Cache / Router Cache），失效策略设计不当会出现"页面不更新"的疑难问题；心智模型分裂——同文件体系下 Server/Client 组件规则不同（能否用 hook、能否传函数 props），团队需要适应；服务端渲染错误调试链路更长（日志在服务端）；不适用场景：纯交互密集应用（仪表盘/编辑器，几乎全部组件都要 "use client"，RSC 收益趋零）、已有成熟 CSR+API 架构且无 SEO/首屏压力的项目，引入 RSC 的复杂度可能大于收益。
 
 \`\`\`tsx
 // Server Component（默认）：服务端执行，不进 bundle
@@ -3091,8 +3177,8 @@ function AddToCart({ id }) {
 <ProductList /> // 内部渲染 <AddToCart />
 \`\`\`
 
-踩坑：Server 组件不能用 useState/onClick（无客户端 JS）；Client 组件不能 async（需 useEffect）；Server→Client 边界需 props 序列化（不能传函数/类实例）；Next.js App Router 默认 RSC。`,
-    keyPoints: ["RSC 服务端渲染零 JS", "直连 DB 减 bundle", "use client 划边界"],
+踩坑：Server 组件不能用 useState/onClick（无客户端 JS）；Client 组件不能 async（需 useEffect）；Server→Client 边界需 props 序列化（不能传函数/类实例）；缓存层多（路由/数据/渲染结果），改数据后看不到更新先查缓存失效；Next.js App Router 默认 RSC。`,
+    keyPoints: ["RSC 服务端渲染零 JS", "直连 DB 减 bundle", "use client 划边界", "多层缓存与不适用场景"],
     followUps: ["RSC 和 SSR 的区别？", "Server/Client 组件边界如何划分？"],
     favorited: false,
   },
@@ -3134,14 +3220,21 @@ export default function Page() {
     answer: `useTransition 标记某次 state 更新为低优先级（不阻塞高优先级如输入）。useDeferredValue 延迟某个值的传递（值滞后更新）。两者都让重渲染不阻塞交互。
 
 \`\`\`jsx
-// useTransition：搜索框输入不阻塞列表渲染
+// useTransition：输入即时更新（高优先级），列表关键词延迟更新（低优先级）
 function Search() {
   const [query, setQuery] = useState("");
+  const [listQuery, setListQuery] = useState(""); // 独立的列表 state
   const [isPending, startTransition] = useTransition();
   return <>
-    <input value={query} onChange={e => setQuery(e.target.value)} /> {/* 高优先级 */}
-    <button onClick={() => startTransition(() => setQuery(query))}>搜索</button>
-    {isPending ? <Spinner /> : <List query={query} />} {/* 低优先级 */}
+    <input
+      value={query}
+      onChange={e => {
+        setQuery(e.target.value);                        // 高优先级：输入立即回显
+        startTransition(() => setListQuery(e.target.value)); // 低优先级：列表后更新
+      }}
+    />
+    {isPending && <Spinner />}
+    <List query={listQuery} />
   </>;
 }
 // useDeferredValue：列表渲染用延迟值
@@ -3204,6 +3297,47 @@ const IdleLane = 0b1000;        // 空闲最低
 踩坑：lane 让并发更新成为可能（同一组件可有多个未完成更新）；过渡更新被打断后丢弃中间结果重做；业务代码不直接操作 lane，通过 useTransition 等 API 间接控制。`,
     keyPoints: ["lane 32 位优先级", "多优先级并行调度", "高优先级打断低优先级"],
     followUps: ["lane 和 expirationTime 区别？", "Offscreen lane 是什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-212",
+    nodeId: "react-concurrent",
+    question: "React 19 的 Actions、useActionState、useOptimistic 解决什么问题？",
+    bigTech: true,
+    answer: `Actions 是 React 19 的表单/变更抽象：传给 <form action={fn}> 的函数自动获得 pending 状态、错误处理、并发管理（底层跑在 transition 里），提交期间旧 UI 保持可交互。useActionState 把 action 的返回结果接回组件状态；useOptimistic 在变更未完成前先展示"乐观结果"，失败自动回滚。
+
+\`\`\`tsx
+// useActionState：表单提交状态机
+function UpdateName({ userId }) {
+  const [error, submitAction, isPending] = useActionState(
+    async (prevError, formData) => {
+      const err = await updateUser(userId, formData.get("name"));
+      return err ?? null; // 返回值成为新 state
+    },
+    null // 初始 state
+  );
+  return (
+    <form action={submitAction}>
+      <input name="name" />
+      <button disabled={isPending}>保存</button>
+      {error && <p className="error">{error}</p>}
+    </form>
+  );
+}
+// useOptimistic：先显示新值，失败回滚
+function LikeButton({ count }) {
+  const [optimistic, addOptimistic] = useOptimistic(count, (c, n) => c + n);
+  return (
+    <form action={async () => { addOptimistic(1); await like(); }}>
+      <button>{optimistic} 赞</button>
+    </form>
+  );
+}
+\`\`\`
+
+踩坑：Actions 内更新跑在 transition 中，pending 期不阻塞输入；useOptimistic 值必须与真实 state 同源（真实值回来后乐观值自动被覆盖）；服务端场景配合 Server Functions（"use server"）可直接调后端逻辑。React Compiler 普及后手写 memo 减少，但 Actions 这套变更语义仍需自己设计。`,
+    keyPoints: ["form action 自动 pending/错误/transition", "useActionState 接回提交结果", "useOptimistic 乐观更新自动回滚"],
+    followUps: ["useOptimistic 失败如何回滚？", "Server Functions 和 Actions 如何配合？"],
     favorited: false,
   },
   // ===== 17. vue-core Vue 核心 =====
@@ -3293,7 +3427,7 @@ function render() { return createVNode("div", null, [_hoisted, msg.value]); }
 
 \`\`\`js
 // 父子：props + emit
-const Child = defineProps(["modelValue"]);
+const props = defineProps(["modelValue"]); // 返回 props 对象，不是组件
 const emit = defineEmits(["update:modelValue"]);
 emit("update:modelValue", newVal);
 // 跨层：provide/inject
@@ -3616,7 +3750,7 @@ const inc = useStore(s => s.inc);
 function App() { return <Counter />; }
 \`\`\`
 
-踩坑：selector 返回新对象每次不同会死循环，用 shallow 比较或拆字段；Zustand 无时间旅行（Redux 有）；中间件少（persist/immer）但够用。字节飞书部分模块用 Zustand 替代 Redux 减少模板。`,
+踩坑：selector 返回新对象每次不同会死循环，用 shallow 比较或拆字段；时间旅行调试可通过官方 devtools 中间件接入 Redux DevTools（import { devtools } from "zustand/middleware"，create(devtools(...))），并非完全没有；中间件生态（persist/immer/devtools）够用。字节飞书部分模块用 Zustand 替代 Redux 减少模板。`,
     keyPoints: ["无 Provider 极简", "selector 精确订阅", "适合中小项目"],
     followUps: ["Zustand selector 返回新对象怎么办？", "Zustand 如何持久化？"],
     favorited: false,
@@ -3759,26 +3893,29 @@ await set("largeState", state);
   {
     id: "fe-134",
     nodeId: "router-data",
-    question: "React Router v6 相比 v5 有哪些变化？核心 API？",
+    question: "React Router v7 有哪些核心变化？和 Remix 是什么关系？",
     bigTech: true,
-    answer: `v6 变化：路由配置用 Routes/Route（switch 语义）、嵌套路由 Outlet、useNavigate 替代 useHistory、loader/action 数据获取、类型安全更好。
+    answer: `React Router v7 把 Remix 合并了进来：Remix 团队宣布 Remix v3 以 React Router v7 的形式发布，v7 同时提供两种模式——library 模式（延续 v6 的组件路由用法，createBrowserRouter）和 framework 模式（原 Remix 的文件约定路由、loader/action、SSR 能力，由 @react-router/dev 提供）。v6 项目可平滑升级，API 基本兼容。
 
-\`\`\`jsx
-import { Routes, Route, Link, Outlet, useNavigate, useParams } from "react-router-dom";
-<Routes>
-  <Route path="/" element={<Layout />}>
-    <Route index element={<Home />} />
-    <Route path="users/:id" element={<User />} />
-    <Route path="*" element={<NotFound />} />
-  </Route>
-</Routes>
-function Layout() { return <div><Outlet /></div>; } {/* 嵌套出口 */}
-function User() { const { id } = useParams(); const nav = useNavigate(); return <button onClick={() => nav("/")}>返回</button>; }
+\`\`\`tsx
+// framework 模式：文件约定路由 + loader/action（原 Remix 玩法）
+// app/routes/users.$id.tsx
+export async function loader({ params }: Route.LoaderArgs) {
+  return { user: await fetchUser(params.id) }; // 服务端执行，类型安全
+}
+export async function action({ request }: Route.ActionArgs) {
+  const form = await request.formData();
+  await updateUser(form); // 表单提交直接打 action
+  return redirect("/users");
+}
+export default function User({ loaderData }: Route.ComponentProps) {
+  return <h1>{loaderData.user.name}</h1>; // loader 数据类型推断到组件
+}
 \`\`\`
 
-踩坑：v6 嵌套路由需 Outlet 出口；路径相对父级（path="users" 非绝对）；v6.4+ 的 createBrowserRouter 支持 loader/action 数据获取；useNavigate 替代 useHistory。`,
-    keyPoints: ["Routes/Route switch 语义", "Outlet 嵌套出口", "loader/action 数据获取"],
-    followUps: ["v6 的 loader 如何用？", "createBrowserRouter 和 Router 区别？"],
+踩坑：v7 的 Route.LoaderArgs/ComponentProps 等类型由框架按路由自动生成（typegen）；library 模式下仍用 v6 的 useLoaderData 泛型；框架模式默认 SSR，纯 SPA 需显式配置 ssr: false。`,
+    keyPoints: ["v7 = v6 + Remix 合并，双模式", "framework 模式文件约定路由+loader/action", "类型安全自动生成（typegen）", "v6 平滑升级"],
+    followUps: ["v7 的 action 如何处理表单？", "framework 模式如何做 SSR 流式渲染？"],
     favorited: false,
   },
   {
@@ -3786,18 +3923,22 @@ function User() { const { id } = useParams(); const nav = useNavigate(); return 
     nodeId: "router-data",
     question: "Next.js App Router 的数据获取方式有哪些？",
     bigTech: true,
-    answer: `App Router 在 Server Component 中直接 async/await 获取数据（服务端执行），Client Component 用 SWR/React Query。缓存：fetch 的 cache 选项、revalidate、ISR。
+    answer: `App Router 在 Server Component 中直接 async/await 获取数据（服务端执行），Client Component 用 SWR/React Query。关键变化：Next.js 15 起 fetch 请求、GET Route Handler、客户端路由缓存全部默认不缓存（uncached），缓存语义从"默认缓存、显式退出"反转为"默认不缓存、显式开启"。
 
 \`\`\`tsx
 // Server Component：直接 async 查数据
 async function Products() {
-  const res = await fetch("https://api/products", { next: { revalidate: 60 } }); // ISR 60 秒
+  // Next 15：fetch 默认不缓存，要缓存需显式声明
+  const res = await fetch("https://api/products", {
+    cache: "force-cache",       // 显式开启缓存（配合 revalidate 实现 ISR）
+    next: { revalidate: 60 },   // 60 秒后重新验证
+  });
   const data = await res.json();
   return data.map(p => <Product key={p.id} {...p} />);
 }
-// 动态路由：按需
+// 实时数据：默认即不缓存，无需 cache:"no-store"
 async function Product({ params }) {
-  const res = await fetch(\`https://api/products/\${params.id}\`, { cache: "no-store" }); // 实时
+  const res = await fetch(\`https://api/products/\${params.id}\`); // 每次请求实时
   return <div>{(await res.json()).name}</div>;
 }
 // Client Component：SWR
@@ -3805,8 +3946,8 @@ async function Product({ params }) {
 function useProducts() { return useSWR("/api/products", fetcher); }
 \`\`\`
 
-踩坑：Server 组件 fetch 默认缓存（force-static），动态数据加 cache:"no-store"；revalidate 控制 ISR 重新生成；generateStaticParams 预生成静态页面。`,
-    keyPoints: ["Server Component 直接 async", "fetch cache/revalidate 控制", "Client 用 SWR/React Query"],
+踩坑：Next 14 及之前 fetch 默认 force-cache，升级到 15 后不加显式 cache 选项的页面会从静态变动态；想整页静态可 export const dynamic = "force-static"；revalidate 搭配 force-cache 才有 ISR 语义；generateStaticParams 预生成静态页面。`,
+    keyPoints: ["Server Component 直接 async", "Next 15 起 fetch 默认不缓存", "cache/revalidate 显式控制", "Client 用 SWR/React Query"],
     followUps: ["ISR 是什么？", "Server/Client 组件数据获取区别？"],
     favorited: false,
   },
@@ -3839,16 +3980,16 @@ function User({ id }) {
   {
     id: "fe-137",
     nodeId: "router-data",
-    question: "React Query 的缓存策略如何工作？staleTime 和 cacheTime 区别？",
+    question: "TanStack Query 的缓存策略如何工作？staleTime 和 gcTime 区别？",
     bigTech: true,
-    answer: `React Query 按 queryKey 缓存。staleTime：数据"新鲜期"内不重新请求；cacheTime：缓存保留时间（无观察者后倒计时清除）。还有失效 invalidateQueries、预取 prefetchQuery。
+    answer: `TanStack Query（原 React Query）按 queryKey 缓存。staleTime：数据"新鲜期"内不重新请求；gcTime（v5 起由 cacheTime 改名，语义不变）：缓存保留时间，无观察者后倒计时由 GC 清除。还有失效 invalidateQueries、预取 prefetchQuery。
 
 \`\`\`js
-const { data } = useQuery({
+const { data, isPending } = useQuery({
   queryKey: ["todos"],
   queryFn: fetchTodos,
-  staleTime: 60000,    // 1 分钟内不重新请求（视为新鲜）
-  cacheTime: 300000,   // 5 分钟无组件观察后清除缓存
+  staleTime: 60000,   // 1 分钟内不重新请求（视为新鲜）
+  gcTime: 300000,     // v5 改名：cacheTime → gcTime，5 分钟无组件观察后清除
   refetchOnWindowFocus: true,
 });
 // 失效：标记过期，重新请求
@@ -3857,9 +3998,11 @@ queryClient.invalidateQueries({ queryKey: ["todos"] });
 queryClient.prefetchQuery({ queryKey: ["user", id], queryFn: () => fetchUser(id) });
 \`\`\`
 
-踩坑：staleTime=0（默认）每次组件挂载都重请求；cacheTime 默认 5 分钟；invalidateQueries 标记 stale 触发重取；queryKey 含参数自动按参数缓存（["user", 1] 与 ["user", 2] 独立）。`,
-    keyPoints: ["staleTime 新鲜期不重请求", "cacheTime 无观察者后清除", "invalidate 触发重取"],
-    followUps: ["React Query 如何预取？", "queryKey 设计原则？"],
+v5 主要差异：cacheTime 改名 gcTime；回调从 useQuery 移除（onSuccess/onError 需在 queryFn 或全局配置处理）；isLoading 拆成 isPending（首次加载）与 isFetching（任何请求中）；useQuery 等 hook 入参收敛为单对象；refetchInterval 在后台页签默认继续需显式 refetchIntervalInBackground。
+
+踩坑：staleTime=0（默认）每次组件挂载都重请求；gcTime 默认 5 分钟；invalidateQueries 标记 stale 触发重取；queryKey 含参数自动按参数缓存（["user", 1] 与 ["user", 2] 独立）。`,
+    keyPoints: ["staleTime 新鲜期不重请求", "v5 cacheTime 改名 gcTime", "invalidate 触发重取", "isPending/isFetching 拆分"],
+    followUps: ["TanStack Query v5 相比 v4 有哪些 breaking change？", "queryKey 设计原则？"],
     favorited: false,
   },
   {
@@ -3960,9 +4103,9 @@ export default defineConfig({
 });
 \`\`\`
 
-踩坑：依赖多时首次预构建有延迟（可用 optimizeDeps.include 预声明）；CJS 依赖需预构建转 ESM；HMR 通过 WebSocket 推送变更模块，按 ESM 边界失效。`,
-    keyPoints: ["dev 原生 ESM 按需编译", "esbuild 极速编译", "生产 Rollup 打包"],
-    followUps: ["Vite 依赖预构建做什么？", "Vite HMR 原理？"],
+踩坑：依赖多时首次预构建有延迟（可用 optimizeDeps.include 预声明）；CJS 依赖需预构建转 ESM；HMR 通过 WebSocket 推送变更模块，按 ESM 边界失效。2025 起 Vite 推出 Rolldown-Vite（用 Rust 版 Rolldown 替换 esbuild+Rollup 双引擎），目前以独立包 rolldown-vite 提供、可平滑替换体验，官方规划未来版本将其作为默认引擎，构建速度和 dev/build 一致性进一步提升，新项目可关注迁移进展。`,
+    keyPoints: ["dev 原生 ESM 按需编译", "esbuild 极速编译", "生产 Rollup 打包", "Rolldown-Vite 统一引擎（迁移中）"],
+    followUps: ["Vite 依赖预构建做什么？", "Rolldown-Vite 带来什么变化？"],
     favorited: false,
   },
   {
@@ -4064,8 +4207,8 @@ const editor = await import("./MonacoEditor");
 // 性能：esbuild/SWC > Babel 10-100x
 \`\`\`
 
-踩坑：Babel 插件生态最全（特殊语法转换 SWC 可能不支持）；SWC 是 Next.js 默认（替代 Babel+Terser）；esbuild 不做类型检查（tsc 单独跑）；Turbopack（Rust）是 Webpack 替代品（Next.js 实验）。`,
-    keyPoints: ["esbuild(Go)/SWC(Rust) 原生极速", "比 Babel 快 10-100x", "Babel 插件生态最全"],
+踩坑：Babel 插件生态最全（特殊语法转换 SWC 可能不支持）；SWC 是 Next.js 默认（替代 Babel+Terser）；esbuild 不做类型检查（tsc 单独跑）；Turbopack（Rust）是 Webpack 替代品，Next.js 15 起 dev 默认启用、build 已稳定；非 Next 生态看 Rspack/Rsbuild（Rust 实现、兼容 Webpack API）。`,
+    keyPoints: ["esbuild(Go)/SWC(Rust) 原生极速", "比 Babel 快 10-100x", "Babel 插件生态最全", "Rust 工具链成主流"],
     followUps: ["esbuild 为什么不做类型检查？", "Turbopack 和 Vite 区别？"],
     favorited: false,
   },
@@ -4095,21 +4238,24 @@ devtool: "hidden-source-map"
   {
     id: "fe-147",
     nodeId: "build-tools",
-    question: "Turbopack 和 Vite/Webpack 有什么区别？",
+    question: "Turbopack、Rspack 和 Vite/Webpack 有什么区别？2026 年现状如何？",
     bigTech: false,
-    answer: `Turbopack（Rust，Vercel）是 Webpack 作者新作，增量编译缓存极致，Next.js 集成。Vite 利用原生 ESM，Turbopack 自带模块图缓存。两者都比 Webpack 快，Turbopack 更适合大型 Next 项目。
+    answer: `Turbopack（Rust，Vercel）是 Webpack 作者新作，函数级增量编译缓存，已深度集成 Next.js：Next.js 15 起 dev 默认启用 Turbopack，生产构建（next build --turbopack）也已稳定可用。Vite 利用原生 ESM 按需编译；Rspack（字节）/Rsbuild 是 Rust 实现的 Webpack API 兼容方案，主打存量 Webpack 项目平滑迁移，已被 Docusaurus 等采用。
 
 \`\`\`js
-// Next.js 启用 Turbopack（实验）
-next dev --turbo
-// 增量编译：函数级缓存，改一个函数只重编该函数
+// Next.js 15+：dev 默认就是 Turbopack，无需 --turbo
+next dev
+// 生产构建启用 Turbopack（已稳定）
+next build --turbopack
+// Rspack：webpack.config.js 几乎原样复用
+// rspack.config.mjs 复用 Webpack loader/plugin 生态
 // Vite：按请求编译 ESM，依赖预构建缓存
 // Webpack：全量打包，HMR 增量但慢
 \`\`\`
 
-踩坑：Turbopack 仍在 beta（部分 Webpack loader 不兼容）；Vite 生态成熟更通用；Turbopack 在超大项目（万文件）缓存优势明显；Rust 编译器初期生态少。`,
-    keyPoints: ["Turbopack(Rust) 增量缓存", "函数级缓存极致", "Next.js 集成"],
-    followUps: ["Turbopack 函数级缓存原理？", "Turbopack 和 Vite 选型？"],
+踩坑：Turbopack 绑定 Next 生态，自定义 Webpack loader 多的项目迁移需评估（支持常用 loader 子集）；Rspack 兼容 Webpack 5 绝大多数 API，适合存量迁移，周边配套 Rsbuild/Rslib/Rspress 全家桶；Vite 生态成熟更通用；Rust 系在超大项目（万文件）缓存优势明显。`,
+    keyPoints: ["Turbopack：Next 15 dev 默认、build 稳定", "Rspack/Rsbuild：Rust 实现兼容 Webpack API", "函数级增量缓存", "存量 Webpack 项目看 Rspack"],
+    followUps: ["Turbopack 函数级缓存原理？", "Rspack 和 Vite 在存量项目如何选型？"],
     favorited: false,
   },
   // ===== 22. testing 测试体系 =====
@@ -4300,6 +4446,22 @@ function formatMoney(n) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "
 <link rel="preload" as="image" href="hero.jpg" />
 // INP 优化：长任务拆分、减少主线程阻塞
 onClick = () => { startTransition(() => setState(x)); }; // 低优先级
+// INP 优化三件套：
+// 1) scheduler.yield()（新 API）：长任务中主动让出主线程，先画一帧再继续
+async function processAll(items) {
+  for (const item of items) {
+    heavy(item);
+    await scheduler.yield(); // 让出，浏览器可先响应输入/渲染
+  }
+}
+// 2) 事件处理拆分：点击回调里先更新视觉反馈（同步少量工作），
+//    重计算放 setTimeout/scheduler.postTask，缩短"输入到下一帧"
+// 3) 归因：Long Animation Frames API（LoAF）定位掉帧长帧的脚本来源
+new PerformanceObserver(list => {
+  for (const e of list.getEntries()) {
+    console.log(e.duration, e.scripts); // 哪个脚本贡献了长帧
+  }
+}).observe({ type: "long-animation-frame", buffered: true });
 // CLS 优化：图片/广告位预留尺寸
 <img width="800" height="600" /> // 预留防偏移
 .ad-slot { min-height: 250px; } // 广告位预留
@@ -4307,8 +4469,8 @@ onClick = () => { startTransition(() => setState(x)); }; // 低优先级
 new PerformanceObserver(list => list.getEntries().forEach(e => console.log(e)));
 \`\`\`
 
-踩坑：LCP 通常是首屏大图/大文字，预加载关键资源；CLS 多因异步加载图片/字体/广告无尺寸；INP 替代 FID（FID 只测首次输入），更严格。美团首屏 LCP 从 3.2s 优化到 1.8s。`,
-    keyPoints: ["LCP<2.5s / INP<200ms / CLS<0.1", "LCP 预加载关键资源", "CLS 预留尺寸防偏移"],
+踩坑：LCP 通常是首屏大图/大文字，预加载关键资源；CLS 多因异步加载图片/字体/广告无尺寸；INP 替代 FID（FID 只测首次输入），更严格；INP 差时用 LoAF 归因到具体脚本，再按 scheduler.yield/事件拆分治理。美团首屏 LCP 从 3.2s 优化到 1.8s。`,
+    keyPoints: ["LCP<2.5s / INP<200ms / CLS<0.1", "LCP 预加载关键资源", "INP：scheduler.yield+事件拆分+LoAF 归因", "CLS 预留尺寸防偏移"],
     followUps: ["INP 为什么替代 FID？", "如何测量 Core Web Vitals？"],
     favorited: false,
   },
@@ -4499,7 +4661,9 @@ function escapeHtml(s) {
 // 2. CSP 限制脚本来源
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
 // 3. httpOnly Cookie 防 JS 偷
-document.cookie = "token=xxx; HttpOnly; Secure; SameSite=Strict";
+// httpOnly 只能由服务端通过 Set-Cookie 响应头设置（前端 JS 无法设置也读不到）：
+//   Set-Cookie: token=xxx; HttpOnly; Secure; SameSite=Strict
+// Express 示例：res.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
 // 4. URL 跳转白名单防 javascript:
 const allowed = ["http", "https"]; if (!allowed.includes(new URL(href).protocol)) return;
 \`\`\`
@@ -4569,14 +4733,20 @@ Access-Control-Allow-Credentials: true // 带 Cookie
 // 预检请求（PUT/自定义 Header）：OPTIONS 预检
 Access-Control-Allow-Methods: GET, POST, PUT
 Access-Control-Allow-Headers: X-Custom
+Access-Control-Max-Age: 86400 // 预检结果缓存 24h，省掉重复 OPTIONS
 // 开发代理（Vite）
 server: { proxy: { "/api": { target: "https://api.com", changeOrigin: true } } }
 // 生产代理：Nginx 反代
 location /api { proxy_pass https://api.com; }
 \`\`\`
 
-踩坑：带 Cookie 时 Allow-Origin 不能是 *（需具体域名）且 Allow-Credentials:true；预检请求缓存（Access-Control-Max-Age）减少 OPTIONS；简单请求条件：GET/POST/HEAD + 安全 Header。`,
-    keyPoints: ["同源=协议+域名+端口", "CORS 服务端配 Allow-Origin", "带 Cookie 不能用 *"],
+三大坑：
+1. 预检缓存：不配 Access-Control-Max-Age 时每个非简单请求都先发一次 OPTIONS（RTT 翻倍）；配上后浏览器缓存预检结果（注意缓存期内改服务端 CORS 配置不生效）。
+2. 带凭据重定向：fetch(url, { credentials: "include", redirect: "follow" }) 跨 30x 跳转时，若目标源变化或响应头在重定向链上缺失 Allow-Credentials，请求会失败；稳妥做法是重定向目标同 CORS 配置齐全，或前端手动 redirect:"manual" 处理。
+3. 简单请求边界：仅 GET/HEAD/POST + Content-Type 限 text/plain、application/x-www-form-urlencoded、multipart/form-data + 仅 safelist 头；一旦加 Authorization/Content-Type: application/json 就触发预检——很多"突然跨域失败"是某次改动让请求从简单变非简单。
+
+踩坑：带 Cookie 时 Allow-Origin 不能是 *（需具体域名）且 Allow-Credentials:true。`,
+    keyPoints: ["同源=协议+域名+端口", "CORS 服务端配 Allow-Origin", "Max-Age 缓存预检", "带凭据重定向易失败", "简单请求边界"],
     followUps: ["什么是预检请求？", "CORS 和代理跨域区别？"],
     favorited: false,
   },
@@ -4856,32 +5026,46 @@ window.addEventListener("appinstalled", () => console.log("已安装"));
   {
     id: "fe-176",
     nodeId: "ai-sdk-frontend",
-    question: "Vercel AI SDK 的 useChat 如何工作？核心 API？",
+    question: "Vercel AI SDK v5 的 useChat 如何工作？核心 API？",
     bigTech: true,
-    answer: `useChat 是 AI SDK 的 React Hook，封装消息流式接收、状态管理、发送逻辑。自动管理 messages/input/handleSubmit，流式更新 UI。
+    answer: `useChat（v5 从 @ai-sdk/react 导入，v4 的 ai/react 已移除）封装消息流式接收、状态管理、发送逻辑。v5 核心变化：传输层抽象为 transport（DefaultChatTransport）；不再托管输入框状态（input/handleInputChange/handleSubmit 移除，输入自己管）；消息为 UIMessage，内容在 parts 数组而非单一 content 字符串；状态用 status（submitted/streaming/ready/error）。
 
 \`\`\`tsx
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { useState } from "react";
+
 function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } = useChat({
-    api: "/api/chat", // 后端流式接口
+  const { messages, sendMessage, status, stop } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
+  const [input, setInput] = useState(""); // v5：输入框状态自己管理
+  const busy = status === "submitted" || status === "streaming";
   return (
     <div>
-      {messages.map(m => <div key={m.id}>{m.role}: {m.content}</div>)}
-      <form onSubmit={handleSubmit}>
-        <input value={input} onChange={handleInputChange} />
+      {messages.map(m => (
+        <div key={m.id}>
+          {m.role}: {m.parts.map((p, i) => p.type === "text" ? <span key={i}>{p.text}</span> : null)}
+        </div>
+      ))}
+      <form onSubmit={e => {
+        e.preventDefault();
+        if (!input.trim()) return;
+        sendMessage({ text: input }); // v5：sendMessage 替代 handleSubmit
+        setInput("");
+      }}>
+        <input value={input} onChange={e => setInput(e.target.value)} disabled={busy} />
         <button type="submit">发送</button>
-        {isLoading && <button onClick={stop}>停止</button>}
+        {busy && <button type="button" onClick={stop}>停止</button>}
       </form>
     </div>
   );
 }
 \`\`\`
 
-踩坑：useChat 自动处理流式 SSE 解析；messages 是受控状态，可用 setMessages 修改（编辑/删除）；onFinish 回调拿完整响应；多轮对话自动带历史发送后端。`,
-    keyPoints: ["useChat 封装流式消息状态", "自动 SSE 解析", "stop 可中断"],
-    followUps: ["useChat 如何处理工具调用？", "useChat 和 useCompletion 区别？"],
+踩坑：v5 消息渲染要遍历 parts（支持文本/工具/文件等多部分）；setMessages 仍可编辑/删除历史；v4 的 api 选项收进 transport；共享会话状态改为显式共享 Chat 实例（不再按 id 隐式共享）。`,
+    keyPoints: ["@ai-sdk/react + transport 架构", "sendMessage 替代 handleSubmit，输入自管", "UIMessage.parts 替代 content", "status 状态机"],
+    followUps: ["useChat 如何处理工具调用？", "transport 抽象解决什么问题？"],
     favorited: false,
   },
   {
@@ -4889,24 +5073,28 @@ function Chat() {
     nodeId: "ai-sdk-frontend",
     question: "AI SDK 如何在前端实现流式 UI（Streaming UI）？",
     bigTech: true,
-    answer: `流式 UI：后端流式返回 token，前端逐 token 渲染（打字机效果）。AI SDK 用 streamText + useChat，后端返回流，前端 React state 逐块更新。
+    answer: `流式 UI：后端流式返回 token，前端逐 token 渲染（打字机效果）。AI SDK v5 用 streamText + useChat，后端返回 UIMessage 流，前端 React state 逐块更新。
 
 \`\`\`ts
-// 后端 route.ts（AI SDK）
-import { streamText } from "ai";
+// 后端 route.ts（AI SDK v5）
+import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
-export async function POST(req) {
-  const { messages } = await req.json();
-  const result = streamText({ model: openai("gpt-4"), messages });
-  return result.toDataStreamResponse(); // 流式响应
+export async function POST(req: Request) {
+  const { messages }: { messages: UIMessage[] } = await req.json();
+  const result = streamText({
+    model: openai("gpt-4o"),
+    messages: await convertToModelMessages(messages), // UIMessage → 模型消息
+  });
+  return result.toUIMessageStreamResponse(); // v5：替代 v4 的 toDataStreamResponse
 }
-// 前端：useChat 自动接收流，messages.content 逐 token 增长
-const { messages } = useChat();
-messages[messages.length - 1].content; // 实时增长
+// 前端：useChat 自动接收流，末条消息的 text part 逐 token 增长
+const { messages } = useChat({ transport: new DefaultChatTransport({ api: "/api/chat" }) });
+const last = messages[messages.length - 1];
+last?.parts.filter(p => p.type === "text").map(p => p.text).join(""); // 实时增长
 \`\`\`
 
-踩坑：流式 UI 用 useChat 自动处理，手动需解析 SSE/ReadableStream；逐 token 渲染避免整段闪烁；Markdown 流式需增量解析（未闭合标签处理）；用 useTransition 防高频更新卡顿。`,
-    keyPoints: ["streamText 返回流", "useChat 自动逐 token 更新", "Markdown 增量解析"],
+踩坑：v5 服务端要用 convertToModelMessages 把前端 UIMessage 转成模型消息；流式 UI 用 useChat 自动处理，手动需解析 SSE/ReadableStream；逐 token 渲染避免整段闪烁；Markdown 流式需增量解析（未闭合标签处理）；高频更新可用 startTransition 防卡顿。`,
+    keyPoints: ["streamText + toUIMessageStreamResponse", "convertToModelMessages 转换", "useChat 逐 token 更新 text part", "Markdown 增量解析"],
     followUps: ["Markdown 流式如何处理未闭合标签？", "流式渲染如何防卡顿？"],
     favorited: false,
   },
@@ -4915,28 +5103,36 @@ messages[messages.length - 1].content; // 实时增长
     nodeId: "ai-sdk-frontend",
     question: "AI SDK 工具调用（Tool Calling）前端如何渲染？",
     bigTech: false,
-    answer: `工具调用：模型决定调工具（如查天气/搜索），前端渲染工具状态（调用中/结果），结果回传模型继续。AI SDK 用 tools + streamText，前端检测 toolInvocations 渲染。
+    answer: `工具调用：模型决定调工具（如查天气/搜索），前端渲染工具状态（调用中/结果），结果回传模型继续。AI SDK v5 中工具调用以 parts 形式混入 UIMessage：每条助手消息的 parts 数组里会出现类型为 tool-{工具名} 的 part，带 state（输入流式中/输入就绪/有结果/出错），替代 v4 的 message.toolInvocations。
 
-\`\`\`ts
-// 后端：定义工具
+\`\`\`tsx
+// 后端：定义工具（v5 用 inputSchema 描述入参）
 const result = streamText({
-  model, messages,
+  model, messages: await convertToModelMessages(messages),
   tools: {
-    weather: { description: "查天气", parameters: z.object({ city: z.string() }),
-      execute: async ({ city }) => getWeather(city) },
+    weather: tool({
+      description: "查天气",
+      inputSchema: z.object({ city: z.string() }),
+      execute: async ({ city }) => getWeather(city),
+    }),
   },
 });
-// 前端：渲染工具调用状态
-{messages.map(m => m.toolInvocations?.map(t => (
-  <div key={t.toolCallId}>
-    {t.state === "call" && <Spinner>调用 {t.toolName}</Spinner>}
-    {t.state === "result" && <Weather data={t.result} />}
-  </div>
-)))}
+// 前端：遍历 parts 渲染工具状态（part.type 形如 "tool-weather"）
+{messages.map(m => m.parts.map((p, i) => {
+  if (p.type === "tool-weather") {
+    return (
+      <div key={p.toolCallId}>
+        {p.state !== "output-available" && <Spinner>调用天气工具…</Spinner>}
+        {p.state === "output-available" && <Weather data={p.output} />}
+      </div>
+    );
+  }
+  return p.type === "text" ? <span key={i}>{p.text}</span> : null;
+}))}
 \`\`\`
 
-踩坑：工具调用可能多轮（模型调多个工具）；前端需处理 call/result 两态；人工确认工具（human-in-the-loop）用 addToolResult 手动回传结果。`,
-    keyPoints: ["tools 定义模型可调用", "toolInvocations 渲染 call/result", "人工确认可手动回传"],
+踩坑：v5 工具 part 的 state 覆盖"入参流式→入参就绪→出参就绪/出错"全过程，比 v4 的 call/result 两态更细；客户端执行的工具用 onToolCall 回调 + addToolOutput 回传结果（替代 v4 的 addToolResult）；多步工具链由服务端 stopWhen 条件控制（v4 的 maxSteps 已移除）。`,
+    keyPoints: ["工具调用是 parts 数组中的 tool-* part", "state 覆盖输入到输出全过程", "onToolCall + addToolOutput 客户端回传", "maxSteps 移除改服务端 stopWhen"],
     followUps: ["多轮工具调用如何处理？", "human-in-the-loop 如何实现？"],
     favorited: false,
   },
@@ -4948,51 +5144,55 @@ const result = streamText({
     answer: `AI SDK 统一接口，后端切换 model 即可，前端传 model 参数。多模型对比可并发请求多个，UI 并排显示。
 
 \`\`\`ts
-// 后端：按参数选模型
+// 后端：按参数选模型（v5）
 import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
-export async function POST(req) {
+import { streamText, convertToModelMessages } from "ai";
+export async function POST(req: Request) {
   const { messages, model } = await req.json();
-  const m = model === "claude" ? anthropic("claude-3") : openai("gpt-4");
-  return streamText({ model: m, messages }).toDataStreamResponse();
+  const m = model === "claude" ? anthropic("claude-sonnet-4") : openai("gpt-4o");
+  return streamText({
+    model: m,
+    messages: await convertToModelMessages(messages),
+  }).toUIMessageStreamResponse();
 }
-// 前端：切换模型
-const { setInput } = useChat({ body: { model: selectedModel } });
+// 前端：v5 通过 transport 的 body 传额外参数
+const chat = useChat({
+  transport: new DefaultChatTransport({ api: "/api/chat", body: { model: selectedModel } }),
+});
 <select onChange={e => setSelectedModel(e.target.value)}>
-  <option value="gpt">GPT-4</option>
+  <option value="gpt">GPT</option>
   <option value="claude">Claude</option>
 </select>
 \`\`\`
 
-踩坑：不同模型 token 计费/上下文长度不同，前端需提示；流式格式可能略异（AI SDK 已统一）；并发对比用 Promise.all 但注意限流。`,
-    keyPoints: ["AI SDK 统一接口切模型", "前端传 model 参数", "并发可对比多模型"],
+踩坑：v5 的 body 参数移到 DefaultChatTransport 上（v4 在 useChat 顶层）；不同模型 token 计费/上下文长度不同，前端需提示；流式格式可能略异（AI SDK 已统一为 UIMessage 流）；并发对比用 Promise.all 但注意限流。`,
+    keyPoints: ["AI SDK 统一接口切模型", "v5 body 走 transport", "并发可对比多模型"],
     followUps: ["不同模型流式格式差异？", "如何做模型 A/B 测试？"],
     favorited: false,
   },
   {
     id: "fe-180",
     nodeId: "ai-sdk-frontend",
-    question: "AI SDK 的 Data Stream 协议是什么？",
+    question: "AI SDK 的流式传输协议是什么？v5 有哪些变化？",
     bigTech: false,
-    answer: `Data Stream 是 AI SDK 自定义的流式协议，用特定前缀标记不同数据类型（text/tool-call/tool-result/error），前端按协议解析。
+    answer: `AI SDK 前后端之间通过自定义流式协议传输：v4 是 Data Stream 协议（前缀标记 text/tool-call/tool-result/error），v5 改为 UIMessage Stream 协议——基于 SSE，每个事件携带结构化 chunk（文本增量、工具入参/出参、错误、结束信号），与 UIMessage 的 parts 模型一一对应，前端 useChat 据此增量拼装消息。
 
 \`\`\`text
-# Data Stream 格式（简化）
+# v4 Data Stream 格式（已废弃，简化示意）
 0:"Hello"        # text chunk
 9:{"toolCallId":"x","toolName":"weather","args":{}}  # tool call
 a:{"toolCallId":"x","result":{}}  # tool result
-3:"错误信息"      # error
-d:{"finishReason":"stop"}  # finish
 \`\`\`
 \`\`\`ts
-// toDataStreamResponse 生成该格式
-return result.toDataStreamResponse();
-// 前端 useChat 自动解析（也可手动用 useChatParser）
+// v5 服务端：生成 UIMessage Stream 响应
+return result.toUIMessageStreamResponse();
+// 前端 useChat 经 transport 自动解析，无需手写解析器
 \`\`\`
 
-踩坑：Data Stream 比 SSE 更结构化（区分文本/工具/错误）；手动解析用 @ai-sdk/react 的 parseDataStream；自定义数据用 streamData 追加自定义部分。`,
-    keyPoints: ["Data Stream 前缀标记类型", "区分 text/tool/error", "比 SSE 更结构化"],
-    followUps: ["Data Stream 和 SSE 区别？", "如何追加自定义数据？"],
+踩坑：v5 协议面向 parts 模型，一条消息可由多个 chunk 拼出多个 part（文本+多个工具调用交错）；手动消费时用 SDK 提供的读取工具而非自行 split 文本；自定义数据（如溯源引用）可通过 transient data part 下发。`,
+    keyPoints: ["v5 改 UIMessage Stream 协议（SSE）", "chunk 与 parts 模型对应", "前端 useChat 自动解析"],
+    followUps: ["UIMessage Stream 和普通 SSE 区别？", "如何下发自定义数据？"],
     favorited: false,
   },
   {
@@ -5000,22 +5200,22 @@ return result.toDataStreamResponse();
     nodeId: "ai-sdk-frontend",
     question: "AI 请求前端如何做错误处理和重试？",
     bigTech: false,
-    answer: `AI 请求可能失败（限流/超时/模型错误）。useChat 的 onError 回调处理，重试用手动 reload。限流（429）指数退避，超时 AbortController。
+    answer: `AI 请求可能失败（限流/超时/模型错误）。useChat 的 onError 回调处理，重试调 regenerate（v5 替代 v4 的 reload）。限流（429）指数退避，超时 AbortController。
 
 \`\`\`tsx
-const { messages, reload, error } = useChat({
-  api: "/api/chat",
+const { messages, regenerate, error } = useChat({
+  transport: new DefaultChatTransport({ api: "/api/chat" }),
   onError: (err) => {
     console.error(err);
     toast.error("请求失败，请重试");
   },
 });
-// 重试上一条
-<button onClick={() => reload()}>重试</button>
+// 重试上一条（v5：regenerate 重新生成最后的助手回复）
+<button onClick={() => regenerate()}>重试</button>
 {error && <div className="error">{error.message}</div>}
 // 后端限流处理
 export async function POST(req) {
-  try { return await streamText({...}).toDataStreamResponse(); }
+  try { return await streamText({...}).toUIMessageStreamResponse(); }
   catch (e) {
     if (e.status === 429) return Response.json({ error: "请求过快" }, { status: 429 });
     return Response.json({ error: "服务错误" }, { status: 500 });
@@ -5023,8 +5223,8 @@ export async function POST(req) {
 }
 \`\`\`
 
-踩坑：流式中途断开需 reload 重试（已收内容可能丢失）；429 限流前端需退避提示用户等待；错误状态 UI 明确（重试按钮），不要静默失败。`,
-    keyPoints: ["onError 回调处理", "reload 重试", "429 限流退避"],
+踩坑：流式中途断开需 regenerate 重试（已收内容可能丢失）；429 限流前端需退避提示用户等待；错误状态 UI 明确（重试按钮），不要静默失败。`,
+    keyPoints: ["onError 回调处理", "regenerate 重试", "429 限流退避"],
     followUps: ["流式中途断开如何恢复？", "如何做请求限流？"],
     favorited: false,
   },
@@ -5220,10 +5420,17 @@ function StreamMarkdown({ content }: { content: string }) {
   return (
     <ReactMarkdown
       components={{
-        // 代码块未高亮完成时降级显示
-        code({ inline, children }) {
-          return inline ? <code>{children}</code> : <pre><code>{children}</code></pre>;
+        // react-markdown v9 起移除了 inline prop，
+        // 改为按节点判定：块级代码会带 language-* 类名/处于 pre 中，行内代码则没有
+        code({ node, className, children, ...rest }) {
+          const isBlock = /language-/.test(className ?? "");
+          return isBlock ? (
+            <pre><code className={className}>{children}</code></pre>
+          ) : (
+            <code className={className} {...rest}>{children}</code>
+          );
         },
+        // 或者分别覆写 pre（块）与 code（行内默认渲染）更稳妥
       }}
     >
       {safe}
@@ -5248,8 +5455,8 @@ function useChunkedMd(stream: string) {
 }
 \`\`\`
 
-踩坑：每次 token 都全量 re-parse Markdown 性能差，长文本需虚拟化或 memo；react-markdown 流式时代码高亮延迟切换会跳动，用 opacity 过渡；表格流式未闭合会渲染异常，建议表格整块收完再渲染。`,
-    keyPoints: ["未闭合代码块补结束符", "段落级缓冲双换行", "增量解析容错"],
+踩坑：每次 token 都全量 re-parse Markdown 性能差，长文本需虚拟化或 memo；react-markdown v9 移除了 code 组件的 inline prop，需按节点类型（language-* 类名或父级 pre）判定块级/行内；流式时代码高亮延迟切换会跳动，用 opacity 过渡；表格流式未闭合会渲染异常，建议表格整块收完再渲染。`,
+    keyPoints: ["未闭合代码块补结束符", "段落级缓冲双换行", "v9 按节点类型判定 inline", "增量解析容错"],
     followUps: ["流式代码高亮如何平滑？", "表格流式如何处理？"],
     favorited: false,
   },
@@ -5352,7 +5559,7 @@ function useBackpressureRender() {
     nodeId: "ai-streaming-ui",
     question: "流式渲染中途出错（网络断开/JSON 解析失败）如何恢复？",
     bigTech: false,
-    answer: `结论：流式错误分两类——网络中断用断点续传或 reload 重试；数据解析错误需容错跳过坏 chunk。策略：保留已收内容，错误状态明确，提供"重试"而非清空。用 ErrorBoundary 兜底渲染崩溃。
+    answer: `结论：流式错误分两类——网络中断用断点续传或 regenerate 重试（AI SDK v5）；数据解析错误需容错跳过坏 chunk。策略：保留已收内容，错误状态明确，提供"重试"而非清空。用 ErrorBoundary 兜底渲染崩溃。
 
 案例：飞书智能助手流式回答时遇网络抖动，前端保留已生成文本，底部显示"连接中断，点击重试"，重试时把已收内容作为 prefix 续写（后端支持）或重新生成。JSON 解析失败的单个 chunk 跳过不中断整体流。
 
@@ -5368,7 +5575,10 @@ async function streamWithRecovery(messages, onToken, onError) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      for (const line of buffer.split("\\n")) {
+      const lines = buffer.split("\\n");
+      // 最后一段可能没有换行符（半行残段），pop 回 buffer 等下次拼完整再解析
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         try {
           const chunk = JSON.parse(line.slice(6)); // 单 chunk 解析失败跳过
@@ -5378,7 +5588,6 @@ async function streamWithRecovery(messages, onToken, onError) {
           console.warn("跳过坏 chunk:", line);
         }
       }
-      buffer = buffer.lastIndexOf("\\n") >= 0 ? "" : buffer;
     }
   } catch (e) {
     onError(e, received); // 传出已收内容，供重试使用
@@ -5392,8 +5601,8 @@ const retry = () => streamWithRecovery(
 );
 \`\`\`
 
-踩坑：单个 chunk JSON 解析失败不能 throw 中断整个流，要 try/catch 跳过；网络断开重试需考虑"是否重复计费"，最好后端支持 lastEventId 续传；ErrorBoundary 包裹流式渲染区，防 Markdown 解析崩溃白屏。`,
-    keyPoints: ["单 chunk 解析失败跳过不中断流", "保留已收内容供重试", "ErrorBoundary 兜底"],
+踩坑：buffer 按行 split 后最后一段可能是不完整的半行（chunk 边界切断），必须 pop 回 buffer 留待下次拼接，否则残段被当完整行解析报错或丢失；单个 chunk JSON 解析失败不能 throw 中断整个流，要 try/catch 跳过；网络断开重试需考虑"是否重复计费"，最好后端支持 lastEventId 续传；ErrorBoundary 包裹流式渲染区，防 Markdown 解析崩溃白屏。`,
+    keyPoints: ["buffer 残段 pop 回等下次拼接", "单 chunk 解析失败跳过不中断流", "保留已收内容供重试", "ErrorBoundary 兜底"],
     followUps: ["如何实现断点续传？", "ErrorBoundary 如何捕获流式错误？"],
     favorited: false,
   },
@@ -5745,6 +5954,7 @@ const messages = buildMessages(i18n.language, input);
 \`\`\`tsx
 function useAutoScroll(deps: unknown[]) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器 ref
   const [atBottom, setAtBottom] = useState(true);
 
   // 监听底部哨兵是否可见
@@ -5762,8 +5972,14 @@ function useAutoScroll(deps: unknown[]) {
     if (atBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, deps); // deps 为 messages/streaming text
 
-  return { bottomRef, atBottom };
+  return { bottomRef, scrollContainerRef, atBottom };
 }
+
+// 使用：容器挂 scrollContainerRef，底部哨兵挂 bottomRef
+// <div ref={scrollContainerRef} className="overflow-y-auto">
+//   {messages.map(...)}
+//   <div ref={bottomRef} />
+// </div>
 
 // 用户上滑时显示"回到底部"按钮
 {!atBottom && (
@@ -6008,45 +6224,43 @@ function getVisiblePath(leafId: string) {
     bigTech: true,
     answer: `结论：Tool Calling 时模型返回 tool_calls，前端展示"正在调用 X 工具"状态，工具执行完把结果作为 tool message 回传，最终 assistant 基于结果回答。UI 需渲染工具调用卡片（名称/参数/结果/状态）。
 
-案例：扣子 Agent 调用"搜索网页"工具时，对话流中插入一个可折叠的工具调用卡片，显示搜索参数和返回结果摘要，用户可展开查看，assistant 基于搜索结果继续回答。Vercel AI SDK 的 useChat 自动管理 tool round-trip。
+案例：扣子 Agent 调用"搜索网页"工具时，对话流中插入一个可折叠的工具调用卡片，显示搜索参数和返回结果摘要，用户可展开查看，assistant 基于搜索结果继续回答。Vercel AI SDK v5 的 useChat 自动管理 tool round-trip，工具调用以 part 形式混入消息流。
 
 \`\`\`tsx
-// Vercel AI SDK：tool calling 自动渲染
+// AI SDK v5：工具调用是 UIMessage.parts 中 type 为 "tool-{工具名}" 的 part
 const { messages } = useChat({
-  api: "/api/chat",
-  // 工具定义在后端，前端渲染 tool invocation
+  transport: new DefaultChatTransport({ api: "/api/chat" }),
 });
 
 function MessageList({ messages }) {
   return messages.map((m) => (
     <div key={m.id}>
-      {/* 文本部分 */}
-      {m.content && <p>{m.content}</p>}
-      {/* 工具调用部分 */}
-      {m.toolInvocations?.map((tool) => (
-        <ToolCard key={tool.toolCallId} tool={tool} />
-      ))}
+      {m.parts.map((part, i) => {
+        if (part.type === "text") return <p key={i}>{part.text}</p>;
+        // 工具 part：type 形如 "tool-searchWeb"，state 覆盖输入到输出
+        if (part.type.startsWith("tool-")) {
+          return <ToolCard key={part.toolCallId} tool={part} />;
+        }
+        return null;
+      })}
     </div>
   ));
 }
 
 function ToolCard({ tool }) {
   const [expanded, setExpanded] = useState(false);
+  const done = tool.state === "output-available";
   return (
     <div className="tool-card">
       <div className="tool-header" onClick={() => setExpanded(!expanded)}>
         <span className="tool-icon">🔧</span>
-        <span>{tool.toolName}</span>
-        <span className="tool-state">
-          {tool.state === "result" ? "✓ 完成" : "⏳ 调用中"}
-        </span>
+        <span>{tool.type.replace("tool-", "")}</span>
+        <span className="tool-state">{done ? "✓ 完成" : "⏳ 调用中"}</span>
       </div>
       {expanded && (
         <div className="tool-detail">
-          <pre>参数：{JSON.stringify(tool.args, null, 2)}</pre>
-          {tool.state === "result" && (
-            <pre>结果：{JSON.stringify(tool.result, null, 2)}</pre>
-          )}
+          <pre>参数：{JSON.stringify(tool.input, null, 2)}</pre>
+          {done && <pre>结果：{JSON.stringify(tool.output, null, 2)}</pre>}
         </div>
       )}
     </div>
@@ -6054,8 +6268,8 @@ function ToolCard({ tool }) {
 }
 \`\`\`
 
-踩坑：工具调用是异步 round-trip（模型→工具→模型），UI 状态机要清晰（calling→result→answering）；工具结果可能很大（如搜索返回 100 条），需折叠 + 分页；多工具并行调用时各自独立卡片；工具失败要展示错误并允许重试。`,
-    keyPoints: ["toolInvocations 渲染工具卡片", "状态机 calling→result", "折叠展示参数与结果"],
+踩坑：工具调用是异步 round-trip（模型→工具→模型），UI 状态机要清晰（输入中→调用中→完成/出错）；v5 工具 part 的入参是 input、出参是 output（v4 是 args/result）；工具结果可能很大（如搜索返回 100 条），需折叠 + 分页；多工具并行调用时各自独立卡片；工具失败要展示错误并允许重试。`,
+    keyPoints: ["tool-* part 渲染工具卡片", "state 状态机输入中→调用中→完成", "input/output 字段", "折叠展示参数与结果"],
     followUps: ["多工具并行如何渲染？", "工具失败如何重试？"],
     favorited: false,
   },
@@ -6135,8 +6349,8 @@ export const runtime = "edge"; // 或 "nodejs"
 export async function POST(req: Request) {
   // Edge Runtime：无 fs、无 Buffer（部分）、无 process.cwd()
   const { messages } = await req.json();
-  const result = await streamText({ model, messages });
-  return result.toDataStreamResponse();
+  const result = await streamText({ model, messages: await convertToModelMessages(messages) });
+  return result.toUIMessageStreamResponse(); // AI SDK v5
 }
 
 // Node.js 专属能力（Edge 不支持）
@@ -6406,9 +6620,9 @@ export default {
     nodeId: "ai-edge-runtime",
     question: "前端项目如何同时部署到 Vercel Edge 与 Cloudflare Pages？",
     bigTech: false,
-    answer: `结论：用适配层抽象 runtime 差异——Next.js 通过 output 标准化，或用 Hono（轻量框架，原生支持多 Edge runtime）写 API。构建产物分别适配 Vercel（@vercel/edge）和 Cloudflare（@cloudflare/next-on-pages）。共享业务逻辑，仅入口/绑定层不同。
+    answer: `结论：用适配层抽象 runtime 差异——Next.js 通过 output 标准化，或用 Hono（轻量框架，原生支持多 Edge runtime）写 API。构建产物分别适配 Vercel（@vercel/edge）和 Cloudflare。注意：@cloudflare/next-on-pages 已弃用，官方继任者是 OpenNext Cloudflare（@opennextjs/cloudflare），把 Next.js 构建产物适配到 Cloudflare Workers。共享业务逻辑，仅入口/绑定层不同。
 
-案例：某开源 AI 工具为避免 Vercel vendor lock-in，用 Hono 写 Edge API 层，同一份代码分别部署到 Vercel Edge Functions 和 Cloudflare Pages，通过环境变量切换数据库 binding，用户可选自托管。
+案例：某开源 AI 工具为避免 Vercel vendor lock-in，用 Hono 写 Edge API 层，同一份代码分别部署到 Vercel Edge Functions 和 Cloudflare Workers，通过环境变量切换数据库 binding，用户可选自托管。
 
 \`\`\`ts
 // Hono：一套代码多 Edge runtime
@@ -6426,7 +6640,7 @@ app.post("/api/chat", async (c) => {
 export const config = { runtime: "edge" };
 export default app;
 
-// Cloudflare Pages 入口（hono/cloudflare-pages）
+// Cloudflare Workers 入口（hono/cloudflare-workers）
 export default app;
 
 // 适配差异：用环境变量 + c.env 抽象 binding
@@ -6439,12 +6653,13 @@ app.get("/data", async (c) => {
 
 // 部署：
 // Vercel:  npx vercel --prod（自动识别 Edge）
-// CF Pages: npx wrangler pages deploy .vercel/output/static
-//          或用 @cloudflare/next-on-pages 转换 Next 产物
+// Cloudflare（Next.js 项目）：用 OpenNext 适配
+//   npx opennextjs-cloudflare build && npx wrangler deploy
+//   （@cloudflare/next-on-pages 已弃用，勿再用于新项目）
 \`\`\`
 
-踩坑：Next.js 在 Cloudflare 需用 @cloudflare/next-on-pages 转换，部分功能（ISR、image optimization）支持不全；binding 差异（Vercel KV vs CF KV）API 略不同，需适配层抹平；静态资源在 Cloudflare 直接 CDN，Vercel 需配置 headers；两平台 Edge 限制不同（CPU 时间、内存），别写重逻辑。`,
-    keyPoints: ["Hono 多 runtime 适配", "env 抽象 binding 差异", "next-on-pages 转换"],
+踩坑：next-on-pages 已停止维护，新项目用 OpenNext Cloudflare，对 Next 新特性（App Router、PPR 等）跟进更好，但部分功能（image optimization、部分缓存语义）仍有差异，上线前逐项验证；binding 差异（Vercel KV vs CF KV）API 略不同，需适配层抹平；两平台 Edge 限制不同（CPU 时间、内存），别写重逻辑。`,
+    keyPoints: ["Hono 多 runtime 适配", "env 抽象 binding 差异", "OpenNext Cloudflare 替代已弃用的 next-on-pages"],
     followUps: ["Next.js 在 Cloudflare 功能差异？", "如何做自托管 fallback？"],
     favorited: false,
   },

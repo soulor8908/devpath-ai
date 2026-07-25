@@ -1,5 +1,5 @@
 // lib/presets/ai.ts
-// AI 算法工程师面试全攻略预设：30 知识节点 + 210 道高频面试题 + 学习计划
+// AI 算法工程师面试全攻略预设：30 知识节点 + 206 道高频面试题 + 学习计划
 // 覆盖：机器学习基础 → 深度学习 → CV → NLP → 推荐系统 → 强化学习 → 前沿与部署
 // 大厂高频题答案结合真实项目场景（字节抖音推荐/阿里电商搜索/腾讯广告/百度凤巢等）
 
@@ -279,7 +279,7 @@ const AI_NODES: KnowledgeNode[] = [
     summary: "PPO、RLHF 三阶段、奖励建模、DPO、GRPO、RLHF 工程挑战、对齐实战。",
     mastery: 0,
   },
-  // ===== 前沿与部署（4 个节点） =====
+  // ===== 前沿与部署（3 个节点） =====
   {
     id: "ai-multimodal",
     title: "多模态",
@@ -674,7 +674,7 @@ clf = DecisionTreeClassifier(criterion="gini", max_depth=5)
     id: "ai-15",
     nodeId: "ai-tree-models",
     question: "随机森林为什么能降低过拟合？Bagging 的原理？",
-    answer: `结论：Bagging 有放回采样训练多棵树，再投票/平均，多树独立误差平均后方差降为 σ²/n。随机森林再加特征随机（每次分裂只选特征子集）降低树间相关性，进一步降方差。
+    answer: `结论：Bagging 有放回采样训练多棵树，再投票/平均。方差账：若单树方差 σ²、树间预测相关系数 ρ，则 n 棵树平均后的方差 = ρσ² + (1−ρ)σ²/n——只有当树间相互独立（ρ=0）时才退化为理想的 σ²/n。树越多只能消掉第二项，ρσ² 是下限。随机森林再加特征随机（每次分裂只选特征子集）降低树间相关性 ρ，逼近独立假设，进一步降方差。
 
 实际案例：金融风控用随机森林做信用评分，单棵深决策树易过拟合，集成后稳定且 OOB（袋外）评估免费。Boosting（GBDT）则降偏差，串联纠错，适合残差还大的场景。
 
@@ -687,7 +687,7 @@ print("OOB 得分:", rf.oob_score_)  # 免费验证集评估
 \`\`\`
 
 踩坑：树越多收益递减且耗时，通常 100-500 棵够了；特征随机比例 sqrt 适合分类，1/3 适合回归；Bagging 降方差不降偏差，欠拟合时换 Boosting。`,
-    keyPoints: ["Bagging 有放回采样训练多棵树", "随机森林加特征随机去相关", "平均降方差 σ²/n"],
+    keyPoints: ["Bagging 有放回采样训练多棵树", "方差=ρσ²+(1−ρ)σ²/n，独立时才 σ²/n", "随机森林加特征随机降 ρ"],
     followUps: ["Bagging 和 Boosting 区别？", "OOB 评估原理？"],
     favorited: false,
     bigTech: false,
@@ -698,7 +698,7 @@ print("OOB 得分:", rf.oob_score_)  # 免费验证集评估
     question: "GBDT 的原理？为什么拟合负梯度（残差）？",
     answer: `结论：GBDT 串行训练，每棵新树拟合之前模型的负梯度（残差），逐步降低偏差。加法模型 Fₘ=Fₘ₋₁+α·hₘ，hₘ 学残差。
 
-实际案例：搜索排序早期用 GBDT（LambdaMART）做排序，每棵树拟合 NDCG 的负梯度。GBDT 降偏差适合"模型还不够强"的场景，但串行训练慢、对噪声敏感。
+实际案例：搜索排序早期用 LambdaMART（GBDT 的排序版本）。注意 NDCG 本身不可导，LambdaMART 并非"拟合 NDCG 的负梯度"，而是用 pair 交换前后 ΔNDCG 加权 pairwise 损失梯度、直接构造出 λ 梯度让每棵树去拟合，从而隐式优化 NDCG。GBDT 降偏差适合"模型还不够强"的场景，但串行训练慢、对噪声敏感。
 
 \`\`\`python
 from sklearn.ensemble import GradientBoostingClassifier
@@ -722,7 +722,7 @@ model.add(new_tree, weight=learning_rate)
     id: "ai-17",
     nodeId: "ai-tree-models",
     question: "XGBoost 相比 GBDT 的核心改进？",
-    answer: `结论：XGBoost 改进：目标函数二阶泰勒展开（用一阶+二阶梯度）、正则化项（叶子数+L2）、特征/列采样、缺失值自动学默认方向、直方图近似分裂加速、并行化（特征粒度）。
+    answer: `结论：XGBoost 相对原始 GBDT 的核心改进：①目标函数二阶泰勒展开（同时用一阶梯度 g 和二阶梯度 h 求分裂增益，收敛更快更准）；②目标函数加正则项（叶子数 γ·T + 叶权重 L2 项 λ‖w‖²），直接写进分裂增益公式防过拟合；③列采样（colsample_bytree/level）；④缺失值自动学默认方向（分裂时对缺失样本分别尝试走左/右取增益大者）；⑤加权分位数草图（weighted quantile sketch）做近似分裂，按二阶梯度 h 加权选候选切分点；⑥列块（column block）预排序+特征粒度并行找分裂点。注意：直方图分裂（histogram-based，连续值分桶后按桶统计）是 LightGBM 首创的做法，XGBoost 是后期才以 tree_method="hist" 引入，并非 XGBoost 原始贡献。
 
 实际案例：XGBoost 长期是 Kaggle 表格数据冠军模型，也是金融风控/广告 CTR 的主力。腾讯广告用 XGBoost 做特征筛选和预估，二阶展开收敛快、精度高，缺失值自动处理省去填充。
 
@@ -737,8 +737,8 @@ model = xgb.train(params, dtr, num_boost_round=1000,
 \`\`\`
 
 踩坑：max_depth 过深易过拟合（表 6-8 足够）；scale_pos_weight 处理不平衡；调参顺序 eta→max_depth→subsample→colsample→正则。`,
-    keyPoints: ["二阶泰勒展开收敛快", "正则化+采样防过拟合", "直方图+并行加速"],
-    followUps: ["XGBoost 直方图算法如何加速？", "XGBoost 如何处理缺失值？"],
+    keyPoints: ["二阶泰勒展开+正则项进增益公式", "列采样+缺失值默认方向", "加权分位数草图近似分裂+列块并行"],
+    followUps: ["加权分位数草图如何选切分点？", "直方图法是谁首创、XGBoost 何时引入？"],
     favorited: false,
     bigTech: true,
   },
@@ -1138,7 +1138,7 @@ shap.summary_plot(shap_values, X_val[:1000])  # 全局特征重要性
     question: "梯度下降的 BGD、SGD、Mini-batch 区别？深度学习为什么用 Mini-batch？",
     answer: `结论：BGD 全量算梯度稳但慢；SGD 单样本快但噪声大震荡；Mini-batch（32-256）折中，利用 GPU 并行+矩阵加速，是深度学习主流。
 
-实际案例：大模型训练用 batch 越大越好（GPU 利用率高），但受显存限制用梯度累加模拟大 batch。腾讯广告在线学习用 SGD/FTRL 单样本更新应对实时性。
+实际案例：大模型训练追求大 batch 提吞吐（GPU 利用率高、梯度方差小），但并非越大越好：超过 critical batch size 后计算收益递减，且过大 batch 泛化变差（倾向收敛到尖锐极小值），需配合线性/平方根学习率缩放与 warmup；受显存限制时用梯度累加模拟大 batch。腾讯广告在线学习用 SGD/FTRL 单样本更新应对实时性。
 
 \`\`\`python
 from torch.utils.data import DataLoader
@@ -1158,8 +1158,8 @@ for i, (x, y) in enumerate(loader):
 \`\`\`
 
 踩坑：batch 太小噪声大收敛慢，太大泛化差（尖锐极小值）；学习率需随 batch 调整（线性缩放规则）；BN 层 batch 太小统计不准。`,
-    keyPoints: ["Mini-batch 折中速度与稳定", "GPU 并行矩阵加速", "梯度累加模拟大 batch"],
-    followUps: ["batch 大小如何影响泛化？", "线性缩放规则是什么？"],
+    keyPoints: ["Mini-batch 折中速度与稳定", "大 batch 提吞吐但受 critical batch size 与泛化约束", "梯度累加模拟大 batch"],
+    followUps: ["critical batch size 如何确定？", "线性缩放规则是什么？"],
     favorited: false,
     bigTech: false,
   },
@@ -1288,7 +1288,7 @@ for p in model.parameters():
     id: "ai-40",
     nodeId: "ai-optimization",
     question: "大规模分布式训练中优化器有哪些工程挑战？ZeRO 如何节省显存？",
-    answer: `结论：大模型训练显存瓶颈在优化器状态（Adam 的 m、v 各占参数量 FP32）和梯度。ZeRO 把优化器状态/梯度/参数分片到多卡，ZeRO-1/2/3 逐步分片，显存从 O(4d) 降到 O(d/N)，支持更大模型。
+    answer: `结论：混合精度 Adam 训练每个参数共占 16 字节：FP16 参数 2 + FP16 梯度 2 + FP32 主参数 4 + FP32 动量 m 4 + FP32 方差 v 4。设参数量为 Ψ、卡数 N，基线单卡要装下全部 16Ψ。ZeRO 逐级分片：ZeRO-1 只分片优化器状态（主参数+m+v 共 12Ψ），每卡 4Ψ + 12Ψ/N；ZeRO-2 再分片梯度，每卡 2Ψ + 14Ψ/N；ZeRO-3 连参数也分片，每卡仅 16Ψ/N，前向/反向时按需 All-Gather 收集。N 越大单卡越省，代价是通信量增加。
 
 实际案例：字节 AML、阿里 PAI 训练千亿模型用 DeepSpeed ZeRO-3 + 激活重计算 + 混合精度。ZeRO-3 把参数也分片，前向反向时按需 All-Gather 收集，通信换显存。
 
@@ -1304,8 +1304,8 @@ model, optimizer, _, _ = deepspeed.initialize(
 \`\`\`
 
 踩坑：ZeRO-3 通信开销大，小模型不值得；激活重计算省显存增计算，需权衡；CPU offload 慢但省 GPU 显存。`,
-    keyPoints: ["Adam 优化器状态占 2 倍参数 FP32", "ZeRO 分片优化器状态/梯度/参数", "通信换显存"],
-    followUps: ["ZeRO 三个 stage 区别？", "激活重计算原理？"],
+    keyPoints: ["混合精度 Adam 16 字节/参数（2+2+4+4+4）", "ZeRO-1/2/3 逐级分片优化器状态/梯度/参数", "ZeRO-3 每卡 16Ψ/N 通信换显存"],
+    followUps: ["ZeRO-2 相比 ZeRO-1 多省在哪？", "激活重计算原理？"],
     favorited: false,
     bigTech: true,
   },
@@ -1341,12 +1341,17 @@ print("AUC:", roc_auc_score(y_true, y_prob))
 实际案例：腾讯反欺诈正样本 0.01%，AUC 0.99 看着很好但实际 Precision 极低（误报多），改用 PR-AUC 才暴露问题。推荐 PR-AUC 评估正类稀疏场景。
 
 \`\`\`python
-from sklearn.metrics import roc_curve, precision_recall_curve, auc
+from sklearn.metrics import (roc_curve, precision_recall_curve, auc,
+                             average_precision_score)
 fpr, tpr, _ = roc_curve(y, prob); print("ROC-AUC:", auc(fpr, tpr))
-prec, rec, _ = precision_recall_curve(y, prob); print("PR-AUC:", auc(rec, prec))
+# 注意：precision_recall_curve 返回的 recall 是递减的，
+# 直接 auc(rec, prec) 梯形积分会得到负值，需反转或改用：
+print("PR-AUC:", average_precision_score(y, prob))  # 推荐，加权平均定义
+prec, rec, _ = precision_recall_curve(y, prob)
+print("PR-AUC(梯形):", auc(rec[::-1], prec[::-1]))  # 反转后积分
 \`\`\`
 
-踩坑：负样本远多于正样本时，FPR 分母大导致 ROC 看起来好；PR-AUC 不稳定需多次采样平均；报告两者更全面。`,
+踩坑：负样本远多于正样本时，FPR 分母大导致 ROC 看起来好；average_precision_score 与梯形 auc 口径略有差异（插值方式不同），报告时注明；PR-AUC 不稳定需多次采样平均；报告两者更全面。`,
     keyPoints: ["ROC 含 TN 极度不平衡虚高", "PR 不含 TN 更真实", "正类稀疏用 PR-AUC"],
     followUps: ["为什么 AUC 阈值无关？", "PR-AUC 如何稳定计算？"],
     favorited: false,
@@ -1383,7 +1388,7 @@ def huber(y, p, delta=1.0):
     id: "ai-44",
     nodeId: "ai-evaluation",
     question: "推荐/搜索排序指标 NDCG、MRR、MAP 的含义？",
-    answer: `结论：NDCG 衡量排序质量考虑位置折扣和增益，适合多相关度等级；MRR 第一个相关项位置的倒数；MAP 所有相关项位置的平均精度。NDCG 是搜索/推荐最常用。
+    answer: `结论：NDCG 衡量排序质量考虑位置折扣和增益，适合多相关度等级；MRR 第一个相关项位置的倒数；AP（Average Precision）是单个 query 内、在每个相关文档位置处取 Precision 再求平均；MAP（Mean AP）是多个 query 的 AP 再取均值——AP 是单 query 指标，MAP 才是跨 query 的集合级指标，二者别混用。NDCG 是搜索/推荐最常用。
 
 实际案例：阿里淘宝搜索用 NDCG@10 评估排序质量，位置越靠前权重越高（log2 折扣）；百度搜索用 MRR 评估第一个相关结果。NDCG 对头部位置敏感，符合用户只看前几条的行为。
 
@@ -1400,8 +1405,8 @@ def mrr(rels_list):
 \`\`\`
 
 踩坑：NDCG 需归一化（除以 IDCG）；位置折扣函数可选（1/log2 或 1/rank）；离线 NDCG 提升不一定带来线上 CTR 提升，需 A/B 验证。`,
-    keyPoints: ["NDCG 位置折扣多相关度", "MRR 第一个相关项倒数", "MAP 相关项平均精度"],
-    followUps: ["NDCG 和 MAP 区别？", "离线 NDCG 与线上 CTR 为何不一致？"],
+    keyPoints: ["NDCG 位置折扣多相关度", "MRR 第一个相关项倒数", "AP 单 query、MAP 跨 query 均值"],
+    followUps: ["AP 的具体计算步骤？", "离线 NDCG 与线上 CTR 为何不一致？"],
     favorited: false,
     bigTech: true,
   },
@@ -1658,15 +1663,20 @@ import pandas as pd
 df["age_bin"] = pd.qcut(df["age"], q=5, labels=False)
 # 等宽分箱
 df["inc_bin"] = pd.cut(df["income"], bins=5, labels=False)
-# WOE 编码
+# WOE 编码：WOE = ln(该箱正样本占比 / 该箱负样本占比)
+# 占比是相对"全体正/负样本"归一化，不是箱内比率（箱内比率算的是 odds 不是 WOE）
 def woe(df, feat, label):
     g = df.groupby(feat)[label].agg(["sum", "count"])
-    woe = np.log((g["sum"] + 0.5) / (g["count"] - g["sum"] + 0.5))
+    pos = g["sum"]                      # 每箱正样本数
+    neg = g["count"] - g["sum"]         # 每箱负样本数
+    pos_pct = (pos + 0.5) / (pos.sum() + 0.5)   # 占全体正样本比例
+    neg_pct = (neg + 0.5) / (neg.sum() + 0.5)   # 占全体负样本比例
+    woe = np.log(pos_pct / neg_pct)
     return df[feat].map(woe)
 \`\`\`
 
 踩坑：树模型不需分箱（自身找切分点）；分箱过多过拟合过少欠拟合；WOE 编码需在训练集算防泄露；分箱后需保单调性符合业务。`,
-    keyPoints: ["分箱引入非线性+鲁棒+可解释", "等频抗偏态/卡方保单调", "评分卡用 WOE 编码"],
+    keyPoints: ["分箱引入非线性+鲁棒+可解释", "等频抗偏态/卡方保单调", "WOE=ln(pos%/neg%) 需对全体正负样本归一化"],
     followUps: ["WOE 编码原理？", "分箱数如何确定？"],
     favorited: false,
     bigTech: false,
@@ -1731,7 +1741,7 @@ def swish(x, beta=1.0): return x * torch.sigmoid(beta * x)
     id: "ai-57",
     nodeId: "ai-nn-fundamentals",
     question: "权重初始化为什么重要？Xavier 和 He 初始化的区别？",
-    answer: `结论：全零初始化致同层神经元对称无法学习。好的初始化让前向各层激活方差稳定、反向各层梯度方差稳定。Xavier（Var=1/n_in）适合 tanh/sigmoid；He（Var=2/n_in）适合 ReLU（负值归零方差减半需补偿）。
+    answer: `结论：全零初始化致同层神经元对称无法学习。好的初始化让前向各层激活方差稳定、反向各层梯度方差稳定。Glorot/Xavier 同时兼顾前向与反向，取 Var=2/(n_in+n_out)，对应均匀分布 U(±√(6/(n_in+n_out))) 或同方差正态，适合 tanh/sigmoid；He（Var=2/n_in）适合 ReLU（负值归零方差减半需补偿）。注意 Var=1/n_in 是更早的 LeCun 初始化（只考虑前向，配合 SELU/tanh 类），不要与 Xavier 混淆。
 
 实际案例：CNN 用 He 初始化，Transformer 也用 He 或截断正态。BN 能放宽对初始化的依赖但仍需合理初始化。
 
@@ -1744,8 +1754,8 @@ nn.init.xavier_uniform_(layer.weight)  # Xavier（tanh）
 \`\`\`
 
 踩坑：初始化过大梯度爆炸过小消失；bias 通常初始化 0；Embedding 用正态小值初始化；残差分支初始化要保证初始接近恒等。`,
-    keyPoints: ["全零初始化致对称无法学习", "He 适合 ReLU", "Xavier 适合 tanh/sigmoid"],
-    followUps: ["为什么 ReLU 需更大初始化方差？", "BN 如何放宽初始化要求？"],
+    keyPoints: ["全零初始化致对称无法学习", "Xavier Var=2/(n_in+n_out) 适合 tanh", "He Var=2/n_in 适合 ReLU；Var=1/n_in 是 LeCun"],
+    followUps: ["为什么 ReLU 需更大初始化方差？", "Xavier 与 LeCun 初始化推导差异？"],
     favorited: false,
     bigTech: false,
   },
@@ -2078,7 +2088,7 @@ out, (h, c) = lstm(x)  # out: (batch, seq, 256*2 双向)
     id: "ai-71",
     nodeId: "ai-rnn",
     question: "GRU 相比 LSTM 简化了什么？如何选择？",
-    answer: `结论：GRU 合并遗忘门+输入门为更新门 z，去独立细胞状态，2 门 vs LSTM 3 门，参数少约 1/3，保留加法梯度通路效果接近。小数据/求速度用 GRU，大数据/长序列用 LSTM。
+    answer: `结论：GRU 合并遗忘门+输入门为更新门 z，去独立细胞状态，2 门 vs LSTM 3 门。参数量上：LSTM 有 4 组权重（输入门 i、遗忘门 f、输出门 o、候选细胞 g），GRU 有 3 组（重置门 r、更新门 z、候选隐状态 h̃），同隐层维度下 GRU 约为 LSTM 的 3/4，即少约 1/4（不是 1/3），保留加法梯度通路效果接近。小数据/求速度用 GRU，大数据/长序列用 LSTM。
 
 实际案例：移动端语音助手用 GRU 省参数；翻译编码器大数据用 LSTM 表达力略强。现代多用 Transformer，RNN 在流式/资源受限场景仍用。
 
@@ -2090,7 +2100,7 @@ out, h = gru(x)
 \`\`\`
 
 踩坑：GRU 更新门耦合遗忘输入，表达力略弱；RNN 在流式实时场景（语音流）仍优于 Transformer（需完整序列）；现代 LLM 已不用 RNN。`,
-    keyPoints: ["GRU 2 门合并 LSTM 遗忘+输入", "无独立细胞状态参数少 1/3", "保留加法梯度通路"],
+    keyPoints: ["GRU 2 门合并 LSTM 遗忘+输入", "LSTM 4 组权重 GRU 3 组，参数少约 1/4", "保留加法梯度通路"],
     followUps: ["GRU 更新门为何能合并？", "什么场景 LSTM 优于 GRU？"],
     favorited: false,
     bigTech: false,
@@ -2145,7 +2155,7 @@ class Decoder(torch.nn.Module):
     question: "RNN 在语音识别/OCR 中如何应用？",
     answer: `结论：语音识别声学模型用 LSTM/GRU 建模音频帧序列，CTC 对齐变长输出；OCR 用 CRNN（CNN 提特征+BiLSTM 序列建模+CTC）。RNN 适合流式和变长序列。
 
-实际案例：科大讯飞语音识别早期用 LSTM-CTF 声学模型；CRNN+CTC 是 OCR 经典方案，端到端无需字符级标注。
+实际案例：科大讯飞语音识别早期用 LSTM-CTC 声学模型；CRNN+CTC 是 OCR 经典方案，端到端无需字符级标注。
 
 \`\`\`python
 import torch.nn as nn
@@ -2416,12 +2426,14 @@ print(tok.decode(out[0]))
 import torch
 import torch.nn.functional as F
 def info_nce(z_i, z_j, temperature=0.1):
-    z = torch.cat([z_i, z_j], 0)
+    B = z_i.size(0)
+    z = torch.cat([z_i, z_j], 0)          # 前 B 行是视图1，后 B 行是视图2
     z = F.normalize(z, dim=1)
     sim = z @ z.T / temperature
-    labels = torch.arange(z_i.size(0)).repeat(2)
-    mask = torch.eye(z.size(0), dtype=torch.bool)
-    sim.masked_fill_(mask, -1e9)
+    # 第 k 行的正样本在 B+k；第 B+k 行的正样本在 k（roll 生成）
+    labels = torch.cat([torch.arange(B) + B, torch.arange(B)]).to(z.device)
+    mask = torch.eye(2 * B, dtype=torch.bool, device=z.device)
+    sim.masked_fill_(mask, -1e9)          # 屏蔽自身相似度
     return F.cross_entropy(sim, labels)
 # CLIP：图文对正样本，批内其他为负
 logits = img_emb @ txt_emb.T / temperature
@@ -2503,6 +2515,49 @@ if loss > prev_loss * 1.5:  # spike
 踩坑：数据去重不充分致过拟合重复内容；loss spike 常因学习率过大/batch 异常；checkpoint 频率需平衡存储与续训成本。`,
     keyPoints: ["数据清洗去重决定上限", "训练稳定性监控 loss spike", "千卡分布式+断点续训"],
     followUps: ["如何检测 loss spike？", "数据去重用什么算法？"],
+    favorited: false,
+    bigTech: true,
+  },
+  {
+    id: "ai-203",
+    nodeId: "ai-pretrain",
+    question: "MoE 混合专家模型原理？Router 负载均衡与专家并行怎么做？",
+    answer: `结论：MoE 把 Transformer 的 FFN 换成 N 个专家网络，router（门控线性层）对每个 token 输出 N 个分数，取 top-k（如 8 选 2）稀疏激活：总参数量做大但每 token 只算 k 个专家，计算量按"激活参数"计，等算力下容量更大。核心难题是负载均衡——router 易"赢者通吃"（专家坍缩，少数专家吃满多数闲置）。Switch 用辅助损失 aux loss = N·Σfᵢ·Pᵢ（fᵢ 为分到专家 i 的 token 比例，Pᵢ 为 router 给专家 i 的平均概率）鼓励均匀；DeepSeek-V3 用 aux-loss-free 方案（给 router logits 加只升不降的可调偏置，超载专家降偏置，不污染主损失）+ 细粒度专家 + 共享专家。工程上专家并行把专家放不同卡，token 经 all-to-all 通信路由；每专家容量 = 容量因子×平均 token 数，溢出 token 被丢弃走残差连接。
+
+实际案例：Mixtral 8x7B（8 专家 top-2）开源打响 MoE；DeepSeek-V3 用 256 个细粒度专家+1 共享专家、top-8 激活；Qwen 系列 MoE 版本同路线。字节/阿里内部大模型也普遍转向 MoE 架构摊薄训练推理成本。
+
+\`\`\`python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+class MoELayer(nn.Module):
+    def __init__(self, d, n_expert=8, k=2):
+        super().__init__()
+        self.k = k
+        self.router = nn.Linear(d, n_expert, bias=False)
+        self.experts = nn.ModuleList([
+            nn.Sequential(nn.Linear(d, 4*d), nn.GELU(), nn.Linear(4*d, d))
+            for _ in range(n_expert)])
+    def forward(self, x):                    # x: (T, d)
+        prob = F.softmax(self.router(x), -1)  # (T, E)
+        topv, topi = prob.topk(self.k, -1)    # 每 token 选 k 个专家
+        gate = topv / topv.sum(-1, keepdim=True)  # 门控权重归一化
+        out = torch.zeros_like(x)
+        for e, expert in enumerate(self.experts):
+            sel = (topi == e).any(-1)
+            if not sel.any(): continue
+            w = (gate * (topi == e).float()).sum(-1, keepdim=True)[sel]
+            out[sel] += w * expert(x[sel])
+        # Switch 负载均衡损失：N · Σ fᵢ · Pᵢ
+        f = torch.stack([(topi == e).float().mean()
+                         for e in range(prob.size(1))])
+        aux = prob.size(1) * (f * prob.mean(0)).sum()
+        return out, aux
+\`\`\`
+
+踩坑：aux loss 权重大了伤主任务、小了不均衡，DeepSeek 的偏置法就是为绕开此权衡；容量因子小丢 token 掉点、大了显存浪费（常用 1.0-1.25）；all-to-all 通信是训练瓶颈需与计算重叠；推理时虽激活少但全量专家参数都要驻留显存。`,
+    keyPoints: ["top-k 稀疏激活 总参大算力省", "aux loss/偏置法防专家坍缩", "专家并行 all-to-all+容量因子"],
+    followUps: ["DeepSeek-V3 免 aux loss 如何均衡？", "MoE 推理显存为何没省？"],
     favorited: false,
     bigTech: true,
   },
@@ -2690,26 +2745,26 @@ x_cut = x1.copy(); x_cut[:,bbx1:bbx2,bby1:bby2] = x2[:,bbx1:bbx2,bby1:bby2]
   {
     id: "ai-95",
     nodeId: "ai-cv-classification",
-    question: "迁移学习微调预训练模型策略？小数据 vs 大数据？",
-    answer: `结论：小数据冻结主干只训分类头（防破坏预训练特征）；大数据全量微调（主干小学习率 1e-4 新层大 1e-3）；逐层解冻渐进式更稳。微调学习率比从头训小 10×。
+    question: "参数高效微调（PEFT）与小样本学习对比？LoRA / Adapter / Prompt 与 Few-shot 如何选？",
+    answer: `结论：二者都解决"下游数据少"但路线不同。PEFT 冻结大模型主干、只训少量参数：LoRA 旁路低秩 A·B（参数<1%，推理可合并无延迟）；Adapter 在层间插小 bottleneck 模块；Prompt/Prefix Tuning 只学输入或每层的连续向量（参数最少但依赖模型规模）。小样本学习（Few-shot）更进一步：元学习（MAML/Prototypical Network）学"如何快速学新类"，或直接靠大模型 in-context learning 不给梯度只给示例。工业主流：数据几百到几万用 LoRA；每类只有几张图用度量学习/CLIP 零样本+线性探测。
 
-实际案例：阿里商品识别用 ImageNet 预训练 ResNet 微调，小类目冻结主干，大类目全量微调。
+实际案例：阿里商品新类目冷启动用 CLIP 零样本先上线，攒几百样本后 LoRA 微调 ViT；字节用 Adapter 做多业务共享一个主干，各业务只存小模块省显存。
 
 \`\`\`python
-import torchvision.models as M, torch.nn as nn
-model = M.resnet50(weights=M.ResNet50_Weights.DEFAULT)
-for p in model.parameters(): p.requires_grad = False  # 冻结
-model.fc = nn.Linear(model.fc.in_features, n)  # 换头
-opt = torch.optim.Adam([{"params": model.fc.parameters(), "lr": 1e-3}])
-# 大数据全量
-for p in model.parameters(): p.requires_grad = True
-opt = torch.optim.Adam([{"params": model.layer4.parameters(), "lr":1e-4},
-                        {"params": model.fc.parameters(), "lr":1e-3}])
+from peft import LoraConfig, get_peft_model
+# ViT 上 LoRA：只训 q/v 投影的低秩旁路
+config = LoraConfig(r=8, lora_alpha=16, target_modules=["qkv"],
+                    lora_dropout=0.05)
+model = get_peft_model(vit, config)
+model.print_trainable_parameters()  # 通常 <1%
+# 小样本：Prototypical Network 用类原型最近邻
+proto = support_emb.view(n_way, n_shot, -1).mean(1)  # 每类均值原型
+pred = (query_emb[:, None] - proto[None]).norm(dim=-1).argmin(-1)
 \`\`\`
 
-踩坑：小数据全量微调易过拟合；逐层解冻从深层开始；微调时数据增强适度防破坏预训练特征。`,
-    keyPoints: ["预训练+换分类头", "冻结(小数据)/全量(大数据)", "微调学习率要小"],
-    followUps: ["如何避免微调遗忘？", "CLIP 零样本迁移？"],
+踩坑：LoRA 的 r 太小学不动、太大失去省参意义；Prompt Tuning 在小模型上效果明显差；Few-shot 评估要按 episode 采样报置信区间，单次划分方差大。`,
+    keyPoints: ["LoRA/Adapter/Prompt 冻结主干训小参数", "元学习学快速适应新类", "数据量定路线：零样本→LoRA→全量"],
+    followUps: ["LoRA 的 r 如何选？", "Prototypical Network 原理？"],
     favorited: false,
     bigTech: false,
   },
@@ -3757,24 +3812,32 @@ gen_sum = summarizer(text, max_length=130)[0]["summary_text"]
   {
     id: "ai-141",
     nodeId: "ai-nlp-generation",
-    question: "机器翻译 Seq2Seq 原理？注意力机制如何改进？",
-    answer: `结论：Seq2Seq 用 encoder 编码源句为向量，decoder 逐步生成目标句。早期用最后隐状态做上下文瓶颈明显，注意力机制让 decoder 每步关注源句不同位置，大幅提升长句翻译。Transformer 用自注意力完全替代 RNN。
+    question: "机器翻译专题：beam search、回译、子词切分各解决什么问题？",
+    answer: `结论：三个翻译关键技术：①Beam search 解码：保留 k 条候选按累计对数概率扩展，缓解 greedy 局部最优，配长度惩罚（length normalization，除以 |y|^α）防偏爱短句；束宽一般 4-8，再大收益小且易出通用句。②回译（back-translation）：用反向模型把目标语单语料译回源语，造伪平行句对，解决低资源语言平行语料稀缺。③子词切分（BPE/SentencePiece）：把词拆成子词单元，平衡词表大小与 OOV，未登录词可拼出，中英等多语言共享词表。
 
-实际案例：百度翻译/有道用 Transformer 做机器翻译；阿里达摩院做多语言翻译。注意力解决长句信息丢失。
+实际案例：百度翻译/有道用 Transformer+beam search；阿里达摩院低资源语种（如东南亚小语种）靠回译把 BLEU 提升数个点；多语言模型 mBART/NLLB 用 SentencePiece 统一子词。
 
 \`\`\`python
-# Seq2Seq + 注意力
-class AttnDecoder(nn.Module):
-    def forward(self, dec_h, enc_outs):
-        scores = dec_h @ enc_outs.T  # 对齐分数
-        attn = softmax(scores / sqrt(d))
-        ctx = attn @ enc_outs  # 加权上下文
-        return torch.cat([dec_h, ctx])  # 生成
+# Beam search 简化实现（长度惩罚）
+def beam_search(model, src, beam=4, max_len=50, alpha=0.6):
+    hyps = [([bos], 0.0)]
+    for _ in range(max_len):
+        cand = []
+        for ys, score in hyps:
+            logp = model.next_logprob(src, ys)     # (V,)
+            top = logp.topk(beam)
+            for v, p in zip(top.indices, top.values):
+                cand.append((ys + [v.item()], score + p.item()))
+        # 长度惩罚：score / len^alpha
+        hyps = sorted(cand, key=lambda c: c[1] / len(c[0])**alpha)[:beam]
+        if all(h[0][-1] == eos for h in hyps): break
+    return max(hyps, key=lambda c: c[1] / len(c[0])**alpha)[0]
+# 回译：tgt 单语 → 反向模型 → 伪 src，与真平行数据混训
 \`\`\`
 
-踩坑：RNN 序列长时慢；beam search 平衡质量速度；低资源语言需回译数据增强。`,
-    keyPoints: ["Seq2Seq encoder-decoder", "注意力解决长句瓶颈", "Transformer 自注意力"],
-    followUps: ["Beam search 翻译？", "回译数据增强？"],
+踩坑：beam search 与采样目标不同——翻译求准用 beam，对话求多样用采样；回译伪数据比例过高会噪声反噬，通常伪：真 ≤ 1:1 起调；子词粒度太细序列变长拖慢训练。`,
+    keyPoints: ["Beam search+长度惩罚求全局较优", "回译造伪平行语料救低资源", "BPE/SentencePiece 平衡词表与 OOV"],
+    followUps: ["长度惩罚为什么需要？", "回译数据比例如何调？"],
     favorited: false,
     bigTech: false,
   },
@@ -3858,9 +3921,9 @@ resp = llm.chat(query, tools=tools)
     id: "ai-145",
     nodeId: "ai-nlp-generation",
     question: "代码生成：LLM 如何做代码补全/生成？如何保证正确性？",
-    answer: `结论：代码生成用代码语料训练的 LLM（Codex/CodeLlama/DeepSeek-Coder），预测下一 token。保证正确性靠：训练数据高质量、上下文填充（函数签名/注释）、测试驱动生成（生成+运行测试反馈）、自我修复（报错重试）。
+    answer: `结论：代码生成用代码语料训练的 LLM，预测下一 token。早期 GitHub Copilot 基于 Codex，但 Codex API 已于 2023 年下线；2026 年现状是 GPT-4 系/Claude/DeepSeek-Coder/Qwen-Coder 等多模型时代，Copilot 等工具也改为可选多模型。保证正确性靠：训练数据高质量、上下文填充（函数签名/注释/FIM 填空）、测试驱动生成（生成+运行测试反馈）、自我修复（报错重试）。评估常用 HumanEval/MBPP 等 pass@k 基准，真实工程能力看 SWE-bench（解决真实 GitHub issue）。
 
-实际案例：字节 MarsCode/Trae、阿里通义灵码用代码 LLM 做补全；GitHub Copilot 用 Codex。DeepSeek-Coder 开源性能强。
+实际案例：字节 MarsCode/Trae、阿里通义灵码用代码 LLM 做补全；GitHub Copilot 现已支持 GPT-4 系等多模型切换。DeepSeek-Coder、Qwen2.5-Coder 开源性能强，SWE-bench 类 agent 评测成为代码能力新标杆。
 
 \`\`\`python
 # 代码补全：填充上下文
@@ -3873,8 +3936,8 @@ for _ in range(3):
 \`\`\`
 
 踩坑：代码 LLM 需长上下文；生成代码需安全审计；私有代码需本地部署保隐私。`,
-    keyPoints: ["代码语料训练 LLM", "低 temperature 求精确", "测试驱动+自我修复"],
-    followUps: ["FIM 填空补全？", "代码 LLM 如何评估？"],
+    keyPoints: ["代码语料训练 LLM，Codex 已下线进入多模型时代", "低 temperature 求精确+测试驱动", "HumanEval/MBPP 与 SWE-bench 评估"],
+    followUps: ["SWE-bench 评估什么？", "FIM 填空补全？"],
     favorited: false,
     bigTech: true,
   },
@@ -3899,6 +3962,35 @@ final = vote(answers)  # 投票
 踩坑：RAG 检索质量影响大；RLHF 可能过对齐拒答；完全消除幻觉极难需人工兜底。`,
     keyPoints: ["幻觉源于数据噪声和概率生成", "RAG 提供事实依据", "RLHF+自一致性缓解"],
     followUps: ["RAG 如何实现？", "如何评估幻觉率？"],
+    favorited: false,
+    bigTech: true,
+  },
+  {
+    id: "ai-205",
+    nodeId: "ai-nlp-generation",
+    question: "LLM 评估：LLM-as-judge 有哪些偏置？事实性/幻觉如何评？基准污染如何应对？",
+    answer: `结论：①LLM-as-judge 用强模型（如 GPT-4 系）给回答打分/ pairwise 比较，便宜且与人类偏好相关性高，但有系统性偏置：位置偏置（偏好先出现的答案，需交换顺序评两次取均值）、冗长偏置（偏好更长更"像样"的回答）、自我偏好（judge 给同家模型打分偏高）、格式偏置（偏好 markdown/列表）。缓解：交换位置、打乱模型匿名、长度归一化、多 judge 投票、给 rubric 评分细则。②事实性/幻觉评估：FActScore 把长回答拆成原子事实逐条对照知识源核真；RAGAS 评 RAG 的 faithfulness/answer relevance/context recall；TruthfulQA 测抗误导。③基准污染：测试集被爬进训练语料导致分数虚高；检测靠 n-gram 重叠分析、扰动测试（改写后大幅掉分说明靠背题）、以及用持续更新的动态基准（如考后发布的新题、LiveCodeBench 按时间滚动）做对照。
+
+实际案例：各大模型榜单（Chatbot Arena 人工投票 vs MT-Bench LLM 评分）并存互为校验；DeepSeek/Qwen 技术报告会公布污染检测（去重 n-gram）说明；字节/阿里内部评估用自留私有测试集防污染。
+
+\`\`\`python
+# LLM-as-judge 位置偏置缓解：交换顺序评两次
+def judge_pair(question, ans_a, ans_b, judge):
+    r1 = judge.compare(question, ans_a, ans_b)   # A 在前
+    r2 = judge.compare(question, ans_b, ans_a)   # B 在前
+    if r1 == "A" and r2 == "B": return "A wins"
+    if r1 == "B" and r2 == "A": return "B wins"
+    return "tie/inconsistent"                    # 两次不一致判平
+# 基准污染扰动测试：改写变量名/数字后复测
+score_clean = evaluate(model, benchmark)
+score_perturbed = evaluate(model, perturb(benchmark))
+if score_clean - score_perturbed > threshold:    # 掉分过大疑似记忆
+    flag_contamination_risk()
+\`\`\`
+
+踩坑：judge 模型本身能力上限决定评估上限（judge 不会的题评不准）； pairwise 比较结果不可传递（A>B、B>C 但 C>A）；基准一旦公开即开始被污染，高分需结合私有集复核；FActScore 依赖检索知识源质量。`,
+    keyPoints: ["judge 偏置：位置/冗长/自我偏好", "FActScore 原子事实核查+RAGAS", "污染检测：重叠/扰动/动态基准"],
+    followUps: ["如何设计抗污染的私有评估集？", "Arena Elo 与 LLM 评分如何互相校验？"],
     favorited: false,
     bigTech: true,
   },
@@ -4537,7 +4629,7 @@ Q[s,a] += alpha*(r + gamma*max(Q[s2]) - Q[s,a])  # 最优动作
     id: "ai-171",
     nodeId: "ai-rl-fundamentals",
     question: "Policy Gradient 策略梯度原理？REINFORCE 算法？",
-    answer: `结论：Policy Gradient 直接参数化策略 π_θ(a|s)，用梯度上升最大化期望回报 J(θ)。REINFORCE 用蒙特卡洛回报 G_t 估计：∇J=∇log π_θ(a|s) G_t。优势是无须价值函数、支持连续动作，但方差大方差大需 baseline 降方差。
+    answer: `结论：Policy Gradient 直接参数化策略 π_θ(a|s)，用梯度上升最大化期望回报 J(θ)。REINFORCE 用蒙特卡洛回报 G_t 估计：∇J=∇log π_θ(a|s) G_t。优势是无须价值函数、支持连续动作，但方差大需 baseline 降方差。
 
 实际案例：连续控制（机器人）用策略梯度；AlphaGo 用策略网络。REINFORCE 是基础，PPO/A3C 都基于此。
 
@@ -4739,9 +4831,9 @@ def dpo_loss(policy, ref, chosen_ids, rejected_ids, beta=0.1):
     id: "ai-179",
     nodeId: "ai-rl-advanced",
     question: "GRPO 原理？DeepSeek 如何用它降低 RLHF 成本？",
-    answer: `结论：GRPO（Group Relative Policy Optimization）对每个 prompt 采样一组回答，用组内相对优势（回答奖励减组均值）代替独立 critic 网络，省去价值模型降低显存。DeepSeek-R1 用 GRPO 训练推理能力，无需 SFT 直接 RL。
+    answer: `结论：GRPO（Group Relative Policy Optimization）对每个 prompt 采样一组回答，用组内相对优势（回答奖励减组均值、除以组标准差）代替独立 critic 网络，省去价值模型降低显存。注意区分 DeepSeek-R1-Zero 与 R1：R1-Zero 才是"无 SFT、在基座上直接纯 RL"的实验（能涌现长 CoT 但输出可读性差、语言混杂）；R1 正式版是"少量冷启动 CoT 数据 SFT → 推理导向 RL（GRPO）→ 拒绝采样再造 SFT 数据 → 全场景 RL"的多阶段流程，并非直接裸 RL。
 
-实际案例：DeepSeek-R1 用 GRPO+可验证奖励（数学/代码正确性）训练出强推理能力，成本低于 PPO。
+实际案例：DeepSeek-R1 用 GRPO+可验证奖励（数学/代码正确性）训练出强推理能力，成本低于 PPO；R1-Zero 证明了纯 RL 也能激发推理，但工程落地走 R1 的冷启动多阶段路线。
 
 \`\`\`python
 def grpo_loss(policy, ref, prompt, group_size=8):
@@ -4756,8 +4848,8 @@ def grpo_loss(policy, ref, prompt, group_size=8):
 \`\`\`
 
 踩坑：组大小影响优势估计；无 critic 偏差需校准；可验证奖励需领域设计。`,
-    keyPoints: ["组内相对优势省 critic", "DeepSeek-R1 推理训练", "可验证奖励降成本"],
-    followUps: ["GRPO vs PPO？", "可验证奖励设计？"],
+    keyPoints: ["组内相对优势省 critic", "R1-Zero 纯 RL vs R1 冷启动 SFT+RL", "可验证奖励降成本"],
+    followUps: ["R1 多阶段训练流程？", "可验证奖励设计？"],
     favorited: false,
     bigTech: true,
   },
@@ -4810,6 +4902,33 @@ attacks = red_team_generator.generate()  # 自动找漏洞
 踩坑：过度安全导致拒答（过对齐）；越狱攻击持续演化；需人工+自动结合审核。`,
     keyPoints: ["RLHF 对齐价值观", "红队+安全护栏", "Constitutional AI 自我批评"],
     followUps: ["越狱攻击防御？", "过对齐如何缓解？"],
+    favorited: false,
+    bigTech: true,
+  },
+  {
+    id: "ai-204",
+    nodeId: "ai-rl-advanced",
+    question: "o1/R1 类推理模型的范式？test-time scaling 与 self-consistency 原理？",
+    answer: `结论：推理模型范式是用 RL（GRPO/PPO）+ 可验证奖励（数学答案对、代码过测试）把模型训出长思维链（CoT），链中含规划、验证、反思回溯（所谓 aha moment），把"训练时 scaling"延伸到"推理时 scaling"：生成 token 越多、思考越久，难题准确率越高，accuracy 随推理算力近对数线性提升。两条互补路线：①内生长 CoT（o1/R1，训练固化进模型）；②推理时搜索增强：self-consistency 采样多条 CoT 多数投票、Best-of-N 配奖励模型筛选、过程奖励模型（PRM）逐步打分引导搜索。代价是推理成本数倍于普通模型，简单问题用长思考是浪费，衍生出"按难度分配思考预算"的路由做法。
+
+实际案例：OpenAI o1/o3、DeepSeek-R1、Qwen-QwQ 走 RL 长 CoT 路线，数学/代码基准大幅提升；字节豆包、阿里通义推出深度思考模式，按问题难度切换快思考/慢思考。
+
+\`\`\`python
+# self-consistency：多条 CoT 投票（训练-free 的 test-time scaling）
+from collections import Counter
+def self_consistency(model, question, n=16, temp=0.7):
+    answers = []
+    for _ in range(n):
+        cot = model.generate(question + "\\n请逐步推理", temperature=temp)
+        answers.append(extract_final_answer(cot))  # 提取 \\boxed{} 答案
+    return Counter(answers).most_common(1)[0][0]   # 多数投票
+# Best-of-N：配 ORM/PRM 打分取最高，比投票更准但需奖励模型
+best = max(samples, key=lambda s: reward_model.score(question, s))
+\`\`\`
+
+踩坑：test-time scaling 存在收益拐点，超过预算 token 反而过思考（overthinking）掉点；self-consistency 依赖答案可聚合，开放任务无效；可验证奖励仅限数学/代码等封闭域，通用推理需 RM 打分代替；长 CoT 可能泄露不安全推理过程需额外审核。`,
+    keyPoints: ["RL+可验证奖励训出长 CoT", "test-time scaling 推理算力换准确率", "self-consistency 投票/Best-of-N/PRM 搜索"],
+    followUps: ["PRM 与 ORM 区别？", "overthinking 如何检测与抑制？"],
     favorited: false,
     bigTech: true,
   },
@@ -5014,25 +5133,29 @@ model.quantize(calib_data, bits=4)
   {
     id: "ai-190",
     nodeId: "ai-model-deploy",
-    question: "知识蒸馏原理？如何用大模型教小模型？",
-    answer: `结论：知识蒸馏让 teacher（大模型）指导 student（小模型）。软标签蒸馏用 teacher 输出概率（带温度）做目标，含暗知识（类间关系）；特征蒸馏对齐中间层特征。DistilBERT 用蒸馏把 BERT 压缩 40%。
+    question: "部署视角的知识蒸馏：在线蒸馏、蒸馏+量化组合怎么做？",
+    answer: `结论：部署蒸馏关注"压缩后线上不掉点+成本可控"。三种形态：①离线蒸馏：teacher 先训好再教 student，最常见但 teacher 训练贵；②在线蒸馏：teacher 与 student 同步训练（或互为同伴互蒸），省掉单独训大模型的阶段，适合 teacher 也放不上产线的场景；③自蒸馏：深层教浅层/自身 logits 复用。蒸馏+量化组合是端侧标配：先蒸馏出小模型，再 QAT（量化感知训练）时继续用 teacher 软标签做蒸馏损失，补偿 INT8 带来的精度损失，通常比"先量化后补救"高。注意蒸馏目标要与线上推理精度格式一致（FP16/INT8 下数值范围不同）。
 
-实际案例：阿里/百度用蒸馏把 BERT 压缩上线；HuggingFace DistilBERT 开源。LLM 蒸馏用大模型生成数据训小模型。
+实际案例：美团/字节把推荐精排大模型在线蒸馏到轻量模型上线，teacher 只离线服务；阿里端侧模型用"蒸馏→QAT 联合训练"，INT8 下精度损失从 1-2% 压到 0.3% 内。
 
 \`\`\`python
+# QAT + 蒸馏联合：量化 student 同时拟合硬标签与 teacher 软标签
 import torch.nn.functional as F
-def distill_loss(student_logits, teacher_logits, labels, T=4, alpha=0.7):
-    soft = F.kl_div(
-        F.log_softmax(student_logits/T, -1),
-        F.softmax(teacher_logits/T, -1), reduction="batchmean") * T*T
-    hard = F.cross_entropy(student_logits, labels)
-    return alpha*soft + (1-alpha)*hard
-# teacher.eval() 不更新
+student_q = torch.ao.quantization.prepare_qat(student.train())
+for x, y in loader:
+    with torch.no_grad():
+        t_logits = teacher_fp32(x)          # teacher 保持高精度
+    s_logits = student_q(x)
+    loss = F.cross_entropy(s_logits, y) + 0.7 * F.kl_div(
+        F.log_softmax(s_logits/4, -1), F.softmax(t_logits/4, -1),
+        reduction="batchmean") * 16
+    loss.backward(); opt.step()
+student_int8 = torch.ao.quantization.convert(student_q.eval())
 \`\`\`
 
-踩坑：温度 T 需调；student 容量限制上限；特征蒸馏需对齐层。`,
-    keyPoints: ["软标签含暗知识", "温度 T 平滑概率", "DistilBERT 压缩 40%"],
-    followUps: ["特征蒸馏？", "LLM 蒸馏数据？"],
+踩坑：在线蒸馏 teacher 未收敛会带偏 student，需 warmup 后再开蒸馏项；QAT 中 BN 折叠与伪量化节点位置影响大；先量化再蒸馏顺序反了精度难救回。`,
+    keyPoints: ["离线/在线/自蒸馏三形态", "蒸馏+QAT 联合补偿量化损失", "蒸馏目标对齐线上推理精度"],
+    followUps: ["QAT 与 PTQ 区别？", "在线蒸馏为何要 warmup？"],
     favorited: false,
     bigTech: true,
   },
@@ -5095,9 +5218,9 @@ result = client.infer("resnet", [img_input])
     id: "ai-193",
     nodeId: "ai-model-deploy",
     question: "LLM 推理加速：KV Cache 原理？PagedAttention 如何优化？",
-    answer: `结论：KV Cache 缓存已生成 token 的 Key/Value 避免重复计算，把生成复杂度从 O(n²) 降到 O(n)。PagedAttention（vLLM）把 KV Cache 分页管理减少碎片，支持连续 batching 提升吞吐。是 LLM 推理核心优化。
+    answer: `结论：KV Cache 缓存已生成 token 的 Key/Value 避免重复计算。复杂度账（生成长度 n，隐层 d）：无 cache 时第 t 步要对全部 t 个位置重算注意力，单步 O(t²·d)，累计 O(n³·d)；有 cache 时第 t 步只算新 token 的 Q/K/V，并与 t 个缓存 K 做点积，单步 O(t·d)，累计 O(n²·d)——平方项不可消除（注意力本身随长度平方增长），cache 省掉的是重复计算的立方项。PagedAttention（vLLM）把 KV Cache 分页管理减少碎片，支持连续 batching 提升吞吐。此外 GQA/MQA 让多个 Q 头共享 K/V 头（GQA 分组共享、MQA 全部共享 1 组），把 KV Cache 显存降到 1/g 甚至 1/h，是长上下文部署标配。
 
-实际案例：vLLM 用 PagedAttention 提升 2-4 倍吞吐；字节/阿里 LLM 服务用 vLLM/TGI。连续 batching 动态调度请求。
+实际案例：vLLM 用 PagedAttention 提升 2-4 倍吞吐；字节/阿里 LLM 服务用 vLLM/TGI。LLaMA-2/3-70B、Qwen 系列用 GQA 压缩 KV Cache，连续 batching 动态调度请求。
 
 \`\`\`python
 # KV Cache：缓存历史 K/V
@@ -5111,8 +5234,8 @@ attn = q @ k.T  # 复用历史
 \`\`\`
 
 踩坑：KV Cache 占显存大长序列易 OOM；PagedAttention 需自定义 kernel；batch 内序列长度不一需 padding。`,
-    keyPoints: ["KV Cache 复用历史降复杂度", "PagedAttention 分页减碎片", "vLLM 连续 batching"],
-    followUps: ["连续 batching？", "Speculative Decoding？"],
+    keyPoints: ["无 cache 累计 O(n³)、有 cache 单步 O(t) 累计 O(n²)", "PagedAttention 分页减碎片", "GQA/MQA 共享 K/V 头压缩 KV Cache"],
+    followUps: ["GQA 和 MQA 的区别与取舍？", "Speculative Decoding？"],
     favorited: false,
     bigTech: true,
   },
@@ -5163,6 +5286,38 @@ torch.onnx.export(quantized, dummy, "model.onnx")
     followUps: ["结构化剪枝？", "MNN 优化？"],
     favorited: false,
     bigTech: false,
+  },
+  {
+    id: "ai-206",
+    nodeId: "ai-model-deploy",
+    question: "Speculative Decoding 投机解码原理？Medusa/EAGLE 变体？接受率与加速比关系？",
+    answer: `结论：自回归解码逐 token 串行是延迟瓶颈，且小 batch 时 GPU 算力闲置（显存带宽受限，decode 是 memory-bound）。Speculative Decoding 用"draft-verify"：小 draft 模型先自回归猜 γ 个 token，大 target 模型一次前向并行验证这 γ 个位置；逐位置比较，接受最长匹配前缀，第一个拒绝处按修正分布 p_norm=max(0, p_target−p_draft) 重采样——数学上保证输出分布与 target 模型完全一致（无损加速）。加速比 ≈ 每步平均接受 token 数 /（draft 耗时占比+1），接受率 α 越高收益越大；draft 越小越快但 α 越低，需在速度与接受率间权衡（同系列小模型或早退头 α 高）。变体：Medusa 在 target 上加多个预测头直接出候选（免独立 draft 模型）；EAGLE 在特征层做外推+树状草稿（tree attention 一次验证多分支），接受长度更长，vLLM/SGLang 已集成。
+
+实际案例：vLLM/SGLang/TensorRT-LLM 均支持 EAGLE/Medusa，实测对话场景 1.5-2.5 倍加速；字节/阿里 LLM 服务在低峰小 batch 时开启投机解码降延迟，高峰大 batch 时关闭（batch 大后 decode 变 compute-bound，投机反而亏）。
+
+\`\`\`python
+# draft-verify 核心逻辑（简化）
+def speculative_step(target, draft, prefix, gamma=4):
+    tokens = list(prefix)
+    for _ in range(gamma):                      # draft 串行猜 γ 个
+        tokens.append(draft.sample(tokens))
+    logits = target.forward(tokens)             # target 一次并行验证
+    accepted = 0
+    for i in range(gamma):
+        p_t, p_d = softmax(logits[len(prefix)+i]), draft.last_prob[i]
+        if sample_accept(p_t[tokens[len(prefix)+1+i]], p_d[tokens[len(prefix)+1+i]]):
+            accepted += 1                        # 接受该 token
+        else:
+            tokens[len(prefix)+1+i] = sample_from_residual(p_t, p_d)
+            break                                # 拒绝处修正后终止
+    return tokens[:len(prefix)+1+accepted]       # 至少前进 1 步
+\`\`\`
+
+踩坑：采样温度高时接受率骤降（分布分散难猜中），greedy 场景收益最大；γ 不是越大越好，超过平均可接受长度后白算；大 batch 下 target 验证变成额外开销，需按负载动态开关；draft 与 target 词表/分词必须一致。`,
+    keyPoints: ["draft 猜 γ 个 target 并行验证 分布无损", "加速比取决于接受率与 draft 开销", "Medusa 多头预测/EAGLE 特征外推+树状验证"],
+    followUps: ["为何说投机解码输出分布无损？", "什么负载场景该关闭投机解码？"],
+    favorited: false,
+    bigTech: true,
   },
   // ===== 30. ai-mlops =====
   {
