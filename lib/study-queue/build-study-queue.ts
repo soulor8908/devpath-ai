@@ -122,9 +122,19 @@ export function buildStudyQueueFromData(
   const tasks: StudyTask[] = [];
 
   // 1. new 任务：每个 plan 的 schedule 中 day === 1 && !completed && type === "learn"
+  //    2026-07-25 用户需求：已掌握（mastered）或全部看懂（allUnderstood）的节点排除
+  //    通过 summary.nodeStates 派生字段判断，无需加载完整 plan/questions
+  //    旧 summary 缺 nodeStates 字段时回退为空对象（不过滤），向后兼容
   for (const plan of plans) {
+    const nodeStates = plan.nodeStates ?? {};
     const todayItems = (plan.schedule ?? []).filter(
-      (s) => s.day === 1 && !s.completed && s.type === "learn",
+      (s) =>
+        s.day === 1 &&
+        !s.completed &&
+        s.type === "learn" &&
+        // 排除已掌握或全部看懂的节点（用户已完成学习）
+        !nodeStates[s.nodeId]?.mastered &&
+        !nodeStates[s.nodeId]?.allUnderstood,
     );
     for (const item of todayItems) {
       tasks.push(scheduleItemToTask(item, plan, date, createdAt));

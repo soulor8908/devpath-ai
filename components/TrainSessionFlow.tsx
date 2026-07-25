@@ -49,6 +49,7 @@ import { createCard, findExistingCard } from "@/lib/fsrs";
 import { toggleQuestionInPlan } from "@/lib/favorite";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 import { toast } from "@/lib/toast";
+import { markQuestionUnderstoodAndMaybeMasterNode } from "@/lib/node-mastery";
 
 interface TrainSessionFlowProps {
   studyQueue: StudyTask[];
@@ -250,6 +251,44 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
     }
   }, [currentQuestion, currentPlan]);
 
+  // 用户点击"我答对了"：写 understood 状态 + 自动标记节点掌握（2026-07-25 用户需求）
+  //
+  // 设计：训练中"我答对了"和计划详情页"看懂了"是同一语义——用户已掌握该题。
+  // 因此训练中点"我答对了"应：
+  //   1. 调 markQuestionUnderstoodAndMaybeMasterNode 持久化 understood=true
+  //   2. 同步更新 currentPlan / currentQuestion 内存状态（避免 NEXT_TASK 重新 loadCurrentTask 读到旧 plan）
+  //   3. 若触发自动掌握，弹 toast 提示用户
+  //
+  // 注意：
+  //   - "没答对"按钮不写 understood=false（避免污染从未标记过的题）
+  //   - 仅 type="new" 且有 currentQuestion 时调用（review 任务无 Question 概念）
+  //   - async 函数：用 IIFE 调用避免阻塞 dispatch（让 reducer 立即切到 feedback phase）
+  const handleAnswerCorrect = useCallback(() => {
+    if (!currentQuestion || !currentPlan) return;
+    // 异步写入 understood + 自动掌握，不阻塞 UI
+    void (async () => {
+      try {
+        const { plan: updatedPlan, autoMastered, node } =
+          await markQuestionUnderstoodAndMaybeMasterNode(
+            currentPlan,
+            currentQuestion.id,
+          );
+        setCurrentPlan(updatedPlan);
+        const updatedQ =
+          updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
+        setCurrentQuestion(updatedQ);
+        if (autoMastered && node) {
+          toast.success(
+            `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
+          );
+        }
+      } catch (e) {
+        // 持久化失败不影响训练流程，仅记日志
+        console.warn("[train] 写 understood 失败:", e);
+      }
+    })();
+  }, [currentQuestion, currentPlan]);
+
   // 会话完成
   useEffect(() => {
     if (state.phase === "completed") {
@@ -418,6 +457,9 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                   onClick={() => {
                     setIsCorrect(true);
                     setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
+                    // 2026-07-25 用户需求：训练中"我答对了"= 题目"看懂了"
+                    // 写入 Question.understood=true，节点下所有题看懂时自动标记掌握
+                    handleAnswerCorrect();
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
                   }}
                   leftIcon="check"

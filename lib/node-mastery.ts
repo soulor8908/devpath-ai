@@ -211,6 +211,72 @@ export async function markQuestionUnderstood(
 }
 
 /**
+ * 标记题目"看懂了"并在节点下所有题目都看懂时自动标记掌握（公共闭环函数）。
+ *
+ * 设计动机（用户需求 2026-07-25）：
+ *   "训练中点击我答对了 → 题目变成看懂了 → 节点下所有题目看懂 → 标记掌握"
+ *   这是用户在训练页 / 计划详情页 / 知识树 都该一致执行的闭环。
+ *   原本只在 PlanDetailClient.handleMarkUnderstood 中实现，导致训练页 ANSWER_SUBMIT
+ *   不持久化 understood 状态。提取为公共函数后，训练页 / 计划详情页复用同一逻辑。
+ *
+ * 行为：
+ *   1. 调用 markQuestionUnderstood(plan, questionId, true) 写入 understood
+ *   2. 检查题目所属节点：若该节点下所有题 understood === true 且节点未 mastered → 自动 markNodeMastered
+ *   3. 返回 { plan, autoMastered, node } 让调用方决定是否弹 toast 提示
+ *
+ * 边界：
+ *   - plan 中找不到 questionId → 返回 { plan, autoMastered: false }
+ *   - 节点下没有题（total=0）→ 不自动掌握
+ *   - 节点已 mastered=true → 不重复标记（用户显式掌握优先）
+ *
+ * @param plan 当前计划（不可变更新，返回新 plan）
+ * @param questionId 要标记看懂的题目 id
+ * @returns { plan: 更新后的 plan; autoMastered: 是否触发了自动掌握; node: 被自动掌握的节点（若有） }
+ */
+export async function markQuestionUnderstoodAndMaybeMasterNode(
+  plan: LearningPlan,
+  questionId: string,
+): Promise<{
+  plan: LearningPlan;
+  autoMastered: boolean;
+  node: KnowledgeNode | null;
+}> {
+  // 第一步：写 understood
+  const updatedPlan = await markQuestionUnderstood(plan, questionId, true);
+
+  // 第二步：检查是否需要自动掌握
+  const targetQ = updatedPlan.questions.find((q) => q.id === questionId);
+  if (!targetQ) {
+    return { plan: updatedPlan, autoMastered: false, node: null };
+  }
+
+  const node = updatedPlan.knowledgeTree.find((n) => n.id === targetQ.nodeId);
+  if (!node) {
+    return { plan: updatedPlan, autoMastered: false, node: null };
+  }
+
+  // 已 mastered 不重复标记
+  if (node.mastered) {
+    return { plan: updatedPlan, autoMastered: false, node: null };
+  }
+
+  // 检查节点下所有题是否都 understood
+  const nodeQuestions = updatedPlan.questions.filter((q) => q.nodeId === node.id);
+  if (nodeQuestions.length === 0) {
+    return { plan: updatedPlan, autoMastered: false, node: null };
+  }
+
+  const allUnderstood = nodeQuestions.every((q) => q.understood === true);
+  if (!allUnderstood) {
+    return { plan: updatedPlan, autoMastered: false, node: null };
+  }
+
+  // 自动标记掌握
+  const masteredPlan = await markNodeMastered(updatedPlan, node.id, true);
+  return { plan: masteredPlan, autoMastered: true, node };
+}
+
+/**
  * 记录题目被展开查看（隐式反馈）。
  * 不修改 understood 状态，只更新 viewed 时间戳。
  */

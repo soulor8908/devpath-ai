@@ -464,6 +464,9 @@ export function deriveCoachInsight(params: {
 
 /** 从 plans 计算今日学习安排 + 待学数 + 最新 plan
  *  P1 优化：接受 LearningPlanSummary（含 schedule 字段），避免首页加载完整 plan 的 knowledgeTree/questions
+ *
+ *  2026-07-25 用户需求：已掌握/全部看懂的节点不进入今日清单
+ *  通过 summary.nodeStates 派生字段过滤（旧 summary 缺此字段时回退为空对象，不过滤）
  */
 export function computeTodaySchedule(plans: LearningPlanSummary[]): {
   todaySchedule: Array<ScheduleItem & { planId: string; topic: string }>;
@@ -474,7 +477,15 @@ export function computeTodaySchedule(plans: LearningPlanSummary[]): {
   let todayLearn = 0;
   const todayItems: Array<ScheduleItem & { planId: string; topic: string }> = [];
   for (const plan of plans) {
-    const today = (plan.schedule ?? []).filter((s) => s.day === 1 && !s.completed);
+    // 2026-07-25：已掌握（mastered）或全部看懂（allUnderstood）的节点不进入今日清单
+    const nodeStates = plan.nodeStates ?? {};
+    const today = (plan.schedule ?? []).filter(
+      (s) =>
+        s.day === 1 &&
+        !s.completed &&
+        !nodeStates[s.nodeId]?.mastered &&
+        !nodeStates[s.nodeId]?.allUnderstood,
+    );
     for (const s of today) {
       todayItems.push({ ...s, planId: plan.id, topic: plan.topic });
     }

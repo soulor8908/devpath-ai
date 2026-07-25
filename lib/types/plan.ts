@@ -28,6 +28,11 @@ export interface LearningPlan {
 // 学习计划摘要（仅用于列表展示，体积小、加载快）
 // 列表页只加载摘要，点击进入详情时才加载完整 plan
 // P1 优化：包含 schedule（轻量字段），首页 computeTodaySchedule 无需加载完整 plan
+//
+// 2026-07-25 扩展：nodeStates 派生字段
+//   - 用途：study-queue 据此过滤已掌握/全部看懂的节点，避免首页今日清单包含已掌握任务
+//   - 由 toSummary(plan) 派生计算（不存原始 questions/knowledgeTree）
+//   - 旧 summary 缺此字段时回退为空对象（不过滤），向后兼容
 export interface LearningPlanSummary {
   id: string;
   topic: string;
@@ -38,6 +43,14 @@ export interface LearningPlanSummary {
   maxNewPerDay: number;
   /** 完整 schedule（P1 新增）：首页计算今日安排用，避免加载 knowledgeTree/questions */
   schedule: ScheduleItem[];
+  /**
+   * 节点状态派生表（2026-07-25 新增）：nodeId → { mastered, allUnderstood }
+   * - mastered: 节点被显式标记为已掌握（mastered=true）
+   * - allUnderstood: 节点下所有题 understood=true（即使未被显式 mastered）
+   * study-queue 据此过滤：mastered 或 allUnderstood 的节点不进入今日学习队列
+   * 旧 summary 缺此字段时回退为空对象（不过滤），向后兼容
+   */
+  nodeStates?: Record<string, { mastered: boolean; allUnderstood: boolean }>;
   createdAt: string;
   updatedAt: string;
 }

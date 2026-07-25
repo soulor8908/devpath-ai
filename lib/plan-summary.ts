@@ -14,6 +14,8 @@ import {
   KEY_PREFIXES,
   type LearningPlan,
   type LearningPlanSummary,
+  type KnowledgeNode,
+  type Question,
 } from "./types";
 
 /** 列表页缓存 key（整列表级别） */
@@ -36,13 +38,17 @@ export function normalizePlan(plan: LearningPlan): LearningPlan {
 }
 
 /**
- * 规范化 LearningPlanSummary：对 schedule 做回退，
- * 避免旧摘要缺 schedule 字段导致首页 computeTodaySchedule 崩溃。
+ * 规范化 LearningPlanSummary：对 schedule / nodeStates 做回退，
+ * 避免旧摘要缺字段导致首页 computeTodaySchedule 崩溃。
+ *
+ * 2026-07-25：nodeStates 字段回退为空对象（旧 summary 缺此字段时不过滤，向后兼容）
  */
 export function normalizePlanSummary(summary: LearningPlanSummary): LearningPlanSummary {
   return {
     ...summary,
     schedule: Array.isArray(summary.schedule) ? summary.schedule : [],
+    // 旧 summary 缺 nodeStates → 回退为空对象（不过滤任何节点）
+    nodeStates: summary.nodeStates ?? {},
   };
 }
 
@@ -62,9 +68,39 @@ export function toSummary(plan: LearningPlan): LearningPlanSummary {
     // P1 优化：包含完整 schedule，首页 computeTodaySchedule 无需加载完整 plan
     // schedule 体积小（~6KB/30天计划），远小于 knowledgeTree + questions（~100KB+）
     schedule,
+    // 2026-07-25 派生 nodeStates：study-queue 据此过滤已掌握/全部看懂的节点
+    // 计算成本 O(N+Q)，远小于加载完整 plan 的 IO 成本
+    nodeStates: deriveNodeStates(knowledgeTree, questions),
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
+}
+
+/**
+ * 派生计算节点状态表（2026-07-25 新增）。
+ *
+ * 规则：
+ *   - mastered: 节点 master 字段 === true（用户显式标记掌握）
+ *   - allUnderstood: 节点下至少有 1 道题，且所有题 understood === true
+ *
+ * 用途：buildStudyQueueFromData 据此过滤掉已掌握/全部看懂的节点的学习任务
+ * 旧 summary 缺此字段时回退为空对象（不过滤），向后兼容
+ */
+function deriveNodeStates(
+  knowledgeTree: KnowledgeNode[],
+  questions: Question[],
+): Record<string, { mastered: boolean; allUnderstood: boolean }> {
+  const result: Record<string, { mastered: boolean; allUnderstood: boolean }> = {};
+  for (const node of knowledgeTree) {
+    const nodeQuestions = questions.filter((q) => q.nodeId === node.id);
+    const allUnderstood =
+      nodeQuestions.length > 0 && nodeQuestions.every((q) => q.understood === true);
+    result[node.id] = {
+      mastered: node.mastered === true,
+      allUnderstood,
+    };
+  }
+  return result;
 }
 
 /** 保存摘要（在保存完整 plan 时一起调用） */

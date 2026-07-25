@@ -22,6 +22,7 @@ import {
   markNodeMastered,
   markNodeNeedsReinforce,
   markQuestionUnderstood,
+  markQuestionUnderstoodAndMaybeMasterNode,
   markQuestionViewed,
 } from "@/lib/node-mastery";
 import {
@@ -93,6 +94,9 @@ export default function PlanDetailClient() {
   const [filterDifficulty, setFilterDifficulty] = useState<number | "all">("all");
   const [filterNodeId, setFilterNodeId] = useState<string | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  // 2026-07-25 用户需求：已看懂的题在计划中默认排除（与训练页一致）
+  // 默认隐藏已看懂题目；用户可切换"显示已看懂"开关查看全部
+  const [hideUnderstood, setHideUnderstood] = useState(true);
 
   // 需求 5：脑图入口弹窗 + 悬浮脑图按钮
   // showMindMapModal: 显示全屏脑图弹窗（首次进入自动弹出，可被悬浮按钮重新打开）
@@ -228,43 +232,30 @@ export default function PlanDetailClient() {
   // 增强项（需求 5）：标记"看懂"后，检查所属知识点下的题目是否全部 understood，
   // 若是且该节点尚未 mastered → 自动调用 markNodeMastered(plan, nodeId, true)
   // 让"看完所有题"自然推导出"掌握该知识点"，无需用户再手动标记
+  //
+  // 2026-07-25 重构：提取为公共函数 markQuestionUnderstoodAndMaybeMasterNode
+  // 让训练页和计划详情页复用同一逻辑，避免两处实现漂移
   async function handleMarkUnderstood(questionId: string, understood: boolean) {
     if (!plan) return;
     try {
-      const updated = await markQuestionUnderstood(plan, questionId, understood);
-      setPlan(updated);
-
-      // 仅在「标记看懂」时检查自动掌握（取消看懂不触发）
       if (understood) {
-        const targetQ = updated.questions.find((q) => q.id === questionId);
-        if (targetQ) {
-          const nodeQuestions = updated.questions.filter(
-            (q) => q.nodeId === targetQ.nodeId,
+        // 标记看懂：用公共闭环函数（写 understood + 检查自动掌握）
+        const { plan: updatedPlan, autoMastered, node } =
+          await markQuestionUnderstoodAndMaybeMasterNode(plan, questionId);
+        setPlan(updatedPlan);
+        if (autoMastered && node) {
+          toast.success(
+            `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
           );
-          const node = updated.knowledgeTree.find(
-            (n) => n.id === targetQ.nodeId,
-          );
-          // 该节点至少有 1 道题，且全部 understood，且节点尚未被显式 mastered
-          if (
-            node &&
-            !node.mastered &&
-            nodeQuestions.length > 0 &&
-            nodeQuestions.every((q) => q.understood)
-          ) {
-            const masteredPlan = await markNodeMastered(
-              updated,
-              node.id,
-              true,
-            );
-            setPlan(masteredPlan);
-            toast.success(
-              `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
-            );
-            return;
-          }
+        } else {
+          toast.success("已记录「看懂了」");
         }
+      } else {
+        // 取消看懂：直接调 markQuestionUnderstood（不触发自动掌握）
+        const updated = await markQuestionUnderstood(plan, questionId, false);
+        setPlan(updated);
+        toast.success("已取消「看懂了」标记");
       }
-      toast.success(understood ? "已记录「看懂了」" : "已取消「看懂了」标记");
     } catch (e) {
       toast.error("标记失败：" + (e instanceof Error ? e.message : String(e)));
     }
@@ -696,7 +687,11 @@ export default function PlanDetailClient() {
   const days = Object.keys(scheduleByDay).map(Number).sort((a, b) => a - b);
 
   // 筛选后的题目
+  // 2026-07-25 用户需求：已看懂的题目在计划中默认排除（与训练页过滤一致）
+  // 用户可通过 hideUnderstood 开关切换"显示已看懂"
   const filteredQuestions = plan.questions.filter((q) => {
+    // 默认隐藏已看懂题目（与训练页 study-queue 过滤一致）
+    if (hideUnderstood && q.understood) return false;
     if (filterBigTech === "big" && !q.bigTech) return false;
     if (filterBigTech === "normal" && q.bigTech) return false;
     if (filterDifficulty !== "all") {
@@ -863,6 +858,17 @@ export default function PlanDetailClient() {
                 {d}
               </Button>
             ))}
+            {/* 2026-07-25：显示/隐藏已看懂题目开关
+                默认隐藏已看懂（与训练页一致），用户可切换查看全部 */}
+            <Button
+              variant={hideUnderstood ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setHideUnderstood((v) => !v)}
+              leftIcon={hideUnderstood ? "check" : undefined}
+              title={hideUnderstood ? "已看懂的题目已隐藏，点击切换为显示" : "正在显示已看懂题目，点击切换为隐藏"}
+            >
+              {hideUnderstood ? "隐藏已看懂" : "显示已看懂"}
+            </Button>
           </div>
           {/* Row 2: node filter + search */}
           <div className="flex flex-wrap items-center gap-2">
@@ -973,7 +979,8 @@ export default function PlanDetailClient() {
             {(filterBigTech !== "all" ||
               filterDifficulty !== "all" ||
               filterNodeId !== "all" ||
-              searchQuery) && (
+              searchQuery ||
+              !hideUnderstood) && (
               <Button
                 variant="link"
                 size="sm"
@@ -982,6 +989,8 @@ export default function PlanDetailClient() {
                   setFilterDifficulty("all");
                   setFilterNodeId("all");
                   setSearchQuery("");
+                  // 2026-07-25：清空条件时恢复"隐藏已看懂"默认值
+                  setHideUnderstood(true);
                   // 2026-07-25 需求：清空条件时同步清空 URL 上的场景参数（?nodeId=xxx），
                   // 让刷新/分享链接时不再带旧筛选条件。
                   // 用 router.replace + 只保留 planId 路径，剥离 query string。
