@@ -19,7 +19,7 @@ concepts:
 sourceIds: [pinecone-docs, chroma-docs]
 gotchas:
   - 嵌入式（Chroma）和托管（Pinecone）的边界：原型用嵌入式，生产上托管——迁移成本不只是改连接串
-  - HNSW 索引建好后不可增量更新最优——频繁新增数据会让图退化，需要定期重建
+  - HNSW 对纯增量插入是鲁棒的，但高频删除/更新会产生大量墓碑（tombstone）节点使图退化——churn 高的业务需定期重建索引
   - 元数据过滤在向量搜索"之前"还是"之后"做差别巨大：pre-filter 省计算但可能丢候选，post-filter 精确但慢
 interview:
   - q: 选向量数据库时考虑哪些因素？Pinecone vs Chroma vs PGVector 怎么选？

@@ -26,8 +26,9 @@ interview:
   - q: Python 的列表和元组有什么区别？工程上怎么选？
     answerSkeleton: >-
       list 与 tuple 的本质差异是可变性：list 可变（append/pop/in-place 修改），tuple 不可变。
-      由此派生两个工程意义：一是 tuple 可哈希，能作为 dict 的 key 或 set 的元素，list 不行；
-      二是语义约定——tuple 表"固定结构的记录"（如坐标、数据库行），list 表"同质集合"。
+      由此派生两个工程意义：一是 tuple 在元素全部可哈希时可哈希，能作为 dict 的 key 或 set 的元素
+      （注意是"元素全部可哈希"才成立——tuple 里套 list 照样不可哈希，这是资深面试官爱挖的坑），
+      list 不行；二是语义约定——tuple 表"固定结构的记录"（如坐标、数据库行），list 表"同质集合"。
       性能上 tuple 略快且内存更省，但这是微优化不应作为首选依据。选择规则：字段位置稳定、长度不变
       用 tuple；需要增删或长度可变用 list。前端迁移映射：tuple ≈ TypeScript 的 readonly tuple 类型
       （如 [string, number]），list ≈ T[]。Tradeoff：不可变带来 hashable 与线程安全，但失去灵活性

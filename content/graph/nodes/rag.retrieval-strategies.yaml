@@ -1,5 +1,5 @@
 id: rag.retrieval-strategies
-title: 检索策略（ dense / sparse / hybrid）
+title: 检索策略（dense / sparse / hybrid）
 summary: 纯向量检索会漏掉精确匹配（人名/型号/代码标识符）。混合检索 + 查询改写是生产 RAG 的标配。
 tracks: [frontend-to-ai-engineer]
 phase: 2
