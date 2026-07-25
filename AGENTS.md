@@ -286,6 +286,17 @@ it("不允许在 components/ui/ 之外使用原生 <input>/<select>/<textarea>/<
 it("浅色 utility 必须带 dark: 配对", () => { ... });
 ```
 
+### 3.4 多轮深度审计
+
+里程碑 / 重大版本发布前 / 定期执行多轮深度审计，流程规范见 [docs/code-audit-methodology.md](file:///workspace/docs/code-audit-methodology.md)。
+
+**三层质量护栏**：
+1. **预防**（编码规范）：AGENTS.md 第 2 节 + ui-design-system.md — 写代码前
+2. **检测**（守护测试）：`__tests__/*-guard.test.ts` — 每次 commit
+3. **审计**（深度扫描）：code-audit-methodology.md — 里程碑 / 定期
+
+三层缺一不可：没有预防 → 缺陷流入代码；没有检测 → 缺陷流入 main；没有审计 → 累积技术债。
+
 ---
 
 ## 4. 代码风格

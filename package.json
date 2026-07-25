@@ -15,6 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "quality-gate": "npm run content:validate && npm run content:freshness && npm run lint && npm run typecheck && npm test",
+    "audit": "cat docs/code-audit-methodology.md",
     "prepare": "husky",
     "build:knowledge-index": "tsx scripts/build-knowledge-index.ts",
     "content:compile": "tsx scripts/compile-content.ts",
