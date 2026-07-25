@@ -649,7 +649,12 @@ export function MindMap({
           width="100%"
           height="100%"
           viewBox={`0 0 ${Math.max(width, 100)} ${Math.max(height, 100)}`}
-          className="block"
+          // 2026-07-25 修复 SVG height 100% 不生效：
+          // 原因：Modal 高度是 auto（受 min-h/max-h 约束的内容高度），
+          // flex-1 + h-full 链无法解析为确定高度 → SVG height="100%" 解析为 auto → 0。
+          // 修复：用 absolute inset-0 让 SVG 脱离流布局，直接填满 relative 容器，
+          // 不依赖父元素有确定高度。容器只需 relative + flex-1 即可。
+          className="absolute inset-0 w-full h-full block"
           // pointerEvents: "all" — 让 SVG 背景也接收 mousedown/touchstart，支持空白区拖动
           // （之前 "none" 导致只能从 container div 的非 SVG 区域启动拖动，几乎无法拖）
           style={{ pointerEvents: "all" }}
