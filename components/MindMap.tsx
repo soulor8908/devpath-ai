@@ -513,8 +513,25 @@ export function MindMap({
 
   return (
     <div
-      className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden flex flex-col ${fillHeight ? "h-full" : ""}`}
-      style={{ minHeight: fillHeight ? "100%" : "600px" }}
+      // 2026-07-25 修复 SVG height 0（第三次修复，根治）：
+      //   原因链：Modal children div (flex-1 min-h-0) → MindMap root (h-full) → canvas (flex-1 min-h-0) → SVG (h-full)
+      //   h-full = height:100%，要求父元素有显式 height。但 Modal children div 用 flex-1 计算高度，
+      //   不被 height:100% 识别 → MindMap root 高度 auto → canvas flex-1 无父高度 → SVG height 0。
+      //
+      //   修复：
+      //   1) Modal children div 已加 flex flex-col（让子元素能用 flex-1 撑满）
+      //   2) MindMap root 用 flex-1 min-h-0（加入父 flex 链）+ 保持 flex flex-col（让 canvas 能 flex-1）
+      //   3) SVG 保持 absolute inset-0（canvas 是 relative，SVG 脱离流布局直接填满）
+      //
+      //   完整 flex 链：
+      //   Modal dialog (flex flex-col, max-h-[90vh])
+      //     → children div (flex-1 min-h-0 flex flex-col)  [Modal 已改]
+      //       → MindMap root (flex-1 min-h-0 flex flex-col) [本处]
+      //         → header (shrink-0)
+      //         → canvas div (flex-1 min-h-0 relative)
+      //           → SVG (absolute inset-0)  ✓ 填满 canvas
+      className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden flex flex-col ${fillHeight ? "flex-1 min-h-0" : ""}`}
+      style={{ minHeight: fillHeight ? undefined : "600px" }}
     >
       {/* 顶部工具条：搜索 + 工具按钮（2026-07-25 重构）
           —— 原 absolute top-2 浮层方案有两类问题：

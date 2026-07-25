@@ -100,12 +100,6 @@ export function useAskAI<T extends HTMLElement = HTMLDivElement>({
     y: number;
     placeAbove: boolean;
   } | null>(null);
-  // 2026-07-25 修复"点击问 AI 没反应"：
-  // 在 selectionchange 时把选中文字缓存到 ref，handleClick 时优先读 ref。
-  // 原因：某些场景下（移动端 touch、焦点切换、浏览器扩展）click 触发时
-  // window.getSelection() 已经为空，导致 onAskAI 收到空字符串而不执行。
-  // 缓存 ref 确保即使 selection 丢失，仍能把选中文字传给回调。
-  const selectedTextRef = useRef("");
 
   // 用 ref 保存最新的 onAskAI / enabled，避免每次回调变化都重注册 document 监听
   const onAskAIRef = useRef(onAskAI);
@@ -114,7 +108,6 @@ export function useAskAI<T extends HTMLElement = HTMLDivElement>({
   useEffect(() => {
     if (!enabled) {
       setPosition(null);
-      selectedTextRef.current = "";
       return;
     }
 
@@ -122,31 +115,25 @@ export function useAskAI<T extends HTMLElement = HTMLDivElement>({
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
         setPosition(null);
-        selectedTextRef.current = "";
         return;
       }
       const container = containerRef.current;
       if (!container) {
         setPosition(null);
-        selectedTextRef.current = "";
         return;
       }
       const range = sel.getRangeAt(0);
       // 选中范围必须在容器内才显示按钮
       if (!container.contains(range.commonAncestorContainer)) {
         setPosition(null);
-        selectedTextRef.current = "";
         return;
       }
       const rect = range.getBoundingClientRect();
       // 选中范围过小不显示，避免误触
       if (rect.width < MIN_SELECTION_PX || rect.height < MIN_SELECTION_PX) {
         setPosition(null);
-        selectedTextRef.current = "";
         return;
       }
-      // 缓存选中文字，供 handleClick 使用
-      selectedTextRef.current = sel.toString();
       const viewportH = window.innerHeight;
       const spaceBelow = viewportH - rect.bottom;
       // 默认放下方（避开移动端原生 selection 菜单，菜单通常在选中范围上方）
@@ -169,15 +156,22 @@ export function useAskAI<T extends HTMLElement = HTMLDivElement>({
     };
   }, [enabled]);
 
+  // 2026-07-25 回退到原始实现（去掉 selectedTextRef 缓存）：
+  //   上次"修复"加了 selectedTextRef 缓存选中文字，但引入了新问题：
+  //   - selectionchange 频繁触发，每次都重置 ref（选中范围不在容器内时也清空）
+  //   - 多个 useAskAI 实例并存时（页面 + 聊天窗内），各自的 ref 互相干扰认知
+  //   - 实际上 onMouseDown preventDefault 已保证 click 时 selection 存活，
+  //     直接读 window.getSelection() 即可，不需要缓存
+  //   原始实现简洁且可靠，是经过验证的模式
   const handleClick = useCallback(() => {
-    // 优先读缓存（selectionchange 时存入），避免 click 时 selection 已被清空
-    const text = selectedTextRef.current || window.getSelection()?.toString() || "";
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString();
     if (!text.trim()) return;
     onAskAIRef.current(text);
-    selectedTextRef.current = "";
     // 清空选中，按钮自然消失
     try {
-      window.getSelection()?.removeAllRanges();
+      sel.removeAllRanges();
     } catch {
       // 某些浏览器在特定状态下不允许 removeAllRanges，忽略
     }

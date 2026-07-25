@@ -230,7 +230,12 @@ export function Modal({
             className={cn(
               "px-5 py-2 text-sm text-gray-700 dark:text-gray-300",
               // fillHeight：children 区占满剩余高度，min-h-0 让内部 overflow 生效
-              fillHeight && "flex-1 min-h-0",
+              // 2026-07-25 修复 SVG height 0：
+              //   必须加 flex flex-col，让子元素能用 flex-1 撑满高度。
+              //   仅 flex-1 min-h-0 不够 —— 子元素的 h-full / height:100%
+              //   要求父元素有显式 height，flex 容器的 computed height 不被识别。
+              //   加 flex flex-col 后，子元素用 flex-1 min-h-0 即可在 flex 链中获取高度。
+              fillHeight && "flex-1 min-h-0 flex flex-col",
               contentClassName,
             )}
           >
