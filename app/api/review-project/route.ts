@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  const body = (await req.json()) as {
+  let body: {
     nodeId?: string;
     title?: string;
     repoUrl?: string;
@@ -34,6 +34,11 @@ export async function POST(req: NextRequest) {
     docUrl?: string;
     artifactText?: string;
   };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  }
 
   // 参数校验
   if (!body.nodeId || typeof body.nodeId !== "string") {

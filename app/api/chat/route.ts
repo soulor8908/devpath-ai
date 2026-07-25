@@ -68,7 +68,12 @@ export async function POST(req: NextRequest) {
     const session = hasSession ? sessionResult.session : null;
 
     // 再读 body（不再含客户端凭证字段）
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    }
     const { messages, contextSnapshot, toolContext, personaContext, preferredPersona, knowledgeContext } = body as {
       messages?: ChatMessage[];
       contextSnapshot?: string;
@@ -88,6 +93,19 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
         { error: "messages 必须是非空数组" },
+        { status: 400 },
+      );
+    }
+    // 元素级校验：缺 role/content 的消息会让 streamText 抛错
+    const validMessages = messages.filter(
+      (m): m is ChatMessage =>
+        !!m &&
+        (m.role === "user" || m.role === "assistant" || m.role === "system") &&
+        typeof m.content === "string",
+    );
+    if (validMessages.length === 0) {
+      return NextResponse.json(
+        { error: "messages 中没有合法消息（需含 role 和 content）" },
         { status: 400 },
       );
     }
@@ -146,14 +164,28 @@ export async function POST(req: NextRequest) {
     // - persona.id 可由客户端记入 AICallRecord.inputDigest 用于归因分析
     let personaSnippet = "";
     let personaId: PersonaId | null = null;
-    if (preferredPersona) {
-      // 用户手动设置优先级最高
+    if (preferredPersona && Object.hasOwn(PERSONAS, preferredPersona)) {
+      // 用户手动设置优先级最高（校验合法性：客户端传入值可能不在 PersonaId 枚举内）
       const persona: Persona = PERSONAS[preferredPersona];
       personaSnippet = persona.snippet;
       personaId = persona.id;
-    } else if (personaContext) {
+    } else if (
+      personaContext &&
+      typeof personaContext.energy === "number" &&
+      typeof personaContext.mood === "string" &&
+      typeof personaContext.streak === "number"
+    ) {
       // 自动选择（服务端不读 IndexedDB，由客户端聚合 ctx）
-      const persona = selectPersona(personaContext);
+      // 先校验形状：畸形 ctx（如 topic 非字符串）会让 selectPersona 抛 TypeError
+      const safeCtx: PersonaContext = {
+        energy: personaContext.energy,
+        mood: personaContext.mood,
+        streak: personaContext.streak,
+        ...(typeof personaContext.topic === "string"
+          ? { topic: personaContext.topic }
+          : {}),
+      };
+      const persona = selectPersona(safeCtx);
       personaSnippet = persona.snippet;
       personaId = persona.id;
     }
@@ -190,7 +222,7 @@ export async function POST(req: NextRequest) {
 
     const result = await streamText({
       model,
-      messages,
+      messages: validMessages,
       system: systemPrompt,
       ...(tools ? { tools, maxSteps: 5 } : {}),
       // onFinish 回调：流式完成后服务端观测 usage（用于服务端日志/未来扩展）

@@ -168,7 +168,12 @@ export async function POST(req: NextRequest) {
     const session = hasSession ? sessionResult.session : null;
 
     // 再读 body
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    }
     const { mode = "interview", config: rawConfig, messages: rawMessages } = body as InterviewRequestBody;
 
     // 参数校验

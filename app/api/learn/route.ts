@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  }
   const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt } = body as {
     topic?: string;
     dailyMinutes?: number;
@@ -37,14 +42,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
     }
 
-    if (dailyMinutes < 15 || dailyMinutes > 120) {
+    if (typeof dailyMinutes !== "number" || !Number.isFinite(dailyMinutes) || dailyMinutes < 15 || dailyMinutes > 120) {
       return NextResponse.json(
         { error: "dailyMinutes 须在 15-120 之间" },
         { status: 400 }
       );
     }
 
-    if (maxNewPerDay < 1 || maxNewPerDay > 5) {
+    if (typeof maxNewPerDay !== "number" || !Number.isFinite(maxNewPerDay) || maxNewPerDay < 1 || maxNewPerDay > 5) {
       return NextResponse.json(
         { error: "maxNewPerDay 须在 1-5 之间" },
         { status: 400 }

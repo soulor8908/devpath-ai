@@ -88,7 +88,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 读 body
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    }
     const { text: rawText } = body as { text?: unknown };
     if (typeof rawText !== "string" || rawText.trim().length === 0) {
       return NextResponse.json(
