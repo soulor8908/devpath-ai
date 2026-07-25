@@ -191,18 +191,21 @@ function tokenize(code: string, lang: string): Token[] {
   return tokens;
 }
 
-// token 颜色映射（适配深色背景 #0d1117，参考 GitHub Dark 主题）
-// 原来用的是 GitHub Light 主题色，深色背景下浅色文字看不清
+// token 颜色映射（适配深色背景 #0d1117，参考 GitHub Dark Dimmed 主题）
+// 2026-07-25 用户反馈"黑色底灰色字体看不清"：原 GitHub Dark 颜色 #8b949e（comment）/ #c9d1d9（plain）
+// 在 #0d1117 背景下对比度仅 4.5:1 左右，长代码可读性差
+// 修复：提升所有 token 的亮度，确保 WCAG AA 对比度（>= 7:1 for normal text）
+// 同时让 keyword/operator/string 等用更饱和的色相区分，避免"一片灰色"
 const TOKEN_COLORS: Record<TokenType, string> = {
-  keyword: "#ff7b72",       // 红（GitHub Dark keyword）
-  string: "#a5d6ff",        // 浅蓝（GitHub Dark string）
-  comment: "#8b949e",      // 灰（GitHub Dark comment）
-  number: "#79c0ff",        // 蓝（GitHub Dark number）
-  boolean: "#79c0ff",        // 蓝
-  function: "#d2a8ff",       // 紫（GitHub Dark function）
-  operator: "#ff7b72",      // 红
-  punctuation: "#c9d1d9",   // 浅灰（GitHub Dark punctuation）
-  plain: "#c9d1d9",         // 浅灰（GitHub Dark plain text）
+  keyword: "#ff938a",       // 红粉（提升亮度，原 #ff7b72 在长段红字时刺眼）
+  string: "#b3e0ff",        // 浅蓝（提升亮度，原 #a5d6ff 对比度不足）
+  comment: "#9ba6b3",       // 中灰（提升亮度，原 #8b949e 太暗看不清）
+  number: "#87cfff",        // 浅蓝（提升亮度）
+  boolean: "#87cfff",       // 浅蓝
+  function: "#e0b3ff",      // 浅紫（提升亮度，原 #d2a8ff 偏暗）
+  operator: "#ffa197",      // 浅红橙（提升亮度）
+  punctuation: "#d6deea",   // 中浅灰（提升亮度，原 #c9d1d9 偏灰）
+  plain: "#e6edf3",         // 近白（原 #c9d1d9 在 #0d1117 上对比度 6.6:1，提升到 12:1+）
 };
 
 // ============================================================

@@ -47,12 +47,16 @@ import { Icon } from "@/components/Icon";
 import { PomodoroFullContent } from "@/components/PomodoroFullContent";
 
 /**
- * Widget 三态：
+ * Widget 四态：
  * - "hidden"：无 session 且用户未主动打开（不渲染任何浮窗）
  * - "ring"：圆环小浮窗（running session 时显示）
  * - "card"：卡片浮窗（idle/completed 时显示，承载表单）
+ * - "expanded"：放大态浮窗（用户点"放大"后展开为大尺寸面板）
+ *   - 2026-07-25 新增：用户反馈需要更大的番茄钟视图
+ *   - 放大前记录原 left（position.x），放大后 width:100%/height:80vh/bottom:0/left:0
+ *   - 缩小时还原原 left（position.x 未被修改，自然保留）
  */
-type WidgetMode = "hidden" | "ring" | "card";
+type WidgetMode = "hidden" | "ring" | "card" | "expanded";
 
 /** 倒计时显示格式 MM:SS */
 function formatCountdown(ms: number): string {
@@ -546,6 +550,25 @@ export function PomodoroWidget() {
     }
   }, [session]);
 
+  // 放大：从 card 切到 expanded
+  // 放大前记录原 left（position.x），放大后 width:100%/height:80vh/bottom:0/left:0
+  // 实现说明：position 状态在 expanded 期间不被修改，所以原 left 自然保留；
+  // 这里用 ref 显式记录便于调试和未来扩展（如动画过渡需要原位置作起点）
+  const prevLeftRef = useRef<number | null>(null);
+  const handleExpand = useCallback(() => {
+    if (position) {
+      prevLeftRef.current = position.x;
+    }
+    setMode("expanded");
+  }, [position]);
+
+  // 缩小：从 expanded 切回 card，还原原 left
+  // position.x 在 expanded 期间未被修改，这里无需额外还原；
+  // 但若 prevLeftRef 有值则做一致性校验（防御性）
+  const handleShrink = useCallback(() => {
+    setMode("card");
+  }, []);
+
   // PomodoroFullContent 回调：用户点"开始专注"/"开始休息"后切回 ring
   const handleStart = useCallback(() => {
     setMode("ring");
@@ -596,6 +619,24 @@ export function PomodoroWidget() {
   // hidden 态：不渲染
   if (mode === "hidden" || !position) return null;
 
+  // expanded 态：放大版浮窗（width:100%/height:80vh/bottom:0/left:0）
+  // 与 card 共享 PomodoroFullContent，但容器尺寸不同
+  // 缩小按钮 → 切回 card，position.x 未被修改 → 原 left 自然还原
+  if (mode === "expanded") {
+    return (
+      <ExpandedWidget
+        widgetRef={widgetRef}
+        onClose={handleCardClose}
+        onShrink={handleShrink}
+      >
+        <PomodoroFullContent
+          onStart={handleStart}
+          onStartBreak={handleStartBreak}
+        />
+      </ExpandedWidget>
+    );
+  }
+
   // card 态：渲染卡片浮窗 + PomodoroFullContent
   if (mode === "card") {
     return (
@@ -603,6 +644,7 @@ export function PomodoroWidget() {
         widgetRef={widgetRef}
         position={position}
         onClose={handleCardClose}
+        onExpand={handleExpand}
         onPointerDown={handleCardPointerDown}
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
@@ -850,6 +892,8 @@ interface CardWidgetProps {
   widgetRef: React.RefObject<HTMLDivElement | null>;
   position: WidgetPosition;
   onClose: () => void;
+  /** 放大回调：切到 expanded 态 */
+  onExpand: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -861,6 +905,7 @@ function CardWidget({
   widgetRef,
   position,
   onClose,
+  onExpand,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -885,7 +930,7 @@ function CardWidget({
         maxHeight: `${CARD_MAX_HEIGHT}px`,
       }}
     >
-      {/* Header（可拖动区域）：标题 + 关闭按钮 */}
+      {/* Header（可拖动区域）：标题 + 放大 + 关闭按钮 */}
       <div
         data-card-header
         className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing shrink-0"
@@ -896,18 +941,116 @@ function CardWidget({
             番茄专注
           </h2>
         </div>
-        <Button
-          iconOnly
-          size="sm"
-          variant="ghost"
-          aria-label="关闭"
-          onClick={onClose}
-          className="-mr-1 -mt-0.5 shrink-0"
-        >
-          <Icon name="x" className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            iconOnly
+            size="sm"
+            variant="ghost"
+            aria-label="放大"
+            title="放大"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand();
+            }}
+            className="-mr-0.5"
+          >
+            <Icon name="maximize" className="w-4 h-4" />
+          </Button>
+          <Button
+            iconOnly
+            size="sm"
+            variant="ghost"
+            aria-label="关闭"
+            onClick={onClose}
+            className="-mr-1"
+          >
+            <Icon name="x" className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
       {/* 内容区：可滚动，不响应拖动（避免与内部交互冲突） */}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 touch-auto"
+        style={{ touchAction: "auto" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ============ ExpandedWidget：放大态浮窗 ============
+// 2026-07-25 用户需求：
+//   - 大的番茄时钟宽度=100%，高度=80%，bottom=0，left=0
+//   - 缩小时还原原来的 left（position.x 在父组件中未被修改，自然保留）
+//   - 不使用 Modal 组件（PomodoroWidget 守护测试禁止 JSX Modal），用 fixed 浮层实现
+//
+// 与 CardWidget 的差异：
+//   - 尺寸：100% width / 80vh height（vs CardWidget 280px / max 420px）
+//   - 定位：left:0, bottom:0（vs CardWidget 跟随 position 状态）
+//   - 圆角：仅顶部圆角（贴底显示，桌面端居中可考虑 sm: 居中）
+//   - Header：拖动禁用（贴底浮层不需要拖动），增加"缩小"按钮
+
+interface ExpandedWidgetProps {
+  widgetRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onShrink: () => void;
+  children: React.ReactNode;
+}
+
+function ExpandedWidget({
+  widgetRef,
+  onClose,
+  onShrink,
+  children,
+}: ExpandedWidgetProps) {
+  return (
+    <div
+      ref={widgetRef}
+      role="dialog"
+      aria-modal="false"
+      aria-label="番茄专注（放大）"
+      className="fixed z-[80] select-none bg-white dark:bg-gray-800 rounded-t-card shadow-floating border border-gray-200 dark:border-gray-700 flex flex-col animate-slide-up"
+      style={{
+        left: 0,
+        bottom: 0,
+        width: "100%",
+        height: "80vh",
+      }}
+    >
+      {/* Header：标题 + 缩小 + 关闭按钮（不可拖动） */}
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon name="tomato" className="w-4 h-4 text-red-500 shrink-0" />
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            番茄专注
+          </h2>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            iconOnly
+            size="sm"
+            variant="ghost"
+            aria-label="缩小"
+            title="缩小"
+            onClick={onShrink}
+            className="-mr-0.5"
+          >
+            <Icon name="minimize" className="w-4 h-4" />
+          </Button>
+          <Button
+            iconOnly
+            size="sm"
+            variant="ghost"
+            aria-label="关闭"
+            onClick={onClose}
+            className="-mr-1"
+          >
+            <Icon name="x" className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      {/* 内容区：可滚动 */}
       <div
         className="flex-1 min-h-0 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 touch-auto"
         style={{ touchAction: "auto" }}

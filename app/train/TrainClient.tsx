@@ -2,21 +2,45 @@
 
 // app/train/TrainClient.tsx
 // 训练会话页客户端——沉浸式学习，不跳转
+//
+// 2026-07-25 修复（用户反馈）：
+//   1. 顶部进度条硬编码 "第 1/total" → 通过 onProgressChange 回调动态显示当前进度
+//   2. 训练完成后无提示 → 增加 <Modal> 完成确认弹窗
+//   3. 用户确认后切换到"今日查看进度"（首页有今日学习清单 + 完成数 + 番茄统计）
+//   4. 训练完成时自动结束进行中的番茄钟（completeSession），避免专注计时继续空跑
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useHomeData } from "@/lib/home";
 import { TrainSessionFlow } from "@/components/TrainSessionFlow";
 import { Icon } from "@/components/Icon";
-import { LinkButton } from "@/components/ui";
-import { POMODORO_OPEN_EVENT, getRunningSession } from "@/lib/timer/pomodoro";
+import { Button, Modal } from "@/components/ui";
+import { POMODORO_OPEN_EVENT, getRunningSession, completeSession } from "@/lib/timer/pomodoro";
+
+interface TrainProgress {
+  currentIndex: number;
+  total: number;
+  questionsAnswered: number;
+  questionsCorrect: number;
+  phase: string;
+}
 
 export default function TrainClient() {
+  const router = useRouter();
   const { studyQueue, reload } = useHomeData();
   const [sessionStartTime] = useState(() => Date.now());
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   // 防止 StrictMode 双调用导致重复唤起番茄钟
   const pomodoroTriggeredRef = useRef(false);
+  // 训练进度（由 TrainSessionFlow 上报）
+  const [progress, setProgress] = useState<TrainProgress | null>(null);
+  // 完成确认弹窗：训练 phase === "completed" 时显示
+  const [completionOpen, setCompletionOpen] = useState(false);
+  // 防止重复触发完成流程（StrictMode / 多次 phase 变化）
+  const completionHandledRef = useRef(false);
+  // 用户确认跳转中（避免重复点击）
+  const [navigating, setNavigating] = useState(false);
 
   // 训练会话重排：先学新内容，后复习。
   // useHomeData 返回的 studyQueue 按 FSRS 紧迫度排序（review 高于 new），
@@ -68,6 +92,46 @@ export default function TrainClient() {
     };
   }, [orderedQueue.length]);
 
+  // 进度回调：TrainSessionFlow 每次状态变化时上报
+  const handleProgressChange = useCallback((p: TrainProgress) => {
+    setProgress(p);
+  }, []);
+
+  // 训练完成处理：phase === "completed" 时自动触发
+  // 1. 弹完成确认 Modal
+  // 2. 自动结束进行中的番茄钟（completeSession，计入今日统计）
+  // 3. 等用户确认后跳首页查看今日进度
+  useEffect(() => {
+    if (progress?.phase !== "completed") return;
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
+
+    setCompletionOpen(true);
+
+    // 自动结束进行中的番茄钟（不阻塞 UI）
+    void (async () => {
+      try {
+        const running = await getRunningSession();
+        if (running) {
+          // 训练已结束，番茄钟没必要继续空跑 → completeSession 写入今日统计
+          await completeSession(running.id);
+        }
+      } catch {
+        // 番茄钟结束失败不阻断训练完成流程
+      }
+    })();
+  }, [progress?.phase]);
+
+  // 用户点击"查看今日进度"：跳首页（首页有今日学习清单 + 完成数 + 番茄统计 + 7 天热力图）
+  const handleViewTodayProgress = useCallback(() => {
+    if (navigating) return;
+    setNavigating(true);
+    // 先 reload 一次首页数据（让今日完成数立即更新），再跳转
+    void reload().finally(() => {
+      router.push("/");
+    });
+  }, [navigating, reload, router]);
+
   if (orderedQueue.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center pb-20 dark:bg-gray-900">
@@ -76,12 +140,19 @@ export default function TrainClient() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           休息一下，明天继续。
         </p>
-        <LinkButton href="/" variant="primary" size="lg">
-          返回首页
-        </LinkButton>
+        <Button variant="primary" size="lg" onClick={handleViewTodayProgress}>
+          查看今日进度
+        </Button>
       </div>
     );
   }
+
+  // 顶部进度条文案：
+  // - 进行中：第 {currentIndex+1}/{total} 项 · 专注 {elapsedMinutes}分钟
+  // - 已完成：已完成 {correct}/{answered} 题
+  const progressText = progress?.phase === "completed"
+    ? `已完成 ${progress.questionsCorrect}/${progress.questionsAnswered} 题`
+    : `第 ${(progress?.currentIndex ?? 0) + 1}/${orderedQueue.length} 项 · 专注 ${elapsedMinutes}分钟`;
 
   return (
     <div className="min-h-screen pb-20 dark:bg-gray-900">
@@ -94,7 +165,7 @@ export default function TrainClient() {
           <div className="text-center">
             <p className="text-xs text-gray-400 dark:text-gray-500">训练中</p>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              第 1/{orderedQueue.length} 项 · 专注 {elapsedMinutes}分钟
+              {progressText}
             </p>
           </div>
           <div className="w-5" />
@@ -106,8 +177,52 @@ export default function TrainClient() {
         <TrainSessionFlow
           studyQueue={orderedQueue}
           onSessionComplete={() => reload()}
+          onProgressChange={handleProgressChange}
         />
       </div>
+
+      {/* 训练完成确认 Modal
+          - 用户反馈：训练做完后应该提示用户已完成，用户确定后切换到今日查看进度
+          - 番茄时钟自动结束（completeSession 已在 useEffect 中调用） */}
+      <Modal
+        open={completionOpen}
+        onClose={() => setCompletionOpen(false)}
+        title="训练完成"
+        size="sm"
+        mobilePosition="center"
+        closeOnBackdropClick={false}
+        closeOnEsc={false}
+      >
+        <div className="text-center py-2 space-y-3">
+          <Icon name="check-circle" className="w-14 h-14 text-green-500 mx-auto" />
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            今天的训练完成了！
+          </h2>
+          {progress && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              答对 <span className="font-bold text-green-600 dark:text-green-400">{progress.questionsCorrect}</span>
+              {" / "}
+              <span className="font-bold text-gray-700 dark:text-gray-300">{progress.questionsAnswered}</span> 题
+              {" · "}专注 {elapsedMinutes} 分钟
+            </p>
+          )}
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            番茄钟已自动结束并计入今日统计
+          </p>
+          <div className="pt-2">
+            <Button
+              variant="primary"
+              block
+              size="lg"
+              loading={navigating}
+              onClick={handleViewTodayProgress}
+              leftIcon="check"
+            >
+              查看今日进度
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -174,6 +174,49 @@ import { Button, Input, Select, Textarea, Modal } from "@/components/ui";
 
 如必须用 div（如复杂卡片整体可点击），必须补 `role="button"` + `tabIndex={0}` + `onKeyDown`（Enter/Space）。
 
+### 2.11 浮层 UI 反模式：禁止 `absolute` 浮层覆盖可滚动内容
+
+**背景**：2026-07-25 用户反馈"脑图搜索框挡住工具栏 + 工具栏和搜索框遮挡脑图节点"。根因分析：
+
+1. **同位置浮层互相重叠**：搜索框 `absolute top-2 left-2 w-44`（176px）+ 工具栏 `absolute top-2 right-2`（约 320px 宽，含"展开"/"收起"文字按钮）在 < 510px 视口下空间不够 → 重叠。
+2. **浮层抢画布空间**：两个浮层都 `z-20` 覆盖在 SVG 画布上，导致画布顶部 60-80px 的节点被永久遮挡（用户永远看不到这些节点，必须放大/拖动才能露出）。
+3. **测试盲区**：开发时只在小数据集 / 桌面宽屏上验证，没考虑窄 Modal（如脑图弹窗在 xl=1024px Modal 内）和移动端场景。
+
+**根因总结**：用 `absolute` 浮层当"工具栏"，默认假设它"不占空间"。实际上：
+- 它占了 viewport 顶部一块固定区域（z-20 + 宽高）
+- 在窄屏下与同位置浮层重叠
+- 在大屏下也遮挡画布主内容
+
+**正确模式**：工具栏 / 搜索框 / 过滤器应当用 **sticky header** 或 **flex 行**布局，让它们占据自己应得的空间，画布从工具栏下方开始。
+
+```tsx
+// ❌ 禁止：absolute 浮层当工具栏（抢画布 + 窄屏重叠）
+<div className="relative h-[600px]">
+  <div className="absolute top-2 left-2 z-20 w-44">搜索框</div>
+  <div className="absolute top-2 right-2 z-20">工具按钮</div>
+  <svg>...</svg>  {/* 顶部 60px 被遮挡 */}
+</div>
+
+// ✅ 正确：sticky header 占据自己空间，画布从下方开始
+<div className="relative h-[600px] flex flex-col">
+  <div className="flex items-center gap-2 px-2 py-2 border-b shrink-0">
+    <div className="flex-1">搜索框</div>
+    <div>工具按钮（全部 icon-only，节省宽度）</div>
+  </div>
+  <div className="flex-1 min-h-0">
+    <svg>...</svg>  {/* 完整可见 */}
+  </div>
+</div>
+```
+
+**判断标准**（设计审查时自查）：
+- 工具栏是否与同位置其他浮层在窄屏（< 600px）下重叠？
+- 工具栏是否覆盖了主要内容区？
+- 工具按钮文字是否能换成 icon-only（用 `aria-label` + `title`）省宽度？
+- 在窄屏 + 数据稀疏 / 窄屏 + 数据密集两种场景下，画布顶部节点是否都可见？
+
+**适用范围**：所有"画布 + 工具栏"类组件（脑图 / 图表 / 时间轴 / 看板 / 大表格等）。
+
 ---
 
 ## 3. 测试与质量门禁
@@ -301,6 +344,7 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 | 手写 div 模态 | 代码评审打回（暂无测试守护，未来补） |
 | 折叠按钮缺 aria-expanded | 代码评审打回（暂无测试守护） |
 | emoji 当功能图标 | 代码评审打回（暂无测试守护） |
+| absolute 浮层覆盖画布内容（见 2.11） | 代码评审打回（暂无测试守护，需自查窄屏 + 浮层重叠） |
 
 ---
 

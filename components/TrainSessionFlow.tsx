@@ -40,9 +40,20 @@ import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 interface TrainSessionFlowProps {
   studyQueue: StudyTask[];
   onSessionComplete: () => void;
+  /**
+   * 进度回调：每当 currentIndex / questionsAnswered / questionsCorrect 变化时触发。
+   * 父组件（TrainClient）据此更新顶部进度条，避免硬编码 "1/total"。
+   */
+  onProgressChange?: (progress: {
+    currentIndex: number;
+    total: number;
+    questionsAnswered: number;
+    questionsCorrect: number;
+    phase: string;
+  }) => void;
 }
 
-export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSessionFlowProps) {
+export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChange }: TrainSessionFlowProps) {
   const [state, dispatch] = useReducer(trainSessionReducer, undefined, createInitialTrainState);
   const [currentNode, setCurrentNode] = useState<KnowledgeNode | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -174,7 +185,28 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
     }
   }, [state.phase, onSessionComplete]);
 
+  // 进度同步：把 currentIndex / answered / correct / phase 上报到父组件
+  // 父组件据此渲染顶部进度条（替代硬编码 "1/total"）
+  useEffect(() => {
+    onProgressChange?.({
+      currentIndex: state.currentIndex,
+      total: studyQueue.length,
+      questionsAnswered: state.questionsAnswered,
+      questionsCorrect: state.questionsCorrect,
+      phase: state.phase,
+    });
+  }, [
+    state.currentIndex,
+    state.questionsAnswered,
+    state.questionsCorrect,
+    state.phase,
+    studyQueue.length,
+    onProgressChange,
+  ]);
+
   if (!currentTask || state.phase === "completed") {
+    // 完成视图：仅展示统计，不渲染按钮
+    // 父组件 TrainClient 监听 phase === "completed" 后弹 Modal 让用户确认 → 跳今日进度
     return (
       <div className="text-center py-12">
         <Icon name="check-circle" className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -182,9 +214,10 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete }: TrainSession
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           答对 {state.questionsCorrect} / {state.questionsAnswered} 题
         </p>
-        <Button variant="primary" onClick={onSessionComplete}>
-          返回首页
-        </Button>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          <Icon name="loader" className="w-3 h-3 inline-block align-middle animate-spin mr-1" />
+          正在统计结果...
+        </p>
       </div>
     );
   }

@@ -22,6 +22,7 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import type { KnowledgeNode } from "@/lib/types";
 import { Button, Input } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 interface MindMapProps {
   nodes: KnowledgeNode[];
@@ -512,112 +513,124 @@ export function MindMap({
 
   return (
     <div
-      className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden ${fillHeight ? "h-full" : ""}`}
+      className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden flex flex-col ${fillHeight ? "h-full" : ""}`}
       style={{ minHeight: fillHeight ? "100%" : "600px" }}
     >
-      {/* 工具栏 */}
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white dark:bg-gray-700 rounded-lg shadow-md p-1 border dark:border-gray-600">
-        <Button
-          iconOnly
-          variant="ghost"
-          size="sm"
-          onClick={zoomOut}
-          className="w-8 h-8 text-lg"
-          aria-label="缩小"
-          title="缩小"
-        >
-          −
-        </Button>
-        <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-center font-mono">
-          {Math.round(scale * 100)}%
-        </span>
-        <Button
-          iconOnly
-          variant="ghost"
-          size="sm"
-          onClick={zoomIn}
-          className="w-8 h-8 text-lg"
-          aria-label="放大"
-          title="放大"
-        >
-          +
-        </Button>
-        <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
-        <Button
-          iconOnly
-          variant="ghost"
-          size="sm"
-          onClick={fitView}
-          className="w-8 h-8 text-sm"
-          aria-label="适配视图"
-          title="适配视图"
-        >
-          ⤢
-        </Button>
-        <Button
-          iconOnly
-          variant="ghost"
-          size="sm"
-          onClick={resetView}
-          className="w-8 h-8 text-sm"
-          aria-label="重置"
-          title="重置视图"
-        >
-          ⟲
-        </Button>
-        <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-0.5" />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={expandAll}
-          className="h-8"
-          aria-label="全部展开"
-          title="全部展开"
-        >
-          展开
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={collapseAll}
-          className="h-8"
-          aria-label="全部收起"
-          title="全部收起"
-        >
-          收起
-        </Button>
-      </div>
-
-      {/* 搜索框（2026-07-23 优化 2）：左上角，输入关键词高亮匹配节点，Enter 聚焦匹配节点群 */}
-      <div className="absolute top-2 left-2 z-20 w-44">
-        <Input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              fitViewToMatches();
-            }
-          }}
-          placeholder="搜索知识点..."
-          inputSize="sm"
-          leftIcon="search"
-          aria-label="搜索知识点"
-        />
+      {/* 顶部工具条：搜索 + 工具按钮（2026-07-25 重构）
+          —— 原 absolute top-2 浮层方案有两类问题：
+          1) 搜索框（w-44=176px）与工具栏（约 320px）在 < 510px 视口下重叠
+          2) 两个浮层都覆盖 SVG 画布，遮挡节点（top-left/top-right 区域不可见）
+          修复：合并到 sticky header（flex-shrink-0），不抢画布空间，
+                工具按钮全部 icon-only + 用 Icon 组件，节省宽度。
+                详见 AGENTS.md "浮层 UI 反模式" 一节。 */}
+      <div className="flex items-center gap-2 px-2 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
+        {/* 搜索框 */}
+        <div className="flex-1 min-w-0 max-w-[12rem] w-full">
+          <Input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                fitViewToMatches();
+              }
+            }}
+            placeholder="搜索知识点..."
+            inputSize="sm"
+            leftIcon="search"
+            aria-label="搜索知识点"
+            className="w-full"
+          />
+        </div>
         {matchedIds && (
-          <p className="text-2xs text-gray-500 dark:text-gray-400 mt-1 px-1 bg-white/80 dark:bg-gray-800/80 rounded">
-            匹配 {matchedIds.size} 个节点
-          </p>
+          <span className="text-2xs text-gray-500 dark:text-gray-400 shrink-0">
+            匹配 {matchedIds.size}
+          </span>
         )}
+
+        {/* 工具按钮组：全部 icon-only，节省宽度 */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={zoomOut}
+            className="w-7 h-7"
+            aria-label="缩小"
+            title="缩小"
+          >
+            <span className="text-base leading-none">−</span>
+          </Button>
+          <span className="text-2xs text-gray-500 dark:text-gray-400 w-9 text-center font-mono tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={zoomIn}
+            className="w-7 h-7"
+            aria-label="放大"
+            title="放大"
+          >
+            <span className="text-base leading-none">+</span>
+          </Button>
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={fitView}
+            className="w-7 h-7"
+            aria-label="适配视图"
+            title="适配视图"
+          >
+            <Icon name="maximize" className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={resetView}
+            className="w-7 h-7"
+            aria-label="重置"
+            title="重置视图"
+          >
+            <Icon name="rotate" className="w-3.5 h-3.5" />
+          </Button>
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={expandAll}
+            className="w-7 h-7"
+            aria-label="全部展开"
+            title="全部展开"
+          >
+            <Icon name="chevron-down" className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            iconOnly
+            variant="ghost"
+            size="sm"
+            onClick={collapseAll}
+            className="w-7 h-7"
+            aria-label="全部收起"
+            title="全部收起"
+          >
+            <Icon name="chevron-right" className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
 
-      {/* 提示 */}
-      <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
+      {/* 提示（底部，不遮挡画布主区域） */}
+      <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded pointer-events-none">
         双指缩放 · 单指拖拽 · 点击节点展开/收起
       </div>
 
-      {/* 画布 */}
+      {/* 画布：占据剩余空间，header 已 shrink-0 不参与滚动 */}
       <div
         ref={containerRef}
         onWheel={handleWheel}
@@ -629,8 +642,8 @@ export function MindMap({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
-        style={{ minHeight: fillHeight ? "100%" : "600px", touchAction: "none" }}
+        className="flex-1 min-h-0 overflow-hidden cursor-grab active:cursor-grabbing relative"
+        style={{ touchAction: "none" }}
       >
         <svg
           width="100%"
