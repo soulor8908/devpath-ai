@@ -100,6 +100,11 @@ export default function PlanDetailClient() {
   // 脑图组件已封装为可复用的 MindMap，本页通过 onSelectNode 回调将节点点击映射到 filterNodeId
   const [showMindMapModal, setShowMindMapModal] = useState(false);
   const [showMindMapFloat, setShowMindMapFloat] = useState(false);
+  // 2026-07-25：脑图悬浮按钮可拖动
+  // floatPos: 按钮位置（null = 默认 right-4 bottom-28，有值 = 拖动后的 fixed 坐标）
+  // dragStarted: 区分"点击"和"拖动"——拖动时不触发 onClick 打开弹窗
+  const [floatPos, setFloatPos] = useState<{ x: number; y: number } | null>(null);
+  const floatDragRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
 
   // 知识树 / 学习计划外层区块默认折叠（用户主动展开查看）
   // 折叠按钮带 aria-expanded + aria-controls（遵循 AGENTS.md 2.5）
@@ -977,6 +982,14 @@ export default function PlanDetailClient() {
                   setFilterDifficulty("all");
                   setFilterNodeId("all");
                   setSearchQuery("");
+                  // 2026-07-25 需求：清空条件时同步清空 URL 上的场景参数（?nodeId=xxx），
+                  // 让刷新/分享链接时不再带旧筛选条件。
+                  // 用 router.replace + 只保留 planId 路径，剥离 query string。
+                  if (window.location.search) {
+                    router.replace(`/learn/${planId}`);
+                  }
+                  // 清空后显示脑图悬浮按钮（用户可能想重新通过脑图导航）
+                  setShowMindMapFloat(true);
                 }}
               >
                 清除筛选
@@ -1230,19 +1243,63 @@ export default function PlanDetailClient() {
         </Modal>
       )}
 
-      {/* ============ 需求 5：脑图悬浮小图标 ============ */}
+      {/* ============ 需求 5：脑图悬浮小图标（可拖动）============ */}
       {/* 弹窗关闭后显示，点击重新展开脑图。
-          样式与 FloatingChatButton / PomodoroWidget 统一：56px 圆形 + shadow-floating
-          定位：right-4 bottom-28（垂直错开 FloatingChat bottom-16，避开底部 nav 44px）
+          2026-07-25：支持拖动，用户可把按钮放到任意位置。
+          - 默认位置：right-4 bottom-28（错开 FloatingChat bottom-16）
+          - 拖动后：用 fixed left/top 定位到拖动位置
+          - 区分点击 vs 拖动：移动 < 5px 视为点击（打开弹窗），否则视为拖动
           层级：z-50（与 FloatingChat 同层，低于 PomodoroWidget z-[80]、Modal z-[60]） */}
       {showMindMapFloat && !showMindMapModal && (
         <Button
           iconOnly
           variant="dark"
           aria-label="打开知识点脑图"
-          title="打开知识点脑图"
-          onClick={() => setShowMindMapModal(true)}
-          className="fixed right-4 bottom-28 z-50 w-14 h-14 rounded-full shadow-floating flex items-center justify-center"
+          title="打开知识点脑图（可拖动）"
+          onPointerDown={(e) => {
+            // 记录起始位置，开始追踪拖动
+            floatDragRef.current = {
+              startX: e.clientX,
+              startY: e.clientY,
+              moved: false,
+            };
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const drag = floatDragRef.current;
+            if (!drag) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            // 移动超过 5px 才算拖动（避免点击误判）
+            if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+            if (!drag.moved) drag.moved = true;
+            // 用按钮中心点定位，确保拖动跟手
+            const btn = e.currentTarget as HTMLElement;
+            const rect = btn.getBoundingClientRect();
+            setFloatPos({
+              x: e.clientX - rect.width / 2,
+              y: e.clientY - rect.height / 2,
+            });
+          }}
+          onPointerUp={(e) => {
+            const drag = floatDragRef.current;
+            floatDragRef.current = null;
+            try {
+              (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+            } catch {
+              // pointerCapture 可能已释放，忽略
+            }
+            // 未移动 → 视为点击 → 打开脑图弹窗
+            if (drag && !drag.moved) {
+              setShowMindMapModal(true);
+            }
+          }}
+          className="fixed z-50 w-14 h-14 rounded-full shadow-floating cursor-grab active:cursor-grabbing touch-none"
+          style={
+            floatPos
+              ? { left: `${floatPos.x}px`, top: `${floatPos.y}px` }
+              : { right: "1rem", bottom: "7rem" }
+          }
         >
           <Icon name="target" className="w-6 h-6" />
         </Button>
