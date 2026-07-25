@@ -19,7 +19,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { aiFetch } from "@/lib/api-client";
+import { aiFetch, SessionExpiredError } from "@/lib/api-client";
 import { getItem, setItem, delItem } from "@/lib/storage/db";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
@@ -94,6 +94,25 @@ export function LearnWizard({
   const [answerErrors, setAnswerErrors] = useState(0);
   const didInitRef = useRef(false);
 
+  // 2026-07-25 用户需求：试用用户（未配置自己的 AI 模型）生成知识库时报
+  // "session expired or not found, please re-exchange"。
+  // 根因：/api/learn/* 强制 requireSession，无 session 直接 401 → aiFetch 抛 SessionExpiredError。
+  // 与 ChatClient 的 trial 模式不同——学习向导涉及 3 次大模型调用（拆知识点+题目+答案），
+  // 成本较高，不适合走 trial 免费额度。这里给出明确引导，让用户去配置自己的模型。
+  // 调用方应在 catch 分支调用此函数并 return（不再继续流程）。
+  const handleSessionExpired = useCallback(
+    async (scene: string): Promise<void> => {
+      const ok = await confirmDialog({
+        title: "需要配置 AI 模型",
+        message: `${scene}需要自己的 AI API Key。请到「我的」→「AI 模型」添加并保存模型配置后重试。`,
+        confirmText: "去配置",
+        cancelText: "稍后",
+      });
+      if (ok) router.push("/profile");
+    },
+    [router],
+  );
+
   // ---- Step 1: 拆知识点 ----
   // 设计原则：自动触发（首次挂载无草稿）不弹 AITaskModal，避免系统默认动作阻塞用户
   // 仅手动触发（用户主动点"重新生成"按钮）才弹 AITaskModal
@@ -128,6 +147,12 @@ export function LearnWizard({
           completeAITask(aiTask.id);
         }
       } catch (err) {
+        // 2026-07-25：session 失效（试用用户/未配模型/session 过期）走专属引导
+        if (err instanceof SessionExpiredError) {
+          void handleSessionExpired("拆解知识点");
+          if (aiTask) errorAITask(aiTask.id, "需要配置 AI 模型");
+          return;
+        }
         const msg = err instanceof Error ? err.message : "未知错误";
         toast.error(`知识点拆解失败：${msg}`);
         if (aiTask) errorAITask(aiTask.id, msg);
@@ -135,7 +160,7 @@ export function LearnWizard({
         setLoading(false);
       }
     },
-    [topic, promptText],
+    [topic, promptText, handleSessionExpired],
   );
 
   // 首次挂载：优先恢复草稿，无草稿才自动开始拆知识点
@@ -211,13 +236,19 @@ export function LearnWizard({
       setAITaskContent(aiTaskId, `已生成 ${data.questions.length} 道题目`);
       completeAITask(aiTaskId);
     } catch (err) {
+      // 2026-07-25：session 失效走专属引导
+      if (err instanceof SessionExpiredError) {
+        void handleSessionExpired("生成题目");
+        errorAITask(aiTaskId, "需要配置 AI 模型");
+        return;
+      }
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`题目生成失败：${msg}`);
       errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
-  }, [nodes]);
+  }, [nodes, handleSessionExpired]);
 
   // ---- Step 3: 流式生成答案 ----
   const fetchAnswers = useCallback(async () => {
@@ -316,13 +347,19 @@ export function LearnWizard({
       setAITaskContent(aiTaskId, `答案生成完成（${done}/${questions.length}）`);
       completeAITask(aiTaskId);
     } catch (err) {
+      // 2026-07-25：session 失效走专属引导
+      if (err instanceof SessionExpiredError) {
+        void handleSessionExpired("生成答案");
+        errorAITask(aiTaskId, "需要配置 AI 模型");
+        return;
+      }
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`答案生成失败：${msg}`);
       errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
-  }, [questions, nodes, topic]);
+  }, [questions, nodes, topic, handleSessionExpired]);
 
   // ---- Step 4: 保存计划并跳转 ----
   const saveAndRedirect = useCallback(async () => {

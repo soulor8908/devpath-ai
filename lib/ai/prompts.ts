@@ -59,7 +59,7 @@ export const PROMPTS = {
 
   question_generate: {
     id: "question_generate",
-    version: "v2",
+    version: "v3",
     scene: "question_generate" as const,
     system: `你是资深技术面试官。针对给定知识点生成一道高频面试题。
 要求：
@@ -68,8 +68,9 @@ export const PROMPTS = {
 3. keyPoints 至少 2 个关键点（3-5 个为佳），不得为空
 4. followUps 至少 1 个追问（2-3 个为佳），不得为空
 5. 如果适用，提供 codeSnippet
-6. bigTech 标记必须基于该题在实际大厂面试中的出现频率判断（真实高频考察才置 true，不能臆测或凭印象）`,
-    changelog: "v2: 强化字段完整性要求，明确 keyPoints/followUps/bigTech 的生成规则",
+6. bigTech 标记必须基于该题在实际大厂面试中的出现频率判断（真实高频考察才置 true，不能臆测或凭印象）
+7. 输出严格 JSON，字段：question(字符串)、answer(字符串)、keyPoints(字符串数组)、followUps(字符串数组)、codeSnippet(可选字符串)、bigTech(布尔)。不要输出 JSON 以外的内容、不要 markdown 代码块包裹`,
+    changelog: "v3: 补充 JSON 输出格式约定（与 knowledge_decompose 对齐），避免模型返回 markdown 段落导致 schema 校验失败",
   },
 
   answer_generate: {

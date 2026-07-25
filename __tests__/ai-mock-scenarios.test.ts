@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 与 __tests__/question.test.ts 相同的 mock 模式
+// 2026-07-25：question.ts 新增 generateObject 失败降级到 generateText 的容错，
+// mock 需同时包含 generateText
 vi.mock("ai", () => ({
   generateObject: vi.fn(),
+  generateText: vi.fn(),
 }));
 
 vi.mock("../lib/ai/provider", () => ({
   createAIProvider: vi.fn(() => ({})),
 }));
 
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { generateQuestions } from "../lib/ai/question";
 import type { KnowledgeNode } from "../lib/types";
 
@@ -28,6 +31,7 @@ function makeNode(id: string): KnowledgeNode {
 describe("AI Mock 场景", () => {
   beforeEach(() => {
     vi.mocked(generateObject).mockReset();
+    vi.mocked(generateText).mockReset();
   });
 
   it("字段缺失时不崩溃（keyPoints/followUps/bigTech 缺失）", async () => {
@@ -56,8 +60,12 @@ describe("AI Mock 场景", () => {
 
   it("AI 超时返回失败标记", async () => {
     const nodes = [makeNode("k1")];
-    // 模拟 AI 调用超时（abort/timeout 类错误）
+    // 2026-07-25：generateObject 失败后会降级到 generateText，
+    // 要走到占位需要 generateText 也失败。两个都 mock 超时错误。
     vi.mocked(generateObject).mockRejectedValue(new Error("The operation was aborted due to timeout"));
+    // generateObject 失败 → 降级 generateText 也超时（第 1 次）
+    // → sleep 800ms 重试 generateObject 还超时 → 降级 generateText 还超时（第 2 次）→ 占位
+    vi.mocked(generateText).mockRejectedValue(new Error("The operation was aborted due to timeout"));
 
     const questions = await generateQuestions(nodes);
 
@@ -88,6 +96,7 @@ describe("AI Mock 场景", () => {
 
   it("部分成功部分失败", async () => {
     const nodes = [makeNode("k1"), makeNode("k2"), makeNode("k3"), makeNode("k4")];
+    // 2026-07-25：generateObject 失败后降级 generateText，要走到占位需 generateText 也失败
     // 4 个节点：成功 / 超时失败 / 网络错误 / 成功
     vi.mocked(generateObject)
       .mockResolvedValueOnce({
@@ -98,6 +107,12 @@ describe("AI Mock 场景", () => {
       .mockResolvedValueOnce({
         object: { question: "题4", answer: "答4", keyPoints: ["p4"], followUps: ["f4"], bigTech: true },
       } as any);
+    // k2/k3 降级 generateText 也失败（每个节点重试 1 次，共 4 次降级调用）
+    vi.mocked(generateText)
+      .mockRejectedValueOnce(new Error("Request timeout"))
+      .mockRejectedValueOnce(new Error("Request timeout"))
+      .mockRejectedValueOnce(new Error("fetch failed: network error"))
+      .mockRejectedValueOnce(new Error("fetch failed: network error"));
 
     const questions = await generateQuestions(nodes);
 

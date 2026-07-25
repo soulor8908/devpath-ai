@@ -295,10 +295,17 @@ export function PomodoroWidget() {
     } else {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // 默认右下角，避开底部 Nav
+      // 2026-07-25 用户需求：默认位置在聊天框（FloatingChatButton，right-4 bottom-16）
+      // 上方，不遮挡它。原默认 Y = vh - 56 - 96（距底 96px）会与 ChatButton 顶部
+      // （距底 64+56=120px）在垂直方向重叠 24px，且 Ring z-80 高于 ChatButton z-50，
+      // 视觉上 Ring 盖住 ChatButton 上半部分。
+      // 调整：Ring Y 再上移 56（ChatButton 高度）+ 8（gap）= 64px
+      //   原 Y = vh - 56 - 96 = vh - 152
+      //   新 Y = vh - 56 - 96 - 56 - 8 = vh - 216
+      // 这样 Ring 范围 [vh-216, vh-160]，ChatButton 范围 [vh-120, vh-64]，gap 40px 安全
       setPosition({
         x: Math.max(0, vw - RING_SIZE - 16),
-        y: Math.max(0, vh - RING_SIZE - 96),
+        y: Math.max(0, vh - RING_SIZE - 96 - 56 - 8),
       });
     }
     // 检查是否有 running session → 初始 mode 为 ring
