@@ -1,11 +1,23 @@
 // public/sw.js
 // Service Worker：缓存静态资源 + 离线 fallback 到首页 + 推送通知
-// 采用 stale-while-revalidate 策略
+// 导航请求：网络优先（让浏览器原生处理 308 尾斜杠重定向），离线回退缓存
+// 静态资源：stale-while-revalidate 策略
 // 扩展：push / notificationclick 事件（PWA 通知基础设施）
 // 扩展：periodicsync 事件（P0.1 后台定期检查，让 AI "在呼吸"）
+//
+// 导航请求为何不能返回 URL 不匹配的缓存响应（2026-07-25 修复）：
+//   next.config.js 开了 trailingSlash，/learn → 308 → /learn/。
+//   旧版 SW 把 /learn 预缓存（body 实为 /learn/ 的 HTML，response.url 带尾斜杠），
+//   导航到 /learn 时直接返回该缓存 —— response.url 与 request.url 不一致，
+//   Chrome 对导航请求拒绝这种响应，直接 net::ERR_FAILED 白屏。
+//   影响面：直接输入/刷新 /learn、/review、/rest、/stats，
+//   以及推送通知点击（data.url="/review"）——全部打不开。
+//   修复：导航请求一律网络优先（浏览器自己跟重定向），仅离线时回退缓存；
+//   预缓存改用尾斜杠 URL，与重定向后的最终 URL 对齐。
 
-const CACHE_NAME = "devpath-v2";
-const STATIC_ASSETS = ["/", "/learn", "/review", "/rest", "/stats", "/manifest.json"];
+const CACHE_NAME = "devpath-v3";
+// 注意：必须与 trailingSlash: true 的产物 URL 一致（带尾斜杠）
+const STATIC_ASSETS = ["/", "/learn/", "/review/", "/rest/", "/stats/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,6 +38,23 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/")) return;
 
+  // 导航请求：网络优先。浏览器原生跟随 trailingSlash 308 重定向，
+  // SW 不介入 URL 改写，避免「缓存响应 URL ≠ 请求 URL」导致的 ERR_FAILED。
+  // 离线时依次回退：精确缓存 → 尾斜杠规范化缓存 → 首页离线壳。
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(async () => {
+        const cached =
+          (await caches.match(event.request)) ??
+          (await caches.match(url.pathname.endsWith("/") ? url.pathname : url.pathname + "/")) ??
+          (await caches.match("/"));
+        return cached ?? Response.error();
+      })
+    );
+    return;
+  }
+
+  // 静态资源（JS/CSS/图标/字体等）：stale-while-revalidate
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request)
@@ -36,7 +65,7 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => cached ?? caches.match("/"));
+        .catch(() => cached);
       return cached ?? fetchPromise;
     })
   );

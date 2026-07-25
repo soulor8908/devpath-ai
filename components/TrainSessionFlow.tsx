@@ -45,8 +45,14 @@ import { AnswerContent } from "@/components/CodeBlock";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { openChatModal } from "@/lib/chat-modal-store";
-import { createCard, findExistingCard } from "@/lib/fsrs";
+import { createCard, findExistingCard, rateCard } from "@/lib/fsrs";
 import { toggleQuestionInPlan } from "@/lib/favorite";
+import { markQuestionUnderstood } from "@/lib/node-mastery";
+import { recordMistake } from "@/lib/mistake-book";
+import { logLearning } from "@/lib/learn-log";
+import { savePlanSummary } from "@/lib/plan-summary";
+import { scheduleAutoSync } from "@/lib/sync";
+import { nowISO } from "@/lib/time";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
 import { toast } from "@/lib/toast";
 
@@ -250,6 +256,86 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
     }
   }, [currentQuestion, currentPlan]);
 
+  // 2026-07-25 核心闭环修复：训练自评结果持久化。
+  // 背景：原实现自评只 dispatch 内存状态机，不写 IndexedDB ——
+  //   用户"学会了"一个知识点后，plan.schedule 里的 learn 项永远 completed=false，
+  //   首页"今日学习队列"的新学任务永远不消失，学习成果无记录、不进 FSRS。
+  // 修复（new 任务）：
+  //   - 答对：标记 schedule 项 completed + 题目 understood（驱动 mastery 派生 + learn_log）
+  //   - 答错：进错题本；schedule 保持未完成（没学会，明天继续出现）
+  // 修复（review 任务）：训练内完成复习卡 → 本地 rateCard(Good) 推进 FSRS，
+  //   否则卡片永远 due<=now，复习任务每天重复出现。
+  const persistTaskResult = useCallback(
+    async (correct: boolean) => {
+      if (!currentTask) return;
+      const now = nowISO();
+
+      if (currentTask.type === "new" && currentPlan) {
+        if (correct) {
+          try {
+            // 1. 标记 plan.schedule 中对应 learn 项完成（首页队列据此消失）
+            const withSchedule: LearningPlan = {
+              ...currentPlan,
+              updatedAt: now,
+              schedule: (currentPlan.schedule ?? []).map((s) =>
+                !s.completed &&
+                s.type === "learn" &&
+                s.nodeId === currentTask.nodeId
+                  ? { ...s, completed: true, completedAt: now }
+                  : s,
+              ),
+            };
+            // 2. 题目 understood（内含 setItem + savePlanSummary + learn_log + mastery 派生）
+            let finalPlan = withSchedule;
+            if (currentQuestion) {
+              finalPlan = await markQuestionUnderstood(withSchedule, currentQuestion.id, true);
+            } else {
+              await setItem(KEY_PREFIXES.PLAN + withSchedule.id, withSchedule);
+              await savePlanSummary(withSchedule);
+              scheduleAutoSync();
+            }
+            setCurrentPlan(finalPlan);
+          } catch {
+            // 持久化失败不阻塞会话推进（内存态已更新，下次进入会重试）
+          }
+        } else if (currentQuestion) {
+          // 答错：进错题本（静默失败不影响流程）；schedule 项保持未完成
+          try {
+            await recordMistake({
+              planId: currentPlan.id,
+              questionId: currentQuestion.id,
+              nodeId: currentQuestion.nodeId,
+              questionText: currentQuestion.question,
+              answerText: currentQuestion.answer || "",
+            });
+          } catch {
+            // 错题记录失败不阻塞会话
+          }
+        }
+        return;
+      }
+
+      if (currentTask.type === "review" && currentTask.cardId) {
+        try {
+          const card = await getItem<ReviewCard>(KEY_PREFIXES.CARD + currentTask.cardId);
+          if (!card) return;
+          // 训练内复习没有 4 档自评 UI，统一按 Good 推进 FSRS（用户已完整看过材料）
+          const updated = rateCard(card, 3);
+          await setItem(KEY_PREFIXES.CARD + updated.id, updated);
+          await logLearning({
+            planId: card.planId,
+            nodeId: card.nodeId,
+            type: "review_complete",
+          }).catch(() => {});
+          scheduleAutoSync();
+        } catch {
+          // FSRS 推进失败不阻塞会话
+        }
+      }
+    },
+    [currentTask, currentPlan, currentQuestion],
+  );
+
   // 会话完成
   useEffect(() => {
     if (state.phase === "completed") {
@@ -418,6 +504,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                   onClick={() => {
                     setIsCorrect(true);
                     setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
+                    void persistTaskResult(true);
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
                   }}
                   leftIcon="check"
@@ -430,6 +517,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                   onClick={() => {
                     setIsCorrect(false);
                     setFeedback(generateSocraticFeedback(false, currentQuestion.keyPoints?.[0]));
+                    void persistTaskResult(false);
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: false });
                   }}
                   leftIcon="x"
@@ -454,6 +542,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
             onClick={() => {
               setIsCorrect(true);
               setFeedback("知识点已标记完成，继续下一个。");
+              void persistTaskResult(true);
               dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
             }}
             leftIcon="chevron-right"

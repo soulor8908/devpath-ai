@@ -10,13 +10,14 @@
 // - 快捷输入：基于用户最近学习/复习/聊天记录智能推荐（无数据用默认）
 // 历史计划列表已迁移到 /learn/list，本页聚焦"创建"。
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES, type LearningPlan, type KnowledgeNode, type Question, type ScheduleItem, type PromptLibraryItem } from "@/lib/types";
-import { PRESETS, type PresetMeta, matchPresetByTopic } from "@/lib/presets";
+import { PRESET_METAS, matchPresetMetaByTopic } from "@/lib/presets/meta";
+import { loadPresetById, type PresetMeta } from "@/lib/presets/loader";
 import { MindMap } from "@/components/MindMap";
 import {
   listPrompts,
@@ -44,7 +45,17 @@ interface PresetPlanData {
 }
 
 export default function LearnNewPage() {
+  // Next.js 15：useSearchParams 必须包在 Suspense 边界内（否则静态页构建报错）
+  return (
+    <Suspense fallback={null}>
+      <LearnNewPageInner />
+    </Suspense>
+  );
+}
+
+function LearnNewPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +114,8 @@ export default function LearnNewPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
+  // 预设数据按需加载中（chunk 下载）的卡片 id，用于卡片点击反馈
+  const [loadingPresetId, setLoadingPresetId] = useState<string | null>(null);
 
   // 用户自定义提示词
   const [promptText, setPromptText] = useState("");
@@ -142,6 +155,36 @@ export default function LearnNewPage() {
     setRegenError("");
     setSelectedNodeId(undefined);
   }
+
+  // 点击预设卡片：按需动态加载该预设的完整题库（code-split chunk），再打开弹窗
+  async function handleOpenPreset(id: string) {
+    if (loadingPresetId) return; // 防重复点击
+    setLoadingPresetId(id);
+    try {
+      const preset = await loadPresetById(id);
+      if (preset) openPreset(preset);
+    } catch {
+      toast.error("预设数据加载失败，请重试");
+    } finally {
+      setLoadingPresetId(null);
+    }
+  }
+
+  // 场景参数闭环（AGENTS.md 2.12）：/learn/new?topic=xxx（如知识详情弹窗「导入学习计划」跳入）
+  // 预填主题输入框；若精确命中预设则直接打开对应预设弹窗，用户无需再操作一遍
+  const topicParamHandled = useRef(false);
+  useEffect(() => {
+    if (topicParamHandled.current) return;
+    const paramTopic = searchParams.get("topic");
+    if (!paramTopic) return;
+    topicParamHandled.current = true;
+    setTopic(paramTopic);
+    const matchedMeta = matchPresetMetaByTopic(paramTopic);
+    if (matchedMeta) {
+      void handleOpenPreset(matchedMeta.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // 右上角"重新生成"按钮：调用 /api/learn 用 AI 重新生成整个知识树
   async function regenerateWithAI() {
@@ -229,18 +272,27 @@ export default function LearnNewPage() {
     e.preventDefault();
     if (!topic.trim()) return;
 
-    // 精确匹配预设 → 立即打开预设弹窗（零等待，预设数据秒开）
+    // 精确匹配预设（轻量 meta 同步匹配）→ 按需加载完整数据后打开预设弹窗
     // 无匹配 → 进入 LearnWizard 渐进式向导（拆知识点 → 题目 → 答案 → 计划）
-    const matched = matchPresetByTopic(topic.trim());
-    if (matched) {
-      const customizedPreset: PresetMeta = {
-        ...matched,
-        topic: topic.trim(),
-      };
-      openPreset(customizedPreset);
-      setError("");
-      setLoading(false);
-      return;
+    const matchedMeta = matchPresetMetaByTopic(topic.trim());
+    if (matchedMeta) {
+      setLoading(true);
+      try {
+        const matched = await loadPresetById(matchedMeta.id);
+        if (matched) {
+          const customizedPreset: PresetMeta = {
+            ...matched,
+            topic: topic.trim(),
+          };
+          openPreset(customizedPreset);
+          setError("");
+          return;
+        }
+      } catch {
+        // 加载失败回落到向导流程（不阻塞用户）
+      } finally {
+        setLoading(false);
+      }
     }
 
     // 无匹配预设 → 进入渐进式向导（取代旧版 /api/learn 全量生成）
@@ -480,22 +532,23 @@ export default function LearnNewPage() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
             <Icon name="package" className="w-4 h-4" />
-            内置知识库（{PRESETS.length} 个方向）
+            内置知识库（{PRESET_METAS.length} 个方向）
           </h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">秒级加载 · 可重新生成</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PRESETS.map((p) => (
+          {PRESET_METAS.map((p) => (
             <div
               key={p.id}
               role="button"
               tabIndex={0}
               aria-label={`打开内置知识库：${p.name}`}
-              onClick={() => openPreset(p)}
+              aria-busy={loadingPresetId === p.id}
+              onClick={() => void handleOpenPreset(p.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  openPreset(p);
+                  void handleOpenPreset(p.id);
                 }
               }}
               className="group cursor-pointer text-left p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-card dark:hover:shadow-gray-900/30 rounded-card transition-all flex flex-col w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
@@ -504,10 +557,14 @@ export default function LearnNewPage() {
               <div className="flex items-center gap-2.5 mb-2">
                 <span className="text-2xl shrink-0" aria-hidden="true">{p.icon}</span>
                 <span className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate flex-1">{p.name}</span>
-                <Icon
-                  name="chevron-right"
-                  className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0"
-                />
+                {loadingPresetId === p.id ? (
+                  <span className="text-2xs text-blue-500 dark:text-blue-400 shrink-0">加载中…</span>
+                ) : (
+                  <Icon
+                    name="chevron-right"
+                    className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0"
+                  />
+                )}
               </div>
               {/* 描述：2 行省略 */}
               <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3 leading-relaxed min-h-[2rem]">
@@ -524,15 +581,15 @@ export default function LearnNewPage() {
                   </span>
                 ))}
               </div>
-              {/* 统计：知识点 / 题目数 */}
+              {/* 统计：知识点 / 题目数（轻量 meta 计数，与真实数据一致性由 preset-bundle-guard 守护） */}
               <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
                 <span className="flex items-center gap-0.5">
                   <Icon name="book" className="w-3 h-3" />
-                  {p.knowledgeTree.length} 知识点
+                  {p.knowledgeCount} 知识点
                 </span>
                 <span className="flex items-center gap-0.5">
                   <Icon name="list" className="w-3 h-3" />
-                  {p.questions.length} 题
+                  {p.questionCount} 题
                 </span>
               </div>
             </div>

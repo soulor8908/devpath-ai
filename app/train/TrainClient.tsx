@@ -44,6 +44,8 @@ export default function TrainClient() {
   const completionHandledRef = useRef(false);
   // 用户确认跳转中（避免重复点击）
   const [navigating, setNavigating] = useState(false);
+  // 完成时是否真的有番茄钟被结束（决定完成 Modal 文案，避免"谎报军情"）
+  const [pomodoroCompleted, setPomodoroCompleted] = useState(false);
 
   // 训练会话重排：先学新内容，后复习。
   // useHomeData 返回的 studyQueue 按 FSRS 紧迫度排序（review 高于 new），
@@ -135,6 +137,7 @@ export default function TrainClient() {
         if (running) {
           // 训练已结束，番茄钟没必要继续空跑 → completeSession 写入今日统计
           await completeSession(running.id);
+          setPomodoroCompleted(true);
         }
       } catch {
         // 番茄钟结束失败不阻断训练完成流程
@@ -226,9 +229,11 @@ export default function TrainClient() {
               {" · "}专注 {elapsedMinutes} 分钟
             </p>
           )}
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            番茄钟已自动结束并计入今日统计
-          </p>
+          {pomodoroCompleted && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              番茄钟已自动结束并计入今日统计
+            </p>
+          )}
           <div className="pt-2">
             <Button
               variant="primary"

@@ -52,9 +52,21 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW reg failed:', e));
-              });
+              // 2026-07-25 修复：开发环境跳过 SW 注册。
+              // dev 下 SW 会缓存 JS chunk（stale-while-revalidate），
+              // 导致热更新后的新代码被旧缓存覆盖，页面跑的是旧 bundle。
+              var isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+              if (isDev) {
+                // 兜底：若 dev 下已存在旧注册（历史版本注册的），主动注销 + 清缓存
+                navigator.serviceWorker.getRegistrations().then(function(rs) {
+                  rs.forEach(function(r) { r.unregister(); });
+                });
+                if ('caches' in window) caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); });
+              } else {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW reg failed:', e));
+                });
+              }
             }`,
           }}
         />

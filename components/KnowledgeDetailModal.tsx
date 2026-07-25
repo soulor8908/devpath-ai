@@ -21,7 +21,7 @@
 import { useRouter } from "next/navigation";
 import { Modal, Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { getPresetById } from "@/lib/presets";
+import { getPresetMetaById } from "@/lib/presets/meta";
 import type { KnowledgeIndexEntry } from "@/lib/types";
 
 export interface KnowledgeDetailModalProps {
@@ -37,12 +37,13 @@ export function KnowledgeDetailModal({ entry, onClose, onNavigate }: KnowledgeDe
   if (!entry) return null;
 
   const isPreset = entry.source === "preset";
-  const preset = isPreset && entry.presetId ? getPresetById(entry.presetId) : undefined;
+  // 仅需 meta.topic 构造导入链接，用轻量 meta（禁引 barrel，见 lib/presets/index.ts 头注释）
+  const presetMeta = isPreset && entry.presetId ? getPresetMetaById(entry.presetId) : undefined;
 
   const handleImportPreset = () => {
-    if (preset) {
-      // 跳转到新建学习页，预填 preset 的 topic（matchPresetByTopic 会匹配上）
-      router.push(`/learn/new?topic=${encodeURIComponent(preset.topic)}`);
+    if (presetMeta) {
+      // 跳转到新建学习页，预填 preset 的 topic（matchPresetMetaByTopic 会匹配上）
+      router.push(`/learn/new?topic=${encodeURIComponent(presetMeta.topic)}`);
     }
     onClose();
   };

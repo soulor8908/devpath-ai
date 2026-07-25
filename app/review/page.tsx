@@ -14,7 +14,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { listItems, setItem, delItem } from "@/lib/storage/db";
-import { aiFetch } from "@/lib/api-client";
+import { rateCard } from "@/lib/fsrs";
+import { nanoid } from "nanoid";
+import { nowISO } from "@/lib/time";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
   ReviewCard,
@@ -193,19 +195,20 @@ function ReviewPageContent() {
     if (!card) return;
 
     try {
-      const res = await aiFetch("/api/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ card, rating }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setError(err.error || `评分失败 (${res.status})`);
-        return;
-      }
-      const { card: updatedCard, log } = (await res.json()) as {
-        card: ReviewCard;
-        log: ReviewLog;
+      // 2026-07-25 离线优先修复：FSRS 评分是纯规则计算（rateCard），
+      // 原实现走 POST /api/review，要求有效 session —— 未配置 API Key 的
+      // 新用户/离线场景评分直接失败，复习主流程完全卡死。
+      // 改为本地计算：结果与 /api/review 完全一致（同一 rateCard 函数），
+      // 无网络往返、无 session 依赖，PWA 离线可用。
+      const updatedCard = rateCard(card, rating);
+      const log: ReviewLog = {
+        id: nanoid(),
+        cardId: card.id,
+        date: nowISO(),
+        rating,
+        elapsedDays: card.elapsedDays,
+        stateBefore: card.state,
+        stateAfter: updatedCard.state,
       };
 
       // 存回 IndexedDB

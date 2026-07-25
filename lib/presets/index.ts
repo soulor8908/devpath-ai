@@ -2,6 +2,15 @@
 // 预设知识库统一索引：算法 200 题 / 前端 / 后端 / AI / LLM 应用开发
 // 用户选择预设时直接导入内置数据（秒级响应），
 // 之后可在右上角点击"重新生成"调用 AI 重新生成整个知识树。
+//
+// ⚠️ 性能约束（2026-07-25 包体积治理）：
+//   本 barrel 静态引入全部 preset 数据（约 3.9 万行 / ~700kB）。
+//   【客户端组件（app/ 与 components/ 下）禁止 import 本模块】，
+//   请改用：
+//     - ./meta   → PRESET_METAS / getPresetMetaById / matchPresetMetaByTopic（同步、轻量）
+//     - ./loader → loadPresetById(id)（动态 import 单个 preset，按需加载）
+//   本模块仅供测试（__tests__/）与 Node 脚本（scripts/）使用，
+//   由 __tests__/preset-bundle-guard.test.ts 守护。
 
 import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 import { ALGORITHM_200_PRESET } from "./algorithm-200";

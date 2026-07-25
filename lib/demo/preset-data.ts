@@ -14,7 +14,6 @@
 import { getItem, setItem, listItems, delItem } from "@/lib/storage/db";
 import { savePlanSummary, deletePlanSummary } from "@/lib/plan-summary";
 import { createCard } from "@/lib/fsrs";
-import { FRONTEND_PRESET } from "@/lib/presets/frontend";
 import { KEY_PREFIXES } from "@/lib/types";
 import type { LearningPlan, ReviewCard, LearnLog } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
@@ -57,6 +56,12 @@ export async function shouldInjectDemo(): Promise<boolean> {
  */
 export async function injectDemoData(): Promise<void> {
   if (typeof window === "undefined") return;
+
+  // 动态引入 frontend preset（6.7k 行题库数据）：
+  //   本模块被 LearnWizard / learn/new / onboarding 静态引用，
+  //   若顶层静态 import preset 会把数据打进这些页面首包。
+  //   只有真正注入 demo（首次访问且无任何计划）时才下载该 chunk。
+  const { FRONTEND_PRESET } = await import("@/lib/presets/frontend");
 
   const now = new Date().toISOString();
   const today = chinaDateNow();
