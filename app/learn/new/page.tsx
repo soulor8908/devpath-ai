@@ -663,8 +663,11 @@ function PresetMindMapModal({
           </div>
         )}
 
-        {/* 脑图 - 填充剩余空间，不滚动（MindMap 内部处理 pan/zoom） */}
-        <div className="flex-1 min-h-0 overflow-hidden bg-gray-50 dark:bg-gray-900">
+        {/* 脑图 - 填充剩余空间，不滚动（MindMap 内部处理 pan/zoom）
+            2026-07-25 修复脑图 SVG height 0：
+            必须加 flex flex-col，让 MindMap root 的 flex-1 min-h-0 能在 flex 链中解析高度。
+            与学习详情页 <Modal fillHeight> 的 children div 保持一致的 flex 链结构。 */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
           {regenerating ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
               <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
