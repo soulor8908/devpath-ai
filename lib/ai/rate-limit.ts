@@ -107,11 +107,20 @@ export function getRateLimitScenes(): AIScene[] {
 
 /**
  * Trial 模式场景配额表：每日上限（比登录用户更紧）
+ *
+ * 2026-07-25 用户需求：试用用户也要能生成知识库（拆知识点+生成题目+生成答案）。
+ *   - 这 3 步成本较高（每步多次大模型调用），配额设 2/天
+ *   - 用户走完一次完整流程 = 1 次拆解 + 1 次题目 + 1 次答案流式
+ *   - 2 次/天足以让用户体验完整流程，又不会被滥用刷免费额度
  */
 const TRIAL_SCENE_QUOTAS: Partial<Record<AIScene, number>> = {
   chat: 5,
   // 知识检索嵌入：trial 用户 100/天（每次知识型聊天约 1 次 embed，足够体验）
   embed: 100,
+  // 学习向导 3 步：trial 用户 2/天/场景（一次完整流程够用）
+  knowledge_decompose: 2,
+  question_generate: 2,
+  answer_generate: 2,
 };
 
 const TRIAL_DEFAULT_QUOTA = 2;

@@ -6,14 +6,21 @@
 //   - 减少用户等待时间：先让用户确认知识点
 //   - recordAICall 质量追踪
 //
-// 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
-//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
+// 鉴权（2026-07-25 用户需求：试用用户也要能生成知识库）：
+//   - 优先走 requireSession（用户已配置自己模型 → 用 session.apiKey）
+//   - requireSession 失败（401）→ 降级到 trial 模式：
+//       a. 服务端用默认模型 getModel()（环境变量配置的 AI_API_KEY）
+//       b. IP 维度限流（knowledge_decompose=2/天，learn 类成本较高）
+//       c. 响应头 X-Trial-Mode: 1 + X-Trial-Remaining: N
+//   - trial 模式让体验用户第一时间能拆解知识点（乔布斯视角：API Key 不应是首日门槛）
 
 import { NextRequest, NextResponse } from "next/server";
+import type { LanguageModel } from "ai";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
 
 export const runtime = "edge";
 
@@ -21,8 +28,22 @@ export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   // 先鉴权
   const sessionResult = await requireSession(req);
-  if (sessionResult instanceof NextResponse) return sessionResult;
-  const { session } = sessionResult;
+  const hasSession = !(sessionResult instanceof NextResponse);
+  const session = hasSession ? sessionResult.session : null;
+
+  // 2026-07-25：session 不存在时降级到 trial 模式（服务端默认模型 + IP 限流）
+  let model: LanguageModel;
+  let isTrial = false;
+  let trialRemaining: number | undefined;
+  if (session) {
+    model = getModelFromSession(session, "learn");
+  } else {
+    const trial = await tryTrialMode(req, "knowledge_decompose", sessionResult as NextResponse);
+    if (trial.errorResponse || !trial.model) return trial.errorResponse ?? NextResponse.json({ error: "trial mode unavailable" }, { status: 500 });
+    model = trial.model;
+    isTrial = trial.isTrial;
+    trialRemaining = trial.remaining;
+  }
 
   let body: unknown;
   try {
@@ -39,8 +60,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
   }
 
-  const model = getModelFromSession(session, "learn");
-
   try {
     const userPrompt =
       typeof prompt === "string" && prompt.trim().length > 0
@@ -48,7 +67,9 @@ export async function POST(req: NextRequest) {
         : undefined;
     const nodes = await decomposeKnowledge(topic.trim(), userPrompt, undefined, model);
 
-    return NextResponse.json({ nodes });
+    const response = NextResponse.json({ nodes });
+    applyTrialHeaders(response, isTrial, trialRemaining);
+    return response;
   } catch (error) {
     // 区分上游 AI 鉴权失败 vs 本地错误（与 chat route 一致）
     const isUpstreamAuthError =

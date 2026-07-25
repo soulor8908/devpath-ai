@@ -37,6 +37,7 @@ import {
   pauseSession,
   resumeSession,
   abandonSession,
+  markSessionCurrent,
   POMODORO_SESSION_CHANGED_EVENT,
   POMODORO_OPEN_EVENT,
 } from "@/lib/timer/pomodoro";
@@ -203,6 +204,37 @@ export function PomodoroWidget() {
   // 正在完成的 session id：防止 refresh 重入
   const completingRef = useRef<string | null>(null);
 
+  // 2026-07-25 用户需求：长按显示快捷键后拖动失效，拖动到快捷键上方触发快捷键事件。
+  // - longPressTimerRef：500ms 长按定时器，触发后打开快捷菜单
+  // - longPressTriggeredRef：长按已触发标记，true 时 pointermove 不再移动 widget（拖动失效）
+  // - lastPointerPosRef：记录最新指针位置，pointerup 时用 elementFromPoint 检测是否在快捷键上方
+  // - menuOpen：快捷菜单是否打开（长按 / 右键 / 键盘均可触发）
+  // - hoveredAction：当前指针悬停的快捷键（用于高亮反馈），null 表示无
+  // - ringActionRef：桥接顶层长按 handler 与 RingWidget 内的 action 执行（避免 prop drilling）
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  const lastPointerPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hoveredAction, setHoveredAction] = useState<string | null>(null);
+  // ringActionRef：长按拖动到快捷键上方时，由 pointerup 调用对应的 action handler。
+  // RingWidget 在挂载时写入此 ref，顶层 handleRingPointerUp 通过 ref 触发。
+  const ringActionRef = useRef<((action: string) => void) | null>(null);
+
+  /** 长按触发阈值（毫秒） */
+  const LONG_PRESS_MS = 500;
+  /** 拖动 vs 点击判定阈值（像素） */
+  const DRAG_THRESHOLD_PX = 5;
+
+  // 卸载时清理长按定时器，避免泄漏
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // 单一事实源（卡帕西视角）：
   // 把"倒计时归零 → 完成 → 切 expanded 浮窗"状态机收归到 widget，
   // ring / expanded 两种形态共享同一套生命周期。
@@ -267,6 +299,13 @@ export function PomodoroWidget() {
     if (latest) {
       setRemainingMs(computeRemainingMs(latest));
       setProgress(computeProgress(latest));
+      // 2026-07-25 需求3：widget 检测到 running session 时同步标记 sessionStorage，
+      // 避免"widget 已显示 ring，用户点击展开后 PomodoroFullContent 又弹'继续/放弃'"的不一致。
+      // 设计权衡：这会禁用"跨浏览会话恢复提示"（recoverInterruptedSession 永远返回 null），
+      // 但用户已在 widget 上看到 session，恢复提示属于重复打扰；放弃/完成仍可从 ring 长按菜单操作。
+      if (latest.status === "running") {
+        markSessionCurrent(latest.id);
+      }
       // 有 running session 时自动切到 ring（除非用户正在 expanded 里操作）
       // 但如果当前是 expanded 态且 session 是 running，说明用户刚点了"开始专注"
       // → 此时应该切到 ring（PomodoroFullContent 的 onStart 回调已处理）
@@ -357,9 +396,23 @@ export function PomodoroWidget() {
   }, [mode]);
 
   /**
-   * Pointer Events 拖动（ring 态）：setPointerCapture 后所有后续 pointer 事件都路由到 handle 元素。
-   * 拖动距离 < 5px 视为点击（触发 expanded 全屏浮窗）。
-   * 2026-07-25 改动：原 setMode("card") 改为 setMode("expanded")，删除中弹框态
+   * Pointer Events 拖动 + 长按检测（ring 态）：
+   *
+   * 2026-07-25 用户需求：长按显示快捷键后拖动失效，拖动到快捷键上方触发快捷键事件。
+   *
+   * 状态机（卡帕西视角：单一事实源，所有判定集中在此）：
+   *   - pointerdown：启动 500ms 长按定时器 + 记录拖动起点
+   *   - pointermove：
+   *     - 若长按已触发 → 拖动失效（不移动 widget），仅更新 lastPointerPos 用于高亮快捷键
+   *     - 若长按未触发且移动 > 5px → 取消长按定时器，进入拖动模式，移动 widget
+   *   - pointerup：
+   *     - 若长按已触发 → 用 elementFromPoint 检测是否在快捷键上方，是则触发对应 action
+   *     - 若长按未触发且未拖动 → 短点击 → 打开 expanded 全屏浮窗
+   *     - 若长按未触发且已拖动 → 吸附到最近边
+   *   - pointercancel：清理定时器和状态
+   *
+   * setPointerCapture 保证所有后续 pointer 事件都路由到 widget 元素，
+   * 即使手指移到快捷键上方也不会丢失事件。
    */
   const handleRingPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -367,6 +420,8 @@ export function PomodoroWidget() {
       if (e.button !== 0 && e.pointerType === "mouse") return;
       e.currentTarget.setPointerCapture(e.pointerId);
       dragMovedRef.current = false;
+      longPressTriggeredRef.current = false;
+      lastPointerPosRef.current = { x: e.clientX, y: e.clientY };
       dragStateRef.current = {
         pointerId: e.pointerId,
         startClientX: e.clientX,
@@ -374,6 +429,17 @@ export function PomodoroWidget() {
         startWidgetX: position.x,
         startWidgetY: position.y,
       };
+      // 启动长按定时器：500ms 后未移动则打开快捷菜单
+      if (longPressTimerRef.current) {
+        window.clearTimeout(longPressTimerRef.current);
+      }
+      longPressTimerRef.current = window.setTimeout(() => {
+        // 长按触发：仅在未拖动时打开菜单（拖动中不触发）
+        if (!dragMovedRef.current) {
+          longPressTriggeredRef.current = true;
+          setMenuOpen(true);
+        }
+      }, LONG_PRESS_MS);
     },
     [position],
   );
@@ -382,10 +448,25 @@ export function PomodoroWidget() {
     (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragStateRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
+      lastPointerPosRef.current = { x: e.clientX, y: e.clientY };
+
+      // 长按已触发：拖动失效，仅更新悬停的快捷键高亮
+      if (longPressTriggeredRef.current) {
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const actionEl = el?.closest("[data-pomodoro-action]") as HTMLElement | null;
+        setHoveredAction(actionEl?.dataset.pomodoroAction ?? null);
+        return;
+      }
+
       const dx = e.clientX - drag.startClientX;
       const dy = e.clientY - drag.startClientY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) {
         dragMovedRef.current = true;
+        // 用户开始拖动 → 取消长按定时器
+        if (longPressTimerRef.current) {
+          window.clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
       }
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -408,6 +489,11 @@ export function PomodoroWidget() {
     (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragStateRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
+      // 清理长按定时器
+      if (longPressTimerRef.current) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
       try {
         e.currentTarget.releasePointerCapture(drag.pointerId);
       } catch {
@@ -415,8 +501,30 @@ export function PomodoroWidget() {
       }
       dragStateRef.current = null;
 
+      // 长按已触发：检测手指是否在快捷键上方 → 触发对应 action
+      if (longPressTriggeredRef.current) {
+        const pos = lastPointerPosRef.current;
+        let triggeredAction: string | null = null;
+        if (pos) {
+          const el = document.elementFromPoint(pos.x, pos.y);
+          const actionEl = el?.closest("[data-pomodoro-action]") as HTMLElement | null;
+          if (actionEl) {
+            triggeredAction = actionEl.dataset.pomodoroAction ?? null;
+          }
+        }
+        setHoveredAction(null);
+        setMenuOpen(false);
+        longPressTriggeredRef.current = false;
+        // 触发对应 action：ringActionRef 由 RingWidget 在 useEffect 中写入，
+        // 映射 pause_resume → onPauseResume，abandon → onAbandon
+        if (triggeredAction) {
+          ringActionRef.current?.(triggeredAction);
+        }
+        // 长按触发后不打开 expanded，无论是否命中快捷键
+        return;
+      }
+
       // 拖动距离 < 5px → 视为点击 → 打开 expanded 全屏浮窗
-      // 2026-07-25 改动：原 setMode("card") 改为 setMode("expanded")
       if (!dragMovedRef.current) {
         setMode("expanded");
         return;
@@ -455,6 +563,21 @@ export function PomodoroWidget() {
     },
     [],
   );
+
+  /**
+   * pointercancel：清理所有状态（系统打断，如来电、多任务切换）
+   * 不触发任何 action，仅清理定时器和 ref，避免内存泄漏 / 状态残留。
+   */
+  const handleRingPointerCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    dragStateRef.current = null;
+    longPressTriggeredRef.current = false;
+    setHoveredAction(null);
+    // 不关闭 menuOpen：cancel 后菜单保留，用户可点击快捷键
+  }, []);
 
   // 2026-07-25 用户需求：删除中弹框（card 态），只保留小图（ring）和全屏（expanded）两态
   // - ring 点击 → expanded（全屏）
@@ -558,10 +681,14 @@ export function PomodoroWidget() {
       remainingMs={remainingMs}
       progress={progress}
       busy={busy}
+      menuOpen={menuOpen}
+      hoveredAction={hoveredAction}
+      setMenuOpen={setMenuOpen}
+      ringActionRef={ringActionRef}
       onPointerDown={handleRingPointerDown}
       onPointerMove={handleRingPointerMove}
       onPointerUp={handleRingPointerUp}
-      onPointerCancel={handleRingPointerUp}
+      onPointerCancel={handleRingPointerCancel}
       onPauseResume={handlePauseResume}
       onAbandon={handleAbandon}
     />
@@ -577,6 +704,14 @@ interface RingWidgetProps {
   remainingMs: number;
   progress: number;
   busy: boolean;
+  /** 快捷菜单是否打开（由顶层长按/右键/键盘控制，单一事实源） */
+  menuOpen: boolean;
+  /** 当前悬停的快捷键 id（用于高亮反馈） */
+  hoveredAction: string | null;
+  /** 设置菜单打开状态（由顶层传入，RingWidget 内右键/键盘/按钮点击调用） */
+  setMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  /** 桥接 ref：RingWidget 写入 action 执行函数，顶层长按 pointerup 通过 ref 触发 */
+  ringActionRef: React.MutableRefObject<((action: string) => void) | null>;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -592,6 +727,10 @@ function RingWidget({
   remainingMs,
   progress,
   busy,
+  menuOpen,
+  hoveredAction,
+  setMenuOpen,
+  ringActionRef,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -612,7 +751,21 @@ function RingWidget({
   const dashOffset = CIRC * (1 - progress / 100);
   const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  // 2026-07-25 需求2：桥接 ringActionRef。
+  // 顶层长按 pointerup 检测到拖动到快捷键上方时调用此函数，触发对应 action。
+  // action 映射：pause_resume → onPauseResume，abandon → onAbandon
+  useEffect(() => {
+    ringActionRef.current = (action: string) => {
+      if (action === "pause_resume") {
+        onPauseResume();
+      } else if (action === "abandon") {
+        onAbandon();
+      }
+    };
+    return () => {
+      ringActionRef.current = null;
+    };
+  }, [ringActionRef, onPauseResume, onAbandon]);
 
   const stateLabel = isOvertime
     ? "已超时"
@@ -640,7 +793,7 @@ function RingWidget({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setMenuOpen((v) => !v);
+            setMenuOpen(!menuOpen);
           }
         }}
         onContextMenu={(e) => {
@@ -719,6 +872,7 @@ function RingWidget({
       </div>
 
       {/* 控制菜单：长按或右键唤起，pause/resume/abandon */}
+      {/* 2026-07-25 需求2：菜单项带 data-pomodoro-action，长按拖动到上方时由 pointerup 检测并触发 */}
       {menuOpen && (
         <>
           <div
@@ -741,12 +895,17 @@ function RingWidget({
             <Button
               variant="ghost"
               role="menuitem"
+              data-pomodoro-action="pause_resume"
               disabled={busy}
               onClick={(e) => {
                 onPauseResume(e);
                 setMenuOpen(false);
               }}
-              className="w-full justify-start px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50"
+              className={`w-full justify-start px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 ${
+                hoveredAction === "pause_resume"
+                  ? "bg-gray-100 dark:bg-gray-700/70"
+                  : ""
+              }`}
             >
               <Icon name={isPaused ? "rotate" : "clock"} className="w-3.5 h-3.5" />
               {isPaused ? "恢复" : "暂停"}
@@ -754,12 +913,17 @@ function RingWidget({
             <Button
               variant="ghost"
               role="menuitem"
+              data-pomodoro-action="abandon"
               disabled={busy}
               onClick={(e) => {
                 onAbandon(e);
                 setMenuOpen(false);
               }}
-              className="w-full justify-start px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+              className={`w-full justify-start px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 ${
+                hoveredAction === "abandon"
+                  ? "bg-red-50 dark:bg-red-950/50"
+                  : ""
+              }`}
             >
               <Icon name="x" className="w-3.5 h-3.5" />
               放弃

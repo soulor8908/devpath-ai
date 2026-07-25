@@ -295,6 +295,28 @@ describe("createSession + completeSession 流程", () => {
     // paused 状态不应被 getRunningSession 返回
     expect(await getRunningSession()).toBeNull();
   });
+
+  // 2026-07-25 需求3 回归测试：
+  // resumeSession 必须调用 markSessionCurrent，避免用户刷新浏览器后
+  // recoverInterruptedSession 误判同一 session 为"中断"再次弹"继续/放弃"。
+  it("resumeSession 后 recoverInterruptedSession 不再误判为中断", async () => {
+    const session = await createSession({
+      taskDescription: "恢复后不重复弹窗",
+      type: "focus",
+      durationMinutes: 25,
+    });
+    await pauseSession(session.id);
+
+    // 模拟浏览器刷新：清空 sessionStorage（createSession 时写入的标记被清除）
+    window.sessionStorage.clear();
+
+    // resumeSession 应重新调用 markSessionCurrent 写入 sessionStorage
+    await resumeSession(session.id);
+
+    // recoverInterruptedSession 应返回 null（sessionStorage 已标记，不算中断）
+    const result = await recoverInterruptedSession();
+    expect(result).toBeNull();
+  });
 });
 
 // ============ recoverInterruptedSession 测试 ============

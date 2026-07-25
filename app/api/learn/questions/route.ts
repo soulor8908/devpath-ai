@@ -5,14 +5,18 @@
 //   - 入参 { nodes, topic, prompt? }，由前端传入已确认的知识点
 //   - 复用 generateQuestions，但 answer 字段清空（待第 3 步生成）
 //
-// 鉴权：requireSession 注入 session，body 不含客户端凭证 / userId
-//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
+// 鉴权（2026-07-25 用户需求：试用用户也要能生成知识库）：
+//   - 优先走 requireSession（用户已配置自己模型 → 用 session.apiKey）
+//   - requireSession 失败（401）→ 降级到 trial 模式（服务端默认模型 + IP 限流）
+//   - trial 配额 question_generate=2/天（单次拆解会生成多题，限流按"次调用"计）
 
 import { NextRequest, NextResponse } from "next/server";
+import type { LanguageModel } from "ai";
 import { generateQuestions } from "@/lib/ai/question";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
 import type { KnowledgeNode } from "@/lib/types";
 
 export const runtime = "edge";
@@ -21,8 +25,22 @@ export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   // 先鉴权
   const sessionResult = await requireSession(req);
-  if (sessionResult instanceof NextResponse) return sessionResult;
-  const { session } = sessionResult;
+  const hasSession = !(sessionResult instanceof NextResponse);
+  const session = hasSession ? sessionResult.session : null;
+
+  // 2026-07-25：session 不存在时降级到 trial 模式
+  let model: LanguageModel;
+  let isTrial = false;
+  let trialRemaining: number | undefined;
+  if (session) {
+    model = getModelFromSession(session, "learn");
+  } else {
+    const trial = await tryTrialMode(req, "question_generate", sessionResult as NextResponse);
+    if (trial.errorResponse || !trial.model) return trial.errorResponse ?? NextResponse.json({ error: "trial mode unavailable" }, { status: 500 });
+    model = trial.model;
+    isTrial = trial.isTrial;
+    trialRemaining = trial.remaining;
+  }
 
   let body: unknown;
   try {
@@ -38,14 +56,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "nodes 是必填项且不能为空" }, { status: 400 });
   }
 
-  const model = getModelFromSession(session, "learn");
-
   try {
     const questions = await generateQuestions(nodes, model);
     // 答案字段清空，待第 3 步生成
     const withoutAnswers = questions.map((q) => ({ ...q, answer: "" }));
 
-    return NextResponse.json({ questions: withoutAnswers });
+    const response = NextResponse.json({ questions: withoutAnswers });
+    applyTrialHeaders(response, isTrial, trialRemaining);
+    return response;
   } catch (error) {
     const isUpstreamAuthError =
       error instanceof Error &&

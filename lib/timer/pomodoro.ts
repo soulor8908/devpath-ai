@@ -207,6 +207,10 @@ export async function pauseSession(id: string): Promise<void> {
 /**
  * 恢复 session：status=paused → running
  * 仅 paused 状态可恢复
+ *
+ * 2026-07-25 需求3：恢复后同步 markSessionCurrent，避免用户刷新浏览器后
+ * recoverInterruptedSession 误判同一 session 为"中断"再次弹"继续/放弃"。
+ * （与 markSessionCurrent 的 docstring 一致："应在 resumeSession 后调用"）
  */
 export async function resumeSession(id: string): Promise<void> {
   const session = await getItem<PomodoroSession>(
@@ -218,6 +222,8 @@ export async function resumeSession(id: string): Promise<void> {
     ...session,
     status: "running",
   });
+  // 需求3：恢复后标记当前会话已知该 session，避免刷新后误触发恢复提示
+  markSessionCurrent(id);
   notifySessionChanged();
 }
 

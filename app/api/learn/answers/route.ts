@@ -13,18 +13,22 @@
 //   - 单题失败：{"questionId":"...","answer":"","error":"..."}
 //   - 结束标记：{"questionId":"","answer":"","done":true,"total":N}
 //
-// 鉴权（apiKey Session 安全架构）：requireSession 注入 session，body 不含客户端凭证 / userId
-//   session 架构下所有用户都用自己加密在 session 中的 apiKey，服务端不再做"今日 N 次"限流
+// 鉴权（2026-07-25 用户需求：试用用户也要能生成知识库）：
+//   - 优先走 requireSession（用户已配置自己模型 → 用 session.apiKey）
+//   - requireSession 失败（401）→ 降级到 trial 模式（服务端默认模型 + IP 限流）
+//   - trial 配额 answer_generate=2/天（流式生成 N 题答案算 1 次调用）
+//   - 流式响应的 trial 标识头在初始 Response 上设置（X-Trial-Mode / X-Trial-Remaining）
 //
 // 为什么不用 Vercel AI SDK 的 data stream protocol？
 //   - data stream 适合"单一对话流"，无法表达"按 questionId 分批完成"的语义
 //   - NDJSON 简单、自描述、易调试，客户端用 ReadableStream reader 即可解析
 
 import { NextRequest, NextResponse } from "next/server";
-import { streamText } from "ai";
+import { streamText, type LanguageModel } from "ai";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { KnowledgeNode, Question } from "@/lib/types";
 
@@ -49,8 +53,22 @@ export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   // 先鉴权
   const sessionResult = await requireSession(req);
-  if (sessionResult instanceof NextResponse) return sessionResult;
-  const { session } = sessionResult;
+  const hasSession = !(sessionResult instanceof NextResponse);
+  const session = hasSession ? sessionResult.session : null;
+
+  // 2026-07-25：session 不存在时降级到 trial 模式
+  let model: LanguageModel;
+  let isTrial = false;
+  let trialRemaining: number | undefined;
+  if (session) {
+    model = getModelFromSession(session, "learn");
+  } else {
+    const trial = await tryTrialMode(req, "answer_generate", sessionResult as NextResponse);
+    if (trial.errorResponse || !trial.model) return trial.errorResponse ?? NextResponse.json({ error: "trial mode unavailable" }, { status: 500 });
+    model = trial.model;
+    isTrial = trial.isTrial;
+    trialRemaining = trial.remaining;
+  }
 
   let body: unknown;
   try {
@@ -73,8 +91,6 @@ export async function POST(req: NextRequest) {
   if (!topic || typeof topic !== "string" || !topic.trim()) {
     return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
   }
-
-  const model = getModelFromSession(session, "learn");
 
   // 构建 nodeId → node 映射，便于按节点上下文生成答案
   const nodeMap = new Map<string, KnowledgeNode>();
@@ -160,11 +176,14 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return new Response(stream, {
+  const response = new Response(stream, {
     headers: {
       "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       "X-AI-Scene": "answer_generate",
     },
   });
+  // Trial 模式标识头注入到流式响应上（客户端从初始响应头读取）
+  applyTrialHeaders(response, isTrial, trialRemaining);
+  return response;
 }

@@ -19,7 +19,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { aiFetch, SessionExpiredError } from "@/lib/api-client";
+import { aiFetch } from "@/lib/api-client";
 import { getItem, setItem, delItem } from "@/lib/storage/db";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
@@ -32,6 +32,7 @@ import { recordInputHistory } from "@/lib/learn-input-history";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { parseNDJSONChunk } from "@/lib/parse-ndjson";
+import { listModelConfigs } from "@/lib/model-config";
 import {
   startAITask,
   appendAITaskContent,
@@ -94,24 +95,67 @@ export function LearnWizard({
   const [answerErrors, setAnswerErrors] = useState(0);
   const didInitRef = useRef(false);
 
-  // 2026-07-25 用户需求：试用用户（未配置自己的 AI 模型）生成知识库时报
-  // "session expired or not found, please re-exchange"。
-  // 根因：/api/learn/* 强制 requireSession，无 session 直接 401 → aiFetch 抛 SessionExpiredError。
-  // 与 ChatClient 的 trial 模式不同——学习向导涉及 3 次大模型调用（拆知识点+题目+答案），
-  // 成本较高，不适合走 trial 免费额度。这里给出明确引导，让用户去配置自己的模型。
-  // 调用方应在 catch 分支调用此函数并 return（不再继续流程）。
-  const handleSessionExpired = useCallback(
-    async (scene: string): Promise<void> => {
-      const ok = await confirmDialog({
-        title: "需要配置 AI 模型",
-        message: `${scene}需要自己的 AI API Key。请到「我的」→「AI 模型」添加并保存模型配置后重试。`,
-        confirmText: "去配置",
-        cancelText: "稍后",
-      });
-      if (ok) router.push("/profile");
+  // 2026-07-25 用户需求：试用用户也要能生成知识库。
+  // Trial 模式：用户没配模型（或 apiKey 为空）时走服务端默认模型 + IP 限流，
+  // 服务端 /api/learn/* 已支持降级（与 /api/chat 一致），客户端只需用普通 fetch（不带 session 签名）。
+  // 用 ref 而非 state：挂载时同步判定，避免 fetchKnowledge 在 useTrialMode state 还没 set 时就触发。
+  const useTrialModeRef = useRef(false);
+  const [trialMode, setTrialMode] = useState<{ active: boolean; remaining?: number }>({
+    active: false,
+  });
+
+  /**
+   * 检测当前用户是否应进入 trial 模式（无 modelConfig 或 apiKey 为空）。
+   * 在挂载时同步执行，判定结果写入 ref 供 learnFetch 同步读取。
+   * @returns 是否为 trial 模式
+   */
+  const detectTrialMode = useCallback(async (): Promise<boolean> => {
+    try {
+      const configs = await listModelConfigs();
+      const hasModel = configs.some((c) => c.apiKey && c.apiKey.trim().length > 0);
+      const isTrial = !hasModel;
+      useTrialModeRef.current = isTrial;
+      return isTrial;
+    } catch {
+      // 读取失败保守按非 trial 处理（让 aiFetch 走，失败再提示）
+      useTrialModeRef.current = false;
+      return false;
+    }
+  }, []);
+
+  /**
+   * 统一 fetch 入口：trial 模式用普通 fetch，非 trial 模式用 aiFetch（带 session 签名）。
+   * 与 ChatClient 的策略一致，避免 trial 用户因无 session 被 401 拦截。
+   * 读 ref 而非 state，保证 fetchKnowledge 在挂载时同步可用。
+   */
+  const learnFetch = useCallback(
+    async (url: string, options: RequestInit = {}): Promise<Response> => {
+      if (useTrialModeRef.current) {
+        return fetch(url, {
+          ...options,
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        });
+      }
+      return aiFetch(url, options);
     },
-    [router],
+    [],
   );
+
+  /**
+   * 从响应头读取 trial 模式标识，更新 banner state。
+   * 服务端在 trial 模式下会设置 X-Trial-Mode: 1 + X-Trial-Remaining: N。
+   */
+  const updateTrialModeFromResponse = useCallback((res: Response) => {
+    const isTrialResponse = res.headers.get("X-Trial-Mode") === "1";
+    if (isTrialResponse) {
+      const remainingHeader = res.headers.get("X-Trial-Remaining");
+      const remaining = remainingHeader ? Number(remainingHeader) : undefined;
+      setTrialMode({
+        active: true,
+        remaining: Number.isFinite(remaining) ? remaining : undefined,
+      });
+    }
+  }, []);
 
   // ---- Step 1: 拆知识点 ----
   // 设计原则：自动触发（首次挂载无草稿）不弹 AITaskModal，避免系统默认动作阻塞用户
@@ -122,7 +166,7 @@ export function LearnWizard({
       // 手动触发才弹模态框；自动触发用 inline loader + toast 反馈
       const aiTask = opts?.manual ? startAITask("AI 正在拆解知识点") : null;
       try {
-        const res = await aiFetch("/api/learn/knowledge", {
+        const res = await learnFetch("/api/learn/knowledge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -131,6 +175,7 @@ export function LearnWizard({
           }),
           signal: aiTask?.signal,
         });
+        updateTrialModeFromResponse(res);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || `请求失败 (${res.status})`);
@@ -147,12 +192,6 @@ export function LearnWizard({
           completeAITask(aiTask.id);
         }
       } catch (err) {
-        // 2026-07-25：session 失效（试用用户/未配模型/session 过期）走专属引导
-        if (err instanceof SessionExpiredError) {
-          void handleSessionExpired("拆解知识点");
-          if (aiTask) errorAITask(aiTask.id, "需要配置 AI 模型");
-          return;
-        }
         const msg = err instanceof Error ? err.message : "未知错误";
         toast.error(`知识点拆解失败：${msg}`);
         if (aiTask) errorAITask(aiTask.id, msg);
@@ -160,7 +199,7 @@ export function LearnWizard({
         setLoading(false);
       }
     },
-    [topic, promptText, handleSessionExpired],
+    [topic, promptText, learnFetch, updateTrialModeFromResponse],
   );
 
   // 首次挂载：优先恢复草稿，无草稿才自动开始拆知识点
@@ -168,6 +207,9 @@ export function LearnWizard({
     if (didInitRef.current) return;
     didInitRef.current = true;
     void (async () => {
+      // 2026-07-25：先同步判定 trial 模式（写入 ref），再触发 fetchKnowledge
+      // 避免竞态：useTrialModeRef.current 必须在 fetchKnowledge 调用前就绪
+      await detectTrialMode();
       try {
         const draft = await getItem<{
           topic: string;
@@ -216,12 +258,13 @@ export function LearnWizard({
     setLoading(true);
     const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在生成题目");
     try {
-      const res = await aiFetch("/api/learn/questions", {
+      const res = await learnFetch("/api/learn/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nodes }),
         signal: aiSignal,
       });
+      updateTrialModeFromResponse(res);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `请求失败 (${res.status})`);
@@ -236,19 +279,13 @@ export function LearnWizard({
       setAITaskContent(aiTaskId, `已生成 ${data.questions.length} 道题目`);
       completeAITask(aiTaskId);
     } catch (err) {
-      // 2026-07-25：session 失效走专属引导
-      if (err instanceof SessionExpiredError) {
-        void handleSessionExpired("生成题目");
-        errorAITask(aiTaskId, "需要配置 AI 模型");
-        return;
-      }
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`题目生成失败：${msg}`);
       errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
-  }, [nodes, handleSessionExpired]);
+  }, [nodes, learnFetch, updateTrialModeFromResponse]);
 
   // ---- Step 3: 流式生成答案 ----
   const fetchAnswers = useCallback(async () => {
@@ -259,7 +296,7 @@ export function LearnWizard({
     setStep("answers");
     const { id: aiTaskId, signal: aiSignal } = startAITask("AI 正在逐题生成答案");
     try {
-      const res = await aiFetch("/api/learn/answers", {
+      const res = await learnFetch("/api/learn/answers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -269,6 +306,7 @@ export function LearnWizard({
         }),
         signal: aiSignal,
       });
+      updateTrialModeFromResponse(res);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `请求失败 (${res.status})`);
@@ -347,19 +385,13 @@ export function LearnWizard({
       setAITaskContent(aiTaskId, `答案生成完成（${done}/${questions.length}）`);
       completeAITask(aiTaskId);
     } catch (err) {
-      // 2026-07-25：session 失效走专属引导
-      if (err instanceof SessionExpiredError) {
-        void handleSessionExpired("生成答案");
-        errorAITask(aiTaskId, "需要配置 AI 模型");
-        return;
-      }
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`答案生成失败：${msg}`);
       errorAITask(aiTaskId, msg);
     } finally {
       setLoading(false);
     }
-  }, [questions, nodes, topic, handleSessionExpired]);
+  }, [questions, nodes, topic, learnFetch, updateTrialModeFromResponse]);
 
   // ---- Step 4: 保存计划并跳转 ----
   const saveAndRedirect = useCallback(async () => {
@@ -461,6 +493,31 @@ export function LearnWizard({
           退出
         </Button>
       </div>
+
+      {/* Trial 模式横幅：试用用户（未配置自己的 AI 模型）走服务端默认模型 + IP 限流。
+          2026-07-25 用户需求：试用用户也要能生成知识库。
+          响应头 X-Trial-Mode=1 时展示，CTA 引导用户去 profile 配置自己的模型。 */}
+      {trialMode.active && (
+        <div className="mb-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-lg px-3 py-2 text-xs flex items-center gap-2 text-blue-700 dark:text-blue-300">
+          <Icon name="info" className="w-3.5 h-3.5 inline-block shrink-0" />
+          <span className="flex-1 truncate">
+            当前是体验模型（基础版），建议添加自己的模型获得更稳定体验
+            {typeof trialMode.remaining === "number" && (
+              <span className="ml-1 text-blue-500 dark:text-blue-400">
+                · 今日剩余 {trialMode.remaining} 次
+              </span>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/profile")}
+            className="shrink-0 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+          >
+            添加模型
+          </Button>
+        </div>
+      )}
 
       {/* 进度条 */}
       <div className="flex items-center gap-1 mb-6 text-xs">

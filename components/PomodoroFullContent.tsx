@@ -392,6 +392,9 @@ export function PomodoroFullContent({
   }
 
   // 恢复中断的 session
+  // 2026-07-25 需求3：必须调用 markSessionCurrent，否则用户关闭 Modal 再打开时
+  // recoverInterruptedSession 会因为 sessionStorage 没有记录而再次返回同一 session，
+  // 导致"明明是同一个时钟却判断成不一样"重复弹"继续/放弃"。
   async function handleRecoverContinue() {
     if (!recoveryPrompt) return;
     setSession(recoveryPrompt);
@@ -400,6 +403,8 @@ export function PomodoroFullContent({
     setRecoveryPrompt(null);
     notifiedRef.current = null;
     completingRef.current = false;
+    // 需求3：标记当前会话已知该 session，避免再次弹恢复提示
+    markSessionCurrent(recoveryPrompt.id);
     startInterruptTracking(recoveryPrompt.id);
   }
 
