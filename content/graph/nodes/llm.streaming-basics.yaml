@@ -23,7 +23,14 @@ gotchas:
   - 拼 chunk 时绝不能假设每次收到完整 JSON——缓冲区必须按 \n\n 分割事件
 interview:
   - q: 为什么 AI 聊天应用都用流式输出？技术上怎么实现？
-    answerSkeleton: 生成是逐 token 的（O(n)）→ 全量等待 = TTFT + 全量生成时间 → 流式把感知延迟降到 TTFT → SSE 协议逐 chunk 推送 delta → 前端增量渲染
+    answerSkeleton: >-
+      流式输出的核心价值是把用户感知延迟从"TTFT + 全量生成时间"降到"TTFT"。本质原因：LLM 生成是逐
+      token 的 O(n) 过程，一段 200 token 的回复完整生成要 5-10 秒，但首 token 只要 300-800ms。全量等待
+      让用户盯着空白 5 秒，流式让用户立刻看到字一个一个冒出来——感知上"快了 10 倍"。技术实现上，服务端
+      用 SSE 协议（text/event-stream）逐 chunk 推送 delta，每个 chunk 含一小段 JSON delta，客户端按
+      OpenAI 协议拼接成完整消息并增量渲染。前端迁移映射：SSE ≈ 一个不自动关闭的 fetch 响应，chunk 拼接
+      ≈ 处理分块传输，TTFT ≈ FCP（首屏渲染）。Tradeoff：流式不能掩盖 TTFT（首字延迟仍要等），且中途断线
+      需要续传与去重逻辑——但产品收益远大于工程复杂度，断线恢复策略是保留已生成内容 + 用户可重试。
     followups:
       - 如果连接在第 50 个 token 时断了，你的恢复策略是什么？
       - EventSource 有哪些限制？生产环境替代方案？

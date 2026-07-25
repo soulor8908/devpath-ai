@@ -23,7 +23,15 @@ gotchas:
   - 重试不带错误反馈是死循环：必须把校验错误信息喂回给模型
 interview:
   - q: 如何保证 LLM 输出的 JSON 100% 可解析且结构正确？
-    answerSkeleton: 分层防御 → 生成侧（Structured Outputs/Function Calling 强约束）→ 解析侧（Pydantic/Zod 校验）→ 失败闭环（错误回喂 + 有限重试）→ 最终兜底（人工/默认值）→ 没有银弹，工程上接受有限重试 + 监控失败率
+    answerSkeleton: >-
+      保证 LLM JSON 输出 100% 可解析必须分层防御，因为模型是概率性的、任何单层都不够：生成侧用
+      Structured Outputs（提供 JSON Schema，生成过程被约束）或 Function Calling（强制结构化返回）做
+      第一道强约束；解析侧用 Pydantic/Zod 做第二道校验，因为 JSON Mode 只保证语法合法不保证结构正确，
+      Mode ≠ Schema；失败闭环是第三道——校验失败时把错误信息回喂给模型让它修正（不能裸重试，那是死循环），
+      最多重试 N 次；最终兜底用人工或默认值。关键 tradeoff：没有银弹，工程上接受有限重试 + 监控失败率，
+      而不是追求 100%（成本无上限）。Schema 设计也影响遵循度——扁平优于深层嵌套，enum 优于 free text。
+      前端迁移映射：这就是你用 Zod 校验后端 API 响应的心智，区别是生产者从"后端服务"变成"概率模型"，
+      两道闸门缺一不可。
     followups:
       - 什么场景下你宁愿用自然语言输出 + 正则提取？
       - Schema 里 enum 和 free text 字段对模型遵循度的影响？

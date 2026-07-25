@@ -24,7 +24,15 @@ gotchas:
   - 除法 / 永远返回 float，整除用 //
 interview:
   - q: Python 的列表和元组有什么区别？工程上怎么选？
-    answerSkeleton: 可变性（list 可变/tuple 不可变）→ 哈希性（tuple 可作 dict key）→ 语义（tuple 表记录，list 表集合）→ 性能微调
+    answerSkeleton: >-
+      list 与 tuple 的本质差异是可变性：list 可变（append/pop/in-place 修改），tuple 不可变。
+      由此派生两个工程意义：一是 tuple 可哈希，能作为 dict 的 key 或 set 的元素，list 不行；
+      二是语义约定——tuple 表"固定结构的记录"（如坐标、数据库行），list 表"同质集合"。
+      性能上 tuple 略快且内存更省，但这是微优化不应作为首选依据。选择规则：字段位置稳定、长度不变
+      用 tuple；需要增删或长度可变用 list。前端迁移映射：tuple ≈ TypeScript 的 readonly tuple 类型
+      （如 [string, number]），list ≈ T[]。Tradeoff：不可变带来 hashable 与线程安全，但失去灵活性
+      ——这也是 React 状态要用不可变更新的同源理由。坑点：可变默认参数（def f(x=[])）会在多次调用间
+      共享状态，是经典面试陷阱，用 None + 内部赋值规避。
     followups:
       - 不可变对象作为函数默认参数为什么安全？
       - 深拷贝与浅拷贝在嵌套 list 上的行为差异？

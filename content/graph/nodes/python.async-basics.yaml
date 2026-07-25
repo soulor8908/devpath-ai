@@ -25,7 +25,16 @@ gotchas:
   - gather 中一个任务异常，默认行为是传播首个异常，其余任务仍在跑——需要 return_exceptions=True 时显式声明
 interview:
   - q: asyncio 和 JS 的 Promise 模型有什么本质区别？
-    answerSkeleton: 语法同源 → 调度差异（协程惰性 vs Promise 创建即执行）→ 生态割裂（sync/async 两套库 vs JS 统一）→ GIL 限制 → 适用场景一致（IO 密集）
+    answerSkeleton: >-
+      asyncio 与 JS Promise 模型有四处本质差异：第一，语法同源但调度不同——JS 的 Promise 创建即执行，
+      asyncio 的协程是惰性的，必须显式 await 或 asyncio.create_task 才会调度，忘 await 会静默不执行
+      （只 RuntimeWarning）；第二，生态割裂——Python 同步/异步是两个世界，在协程里调 time.sleep 或
+      requests 会冻结整个事件循环，必须用 asyncio.sleep / httpx，而 JS 的 async 是统一生态；第三，
+      GIL 限制——asyncio 只解决 IO 密集，CPU 密集任务要 multiprocessing 或 offload；第四，并发原语对应
+      ——asyncio.gather ≈ Promise.all，asyncio.create_task ≈ 启动后台 Promise，但错误处理不同
+      （gather 默认传播首个异常，其余仍跑，要 return_exceptions=True 显式控制）。适用场景一致：都是 IO
+      密集型的吞吐量优化。前端迁移映射：心智模型直接平移，但"两套库"是最大坑——记住在 async 函数里
+      调阻塞 IO 会冻结整个事件循环。
     followups:
       - 为什么 CPU 密集任务用 asyncio 没收益？该用什么？
       - gather 与 TaskGroup 的错误处理差异？

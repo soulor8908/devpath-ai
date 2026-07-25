@@ -24,7 +24,16 @@ gotchas:
   - 严格模式（strict=True）下 "1" 不会自动转 1——处理 LLM 输出时要明确选择
 interview:
   - q: 为什么 Python 有了 type hints 还需要 Pydantic？
-    answerSkeleton: hints 静态不强制 → 运行时数据不可信（网络/LLM 输出）→ Pydantic 提供运行时校验 +  coercion → 与生态（FastAPI/LangChain）集成
+    answerSkeleton: >-
+      Python 有了 type hints 还需要 Pydantic 的根本原因是 type hints 只在静态检查（mypy/pyright）时生效，
+      运行时完全不强制——而真实世界的运行时数据（网络响应、用户输入、LLM 输出）从来不可信。type hints 是
+      "文档 + lint"，Pydantic 是"运行时闸门"：它提供 BaseModel 声明式 schema、运行时校验、类型 coercion
+      （可配置严格度）、序列化（model_dump / model_validate）、错误结构化（ValidationError）。在 AI 工程中
+      Pydantic 是 LLM 输出的第一道类型闸门——配合 Structured Outputs 用 schema 约束生成，再用 Pydantic
+      校验解析结果，失败时把 ValidationError 信息回喂模型重试。生态集成是关键：FastAPI、LangChain 全部建立
+      在 Pydantic 之上。前端迁移映射：type hints ≈ TypeScript 类型标注，Pydantic ≈ Zod——你在前端用 Zod
+      校验 API 响应的心智直接平移，区别是 Pydantic 在 Python 生态渗透更深。Tradeoff：strict 模式不自动
+      coercion，处理 LLM 输出要明确选择严格还是宽松。
     followups:
       - Pydantic 校验失败的错误信息结构是怎样的？怎么用于 LLM 输出重试？
       - strict 模式与 lax 模式各自适合什么场景？
