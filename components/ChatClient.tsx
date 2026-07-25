@@ -1415,9 +1415,16 @@ export default function ChatClient({
                 </div>
               )}
 
-              {/* 操作按钮（hover 显示；编辑模式下隐藏） */}
+              {/* 操作按钮（hover 显示；编辑模式下隐藏）
+                  2026-07-25 重构：原方案用 absolute -left-7/-left-14/-left-21 把按钮
+                  浮在气泡左侧，存在两个问题：
+                  1) -left-21 不是有效 Tailwind 类（默认 spacing 无 21），编辑按钮位置错乱
+                  2) 三个按钮绝对定位重叠风险：窄屏下气泡占满 80% 宽度时，左侧空间不足以
+                     容纳三个 28px 间距的按钮，会被截断或遮挡相邻消息
+                  改为与 AI 回复一致的 inline 工具栏（气泡下方一行），统一交互范式：
+                  用户消息右对齐 + 工具栏右对齐；AI 回复左对齐 + 工具栏左对齐 */}
               {m.id !== editingMessageId && (
-                <>
+                <div className="mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {/* 复制消息按钮（2026-07-25 新增：用户消息也支持复制） */}
                   <Button
                     variant="ghost"
@@ -1431,12 +1438,29 @@ export default function ChatClient({
                         toast.error("复制失败，请手动选择文字复制");
                       }
                     }}
-                    className="absolute -left-7 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-2xs text-gray-400 hover:text-blue-500"
                     aria-label="复制消息"
                     title="复制消息"
                   >
                     <Icon name="copy" className="w-3.5 h-3.5" />
                   </Button>
+                  {/* 编辑按钮：仅最新一条 user 消息 + 非流式输出时显示 */}
+                  {!streaming && m.id === lastUserMessageId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      onClick={() => {
+                        setEditingMessageId(m.id);
+                        setEditContent(m.content);
+                      }}
+                      className="text-2xs text-gray-400 hover:text-blue-500"
+                      aria-label="编辑消息"
+                      title="编辑消息"
+                    >
+                      <Icon name="pen" className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                   {/* 删除单条消息按钮 */}
                   <Button
                     variant="ghost"
@@ -1452,30 +1476,13 @@ export default function ChatClient({
                       });
                       if (ok) handleDeleteMessage(m.id);
                     }}
-                    className="absolute -left-14 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-2xs text-gray-400 hover:text-red-500"
                     aria-label="删除消息"
                     title="删除消息"
                   >
                     <Icon name="trash" className="w-3.5 h-3.5" />
                   </Button>
-                  {/* 编辑按钮：仅最新一条 user 消息 + 非流式输出时显示 */}
-                  {!streaming && m.id === lastUserMessageId && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      onClick={() => {
-                        setEditingMessageId(m.id);
-                        setEditContent(m.content);
-                      }}
-                      className="absolute -left-21 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label="编辑消息"
-                      title="编辑消息"
-                    >
-                      <Icon name="pen" className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </>
+                </div>
               )}
 
               {/* 刷新按钮：仅最新一条 user 消息下方显示（重新生成对应 AI 回复） */}

@@ -10,8 +10,15 @@
 //   - 答案用 AnswerContent 渲染（代码编辑器样式 + 代码高亮）
 //   - 答案和题目支持选中文字问 AI
 //   - 题目支持收藏（收藏时自动造 FSRS 复习卡）
+//
+// 2026-07-25 进度持久化：
+//   - 用户反馈"训练到第3题跳出去再回来，又要从第1题开始"
+//   - 用 sessionStorage 保存进度，同一天内跳转回来自动恢复
+//   - 详见 lib/ai/train-scheduler.ts 的 restoreTrainSession / saveTrainSession / clearTrainSession
+//   - 恢复时瞬态 phase（feedback/breaking）降级到稳定 phase（questioning/learning），
+//     避免恢复出"空反馈"或"卡在休息中"的破损 UI
 
-import { useReducer, useEffect, useState, useCallback } from "react";
+import { useReducer, useEffect, useState, useCallback, useRef } from "react";
 import { getItem, setItem } from "@/lib/storage/db";
 import {
   KEY_PREFIXES,
@@ -26,6 +33,11 @@ import {
   trainSessionReducer,
   generateSocraticFeedback,
   FOCUS_THRESHOLD_MINUTES,
+  restoreTrainSession,
+  saveTrainSession,
+  clearTrainSession,
+  type TrainSessionState,
+  type TrainSessionExtras,
 } from "@/lib/ai/train-scheduler";
 import { KnowledgeBrief } from "@/components/KnowledgeBrief";
 import { SocraticFeedback } from "@/components/SocraticFeedback";
@@ -36,6 +48,7 @@ import { openChatModal } from "@/lib/chat-modal-store";
 import { createCard, findExistingCard } from "@/lib/fsrs";
 import { toggleQuestionInPlan } from "@/lib/favorite";
 import { trackAIFeedback } from "@/lib/ai/quality-tracker";
+import { toast } from "@/lib/toast";
 
 interface TrainSessionFlowProps {
   studyQueue: StudyTask[];
@@ -54,7 +67,23 @@ interface TrainSessionFlowProps {
 }
 
 export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChange }: TrainSessionFlowProps) {
-  const [state, dispatch] = useReducer(trainSessionReducer, undefined, createInitialTrainState);
+  // 恢复持久化的训练会话（只调用一次，避免 StrictMode 双调用重复读 sessionStorage）
+  // useRef + lazy 模式：第一次访问时计算，之后复用
+  // useMemo 不行——StrictMode 会重复调用，可能导致重复消费
+  const restoredRef = useRef<
+    { state: TrainSessionState; extras: TrainSessionExtras } | null | undefined
+  >(undefined);
+  if (restoredRef.current === undefined) {
+    restoredRef.current = restoreTrainSession(studyQueue.length);
+  }
+  const restored = restoredRef.current;
+
+  const [state, dispatch] = useReducer(
+    trainSessionReducer,
+    studyQueue.length,
+    // lazy initializer：有持久化数据则恢复，否则用默认初始状态
+    () => restored?.state ?? createInitialTrainState(),
+  );
   const [currentNode, setCurrentNode] = useState<KnowledgeNode | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [currentPlan, setCurrentPlan] = useState<LearningPlan | null>(null);
@@ -62,9 +91,16 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   const [isCorrect, setIsCorrect] = useState(false);
   const [loading, setLoading] = useState(true);
   // 测试阶段答案是否已揭示（默认隐藏，强制用户先回忆）
-  const [answerRevealed, setAnswerRevealed] = useState(false);
+  // 2026-07-25 持久化：恢复时从 sessionStorage 读出（用户已看过答案就直接展示）
+  const [answerRevealed, setAnswerRevealed] = useState(restored?.extras.answerRevealed ?? false);
 
   const currentTask = studyQueue[state.currentIndex];
+
+  // 跟踪已加载过的任务 id，避免在同一任务上因 phase 切换重复 fetch
+  // 2026-07-25 持久化恢复场景：用户可能直接落在 questioning phase（跳过 learning），
+  // 此时 currentNode/currentQuestion 尚未加载，需要触发 loadCurrentTask。
+  // 但 learning → questioning 的正常流程中不应重复加载（数据已就绪）。
+  const loadedTaskIdRef = useRef<string | null>(null);
 
   // 专注时间计时——每分钟 +1 focusMinutes，达到阈值触发休息
   useEffect(() => {
@@ -75,13 +111,14 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   }, []);
 
   // 加载当前任务的知识点和题目
+  // 2026-07-25 修改：移除 setAnswerRevealed(false) —— answerRevealed 的重置
+  // 由 LEARN_COMPLETE / NEXT_TASK 的 dispatch 处负责，避免恢复时被错误清空
   const loadCurrentTask = useCallback(async () => {
     if (!currentTask) {
       dispatch({ type: "SESSION_COMPLETE" });
       return;
     }
     setLoading(true);
-    setAnswerRevealed(false);
     try {
       if (currentTask.type === "new" && currentTask.planId) {
         // 加载计划中的知识点
@@ -115,11 +152,46 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
     }
   }, [currentTask]);
 
+  // 任务加载触发条件：
+  // - currentTask 变化（NEXT_TASK 后切到新任务）
+  // - 恢复时落在 questioning phase（currentNode/currentQuestion 尚未加载）
+  // 用 loadedTaskIdRef 去重：同一任务不重复加载，避免 learning → questioning 时的无谓 fetch
   useEffect(() => {
-    if (state.phase === "learning" && currentTask) {
-      void loadCurrentTask();
+    if (!currentTask) {
+      // 队列耗尽或索引越界（恢复数据与当前队列不匹配）→ 结束会话
+      dispatch({ type: "SESSION_COMPLETE" });
+      return;
     }
-  }, [state.phase, currentTask, loadCurrentTask]);
+    if (loadedTaskIdRef.current === currentTask.id) return;
+    loadedTaskIdRef.current = currentTask.id;
+    void loadCurrentTask();
+  }, [currentTask, loadCurrentTask]);
+
+  // 持久化训练进度到 sessionStorage（2026-07-25 新增）
+  // - 每次 state / answerRevealed 变化都写入
+  // - phase === "completed" 时不写入（saveTrainSession 内部已处理）
+  // - 完成时清除持久化数据，避免下次进入训练页错误恢复
+  useEffect(() => {
+    saveTrainSession(state, { answerRevealed }, studyQueue.length);
+  }, [state, answerRevealed, studyQueue.length]);
+
+  useEffect(() => {
+    if (state.phase === "completed") {
+      clearTrainSession();
+    }
+  }, [state.phase]);
+
+  // 恢复进度提示（2026-07-25 交互闭环）
+  // 用户从其他页面跳回训练页时，如果恢复了之前的进度，给一个明确提示，
+  // 让用户知道"系统记得我刚才做到哪了"，而不是默默跳到第 N 题让用户困惑。
+  // 仅在恢复到非第 0 题时提示（第 0 题是默认起始位置，无需提示）。
+  useEffect(() => {
+    if (!restored) return;
+    if (restored.state.currentIndex > 0) {
+      toast.info(`已恢复到第 ${restored.state.currentIndex + 1} 题`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 选中文字问 AI（题目/答案通用回调）
   const handleAskAI = useCallback((selectedText: string, sourceLabel: string) => {
@@ -248,7 +320,11 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
         <KnowledgeBrief
           node={currentNode}
           question={currentQuestion}
-          onLearned={() => dispatch({ type: "LEARN_COMPLETE" })}
+          onLearned={() => {
+            // 进入 questioning 前重置答案揭示状态（隐藏答案，强制用户先回忆）
+            setAnswerRevealed(false);
+            dispatch({ type: "LEARN_COMPLETE" });
+          }}
           onAskAI={(text) => handleAskAI(text, "学习材料")}
         />
       )}
@@ -392,7 +468,11 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
         <SocraticFeedback
           isCorrect={isCorrect}
           feedback={feedback}
-          onContinue={() => dispatch({ type: "NEXT_TASK" })}
+          onContinue={() => {
+            // 进入下一项任务前重置答案揭示状态
+            setAnswerRevealed(false);
+            dispatch({ type: "NEXT_TASK" });
+          }}
         />
       )}
 
