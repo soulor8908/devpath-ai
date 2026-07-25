@@ -128,9 +128,11 @@ export default function PlanDetailClient() {
         setDeckId(found.id);
       }
 
-      // URL 参数 ?node=xxx 自动筛选 + 滚动到题目区
-      // 用于从其他入口（脑图、知识树、追问等）带着知识点 id 进入
-      const nodeParam = searchParams?.get("node");
+      // URL 参数 ?nodeId=xxx 自动筛选 + 滚动到题目区
+      // 用于从其他入口（脑图、知识树、首页今日清单、追问等）带着知识点 id 进入
+      // 2026-07-25：参数名从 ?node 统一为 ?nodeId（与 nav-params 约定一致），
+      // 保留 ?node 回退兼容老链接/书签
+      const nodeParam = searchParams?.get("nodeId") ?? searchParams?.get("node");
       if (nodeParam && p.knowledgeTree.some((n) => n.id === nodeParam)) {
         setFilterNodeId(nodeParam);
         // 等 filteredQuestions 重渲染后再滚动

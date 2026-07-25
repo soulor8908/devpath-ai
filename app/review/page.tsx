@@ -12,6 +12,7 @@
 //   - 完成后展示统计
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { listItems, setItem, delItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES } from "@/lib/types";
@@ -36,6 +37,7 @@ import {
 } from "@/lib/review-filter";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
+import { parseSceneParams } from "@/lib/study-queue/nav-params";
 
 const DIFFICULTIES: number[] = [1, 2, 3, 4, 5];
 const DUE_STATUSES: { value: ReviewFilters["dueStatus"]; label: string }[] = [
@@ -51,10 +53,25 @@ const BIGTECH_OPTIONS: { value: ReviewFilters["bigTech"]; label: string }[] = [
 ];
 
 export default function ReviewPage() {
+  const searchParams = useSearchParams();
+  // 2026-07-25 交互闭环：从首页/计划详情点进来的复习任务，
+  // URL 会带 planId/nodeId/cardId/date 等场景参数，
+  // 这里把它们合并到 filters 初始值，让用户直接看到目标任务，
+  // 而不是落到 /review 后还要在筛选器里再找一遍。
+  const scene = useMemo(() => parseSceneParams(searchParams), [searchParams]);
+  const initialFilters = useMemo<ReviewFilters>(() => {
+    if (!scene.planId && !scene.nodeId) return DEFAULT_FILTERS;
+    return {
+      ...DEFAULT_FILTERS,
+      planId: scene.planId ?? "all",
+      nodeId: scene.nodeId ?? "all",
+    };
+  }, [scene]);
+
   const [allCards, setAllCards] = useState<ReviewCard[]>([]);
   const [plans, setPlans] = useState<LearningPlan[]>([]);
   const [decks, setDecks] = useState<FavoriteDeck[]>([]);
-  const [filters, setFilters] = useState<ReviewFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<ReviewFilters>(initialFilters);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [buriedIds, setBuriedIds] = useState<Set<string>>(new Set());

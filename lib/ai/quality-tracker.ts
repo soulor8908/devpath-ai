@@ -134,7 +134,10 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   "glm-4": { input: 3.5, output: 3.5 },
   "glm-4-plus": { input: 5.0, output: 5.0 },
   // DeepSeek — https://api-docs.deepseek.com/quick_start/pricing
-  "deepseek-chat": { input: 0.14, output: 0.28 },
+  // 2026-07-25：deepseek-chat 已被新 API 弃用，新增 v4 系列价格
+  "deepseek-chat": { input: 0.14, output: 0.28 }, // 旧模型，保留以兼容历史日志
+  "deepseek-v4-flash": { input: 0.14, output: 0.28 }, // 与原 chat 同档位
+  "deepseek-v4-pro": { input: 0.55, output: 2.19 }, // 升级版（类似 reasoner）
   "deepseek-reasoner": { input: 0.55, output: 2.19 },
   // MiMo（小米）— 估算
   "mimo-v2-pro": { input: 0.5, output: 0.5 },

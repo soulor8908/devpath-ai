@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 describe("provider", () => {
   const originalEnv = { ...process.env };
@@ -33,7 +33,7 @@ describe("provider", () => {
     const { getProviderInfo } = await import("../lib/ai/provider");
     const info = getProviderInfo();
     expect(info.provider).toBe("deepseek");
-    expect(info.model).toBe("deepseek-chat");
+    expect(info.model).toBe("deepseek-v4-flash");
     expect(info.baseURL).toBe("https://api.deepseek.com/v1");
   });
 

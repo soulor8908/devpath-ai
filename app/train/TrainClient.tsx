@@ -10,13 +10,14 @@
 //   4. 训练完成时自动结束进行中的番茄钟（completeSession），避免专注计时继续空跑
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useHomeData } from "@/lib/home";
 import { TrainSessionFlow } from "@/components/TrainSessionFlow";
 import { Icon } from "@/components/Icon";
 import { Button, Modal } from "@/components/ui";
 import { POMODORO_OPEN_EVENT, getRunningSession, completeSession } from "@/lib/timer/pomodoro";
+import { parseSceneParams } from "@/lib/study-queue/nav-params";
 
 interface TrainProgress {
   currentIndex: number;
@@ -28,6 +29,8 @@ interface TrainProgress {
 
 export default function TrainClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const scene = useMemo(() => parseSceneParams(searchParams), [searchParams]);
   const { studyQueue, reload } = useHomeData();
   const [sessionStartTime] = useState(() => Date.now());
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
@@ -47,11 +50,28 @@ export default function TrainClient() {
   // 适合首页"今日学习清单"展示紧迫感；但训练会话的体感是"先学新再复习"，
   // 因此这里按 type 重排：new 在前（保持 priority 降序），review 在后（保持 priority 降序）。
   // 首页 studyQueue 的排序不受影响，仅在训练页本地重排。
+  //
+  // 2026-07-25 交互闭环：如果 URL 带了场景参数（planId/nodeId/cardId/date），
+  // 则按参数过滤队列——用户从首页点某个任务进训练页，应该只训练那一项/那一组，
+  // 而不是把今日全部任务塞给他。这是"我刚点过的东西在新页面应该默认选中"的体现。
   const orderedQueue = useMemo(() => {
-    const newTasks = studyQueue.filter((t) => t.type === "new");
-    const reviewTasks = studyQueue.filter((t) => t.type === "review");
+    // 场景过滤：任一参数存在时启用
+    const hasSceneFilter =
+      !!scene.planId || !!scene.nodeId || !!scene.cardId || !!scene.date;
+    let queue = studyQueue;
+    if (hasSceneFilter) {
+      queue = studyQueue.filter((t) => {
+        if (scene.planId && t.planId !== scene.planId) return false;
+        if (scene.nodeId && t.nodeId !== scene.nodeId) return false;
+        if (scene.cardId && t.cardId !== scene.cardId) return false;
+        if (scene.date && t.date !== scene.date) return false;
+        return true;
+      });
+    }
+    const newTasks = queue.filter((t) => t.type === "new");
+    const reviewTasks = queue.filter((t) => t.type === "review");
     return [...newTasks, ...reviewTasks];
-  }, [studyQueue]);
+  }, [studyQueue, scene]);
 
   // 计时器
   useEffect(() => {

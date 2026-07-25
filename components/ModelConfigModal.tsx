@@ -390,7 +390,7 @@ export function ModelConfigModal({
           <Input
             value={modelModel}
             onChange={(e) => setModelModel(e.target.value)}
-            placeholder="如 gpt-4o-mini / deepseek-chat"
+            placeholder="如 gpt-4o-mini / deepseek-v4-flash"
             inputSize="sm"
             className="mt-1 font-mono"
           />

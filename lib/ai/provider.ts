@@ -24,7 +24,10 @@ const PRESETS: Record<string, Omit<ProviderConfig, "apiKey">> = {
   },
   deepseek: {
     baseURL: "https://api.deepseek.com/v1",
-    model: "deepseek-chat",
+    // 2026-07-25：deepseek-chat 在新 API key 下报错
+    // "supported API model names are deepseek-v4-pro or deepseek-v4-flash"
+    // 切到 deepseek-v4-flash（与原 deepseek-chat 同档位的轻量版）
+    model: "deepseek-v4-flash",
   },
   mimo: {
     baseURL: "https://api.xiaomimimo.com/v1",

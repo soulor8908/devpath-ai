@@ -310,7 +310,7 @@ export function MindMap({
     e.stopPropagation();
     const delta = -e.deltaY * 0.0015;
     setScale((s) => {
-      const next = Math.max(0.3, Math.min(2.5, s + delta * s));
+      const next = Math.max(0.3, Math.min(5, s + delta * s));
       return next;
     });
   }, []);
@@ -442,7 +442,7 @@ export function MindMap({
     setTranslate({ x: 0, y: 0 });
   }, []);
 
-  const zoomIn = useCallback(() => setScale((s) => Math.min(2.5, s + 0.2)), []);
+  const zoomIn = useCallback(() => setScale((s) => Math.min(5, s + 0.2)), []);
   const zoomOut = useCallback(() => setScale((s) => Math.max(0.3, s - 0.2)), []);
   const expandAll = useCallback(() => setExpanded(new Set(allIds)), [allIds]);
   const collapseAll = useCallback(() => setExpanded(new Set()), []);
@@ -453,7 +453,7 @@ export function MindMap({
     const rect = containerRef.current.getBoundingClientRect();
     const scaleX = (rect.width - PADDING * 2) / width;
     const scaleY = (rect.height - PADDING * 2) / height;
-    const next = Math.max(0.3, Math.min(2.5, Math.min(scaleX, scaleY)));
+    const next = Math.max(0.3, Math.min(5, Math.min(scaleX, scaleY)));
     setScale(next);
     setTranslate({ x: 0, y: 0 });
   }, [positions.length, width, height]);
@@ -486,7 +486,7 @@ export function MindMap({
     const rect = containerRef.current.getBoundingClientRect();
     const scaleX = (rect.width - PADDING * 2) / matchesWidth;
     const scaleY = (rect.height - PADDING * 2) / matchesHeight;
-    const next = Math.max(0.3, Math.min(2.5, Math.min(scaleX, scaleY)));
+    const next = Math.max(0.3, Math.min(5, Math.min(scaleX, scaleY)));
     setScale(next);
     // translate 让匹配节点群居中：补偿 PADDING + 偏移到匹配区域左上角
     setTranslate({

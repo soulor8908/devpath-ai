@@ -33,6 +33,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useHomeData, getStreakMeta } from "@/lib/home";
+import { buildSceneUrl } from "@/lib/study-queue/nav-params";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
 import { PathProgressBar } from "@/components/PathProgressBar";
 import { PathCoachInsight } from "@/components/PathCoachInsight";
@@ -299,7 +300,7 @@ export default function HomeClient() {
           与第 2/3 格（纯展示）形成视觉区分，让"可点击"更明显 ============ */}
       <section className="mb-5 grid grid-cols-3 gap-3">
         <Link
-          href={studyQueue[0] ? (studyQueue[0].type === "review" ? "/review" : `/learn/${studyQueue[0].planId ?? ""}`) : "/learn/new"}
+          href={studyQueue[0] ? (studyQueue[0].type === "review" ? buildSceneUrl("/review", studyQueue[0], "home") : buildSceneUrl(`/learn/${studyQueue[0].planId ?? ""}`, studyQueue[0], "home")) : "/learn/new"}
           aria-label={`今日学习清单 ${studyQueue.length} 项，点击进入学习`}
           className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/40 dark:to-gray-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all group relative"
         >
@@ -460,7 +461,9 @@ export default function HomeClient() {
         {studyQueue.length > 0 ? (
           <div className="space-y-1.5">
             {studyQueue.slice(0, 5).map((task) => {
-              const href = task.type === "review" ? "/review" : `/learn/${task.planId ?? ""}`;
+              const href = task.type === "review"
+                ? buildSceneUrl("/review", task, "home")
+                : buildSceneUrl(`/learn/${task.planId ?? ""}`, task, "home");
               return (
                 <Link
                   key={task.id}

@@ -217,6 +217,46 @@ import { Button, Input, Select, Textarea, Modal } from "@/components/ui";
 
 **适用范围**：所有"画布 + 工具栏"类组件（脑图 / 图表 / 时间轴 / 看板 / 大表格等）。
 
+### 2.12 交互闭环：跳转必须携带场景参数
+
+**背景**：2026-07-25 用户反馈"我从某个知识点进来的，那就默认过来某个知识点；从今天计划进来的，就加今日过滤条件"。原代码从首页/计划详情跳到训练/复习/学习详情页时**不带任何 query 参数**，导致用户落到目标页后还要重新找一遍刚点过的任务——交互闭环断裂。
+
+**根因**：跳转方只写了 `href="/review"` 或 `href={`/learn/${planId}`}`，没有把"用户当前在看的任务上下文"传过去。目标页也只能从全量数据里加载，不知道用户想聚焦哪一项。
+
+**正确模式**：跳转方用 `buildSceneUrl` 构造带场景参数的 URL；目标页用 `parseSceneParams` 读取并过滤/预选。
+
+```tsx
+// ❌ 禁止：跳转不带场景参数（用户在目标页要重新找）
+<Link href="/review">去复习</Link>
+<Link href={`/learn/${task.planId}`}>去学习</Link>
+
+// ✅ 正确：用 buildSceneUrl 把当前任务上下文带过去
+import { buildSceneUrl } from "@/lib/study-queue/nav-params";
+<Link href={buildSceneUrl("/review", task, "home")}>去复习</Link>
+<Link href={buildSceneUrl(`/learn/${task.planId}`, task, "home")}>去学习</Link>
+
+// ✅ 正确：目标页用 parseSceneParams 读取并过滤
+import { parseSceneParams } from "@/lib/study-queue/nav-params";
+const searchParams = useSearchParams();
+const scene = useMemo(() => parseSceneParams(searchParams), [searchParams]);
+// 用 scene.planId / scene.nodeId / scene.cardId / scene.date 过滤数据
+```
+
+**参数约定**（见 [lib/study-queue/nav-params.ts](file:///workspace/lib/study-queue/nav-params.ts)）：
+- `planId`：关联的学习计划 id（type=new 时有值）
+- `nodeId`：关联的知识点 id（type=new 时有值）
+- `cardId`：关联的 FSRS 卡片 id（type=review 时有值）
+- `date`：任务日期 "YYYY-MM-DD"（用于"今日计划"过滤）
+- `from`：来源标记（如 "home" / "plan-detail"），用于目标页做埋点/差异化提示
+
+**判断标准**（设计审查时自查）：
+- 跳转入口是否知道用户当前在看哪个任务？知道就带场景参数。
+- 目标页是否能从全量数据里聚焦到目标任务？不能就加 `parseSceneParams` 读取。
+- 用户从 A 页面点任务 X 跳到 B 页面，B 页面是否默认选中/过滤到任务 X？
+- routine-based 的通用 CTA（如"去复习"、"去休息"）不需要带参数——它们没有具体任务上下文。
+
+**适用范围**：所有"任务列表 → 任务详情/训练/复习"的跳转入口（首页今日清单 / 计划详情页 / 知识树 / 脑图节点等）。
+
 ---
 
 ## 3. 测试与质量门禁
@@ -345,6 +385,7 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 | 折叠按钮缺 aria-expanded | 代码评审打回（暂无测试守护） |
 | emoji 当功能图标 | 代码评审打回（暂无测试守护） |
 | absolute 浮层覆盖画布内容（见 2.11） | 代码评审打回（暂无测试守护，需自查窄屏 + 浮层重叠） |
+| 跳转不带场景参数（见 2.12） | 代码评审打回（暂无测试守护，需自查交互闭环） |
 
 ---
 

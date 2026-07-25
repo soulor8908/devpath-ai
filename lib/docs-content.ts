@@ -209,14 +209,14 @@ AI 会根据你的状态自动调整当日学习负载。
    - **提供商**：glm / deepseek / mimo / kimi / custom
    - **baseURL**：API 地址
    - **API Key**：从模型服务商获取的密钥
-   - **模型名**：如 glm-4-flash、deepseek-chat
+   - **模型名**：如 glm-4-flash、deepseek-v4-flash
 4. 保存后可点击「测试」验证连接
 
 ## 预设模板
 
 内置以下模板，点击即可自动填充：
 - **智谱 GLM**（glm-4-flash，免费额度）
-- **DeepSeek**（deepseek-chat）
+- **DeepSeek**（deepseek-v4-flash）
 - **小米 MiMo**（mimo-v2-pro）
 - **Kimi**（moonshot-v1-8k，Moonshot AI）
 - **OpenAI**（gpt-4o-mini）

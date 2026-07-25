@@ -17,7 +17,8 @@ export const MODEL_PRESETS: Array<Pick<ModelConfig, "name" | "provider" | "baseU
     name: "DeepSeek",
     provider: "deepseek",
     baseURL: "https://api.deepseek.com/v1",
-    model: "deepseek-chat",
+    // 2026-07-25：deepseek-chat 已被新 API 拒绝（要求 deepseek-v4-pro/flash）
+    model: "deepseek-v4-flash",
   },
   {
     name: "小米 MiMo",
@@ -47,6 +48,11 @@ export const MODEL_PRESETS: Array<Pick<ModelConfig, "name" | "provider" | "baseU
 
 /** 获取所有模型配置 */
 export async function listModelConfigs(): Promise<ModelConfig[]> {
+  // 2026-07-25 迁移：把老用户的 deepseek-chat 自动升级到 deepseek-v4-flash
+  // 旧预设 deepseek-chat 在新 API key 下报错（supported: deepseek-v4-pro/flash）
+  // 迁移幂等：仅升级 model="deepseek-chat" 且 baseURL 包含 deepseek.com 的配置
+  await migrateDeepseekChatToV4();
+
   const configs = await listItems<ModelConfig>(KEY_PREFIXES.MODEL_CONFIG);
   return configs.sort((a, b) => {
     // 默认模型排第一，其余按创建时间
@@ -54,6 +60,42 @@ export async function listModelConfigs(): Promise<ModelConfig[]> {
     if (!a.isDefault && b.isDefault) return 1;
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
+}
+
+/**
+ * 迁移：把 deepseek-chat 升级到 deepseek-v4-flash
+ *
+ * 背景：DeepSeek API 2026 年某次升级后，旧 key 不再支持 deepseek-chat，
+ * 报错 "supported API model names are deepseek-v4-pro or deepseek-v4-flash"。
+ * 老用户在 profile 里保存的 modelConfig 仍是 deepseek-chat，导致聊天全挂。
+ *
+ * 策略：
+ *   - 仅匹配 baseURL 含 "deepseek.com" 且 model === "deepseek-chat" 的配置
+ *   - 升级到 model = "deepseek-v4-flash"（与原 deepseek-chat 同档位的轻量版）
+ *   - 幂等：已升级的不重复处理
+ *   - 不修改用户自定义的其他模型配置
+ */
+async function migrateDeepseekChatToV4(): Promise<void> {
+  try {
+    const configs = await listItems<ModelConfig>(KEY_PREFIXES.MODEL_CONFIG);
+    const toMigrate = configs.filter(
+      (c) =>
+        c.model === "deepseek-chat" &&
+        typeof c.baseURL === "string" &&
+        c.baseURL.includes("deepseek.com"),
+    );
+    if (toMigrate.length === 0) return;
+    await Promise.all(
+      toMigrate.map((c) =>
+        setItem(KEY_PREFIXES.MODEL_CONFIG + c.id, {
+          ...c,
+          model: "deepseek-v4-flash",
+        }),
+      ),
+    );
+  } catch {
+    // 迁移失败不影响 listModelConfigs 主流程（返回未迁移的数据也比挂掉强）
+  }
 }
 
 /** 获取默认模型（无则取第一个） */
