@@ -1418,6 +1418,25 @@ export default function ChatClient({
               {/* 操作按钮（hover 显示；编辑模式下隐藏） */}
               {m.id !== editingMessageId && (
                 <>
+                  {/* 复制消息按钮（2026-07-25 新增：用户消息也支持复制） */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard?.writeText(m.content);
+                        toast.success("已复制到剪贴板");
+                      } catch {
+                        toast.error("复制失败，请手动选择文字复制");
+                      }
+                    }}
+                    className="absolute -left-7 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="复制消息"
+                    title="复制消息"
+                  >
+                    <Icon name="copy" className="w-3.5 h-3.5" />
+                  </Button>
                   {/* 删除单条消息按钮 */}
                   <Button
                     variant="ghost"
@@ -1433,7 +1452,7 @@ export default function ChatClient({
                       });
                       if (ok) handleDeleteMessage(m.id);
                     }}
-                    className="absolute -left-7 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -left-14 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="删除消息"
                     title="删除消息"
                   >
@@ -1449,7 +1468,7 @@ export default function ChatClient({
                         setEditingMessageId(m.id);
                         setEditContent(m.content);
                       }}
-                      className="absolute -left-14 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -left-21 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
                       aria-label="编辑消息"
                       title="编辑消息"
                     >
@@ -1485,16 +1504,21 @@ export default function ChatClient({
                   // 聊天框内选文字问 AI：把选中文字塞入输入框作为追问，
                   // 不走 openChatModal（避免触发新对话丢失上下文）
                   // 2026-07-25 修复"点击没反应"：
-                  //   1) 追加而非覆盖（保留用户已输入的内容）
-                  //   2) 用 setTimeout 让 focus 在 React state flush 后执行
-                  //   3) streaming 时 textarea 是 disabled，focus 也不响应；
-                  //      改用 toast 提示用户"已加入输入框，等回复完成后发送"
+                  //   1) useAskAI 已缓存 selectedText 到 ref，不再依赖 click 时 selection 存活
+                  //   2) 追加而非覆盖（保留用户已输入的内容）
+                  //   3) 用 setTimeout 让 focus + scrollIntoView 在 React state flush 后执行
+                  //   4) 加 toast 反馈，让用户明确知道内容已加入输入框
+                  //   5) streaming 时 textarea 是 disabled，改用 toast 提示
                   const prefill = `关于上面回复中的这段内容：\n\n> ${selectedText}\n\n请帮我进一步解释。`;
                   setInput((prev) => (prev.trim() ? `${prev}\n\n${prefill}` : prefill));
                   if (streaming) {
                     toast.info("已加入输入框，回复完成后即可发送");
                   } else {
-                    setTimeout(() => inputRef.current?.focus(), 0);
+                    toast.success("已加入输入框");
+                    setTimeout(() => {
+                      inputRef.current?.focus();
+                      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 0);
                   }
                 }}
               />
