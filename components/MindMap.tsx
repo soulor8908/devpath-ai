@@ -409,7 +409,9 @@ export function MindMap({
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const ratio = dist / t.initialDist;
-      setScale(Math.max(0.3, Math.min(2.5, t.initialScale * ratio)));
+      // 2026-07-25 用户需求：手势 pinch 缩放上限与滚轮/按钮统一为 5（500%）
+      // 原值 2.5（250%）导致移动端双指放大被截断，与桌面端体验不一致
+      setScale(Math.max(0.3, Math.min(5, t.initialScale * ratio)));
       // pinch 的 translate 也需要除以 svgToClientRatio（与 pan 一致）
       const svgRatio = svgToClientRatioRef.current || 1;
       const midX = (t1.clientX + t2.clientX) / 2;
