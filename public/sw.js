@@ -4,7 +4,6 @@
 // 扩展：push / notificationclick 事件（PWA 通知基础设施）
 // 扩展：periodicsync 事件（P0.1 后台定期检查，让 AI "在呼吸"）
 
-const SW_VERSION = "v3";
 const CACHE_NAME = "devpath-v2";
 const STATIC_ASSETS = ["/", "/learn", "/review", "/rest", "/stats", "/manifest.json"];
 

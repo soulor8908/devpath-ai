@@ -148,22 +148,3 @@ export function buildStudyQueueFromData(
 
   return tasks;
 }
-
-// ============ 兼容旧接口（第 1 阶段实现，标记为 deprecated） ============
-
-/**
- * @deprecated 第 1 阶段实现，读 LearnLog/ReviewLog 已完成日志——语义偏差。
- * 第 2 阶段起请使用 buildStudyQueueFromData（接受 plans + dueCards）。
- *
- * 保留此函数仅为不破坏现有测试；新代码请用 buildStudyQueueFromData。
- */
-export async function buildStudyQueue(
-  options?: BuildStudyQueueOptions,
-): Promise<StudyTask[]> {
-  // 服务端渲染 → 空数组
-  if (typeof window === "undefined") return [];
-  // 第 1 阶段实现已废弃，返回空数组（调用方应改用 buildStudyQueueFromData）
-  // 不抛错以保持向后兼容
-  void options;
-  return [];
-}
