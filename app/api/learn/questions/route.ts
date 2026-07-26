@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { LanguageModel } from "ai";
-import { generateQuestions } from "@/lib/ai/question";
+import { generateQuestionStems, FAILED_QUESTION_SENTINEL } from "@/lib/ai/question";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
@@ -57,21 +57,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const questions = await generateQuestions(nodes, model);
-    // 答案字段清空，待第 3 步生成
+    // 2026-07-26 根因修复：改用 stem-only 批量生成（只产题干，答案由 step3 流式生成）。
+    // 旧版 generateQuestions 要求模型一次输出大 JSON（question+answer+keyPoints+followUps
+    // +codeSnippet）且 5 路并发，在 GLM/DeepSeek 等免费档下极易截断/限流 → 整批占位失败；
+    // 且 answer 随后被本路由丢弃，纯属浪费。详见 lib/ai/question.ts 文件头。
+    const { questions, firstError } = await generateQuestionStems(nodes, model);
+    // 答案字段统一清空（stem 路径本就没答案；占位题的 [ERROR] 详情也清掉，
+    // 真实错误通过 firstError 字段透出，避免污染 UI 展示）
     const withoutAnswers = questions.map((q) => ({ ...q, answer: "" }));
 
-    // 2026-07-26 修复：题目生成失败但前端误报"生成成功"的问题
-    // generateQuestions 对单题失败会返回占位 Question（question === "生成失败，点击重试"），
-    // 不抛错。原 API 路由不区分"全部成功 / 部分失败 / 全部失败"，统一以 200 返回，
-    // 前端无条件 toast.success("已生成 X 道题目")，误导用户。
-    // 现在统计失败题数并附在响应体里，让前端按情况显示分级提示：
+    // 统计失败题数并附在响应体里，让前端按情况显示分级提示：
     //   - failedCount === 0 → 全部成功，正常 toast.success
     //   - 0 < failedCount < total → 部分成功，toast.warning 提示可重试
     //   - failedCount === total → 全部失败，toast.error 提示用户检查 API Key 或重试
-    const FAILED_SENTINEL = "生成失败，点击重试";
     const failedCount = withoutAnswers.filter(
-      (q) => q.question === FAILED_SENTINEL,
+      (q) => q.question === FAILED_QUESTION_SENTINEL,
     ).length;
     const successCount = withoutAnswers.length - failedCount;
 
@@ -80,6 +80,9 @@ export async function POST(req: NextRequest) {
       failedCount,
       successCount,
       total: withoutAnswers.length,
+      // 2026-07-26：透出第一道题的真实失败原因（如 429 限流 / 401 鉴权 / schema 校验失败），
+      // 前端在失败 toast 中展示，用户不用再猜"AI 配置正常为什么还失败"
+      firstError: failedCount > 0 ? firstError : null,
     });
     applyTrialHeaders(response, isTrial, trialRemaining);
     return response;

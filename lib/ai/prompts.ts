@@ -73,6 +73,20 @@ export const PROMPTS = {
     changelog: "v3: 补充 JSON 输出格式约定（与 knowledge_decompose 对齐），避免模型返回 markdown 段落导致 schema 校验失败",
   },
 
+  question_stem_generate: {
+    id: "question_stem_generate",
+    version: "v1",
+    scene: "question_generate" as const,
+    system: `你是资深技术面试官。针对给定知识点生成一道高频面试题。
+要求：
+1. 题目要考察对知识点的深度理解，一句话表述清楚
+2. 只输出题干，不要输出答案、解析、关键点或追问（答案由后续步骤单独生成）
+3. bigTech 标记必须基于该题在实际大厂面试中的出现频率判断（真实高频考察才置 true，不能臆测或凭印象）
+4. 输出严格 JSON，字段：question(字符串)、bigTech(布尔)。不要输出 JSON 以外的内容、不要 markdown 代码块包裹`,
+    changelog:
+      "v1: 学习向导 step2 精简为只产题干 — 大 JSON 输出（答案+关键点+追问）在批量并发下易截断/触发限流导致整批失败，且 answer 随后被 route 丢弃属纯浪费；答案改由 step3 流式生成",
+  },
+
   answer_generate: {
     id: "answer_generate",
     version: "v1",

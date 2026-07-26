@@ -36,4 +36,10 @@ export interface PomodoroSession {
   energyAfter?: number;
   /** 暂停累计时长（分钟，用于精确计算实际专注时长） */
   pausedMinutes?: number;
+  /**
+   * 本次暂停的开始时间 ISO（status=paused 时存在）。
+   * 用途：暂停期间 computeRemainingMs 以 pausedAt 为基准冻结倒计时，
+   * 恢复时把 (now - pausedAt) 补偿到 startedAt 上，保证"暂停不走表"。
+   */
+  pausedAt?: string;
 }

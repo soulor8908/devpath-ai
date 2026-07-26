@@ -190,6 +190,11 @@ export async function abandonSession(
 /**
  * 暂停 session：status=running → paused
  * 仅 running 状态可暂停
+ *
+ * 2026-07-26 修复（用户反馈"暂停状态对了但时钟没暂停"）：
+ *   旧实现只切 status，不记录 pausedAt；而 computeRemainingMs 用
+ *   startedAt + duration - now 计算剩余，暂停期间 now 照走 → 倒计时照走。
+ *   现在记录 pausedAt，让倒计时以 pausedAt 为基准冻结。
  */
 export async function pauseSession(id: string): Promise<void> {
   const session = await getItem<PomodoroSession>(
@@ -200,6 +205,7 @@ export async function pauseSession(id: string): Promise<void> {
   await setItem(KEY_PREFIXES.POMODORO_SESSION + id, {
     ...session,
     status: "paused",
+    pausedAt: new Date().toISOString(),
   });
   notifySessionChanged();
 }
@@ -211,6 +217,11 @@ export async function pauseSession(id: string): Promise<void> {
  * 2026-07-25 需求3：恢复后同步 markSessionCurrent，避免用户刷新浏览器后
  * recoverInterruptedSession 误判同一 session 为"中断"再次弹"继续/放弃"。
  * （与 markSessionCurrent 的 docstring 一致："应在 resumeSession 后调用"）
+ *
+ * 2026-07-26 修复（用户反馈"暂停后时钟照走"）：
+ *   恢复时把暂停时长补偿到 startedAt（startedAt += now - pausedAt），
+ *   并累计 pausedMinutes（供 completeSession 计算实际专注时长）。
+ *   兼容旧数据：pausedAt 缺失时按 0 补偿（不偏移 startedAt）。
  */
 export async function resumeSession(id: string): Promise<void> {
   const session = await getItem<PomodoroSession>(
@@ -218,13 +229,66 @@ export async function resumeSession(id: string): Promise<void> {
   );
   if (!session) return;
   if (session.status !== "paused") return;
-  await setItem(KEY_PREFIXES.POMODORO_SESSION + id, {
+
+  const nowMs = Date.now();
+  const pausedAtMs = session.pausedAt
+    ? new Date(session.pausedAt).getTime()
+    : NaN;
+  const pausedMs =
+    Number.isFinite(pausedAtMs) && pausedAtMs <= nowMs ? nowMs - pausedAtMs : 0;
+  const startMs = new Date(session.startedAt).getTime();
+
+  const updated: PomodoroSession = {
     ...session,
     status: "running",
-  });
+    // 关键：把暂停时长推后开始时间，使剩余时间恢复暂停前的值
+    startedAt: new Date(startMs + pausedMs).toISOString(),
+    pausedMinutes:
+      Math.round(((session.pausedMinutes ?? 0) + pausedMs / 60_000) * 100) /
+      100,
+    pausedAt: undefined,
+  };
+  await setItem(KEY_PREFIXES.POMODORO_SESSION + id, updated);
   // 需求3：恢复后标记当前会话已知该 session，避免刷新后误触发恢复提示
   markSessionCurrent(id);
   notifySessionChanged();
+}
+
+/**
+ * 计算 session 剩余时间（ms），负值表示已超时。
+ *
+ * 2026-07-26 修复（用户反馈"暂停状态对了但时钟没暂停"）：
+ *   旧实现（两个 UI 组件各自拷贝）一律 endMs - Date.now()，
+ *   暂停期间 now 照走 → 倒计时照走。重复代码导致 lib 层修复漏网到 UI。
+ *   现收敛为 lib 层唯一实现：
+ *   - status=paused 且 pausedAt 存在 → 以 pausedAt 为"现在"冻结倒计时
+ *   - status=running → startedAt 已被 resumeSession 补偿（含历史暂停时长），直接用 Date.now()
+ *   - 兼容旧数据：paused 但缺 pausedAt 时退化为 Date.now()（不会把时间算错方向）
+ */
+export function computeRemainingMs(session: PomodoroSession): number {
+  const startMs = new Date(session.startedAt).getTime();
+  const endMs = startMs + session.durationMinutes * 60_000;
+  return endMs - effectiveNowMs(session);
+}
+
+/**
+ * 计算 session 进度百分比（0-100），用于进度环。
+ * 与 computeRemainingMs 同一基准：paused 时冻结。
+ */
+export function computeProgress(session: PomodoroSession): number {
+  const total = session.durationMinutes * 60_000;
+  if (total <= 0) return 0;
+  const elapsed = effectiveNowMs(session) - new Date(session.startedAt).getTime();
+  return Math.min(100, Math.max(0, (elapsed / total) * 100));
+}
+
+/** 倒计时计算的"现在"基准：paused 时冻结在 pausedAt，否则为真实当前时间 */
+function effectiveNowMs(session: PomodoroSession): number {
+  if (session.status === "paused" && session.pausedAt) {
+    const pausedAtMs = new Date(session.pausedAt).getTime();
+    if (Number.isFinite(pausedAtMs)) return pausedAtMs;
+  }
+  return Date.now();
 }
 
 /**

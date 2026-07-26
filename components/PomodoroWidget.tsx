@@ -38,6 +38,8 @@ import {
   resumeSession,
   abandonSession,
   markSessionCurrent,
+  computeRemainingMs,
+  computeProgress,
   POMODORO_SESSION_CHANGED_EVENT,
   POMODORO_OPEN_EVENT,
 } from "@/lib/timer/pomodoro";
@@ -66,20 +68,6 @@ function formatCountdown(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-/** 计算 session 剩余时间（ms），负值表示已超时 */
-function computeRemainingMs(session: PomodoroSession): number {
-  const startMs = new Date(session.startedAt).getTime();
-  const endMs = startMs + session.durationMinutes * 60_000;
-  return endMs - Date.now();
-}
-
-/** 计算 session 进度百分比（0-100），用于进度环 */
-function computeProgress(session: PomodoroSession): number {
-  const total = session.durationMinutes * 60_000;
-  const elapsed = Date.now() - new Date(session.startedAt).getTime();
-  return Math.min(100, Math.max(0, (elapsed / total) * 100));
 }
 
 /** localStorage key：持久化 widget 位置（同设备记忆） */

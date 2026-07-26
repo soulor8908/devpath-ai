@@ -274,6 +274,8 @@ export function LearnWizard({
         failedCount?: number;
         successCount?: number;
         total?: number;
+        /** 第一道题的真实失败原因（全部成功时为 null），2026-07-26 错误透出 */
+        firstError?: string | null;
       };
       if (!data.questions || data.questions.length === 0) {
         throw new Error("AI 未返回题目，请重试");
@@ -286,6 +288,12 @@ export function LearnWizard({
       const failedCount = data.failedCount ?? 0;
       const total = data.total ?? data.questions.length;
       const successCount = data.successCount ?? total - failedCount;
+      // 真实失败原因（截断展示，避免 toast 过长）
+      const reason = data.firstError
+        ? data.firstError.length > 120
+          ? data.firstError.slice(0, 120) + "…"
+          : data.firstError
+        : null;
 
       if (failedCount === 0) {
         toast.success(`已生成 ${total} 道题目`);
@@ -294,16 +302,26 @@ export function LearnWizard({
         toast.warning(
           `已生成 ${successCount}/${total} 道题目，${failedCount} 道失败，可点击"重新生成"重试`,
         );
+        if (reason) console.warn(`[LearnWizard] 部分题目生成失败，首个错误：${data.firstError}`);
       } else {
         // 全部失败：仍然进入 questions 步骤，让用户看到失败题目列表 + 重试按钮
         // 不抛错让用户卡在原步骤，因为失败题目也需要展示出来让用户知道发生了什么
+        // 2026-07-26：把真实失败原因透出到 toast（如 429 限流 / 401 鉴权 / 模型不存在），
+        // 用户不用再猜"AI 配置正常为什么还失败"
         toast.error(
-          `全部 ${total} 道题目生成失败，请检查 AI 配置后点击"重新生成"`,
+          reason
+            ? `全部 ${total} 道题目生成失败：${reason}`
+            : `全部 ${total} 道题目生成失败，请检查 AI 配置后点击"重新生成"`,
         );
       }
       setStep("questions");
       setAITaskContent(aiTaskId, `已生成 ${successCount}/${total} 道题目`);
-      completeAITask(aiTaskId);
+      // 全部失败时 AITask 标记为错误态（带上真实原因），而非假成功
+      if (failedCount > 0 && successCount === 0) {
+        errorAITask(aiTaskId, reason ?? "全部题目生成失败");
+      } else {
+        completeAITask(aiTaskId);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";
       toast.error(`题目生成失败：${msg}`);

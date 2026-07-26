@@ -42,6 +42,7 @@ import {
   // 改用 getActiveSession() 同时查 running 和 paused，正确恢复 paused 视图。
   getActiveSession,
   markSessionCurrent,
+  computeRemainingMs,
   POMODORO_SESSION_CHANGED_EVENT,
 } from "@/lib/timer/pomodoro";
 import {
@@ -77,13 +78,6 @@ function formatCountdown(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-/** 计算 session 剩余时间（ms） */
-function computeRemainingMs(session: PomodoroSession): number {
-  const startMs = new Date(session.startedAt).getTime();
-  const endMs = startMs + session.durationMinutes * 60_000;
-  return endMs - Date.now();
 }
 
 /** 把 ISO 时间格式化为 HH:MM 显示（用于今日列表） */
@@ -365,11 +359,17 @@ export function PomodoroFullContent({
     try {
       if (session.status === "running") {
         await pauseSession(session.id);
-        setSession({ ...session, status: "paused" });
+        // 重读完整 session：pauseSession 会写入 pausedAt，
+        // 本地 state 必须带上 pausedAt，computeRemainingMs 才能以它为基准冻结倒计时
+        const updated = await getActiveSession();
+        if (updated) setSession(updated);
         stopGuard();
       } else if (session.status === "paused") {
         await resumeSession(session.id);
-        setSession({ ...session, status: "running" });
+        // 重读完整 session：resumeSession 会把暂停时长补偿到 startedAt，
+        // 本地 state 必须带上新 startedAt，否则倒计时显示会"跳变"丢失暂停时长
+        const updated = await getActiveSession();
+        if (updated) setSession(updated);
         startInterruptTracking(session.id);
       }
     } catch (e) {
