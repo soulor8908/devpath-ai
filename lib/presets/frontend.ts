@@ -270,6 +270,16 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "手写 Promise A+、Promise.all/race/allSettled/any、并发限制调度器、重试超时、红绿灯循环、可取消异步。",
     mastery: 0,
   },
+  {
+    id: "coding-algorithm",
+    title: "前端场景算法",
+    difficulty: 3,
+    prerequisites: ["js-api", "coding-utility"],
+    frequency: "中",
+    bigTech: true,
+    summary: "大数运算、数组扁平化/去重、版本号比较、千分位格式化、树结构互转与查找、日期区间、虚拟列表计算。",
+    mastery: 0,
+  },
   // ===== 工程化层（5 个节点） =====
   {
     id: "build-tools",
@@ -8899,6 +8909,505 @@ const getUser2 = spawn(function* (id: string) {
 踩坑：①Generator 的 this 与箭头函数——Generator 函数不能是箭头函数（无 this、无 prototype），spawn 里要 apply(this) 透传；②错误时序——gen.throw(err) 若生成器内没有 try/catch 包裹该 yield，错误冒泡出生成器，执行器 reject，与 async 行为一致；③return 提前结束——生成器内 return 时 done: true，执行器 resolve 该值，对应 async 的 return；④for await 消费同步可迭代对象——会把每个元素 Promise.resolve 包一层再 await，语义安全但有微任务开销。`,
     keyPoints: ["async = Generator + spawn 自动执行器", "reject → gen.throw 在 yield 处注入，故可 try/catch", "双向通信（next 注值/throw 注错）是协程暂停恢复的本质"],
     followUps: ["for await...of 的异步迭代器协议（Symbol.asyncIterator）如何工作？", "为什么 await 循环会拖慢微任务队列？如何批量优化？"],
+    favorited: false,
+  },
+  // ===== 37. coding-algorithm 前端场景算法 =====
+  {
+    id: "fe-262",
+    nodeId: "coding-algorithm",
+    question: "实现大数相加与大数相乘（输入输出均为字符串，数字可能超出 Number.MAX_SAFE_INTEGER）。为什么 JS 需要大数运算？",
+    bigTech: true,
+    answer: `结论：JS 的 Number 是 IEEE 754 双精度，安全整数范围 ±2^53（9007199254740991），超出即丢精度。后端雪花 ID、订单号、金额（以分为单位的大整数）常超此限。三种方案：字符串模拟竖式运算、BigInt（ES2020）、让后端传字符串（约定优先）。
+
+真实事故：订单系统后端返回 Long 型订单 ID（19 位），前端 JSON.parse 后精度丢失（1234567890123456789 变成 1234567890123456800），导致"订单详情 404"——因为拿错误的 ID 去查库。修复方案就是接口规范：超 15 位的 ID 一律返回字符串。
+
+\`\`\`ts
+// 大数相加：竖式模拟，从低位向高位逐位加 + 进位
+function addBig(a: string, b: string): string {
+  let i = a.length - 1, j = b.length - 1, carry = 0;
+  let result = "";
+  while (i >= 0 || j >= 0 || carry > 0) {      // 注意：carry 也是循环条件
+    const digitA = i >= 0 ? a.charCodeAt(i--) - 48 : 0;
+    const digitB = j >= 0 ? b.charCodeAt(j--) - 48 : 0;
+    const sum = digitA + digitB + carry;
+    result = (sum % 10) + result;               // 当前位
+    carry = Math.floor(sum / 10);               // 进位
+  }
+  return result;
+}
+
+// 大数相乘：竖式乘法——a[i]*b[j] 的结果累加到 result[i+j+1]，最后统一处理进位
+function multiplyBig(a: string, b: string): string {
+  if (a === "0" || b === "0") return "0";
+  const m = a.length, n = b.length;
+  const pos = new Array(m + n).fill(0);
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      const mul = (a.charCodeAt(i) - 48) * (b.charCodeAt(j) - 48);
+      const p1 = i + j, p2 = i + j + 1;         // 竖式定位：乘积落在两位上
+      const sum = mul + pos[p2];
+      pos[p2] = sum % 10;
+      pos[p1] += Math.floor(sum / 10);          // 进位累加到高位（暂不归一）
+    }
+  }
+  // 去掉前导零后拼接
+  return pos.join("").replace(/^0+/, "") || "0";
+}
+
+// BigInt 版（现代环境首选）：原生任意精度整数
+const addBigNative = (a: string, b: string) => (BigInt(a) + BigInt(b)).toString();
+\`\`\`
+
+要点：①charCodeAt(i) - 48 比 Number(char) 快——避免创建字符串再解析，数字字符的 ASCII 从 48 开始；②加法的循环终止条件是 i>=0 || j>=0 || carry>0——最高位进位最容易漏（999+1=1000）；③乘法的位置映射 a[i]*b[j] → [i+j, i+j+1] 是竖式的数学本质，先在 pos 数组里"不归一累加"，最后一次性处理，避免中间态反复进位；④BigInt 与 Number 不能混合运算（1n + 1 抛 TypeError），互转要显式，BigInt 不支持 Math 方法、JSON.stringify（要 toJSON 补丁或 toString）。
+
+面试加分——为什么不用浮点模拟：金额场景禁用浮点（0.1+0.2=0.30000000000000004），业内通行做法是"以分为单位用整数"或 decimal 库。BigInt 的运算性能比 Number 慢一个数量级（任意精度要堆分配），高频计算场景慎用。
+
+踩坑：①输入含负号/小数点要单独处理（上面实现假设非负整数字符串）；②JSON.parse 解析大数时精度在 parse 阶段就丢了，轮不到你后续处理——必须源头传字符串，或自定义 JSON.parse 的 reviver 也无法挽回（reviver 拿到的已是丢精度的数）；③BigInt 转 Number 超出安全范围静默丢精度，Number(big) 之前要自行判断范围；④除法/开方 BigInt 会截断小数（7n / 2n === 3n），金融场景要配合定点数库。`,
+    keyPoints: ["竖式模拟：低位向高位 + 进位；乘法 i+j 定位", "BigInt 原生但不可与 Number 混算、不可 JSON 序列化", "源头治理：超 15 位 ID 后端必须传字符串"],
+    followUps: ["如何实现大数除法与取模？", "decimal.js 如何表示任意精度小数？（分数/科学计数法存储）"],
+    favorited: false,
+  },
+  {
+    id: "fe-263",
+    nodeId: "coding-algorithm",
+    question: "实现数组扁平化（支持任意深度）与对象扁平化（{a:{b:{c:1}}} → {'a.b.c':1}）。各有哪些边界情况？",
+    bigTech: true,
+    answer: `结论：数组扁平化是"深度遍历 + 拼接"，对象扁平化是"路径记录 + 叶子写入"。边界情况是区分度所在：循环引用、数组作为对象的叶子、特殊对象（Date/RegExp 不该被展开）、key 中含点号的路径冲突。
+
+\`\`\`ts
+// ===== 1. 数组扁平化 =====
+// 递归版：depth 控制展开层数（Infinity 全展开）
+function flat<T>(arr: unknown[], depth = Infinity): T[] {
+  const result: T[] = [];
+  for (const item of arr) {
+    if (Array.isArray(item) && depth > 0) {
+      result.push(...flat<T>(item, depth - 1));  // 深度递减
+    } else {
+      result.push(item as T);
+    }
+  }
+  return result;
+}
+
+// 迭代版（栈）：防深度爆炸栈溢出（10 万层嵌套递归会 stack overflow）
+function flatIterative<T>(arr: unknown[]): T[] {
+  const result: T[] = [];
+  const stack = [...arr];
+  while (stack.length) {
+    const item = stack.shift()!;                 // BFS 顺序（要 DFS 用 pop+unshift 结果再反转）
+    if (Array.isArray(item)) stack.unshift(...item); // 前插保序
+    else result.push(item as T);
+  }
+  return result;
+}
+
+// 原生 arr.flat(Infinity)：ES2019，但不展开稀疏数组的空位（hole 会被跳过）
+
+// ===== 2. 对象扁平化 =====
+function flatten(obj: Record<string, unknown>, prefix = "", hash = new WeakSet<object>()): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? \`\${prefix}.\${key}\` : key;
+    if (value !== null && typeof value === "object") {
+      if (hash.has(value)) throw new TypeError("循环引用无法扁平化");
+      // 边界决策：Date/RegExp/数组 视为叶子，不展开
+      if (value instanceof Date || value instanceof RegExp || Array.isArray(value)) {
+        result[path] = value;
+        continue;
+      }
+      hash.add(value);
+      Object.assign(result, flatten(value as Record<string, unknown>, path, hash));
+      hash.delete(value);                        // 兄弟分支可复用同一引用（菱形引用不算循环）
+    } else {
+      result[path] = value;                      // 原始值叶子
+    }
+  }
+  return result;
+}
+// { a: { b: { c: 1 }, d: [1,2] }, e: new Date() }
+// → { 'a.b.c': 1, 'a.d': [1,2], 'e': Date }
+\`\`\`
+
+真实应用：①动态表单系统——嵌套的表单模型拍平成"路径 → 值"做校验和脏检查，lodash.get/set 配套按路径回写；②i18n 语言包——{ home: { title: "首页" } } 拍平成 "home.title" 做 key 查找；③接口参数转换——老后端要平铺 query 参数，前端把嵌套对象拍平再 URL 编码；④React 的 children 扁平化——React.Children.toArray 内部就做了扁平 + 去 Fragment。
+
+边界情况逐个过：①稀疏数组——[, , 1] 手动递归会把 hole 当 undefined 收入结果，原生 flat 跳过 hole，语义差异要在面试中点出；②循环引用——{ a: { self: a } } 递归版爆栈，WeakSet 记录"当前路径上"的祖先（用完 delete，允许兄弟分支共享引用——菱形依赖是合法的）；③数组的处理分歧——有的业务要 'arr.0.x' 展开数组，有的把数组当叶子，必须和面试官确认需求（lodash.flattenDeep 只展开数组，flat 对象另有 flatten 库）；④key 冲突——{ a: { b: 1 }, 'a.b': 2 } 拍平后两个键都是 'a.b'，后写覆盖先写，要检测冲突报 warning；⑤Symbol 键——Object.entries 拿不到 Symbol 键，需要 Reflect.ownKeys 才完整。
+
+逆向操作（unflatten）：按 . 拆分路径逐层建树，配合 lodash.set 一行搞定——拍平和还原常成对出现在"数据快照对比"场景（diff 两个版本的对象，先拍平再逐 key 比对）。`,
+    keyPoints: ["数组扁平：递归 depth 递减 / 栈迭代防爆栈", "对象扁平：路径拼接 + 叶子判定（Date/数组不展开）", "循环引用用祖先集 WeakSet，菱形引用要放行"],
+    followUps: ["原生 flat 对稀疏数组的处理与手动实现差异？", "unflatten 还原时 'a.0.b' 路径如何决定建数组还是对象？"],
+    favorited: false,
+  },
+  {
+    id: "fe-264",
+    nodeId: "coding-algorithm",
+    question: "实现数组去重的多种方案，并扩展到：按对象 key 去重、求两个数组的交集/并集/差集。分析各方案复杂度。",
+    bigTech: true,
+    answer: `结论：原始值去重首选 [...new Set(arr)]（O(n)）；NaN 和对象引用是 Set 的判定盲区（Set 用 SameValueZero，NaN 视为相等去重，对象按引用比）。按 key 去重要 Map 建索引；交并差集是 Set 语义的直接映射，但对象数组要先映射到键空间。
+
+\`\`\`ts
+// ===== 1. 原始值去重 =====
+const uniq = <T>(arr: T[]): T[] => [...new Set(arr)];
+// [1, '1', NaN, NaN] → [1, '1', NaN]（NaN 被去重，1 和 '1' 不相等）
+
+// filter + indexOf 版（面试手写常考，O(n²)，只能当备胎）
+const uniqLegacy = <T>(arr: T[]): T[] => arr.filter((v, i) => arr.indexOf(v) === i);
+// 坑：indexOf 用严格相等，NaN 永远找不到自己 → NaN 全被过滤掉！
+
+// ===== 2. 对象数组按 key 去重（保首次出现） =====
+function uniqBy<T, K extends keyof T>(arr: T[], key: K): T[] {
+  const seen = new Map<T[K], T>();
+  for (const item of arr) {
+    if (!seen.has(item[key])) seen.set(item[key], item); // 先到先得
+  }
+  return [...seen.values()];
+}
+// 保最后一次出现：改成每次都 set，Map 的 key 覆盖、插入序不变
+
+// ===== 3. 集合运算（对象数组版本，先映射到键空间） =====
+type KeyFn<T> = (item: T) => string | number;
+
+function intersect<T>(a: T[], b: T[], key: KeyFn<T>): T[] {
+  const bKeys = new Set(b.map(key));
+  const seen = new Set<string | number>();
+  return a.filter((item) => {
+    const k = key(item);
+    if (!bKeys.has(k) || seen.has(k)) return false; // 不在 b 或已取过
+    seen.add(k);
+    return true;
+  });
+}
+
+function union<T>(a: T[], b: T[], key: KeyFn<T>): T[] {
+  return uniqBy([...a, ...b], key as never);       // 并集 = 拼接后去重
+}
+
+function difference<T>(a: T[], b: T[], key: KeyFn<T>): T[] {
+  const bKeys = new Set(b.map(key));
+  return a.filter((item) => !bKeys.has(key(item))); // 在 a 不在 b
+}
+\`\`\`
+
+复杂度分析（面试官必问）：①Set/Map 方案 O(n)——哈希表均摊 O(1) 查询；②filter+indexOf O(n²)——万条数据 1 亿次比较，实测 Chrome 下 10 万元素 Set 版 2ms vs indexOf 版 800ms，差 400 倍；③includes 版去重（arr.includes）同样 O(n²)，但正确处理 NaN（SameValueZero）。
+
+真实场景：①标签系统——用户已选标签与推荐标签求差集，得出"还可添加"列表；②权限 diff——旧权限集与新权限集做交并差，算出"新增/删除/保留"三种操作渲染差异列表；③表格批量选择——跨页全选时，已选行按 id 去重合并（翻页回来不重复计数）；④埋点去抖——同一用户同一事件 5 分钟内按 eventId+uid 去重，防重复上报污染统计。
+
+深度判定问题：①对象内容相等但引用不同（{a:1} 和 {a:1}）Set 无法去重——需要"键序列化"（JSON.stringify 键，但键顺序敏感：{a:1,b:2} 和 {b:2,a:1} 序列化不同，要排序键再序列化，或手写稳定 hash）；②Set 去重保持插入序——这也是为什么 [...new Set()] 比 Map 方案更常被首选，语义天然符合"去重且保序"；③大数组的内存——Set 额外占用一份存储，百万级数据可考虑"先排序再相邻去重"（O(nlogn) 但无额外哈希表），流式数据则必须在线算法。
+
+踩坑：①NaN 的三种判定差异——indexOf(NaN)===-1（严格相等）、includes(NaN)===true、Set.has(NaN)===true；②+0 和 -0——SameValueZero 视为相等会去掉一个，Object.is(+0,-0) 为 false，数学计算场景要注意符号丢失；③去重后顺序——要求"按最后出现去重"（保留最新数据）时 Set 方案要从右往左遍历；④对象键冲突——id 有 number 1 和 string "1" 混合时，key 函数要 String(item.id) 统一类型，否则 Map 里 1 和 "1" 是两个键。`,
+    keyPoints: ["Set 去重 O(n) 保序；indexOf 版 O(n²) 且丢 NaN", "按 key 去重 Map 索引；交并差先映射键空间", "对象内容去重要稳定序列化键（排序键再 stringify）"],
+    followUps: ["百万级数据去重，Set 内存溢出时如何外排序去重？", "SameValueZero 与严格相等、Object.is 的三方差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-265",
+    nodeId: "coding-algorithm",
+    question: "实现版本号比较函数 compareVersion('1.2.0', '1.10.0')。如何处理预发布标签（alpha/beta/rc）？semver 规范还有哪些规则？",
+    bigTech: true,
+    answer: `结论：版本号按 . 分段数值比较，'1.10.0' > '1.2.0'（10 > 2，不能按字符串比）。带预发布标签时：正式版 > 预发布版，预发布按标签链逐级比较（alpha < beta < rc）。这是依赖管理（package.json 的 ^/~）、灰度发布、特性开关的基础设施。
+
+\`\`\`ts
+// 基础版：纯数字段比较，返回 1 / -1 / 0
+function compareVersion(a: string, b: string): number {
+  const partsA = a.split(".").map(Number);
+  const partsB = b.split(".").map(Number);
+  const len = Math.max(partsA.length, partsB.length); // 段数不等补 0
+  for (let i = 0; i < len; i++) {
+    const x = partsA[i] ?? 0;                          // '1.2' 视为 '1.2.0'
+    const y = partsB[i] ?? 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+// 完整版：支持预发布标签（semver 规范 §11）
+const PRERELEASE_ORDER = ["alpha", "beta", "rc"];      // 标签优先级表
+
+function compareSemver(a: string, b: string): number {
+  const parse = (v: string) => {
+    const [core, pre = ""] = v.split("-");             // '1.2.0-rc.1' → core='1.2.0', pre='rc.1'
+    return { nums: core.split(".").map(Number), pre: pre.split(".").filter(Boolean) };
+  };
+  const pa = parse(a), pb = parse(b);
+
+  // 1. 主版本号三段数值比较
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+
+  // 2. 都有正式版 core 相同：无 pre 的（正式版）> 有 pre 的（预发布版）
+  if (!pa.pre.length && !pb.pre.length) return 0;
+  if (!pa.pre.length) return 1;                        // '1.2.0' > '1.2.0-rc.1'
+  if (!pb.pre.length) return -1;
+
+  // 3. 逐级比较 pre 标签：数字 < 字母；同类型数值比大小，字母按字典序
+  for (let i = 0; i < Math.max(pa.pre.length, pb.pre.length); i++) {
+    const x = pa.pre[i], y = pb.pre[i];
+    if (x === undefined) return -1;                    // 标签链短的小：'1.0.0-alpha' < '1.0.0-alpha.1'
+    if (y === undefined) return 1;
+    const xNum = /^\\d+$/.test(x), yNum = /^\\d+$/.test(y);
+    if (xNum && yNum) {                                // 都是数字：数值比
+      const d = Number(x) - Number(y);
+      if (d !== 0) return d > 0 ? 1 : -1;
+    } else if (xNum) return -1;                        // 数字 < 字母
+    else if (yNum) return 1;
+    else if (x !== y) return x > y ? 1 : -1;           // 字母：字典序（alpha < beta < rc 天然成立）
+  }
+  return 0;
+}
+\`\`\`
+
+semver 完整规则（面试常考背景知识）：①三段语义——MAJOR（不兼容变更）.MINOR（向后兼容新特性）.PATCH（向后兼容修复）；②^ 与 ~ 范围——^1.2.3 允许 1.x.x（主版本锁死），~1.2.3 只允许 1.2.x（次版本锁死），^0.x 特殊（0 主版本视为不稳定，^0.2.3 只到 0.2.x）；③build 元数据——1.0.0+build.123 不参与比较（只作构建标识）；④版本底线——1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta < 1.0.0-beta.2 < 1.0.0-beta.11 < 1.0.0-rc.1 < 1.0.0。
+
+真实应用：①灰度发布——客户端上报版本，服务端判断 "version >= 3.2.0" 才下发新功能配置；②依赖冲突排查——npm ls 后手工判断两个传递依赖能否合并（semver.satisfies）；③强制升级——比较当前版本与最低支持版本，低于则弹强更框（App 内嵌 H5 常做）；④webpack Module Federation——共享依赖的版本协商，semver 不满足则各自加载独立副本（运行时包体积翻倍的根源）。
+
+踩坑：①前导零——'1.02.0' 严格 semver 非法（数字段不许前导零），但宽松解析要兼容；②段数不等——'1.2' vs '1.2.0' 应视为相等（补零），别误判小于；③非数字字符——'v1.2.0' 的 v 前缀要先 strip（git tag 习惯）；④大数字段——版本段可能超 2^53（极少见但构建号可能很长），稳妥用 BigInt 或分段字符串比较；⑤比较方向——排序用 arr.sort(compareVersion) 是升序，要"最新在前"记得反转；⑥npm 实际算法——真实 npm semver 库还有连字符范围（1.2.3 - 2.3.4）、x 范围（1.2.x）、|| 并集等 DSL，面试点到即可，别陷入实现黑洞。`,
+    keyPoints: ["分段数值比较，段数不等补零", "正式版 > 预发布版；数字标签 < 字母标签", "^ 锁主版本、~ 锁次版本、^0.x 特殊"],
+    followUps: ["npm 依赖解析如何用最浅树 + semver 满足集选版本？", "Module Federation 共享依赖版本不满足时的加载策略？"],
+    favorited: false,
+  },
+  {
+    id: "fe-266",
+    nodeId: "coding-algorithm",
+    question: "实现数字千分位格式化（1234567.891 → '1,234,567.891'），要求支持负数与任意小数位。再实现大数缩写（12300 → '1.2万'）。",
+    bigTech: true,
+    answer: `结论：千分位的核心是"整数部分每三位插逗号"，正则版用前瞻断言一行搞定，手动版从右往左每三位切片。小数部分不参与千分位。大数缩写是"按数量级归一 + 单位映射"，中文环境按万/亿，英文按 k/M/B——这是数据看板的标配。
+
+\`\`\`ts
+// ===== 1. 千分位格式化 =====
+// 正则版：利用前瞻断言，找"后面跟着 3 的倍数位数字"的位置插逗号
+function toThousand(num: number | string): string {
+  const [int, dec] = String(num).split(".");
+  const formatted = int.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ",");
+  return dec === undefined ? formatted : \`\${formatted}.\${dec}\`;
+}
+// 正则拆解：\\B 非单词边界（不在开头）+ (?=(\\d{3})+(?!\\d)) 前瞻——
+// 当前位置向右数，数字个数是 3 的倍数且结尾后无更多数字组
+
+// 手动版（面试要求解释原理时写）：从右往左三位一切
+function toThousandManual(num: number | string): string {
+  const str = String(num);
+  const negative = str.startsWith("-");
+  const body = negative ? str.slice(1) : str;
+  const [int, dec] = body.split(".");
+  let result = "";
+  for (let i = int.length; i > 0; i -= 3) {
+    const start = Math.max(0, i - 3);
+    result = int.slice(start, i) + (result ? "," : "") + result;
+  }
+  return (negative ? "-" : "") + result + (dec === undefined ? "" : \`.\${dec}\`);
+}
+
+// ===== 2. 大数缩写（中文万/亿 与 英文 k/M/B 双体系） =====
+function abbreviate(num: number, locale: "zh" | "en" = "zh"): string {
+  const abs = Math.abs(num);
+  const units: Array<[number, string]> = locale === "zh"
+    ? [[1e8, "亿"], [1e4, "万"]]
+    : [[1e9, "B"], [1e6, "M"], [1e3, "k"]];
+  for (const [threshold, unit] of units) {
+    if (abs >= threshold) {
+      const value = abs / threshold;
+      // 保留 1 位小数并去尾零：1.0万 → 1万，1.2万 保留
+      const text = value.toFixed(1).replace(/\\.0$/, "");
+      return (num < 0 ? "-" : "") + text + unit;
+    }
+  }
+  return String(num);
+}
+\`\`\`
+
+正则版原理详解（面试必追问）：(?=(\d{3})+(?!\d)) 是零宽前瞻断言——不消费字符、只断言"当前位置右侧"的模式。拆解：从某位置向右看，能看到若干组"恰好 3 位数字"，且最后一组后面不再是数字。这样匹配到的位置恰好是千分位逗号应插入处。\B 排除字符串开头（开头插逗号就错了）。整个过程不修改数字本身，只插入分隔符——零宽断言的经典应用，同类还有密码强度校验 (?=.*[a-z])(?=.*[A-Z])。
+
+边界与精度：①负数——先取符号再处理，正则版对负号天然安全（- 不是 \d 不参与计数）；②小数——split('.') 分离，小数位不插逗号，科学计数法字符串（1e21）要先转普通表示（(1e21).toLocaleString 或直接拒绝处理）；③精度——123456789.12345678 浮点本身已丢精度，千分位只是"显示层"格式化，高精度场景要在字符串状态下格式化（函数入参接受 string 就是这个原因）；④原生方案——Intl.NumberFormat('zh-CN').format(1234567.89) 或 toLocaleString()，生产环境首选，还支持货币、百分比，手写是为了面试和兼容极端定制。
+
+大数缩写的真实业务：①数据看板——GMV 显示 "12.3亿" 而非 1230000000，C 端阅读效率提升；②社交产品——粉丝数 1.2万、播放量 340万；③取舍细节——不足 1 万显示原值还是 "9999"？产品通常要求 "9999" 原样（避免 "1万" 在四舍五入边界的跳动），toFixed 是银行家舍入吗？——不是，toFixed 是"向最近舍入，0.5 情况实现相关"（二进制浮点导致 1.005.toFixed(2) === '1.00'），金额场景禁用 toFixed 做舍入，要用十进制定点库；④缩写后的悬停——缩写是展示态，title tooltip 要显示完整数字，无障碍场景 aria-label 同理。
+
+踩坑：①toLocaleString 在旧 Android WebView 的兼容（部分机型不插逗号）；②缩写截断 vs 舍入——1.29万 显示 "1.2万" 还是 "1.3万" 要和产品确认（数据看板通常截断防"看起来虚高"）；③万/亿体系对英文用户不直观——国际化项目单位表按 locale 切换；④Number.isFinite 守卫——NaN/Infinity 输入要原样返回或抛错，正则版对 NaN 会输出 'NaN' 还算安全。`,
+    keyPoints: ["\\B(?=(\\d{3})+(?!\\d)) 零宽前瞻插逗号", "小数与符号分离处理；生产首选 Intl.NumberFormat", "缩写按数量级归一，toFixed 非精确舍入金额禁用"],
+    followUps: ["为什么 1.005.toFixed(2) 是 '1.00'？如何实现真正的四舍五入？", "Intl.NumberFormat 如何做货币与紧凑记数（notation:'compact'）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-267",
+    nodeId: "coding-algorithm",
+    question: "实现扁平数组转树（listToTree）与树转数组（treeToList），再实现查找某节点的完整路径。这是哪些前端组件的底层？",
+    bigTech: true,
+    answer: `结论：listToTree 是"一次遍历建索引 + 二次遍历挂父子"的 O(n) 算法（朴素双重循环是 O(n²)）；treeToList 是 DFS/BFS 遍历；路径查找是"带回溯的 DFS"或"父指针回爬"。级联选择器、组织架构树、菜单权限树、评论区都建立在这三件套上。
+
+\`\`\`ts
+interface TreeNode { id: number; parentId: number | null; name: string; children?: TreeNode[] }
+
+// ===== 1. 数组转树：O(n) 哈希索引法 =====
+function listToTree(list: TreeNode[]): TreeNode[] {
+  const map = new Map<number, TreeNode & { children: TreeNode[] }>();
+  const roots: TreeNode[] = [];
+  // 第一遍：建索引（顺便预置 children 数组）
+  for (const item of list) map.set(item.id, { ...item, children: [] });
+  // 第二遍：挂父子
+  for (const node of map.values()) {
+    if (node.parentId !== null && map.has(node.parentId)) {
+      map.get(node.parentId)!.children.push(node);  // 挂到父节点
+    } else {
+      roots.push(node);                              // 无父即根（支持多根/森林）
+    }
+  }
+  return roots;
+}
+
+// ===== 2. 树转数组：DFS 遍历（可带层级信息） =====
+function treeToList(tree: TreeNode[]): TreeNode[] {
+  const result: TreeNode[] = [];
+  const walk = (nodes: TreeNode[]) => {
+    for (const node of nodes) {
+      const { children, ...rest } = node;            // 剥离 children 还原平铺结构
+      result.push(rest as TreeNode);
+      if (children?.length) walk(children);          // 先序遍历：父先于子
+    }
+  };
+  walk(tree);
+  return result;
+}
+
+// ===== 3. 查找节点路径：DFS 回溯 =====
+function findPath(tree: TreeNode[], targetId: number): TreeNode[] | null {
+  for (const node of tree) {
+    if (node.id === targetId) return [node];         // 命中：路径起点
+    if (node.children?.length) {
+      const subPath = findPath(node.children, targetId);
+      if (subPath) return [node, ...subPath];        // 子树命中：自己接在路径头部
+    }
+  }
+  return null;                                       // 本分支未命中，回溯
+}
+
+// 4. 备选：父指针回爬（有 parent 引用时 O(depth)，无需遍历整棵树）
+function findPathByParent(node: TreeNode & { parent?: TreeNode }): TreeNode[] {
+  const path: TreeNode[] = [];
+  let cur: TreeNode | undefined = node;
+  while (cur) { path.unshift(cur); cur = cur.parent; } // 沿父指针爬到根
+  return path;
+}
+\`\`\`
+
+复杂度对比：listToTree 哈希版 O(n) 时间 O(n) 空间；朴素版（每个节点都扫一遍数组找父亲）O(n²)，5 万条组织架构数据从 3 秒降到 5ms。findPath DFS 最坏 O(n)，父指针版 O(depth)——树深通常 log n 级，差异在百万节点时才显著。
+
+真实组件底层：①级联选择器（Cascader）——选中叶子后要展示"省/市/区"完整路径，findPath 的返回值直接绑给受控值；②菜单权限——后端存平铺的 menu 表（parent_id 字段），前端 listToTree 渲染侧边栏；③组织架构——企业微信式的部门树，搜索成员时 treeToList 做扁平索引再全文匹配；④评论区——嵌套评论平铺存储，渲染时转树，"删除父评论"策略（级联删 or 标记"该评论已删除"保留楼层）是产品决策点；⑤面包屑导航——findPath 的产物就是面包屑数据。
+
+细节决策点：①数据源拷贝——上面实现 {...item} 浅拷贝不污染原数组（原数组可能被其他组件引用，直接挂 children 会造成"渲染一次数据脏一次"的诡异 bug）；②多根支持——parentId 找不到父节点的节点一律当根（容错脏数据：父节点被删但子节点还在）；③排序——children.push 保持原数组顺序，要求"按 sort 字段排序"要在挂载后对各层 children 排序；④深度限制——递归版在超深树（如 DOM 树转录）会栈溢出，迭代版用显式栈解决；⑤循环引用——脏数据 A 的 parent 是 B、B 的 parent 是 A 会形成环，遍历时死循环，生产代码要加 visited 集合防御。
+
+踩坑：①id 类型混用（数字 1 vs 字符串 "1"）导致 map.get 拿不到父节点，树退化成全平铺——建索引前统一 String(id)；②listToTree 要求列表中父节点存在于数组中（允许孤儿当根），但有些业务要求"父缺失即丢弃"，要在挂载时判断；③treeToList 剥离 children 用解构是浅操作，深层嵌套属性仍共享引用；④虚拟滚动渲染大树时，要把树再拍平成"可见节点列表"（treeToList 的变体：只展开 expanded 的分支），万级节点全量渲染必卡。`,
+    keyPoints: ["listToTree：哈希索引 O(n)，朴素双重循环 O(n²)", "findPath：DFS 命中回溯拼接 / 父指针回爬 O(depth)", "级联选择器/菜单树/组织架的底层三件套"],
+    followUps: ["树的虚拟滚动如何只展开可见分支并计算缩进？", "不可变数据（Immer）下树节点更新如何做到 O(depth) 而非整树拷贝？"],
+    favorited: false,
+  },
+  {
+    id: "fe-268",
+    nodeId: "coding-algorithm",
+    question: "日期处理：实现判断两个日期区间是否重叠、获取某天所在周的周一日期、相对时间格式化（刚刚/x分钟前/昨天）。各有什么时区陷阱？",
+    bigTech: true,
+    answer: `结论：日期区间重叠用"起点交集"判定——a.start <= b.end && b.start <= a.end（转换为时间戳比较）。所在周周一要处理周日为 0 的偏移。相对时间是"差值分级映射"。时区陷阱的根源：Date 存的是 UTC 时间戳，显示时按本地时区渲染，跨时区比较必须统一基准。
+
+\`\`\`ts
+// ===== 1. 日期区间重叠判断 =====
+interface Range { start: Date | number; end: Date | number }
+function isOverlap(a: Range, b: Range): boolean {
+  const aStart = +a.start, aEnd = +a.end;             // 一元 + 转时间戳
+  const bStart = +b.start, bEnd = +b.end;
+  return aStart <= bEnd && bStart <= aEnd;            // 闭区间判定
+}
+// 反证法好理解：不重叠 ⟺ a 完全在 b 前（aEnd < bStart）或 b 完全在 a 前
+
+// 进阶：区间求交集（日程冲突检测用）
+function intersectRange(a: Range, b: Range): Range | null {
+  if (!isOverlap(a, b)) return null;
+  return { start: Math.max(+a.start, +b.start), end: Math.min(+a.end, +b.end) };
+}
+
+// ===== 2. 获取某天所在周的周一 =====
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);                              // 归零时分秒，避免跨天误差
+  const day = d.getDay();                              // 0=周日 1=周一 ... 6=周六
+  const diff = day === 0 ? -6 : 1 - day;               // 周日要回退 6 天，其余回退 day-1 天
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+// ===== 3. 相对时间格式化 =====
+function timeAgo(input: Date | number, now = Date.now()): string {
+  const diff = now - +input;                           // 毫秒差
+  if (diff < 0) return "未来";
+  const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+  if (diff < MIN) return "刚刚";
+  if (diff < HOUR) return \`\${Math.floor(diff / MIN)}分钟前\`;
+  if (diff < DAY) return \`\${Math.floor(diff / HOUR)}小时前\`;
+  if (diff < 2 * DAY) return "昨天";
+  if (diff < 7 * DAY) return \`\${Math.floor(diff / DAY)}天前\`;
+  const d = new Date(input);                           // 超一周：显示具体日期
+  return \`\${d.getMonth() + 1}月\${d.getDate()}日\`;
+}
+\`\`\`
+
+时区陷阱（这才是区分度）：①new Date('2024-01-15') 的解析分歧——纯日期串按 UTC 解析（ISO 规范），'2024-01-15 10:00:00' 带空格的形式按本地时区解析，Chrome 和 Safari 对非 ISO 格式解析行为不一致（Safari 对 '2024-01-15 10:00:00' 返回 Invalid Date！）——生产环境日期串必须是 ISO 格式（YYYY-MM-DDTHH:mm:ss）或手动拆分构造；②跨时区比较——服务器存 UTC 时间戳、客户端按本地显示是唯一正解，任何"把时间字符串传来传去"的方案都会在跨国用户处爆炸；③夏令时——美国/欧洲夏令时切换日，一天可能是 23 或 25 小时，"加 24 小时"不等于"加一天"（要 setDate(getDate()+1) 而非 +86400000ms）；④getDay() 的周起点——JS 周日是 0，中国习惯周一是起点，getMonday 里 day===0 特判就是这个坑；⑤月末进位——setDate(31+15) 自动进位到下月（1月31日+15天=2月15日），这个"溢出"特性既是便利也是 bug 源（1月31日加一个月变 3月3日而非 2月28日）。
+
+真实应用：①日程/会议系统——isOverlap 检测会议室冲突，intersectRange 算出冲突时段高亮；②周报系统——getMonday 定位数据归属周，配合 Intl API 还能拿 ISO 周数（某些公司以周为粒度 OKR）；③feed 流——timeAgo 是朋友圈/微博的标配，注意"昨天"和"1天前"的语义差（昨天是日历日概念，1 天前是 24 小时差）；④倒计时——要服务端校时（客户端时钟可被用户修改），首次握手拿 serverTime - clientTime 的偏移量，后续本地推算。
+
+生产建议：超过上述级别的日期需求（周期事件、时区转换、DST 感知）直接上 date-fns（tree-shakable）或 dayjs，Intl.RelativeTimeFormat('zh-CN') 原生支持相对时间本地化（"3天前"），Temporal API（提案阶段）是 Date 的正统继任者，彻底解决可变性（Date 的 set* 方法原地修改是著名坑）与时区问题。
+
+踩坑：①iOS Safari 的 YYYY-MM-DD HH:mm:ss 必须换成 YYYY/MM/DD 或 ISO T 分隔；②时间戳单位混用（后端给秒、前端 Date 要毫秒，×1000 忘了就显示 1970 年）；③timeAgo 的 now 要由调用方传入或缓存——列表 100 条各自 new Date() 会有毫秒级不一致，统一取一次更整齐；④性能：长列表每条 timeAgo 都调一次，万级列表考虑定时统一刷新（setInterval 60s 全量重算）而非各自挂定时器。`,
+    keyPoints: ["区间重叠：aStart <= bEnd && bStart <= aEnd", "getDay 周日为 0，回退 6 天到周一", "UTC 存储本地显示；非 ISO 日期串 Safari 解析炸"],
+    followUps: ["夏令时切换日「加一天」为什么不能用 +86400000ms？", "Temporal API 相对 Date 解决了哪些本质问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-269",
+    nodeId: "coding-algorithm",
+    question: "虚拟列表的核心算法：给定 10 万条定高数据，如何计算可视区应渲染的项范围与占位高度？不定高场景怎么办？",
+    bigTech: true,
+    answer: `结论：虚拟列表的本质是"只渲染视口 ± 缓冲区的项，用上下占位元素撑出完整滚动高度"。定高场景是纯算术：startIndex = floor(scrollTop / itemHeight)，渲染区间 [startIndex - buffer, endIndex + buffer]，上占位 = startIndex × itemHeight，下占位 = (total - endIndex) × itemHeight。不定高需要"预估高度 + 实测缓存 + 滚动修正"。
+
+\`\`\`tsx
+// 定高虚拟列表核心（React 示意，重点是算术）
+function VirtualList({ items, itemHeight, viewportHeight }: Props) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const BUFFER = 5;                                     // 上下各多渲染 5 条，滚动白屏缓冲
+
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - BUFFER);
+  const visibleCount = Math.ceil(viewportHeight / itemHeight);
+  const endIndex = Math.min(items.length, startIndex + visibleCount + BUFFER * 2);
+
+  const visibleItems = items.slice(startIndex, endIndex);
+  const offsetY = startIndex * itemHeight;              // 渲染块的偏移
+
+  return (
+    <div style={{ height: viewportHeight, overflow: "auto" }}
+         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+      {/* 总高度容器：撑出真实滚动条 */}
+      <div style={{ height: items.length * itemHeight, position: "relative" }}>
+        {/* 渲染块：transform 定位到可视位置 */}
+        <div style={{ transform: \`translateY(\${offsetY}px)\` }}>
+          {visibleItems.map((item, i) => (
+            <div key={startIndex + i} style={{ height: itemHeight }}>{item.content}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+\`\`\`
+
+三个关键算术：①startIndex = floor(scrollTop / itemHeight)——当前滚动到的第一条完整项；②totalHeight = count × itemHeight——内层容器撑出和真实全量渲染一样的高度，滚动条比例才正确；③offsetY 用 transform 而非 top——合成层属性，滚动重排时只触发合成，不触发重排（性能关键）。
+
+不定高场景（真实世界的常态）：预估 + 缓存 + 修正三步。①初始给每项预估高度 estimatedHeight，首次按定高算法渲染；②渲染后用 ResizeObserver 实测每项真实高度，存入 heights 缓存数组，并更新"前缀和"（或二分查找用的累积高度数组）；③用户滚动时，scrollTop 对应的目标项通过二分查找在累积高度数组中定位（O(log n)）；④修正——当已渲染项实测高度与预估不符时，总高度变化导致滚动条跳动，要调整 scrollTop 补偿差值（react-window 的 VariableSizeList 就是这么做的）。更先进的方案：IntersectionObserver 驱动的"按需回收"（如 FlashList 的回收池复用 cell）。
+
+性能体系：①渲染量——视口 600px / 行高 50px = 12 条 + 缓冲 10 条 ≈ 22 个 DOM 节点 vs 全量 10 万节点，内存与首屏渲染都是数量级差距；②滚动事件节流——onScroll 高频触发，setState 要用 rAF 节流或直接读写 ref 手动控制渲染（React 18 的 useSyncExternalStore 模式）；③key 的稳定性——key 必须用数据 id 而非索引，否则缓冲区滑动时 React 复用错组件（输入框内容串行）；④图片懒加载协同——虚拟列表项进出视口快，图片要用 loading="lazy" 或 IO 提前半屏加载。
+
+真实应用：①聊天记录——IM 消息列表（微信/飞书 Web），十万条历史消息虚拟滚动 + 向上翻页加载；②长报表——财报/日志查看器，固定表头 + 虚拟行；③表格——antd Table 的 virtual 模式、AG Grid 的 rowVirtualisation（默认开启，号称百万行不卡）；④通讯录——字母索引条与虚拟列表联动（点击字母直接 scrollTo 对应 offset，offset = 字母首项索引 × 行高）。
+
+踩坑：①translateY 大数精度——10 万 × 50px = 500 万像素，Chrome 元素高度上限约 1677 万像素，超限后滚动失效（需分段渲染）；②scrollTop 漂移——不定高修正逻辑有 bug 时滚动会"弹跳"，调试手段是冻结 heights 缓存对比；③屏内 focus 丢失——滚动把 focus 中的输入框回收了，焦点直接丢失（要保留 focus 项或滚动前 blur）；④SSR 场景——服务端无 scrollTop，首屏按 scrollTop=0 渲染即可，注意 hydration 一致；⑤sticky 行——表头/分组吸顶行要与虚拟区间计算联动，吸顶行自身也在被回收的列表里时要特殊处理。`,
+    keyPoints: ["startIndex=floor(scrollTop/itemHeight)，总高撑滚动条，transform 偏移", "不定高：预估+实测缓存+前缀和二分+scrollTop 修正", "key 用 id；滚动 rAF 节流；缓冲区防白屏"],
+    followUps: ["二维虚拟滚动（行+列都虚拟的大表格）如何计算？", "IntersectionObserver 回收池方案相对索引计算的优劣？"],
     favorited: false,
   },
 ];
