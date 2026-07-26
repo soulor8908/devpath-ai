@@ -29,7 +29,7 @@ import { refreshAccuracyAndSkill } from "@/lib/ai/memory/user-profile";
 import { listFavoriteDecks } from "@/lib/favorite";
 import { ReviewCardView } from "@/components/ReviewCardView";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Select, Slider } from "@/components/ui";
+import { Button, Input, Select, Slider, ProgressBar, LoadingScreen } from "@/components/ui";
 import {
   applyReviewFilters,
   DEFAULT_FILTERS,
@@ -288,11 +288,7 @@ function ReviewPageContent() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">加载复习卡片...</p>
-      </div>
-    );
+    return <LoadingScreen text="加载复习卡片..." />;
   }
 
   if (finished) {
@@ -481,14 +477,15 @@ function ReviewPageContent() {
               下一条 <Icon name="chevron-right" className="w-3.5 h-3.5 inline-block" />
             </Button>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
-            <div
-              className="bg-blue-500 h-1 rounded-full transition-all"
-              style={{
-                width: `${((currentIndex + 1) / dueCards.length) * 100}%`,
-              }}
-            />
-          </div>
+          <ProgressBar
+            value={currentIndex + 1}
+            min={0}
+            max={dueCards.length}
+            label={`复习进度 ${currentIndex + 1} / ${dueCards.length}`}
+            size="xs"
+            color="blue"
+            className="mt-2"
+          />
           {showJumpSlider && (
             <Slider
               min={0}

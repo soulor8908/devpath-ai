@@ -12,7 +12,7 @@ import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
 import { RelatedKnowledge } from "@/components/RelatedKnowledge";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Textarea, Select, Modal } from "@/components/ui";
+import { Button, Input, Textarea, Select, Modal, LoadingScreen } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
@@ -670,11 +670,7 @@ export default function PlanDetailClient() {
   }, [plan]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">加载中...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!plan) return null;

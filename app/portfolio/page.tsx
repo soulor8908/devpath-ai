@@ -36,6 +36,7 @@ import {
 } from "@/lib/curriculum/portfolio-store";
 import { recordVerificationResult } from "@/lib/curriculum/mastery-store";
 import { getItem as dbGet } from "@/lib/storage/db";
+import { formatISODate } from "@/lib/time";
 import { apiFetch } from "@/lib/api-client";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
@@ -532,11 +533,5 @@ function StatusBadge({ status }: { status: PortfolioEntry["status"] }) {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  } catch {
-    return "";
-  }
+  return formatISODate(iso);
 }

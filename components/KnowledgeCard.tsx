@@ -14,7 +14,7 @@
 //   - 浅色 utility 配对 dark:（2.3）
 //   - 无原生表单元素
 
-import { Button } from "@/components/ui";
+import { Button, ProgressBar } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { KnowledgeIndexEntry } from "@/lib/types";
 
@@ -54,19 +54,13 @@ export function KnowledgeCard({ entry, score, compact, onClick }: KnowledgeCardP
           </span>
         </div>
         {typeof score === "number" && !compact && (
-          <div
-            role="progressbar"
-            aria-valuenow={Math.round(score * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`匹配度 ${Math.round(score * 100)}%`}
-            className="shrink-0 w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
-          >
-            <div
-              className="h-full bg-blue-500 dark:bg-blue-400 rounded-full"
-              style={{ width: `${Math.round(score * 100)}%` }}
-            />
-          </div>
+          <ProgressBar
+            value={Math.round(score * 100)}
+            label={`匹配度 ${Math.round(score * 100)}%`}
+            size="sm"
+            color="blue"
+            widthClassName="shrink-0 w-12"
+          />
         )}
       </div>
       <h4 className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">

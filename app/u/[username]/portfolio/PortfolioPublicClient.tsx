@@ -27,6 +27,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { Button, EmptyState, SkeletonCard } from "@/components/ui";
 import type { PublicProfile, PublicPortfolioEntry } from "@/lib/types";
 import { maskUsername } from "@/lib/username-mask";
+import { formatISODate } from "@/lib/time";
 
 interface PortfolioResponse {
   entries: PublicPortfolioEntry[];
@@ -342,11 +343,5 @@ function LinkButton({
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  } catch {
-    return "";
-  }
+  return formatISODate(iso);
 }

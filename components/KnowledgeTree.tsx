@@ -18,7 +18,7 @@
 
 import { useState } from "react";
 import type { KnowledgeNode } from "@/lib/types";
-import { Button } from "@/components/ui";
+import { Button, ProgressBar } from "@/components/ui";
 
 interface KnowledgeTreeProps {
   nodes: KnowledgeNode[];
@@ -188,25 +188,13 @@ export function KnowledgeTree({
                           依赖：{node.prerequisites.join(", ")}
                         </p>
                       )}
-                      <div
-                        role="progressbar"
-                        aria-valuenow={isMastered ? 100 : node.mastery}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${node.title} 掌握度 ${isMastered ? 100 : node.mastery}%`}
-                        className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"
-                      >
-                        <div
-                          className={`h-2 rounded-full transition-all ${
-                            isMastered
-                              ? "bg-green-500"
-                              : needsReinforce
-                              ? "bg-orange-500"
-                              : "bg-blue-500"
-                          }`}
-                          style={{ width: `${isMastered ? 100 : node.mastery}%` }}
-                        />
-                      </div>
+                      <ProgressBar
+                        value={isMastered ? 100 : node.mastery}
+                        label={`${node.title} 掌握度 ${isMastered ? 100 : node.mastery}%`}
+                        size="md"
+                        color={isMastered ? "green" : needsReinforce ? "orange" : "blue"}
+                        className="mt-2"
+                      />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         掌握度：{isMastered ? 100 : node.mastery}%
                       </p>

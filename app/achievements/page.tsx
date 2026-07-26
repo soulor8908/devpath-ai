@@ -16,6 +16,7 @@ import {
   collectStats,
   listAllAchievements,
 } from "@/lib/achievements";
+import { formatISODate } from "@/lib/time";
 
 /** type 中文标签 + 图标 + 排序 */
 const TYPE_META: Array<{
@@ -32,13 +33,7 @@ const TYPE_META: Array<{
 ];
 
 function formatUnlockedAt(iso: string): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  } catch {
-    return "";
-  }
+  return formatISODate(iso);
 }
 
 export default function AchievementsPage() {

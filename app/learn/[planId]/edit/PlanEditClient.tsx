@@ -19,7 +19,7 @@ import {
 } from "@/lib/learn-log";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
-import { Button, Input, Textarea, Checkbox } from "@/components/ui";
+import { Button, Input, Textarea, Checkbox, LoadingScreen } from "@/components/ui";
 import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 
 type RoutineSlot = Routine["slots"][number];
@@ -250,11 +250,7 @@ export default function PlanEditClient() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">加载中...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!plan) return null;

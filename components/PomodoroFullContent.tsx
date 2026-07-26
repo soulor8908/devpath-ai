@@ -60,6 +60,7 @@ import {
   type FocusGuardMode,
 } from "@/lib/timer/focus-guard";
 import { notify, requestPermission, hasPermission } from "@/lib/timer/notification-permission";
+import { formatCountdown } from "@/lib/timer/format";
 import {
   getUserProfile,
   saveUserProfile,
@@ -71,14 +72,7 @@ import { Button, Input, Select, Checkbox } from "@/components/ui";
 
 type View = "idle" | "running" | "completed";
 
-/** 倒计时显示格式 MM:SS */
-function formatCountdown(ms: number): string {
-  if (ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+// formatCountdown 抽到 @/lib/timer/format（与 PomodoroWidget 共享同一实现）
 
 /** 把 ISO 时间格式化为 HH:MM 显示（用于今日列表） */
 function formatStartedAtTime(iso: string): string {

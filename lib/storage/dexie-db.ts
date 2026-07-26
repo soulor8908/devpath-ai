@@ -215,5 +215,9 @@ function extractDueAtFromValue(value: unknown): string | undefined {
   return undefined;
 }
 
-/** 导出 extractDueAtFromValue 供 db.ts 使用 */
-export { extractDueAtFromValue };
+/**
+ * 导出 extractUpdatedAtFromValue + extractDueAtFromValue 供 db.ts 复用。
+ * 2026-07-26 抽取：原 db.ts 与 dexie-db.ts 各有一份 extractUpdatedAtFromValue 实现，
+ * 此处 export 后 db.ts 改为 import，避免两份拷贝漂移。
+ */
+export { extractUpdatedAtFromValue, extractDueAtFromValue };

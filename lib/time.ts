@@ -58,3 +58,18 @@ export function chinaDateShift(dateStr: string, days: number): string {
 export function nowISO(): string {
   return new Date().toISOString();
 }
+
+// 把 ISO 时间戳格式化为 "YYYY-MM-DD"（用本地时区，与原 formatDate 行为一致）
+// 2026-07-26 抽取：app/portfolio/page.tsx / app/u/[username]/portfolio/PortfolioPublicClient.tsx /
+// app/achievements/page.tsx 三处完全相同的实现合并为单一事实源。
+// 注意：此函数用本地时区（new Date(iso).getFullYear() 等），与 chinaDateNow 的固定
+// Asia/Shanghai 不同。保留本地时区行为以避免显示回归（用户已有的"解锁于"日期不应突然变化）。
+export function formatISODate(iso: string): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  } catch {
+    return "";
+  }
+}

@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Heatmap } from "@/components/Heatmap";
 import { RadarChart } from "@/components/RadarChart";
 import { Icon, type IconName } from "@/components/Icon";
-import { Button } from "@/components/ui";
+import { Button, LoadingScreen } from "@/components/ui";
 import type { PublicProfile, KnowledgeNode, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
 import { setItem as dbSet, getItem as dbGet } from "@/lib/storage/db";
@@ -129,11 +129,7 @@ export default function UserPageClient() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error === "not_found") {

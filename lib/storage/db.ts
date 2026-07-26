@@ -21,6 +21,7 @@ import {
   ensureDBReady,
   extractPrefix,
   extractDueAtFromValue,
+  extractUpdatedAtFromValue,
   type KVRecord,
 } from "@/lib/storage/dexie-db";
 import { invalidateCache, setCached } from "@/lib/storage/cache";
@@ -301,11 +302,5 @@ export async function cleanExpiredTombstones(
 }
 
 // ============ 内部工具 ============
-
-function extractUpdatedAtFromValue(value: unknown): string | undefined {
-  if (value && typeof value === "object" && "updatedAt" in value) {
-    const ts = (value as { updatedAt?: unknown }).updatedAt;
-    return typeof ts === "string" ? ts : undefined;
-  }
-  return undefined;
-}
+// extractUpdatedAtFromValue / extractDueAtFromValue 已统一从 dexie-db.ts 导入
+// （2026-07-26 抽取：原 db.ts 本地拷贝已删除，避免两份漂移）

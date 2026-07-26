@@ -44,6 +44,7 @@ import {
   POMODORO_OPEN_EVENT,
 } from "@/lib/timer/pomodoro";
 import { notify } from "@/lib/timer/notification-permission";
+import { formatCountdown } from "@/lib/timer/format";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
@@ -61,14 +62,7 @@ import { PomodoroFullContent } from "@/components/PomodoroFullContent";
  */
 type WidgetMode = "hidden" | "ring" | "expanded";
 
-/** 倒计时显示格式 MM:SS */
-function formatCountdown(ms: number): string {
-  if (ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+// formatCountdown 抽到 @/lib/timer/format（与 PomodoroFullContent 共享同一实现）
 
 /** localStorage key：持久化 widget 位置（同设备记忆） */
 const POSITION_STORAGE_KEY = "pomodoro-widget-position";
