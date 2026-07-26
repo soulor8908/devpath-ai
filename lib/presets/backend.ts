@@ -1,16 +1,71 @@
 // lib/presets/backend.ts
-// 后端工程师（含 AI 后端方向）预设：30 知识节点 + 215 道高频面试题 + 学习计划
-// 覆盖：语言基础（Java/Python/Go）→ 数据存储（MySQL/Redis/MQ/NoSQL/ES）→
-//       架构与设计（微服务/分布式/系统设计/高并发/高可用/API）→
-//       运维与工程（容器/CI-CD/监控）→ AI 后端方向（推理/管线/网关/成本/评估）
-// 大厂高频题标注 bigTech: true，答案结合真实项目场景（阿里双 11、美团外卖、字节抖音、腾讯微信等）
+// 后端工程师（含 AI 后端方向）预设：46 知识节点 + 340+ 道高频面试题 + 学习计划
+// 覆盖：计算机基础（TCP/HTTP/QUIC、操作系统、IO 模型、设计模式）→
+//       语言与框架（Java/JVM/Spring/MyBatis/Netty、Python、Go）→
+//       数据存储（MySQL/Redis/MQ/NoSQL/ES）→
+//       架构与分布式（微服务/一致性/系统设计/高并发/高可用/ZK/etcd/分布式 DB/Flink/OLAP/DDD）→
+//       安全与认证（OWASP/注入/XSS/CSRF、JWT/OAuth2/SSO/RBAC）→
+//       运维与工程（容器/CI-CD/监控/线上排查/云原生）→ AI 后端方向（推理/管线/网关/成本/评估）
+// 大厂高频题标注 bigTech: true，答案结合真实项目场景（阿里双 11、美团外卖、字节抖音、腾讯微信、12306 等）
+// 答案统一结构：结论分层 → 真实案例 → 可运行代码/命令 → 对比表格 → 生产踩坑 → 举一反三追问
 
 import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 
-// ===== 知识节点（30 个）=====
+// ===== 知识节点（46 个）=====
 
 const BACKEND_NODES: KnowledgeNode[] = [
-  // ----- Java 语言（5 个节点） -----
+  // ----- 计算机基础（5 个节点） -----
+  {
+    id: "be-network-tcp",
+    title: "TCP 与网络层（三次握手/四次挥手/拥塞控制/TIME_WAIT）",
+    difficulty: 4,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "三次握手与 SYN 泛洪、四次挥手 TIME_WAIT/CLOSE_WAIT、滑动窗口与拥塞控制慢启动/拥塞避免、TCP vs UDP 选型、粘包拆包、Keepalive、tcpdump 抓包实战。",
+    mastery: 0,
+  },
+  {
+    id: "be-network-http",
+    title: "HTTP/HTTPS/QUIC（HTTP1.1→3/TLS1.3/WebSocket）",
+    difficulty: 4,
+    prerequisites: ["be-network-tcp"],
+    frequency: "高",
+    bigTech: true,
+    summary: "HTTP1.1 管线化 vs HTTP2 多路复用 vs HTTP3 QUIC 0-RTT、TLS1.2/1.3 握手流程、证书链校验与 HSTS、WebSocket/SSE、状态码与缓存协商、DNS 与 DoH。",
+    mastery: 0,
+  },
+  {
+    id: "be-os-linux",
+    title: "操作系统与 Linux（进程线程协程/内存/调度/排查命令）",
+    difficulty: 4,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "进程/线程/协程区别、IPC 七种方式、虚拟内存与分页、页面置换 LRU、上下文切换开销、CPU 负载与 top/vmstat/iostat 排查、死锁四条件与破解。",
+    mastery: 0,
+  },
+  {
+    id: "be-io-model",
+    title: "IO 模型（BIO/NIO/AIO/epoll/零拷贝/Reactor）",
+    difficulty: 4,
+    prerequisites: ["be-os-linux"],
+    frequency: "高",
+    bigTech: true,
+    summary: "五种 IO 模型对比、select/poll/epoll 红黑树+就绪链表、epoll ET/LT 触发、零拷贝 sendfile/mmap、splice、Reactor 单线程/多线程/主从模型、C10K→C10M。",
+    mastery: 0,
+  },
+  {
+    id: "be-design-pattern",
+    title: "设计模式与 SOLID（单例/工厂/代理/观察者/策略）",
+    difficulty: 3,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "手写线程安全单例五种写法、三大工厂模式、JDK/CGLIB 动态代理、观察者事件驱动、策略+模板消除 if-else、SOLID 六原则、Spring/MyBatis 源码中的模式。",
+    mastery: 0,
+  },
+  // ----- Java 语言与框架（7 个节点） -----
   {
     id: "be-java-core",
     title: "Java 核心（集合/泛型/IO/反射/注解）",
@@ -59,6 +114,26 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "@Conditional 自动装配、Starter 开发、Actuator 健康检查、Profile 多环境、配置加载优先级、启动事件流程。",
+    mastery: 0,
+  },
+  {
+    id: "be-mybatis",
+    title: "MyBatis 与 ORM（#{} vs ${}/缓存/插件/执行流程）",
+    difficulty: 3,
+    prerequisites: ["be-spring-core"],
+    frequency: "高",
+    bigTech: true,
+    summary: "#{} 预编译防注入 vs ${} 字符串拼接、一级/二级缓存机制与坑、Executor→StatementHandler 执行链、Interceptor 插件分页、Mapper 接口动态代理、MyBatis-Plus 增强。",
+    mastery: 0,
+  },
+  {
+    id: "be-netty",
+    title: "Netty 网络编程（EventLoop/ByteBuf/粘包拆包/心跳）",
+    difficulty: 4,
+    prerequisites: ["be-io-model"],
+    frequency: "中",
+    bigTech: true,
+    summary: "主从 Reactor EventLoopGroup、ByteBuf 池化与零拷贝、LengthFieldBasedFrameDecoder 拆包、IdleStateHandler 心跳保活、Pipeline Handler 责任链、Dubbo/gRPC/IM 中的应用。",
     mastery: 0,
   },
   // ----- Python 后端（3 个节点） -----
@@ -171,7 +246,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     summary: "ES 倒排索引 FST、IK 分词器、BM25 相关性评分、聚合分析、集群分片与副本、深度分页 scroll/search_after、写入 translog。",
     mastery: 0,
   },
-  // ----- 架构与分布式（6 个节点） -----
+  // ----- 架构与分布式（11 个节点） -----
   {
     id: "be-microservice",
     title: "微服务（注册发现/熔断/链路追踪/网关）",
@@ -231,7 +306,75 @@ const BACKEND_NODES: KnowledgeNode[] = [
     summary: "RESTful 资源设计、GraphQL Schema 与 N+1、gRPC Protobuf 接口、API 版本管理、Swagger/OpenAPI 文档、API 安全认证。",
     mastery: 0,
   },
-  // ----- DevOps 与运维（3 个节点） -----
+  {
+    id: "be-zk-etcd",
+    title: "协调服务（ZooKeeper ZAB/watch/etcd Raft）",
+    difficulty: 4,
+    prerequisites: ["be-distributed"],
+    frequency: "中",
+    bigTech: true,
+    summary: "ZAB 协议崩溃恢复与原子广播、临时顺序节点+Watcher 实现分布式锁、羊群效应、etcd Raft 与租约 Lease、服务注册发现、脑裂与奇数节点部署。",
+    mastery: 0,
+  },
+  {
+    id: "be-distributed-db",
+    title: "分布式数据库（TiDB/OceanBase/NewSQL/HTAP）",
+    difficulty: 5,
+    prerequisites: ["be-mysql", "be-distributed"],
+    frequency: "中",
+    summary: "TiDB TiKV Raft 多副本与 PD 调度、OceanBase Paxos 与 LSM 树、Spanner TrueTime 全局一致、PolarDB 存储计算分离、HTAP 混合负载、分布式事务 2PC 优化。",
+    mastery: 0,
+  },
+  {
+    id: "be-flink",
+    title: "实时计算（Flink 状态/窗口/水位线/Exactly-Once）",
+    difficulty: 4,
+    prerequisites: ["be-mq"],
+    frequency: "中",
+    bigTech: true,
+    summary: "KeyedState/RocksDB 状态后端、滚动/滑动/会话窗口、Watermark 乱序处理、Checkpoint 两阶段提交、Exactly-Once 语义、反压机制、实时数仓分层。",
+    mastery: 0,
+  },
+  {
+    id: "be-olap-bigdata",
+    title: "大数据与 OLAP（HBase/ClickHouse/Doris/数据湖）",
+    difficulty: 4,
+    prerequisites: ["be-mq"],
+    frequency: "中",
+    summary: "HBase LSM 树与 Region 分裂、ClickHouse 列存与向量化执行、Doris MPP 架构、Hive 分区与分桶、Iceberg/Hudi 数据湖、Lambda vs Kappa 架构选型。",
+    mastery: 0,
+  },
+  {
+    id: "be-ddd",
+    title: "架构设计与 DDD（架构演进/领域建模/中台）",
+    difficulty: 4,
+    prerequisites: ["be-microservice"],
+    frequency: "中",
+    summary: "单体→微服务→Serverless 演进、DDD 战略（限界上下文/上下文映射）与战术（实体/值对象/聚合根/领域服务）、整洁架构与六边形架构、中台战略、充血模型 vs 贫血模型。",
+    mastery: 0,
+  },
+  // ----- 安全与认证（2 个节点） -----
+  {
+    id: "be-security",
+    title: "Web 安全（SQL 注入/XSS/CSRF/SSRF/加密/防重放）",
+    difficulty: 4,
+    prerequisites: ["be-network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "SQL 注入与预编译、XSS 存储/反射/DOM 三型与 CSP、CSRF Token 与 SameSite、SSRF 内网探测、对称/非对称/国密、接口签名+时间戳+nonce 防重放、越权 IDOR。",
+    mastery: 0,
+  },
+  {
+    id: "be-auth",
+    title: "认证授权（Session-Cookie/JWT/OAuth2/SSO/RBAC）",
+    difficulty: 3,
+    prerequisites: ["be-network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "Session-Cookie vs JWT 无状态、JWT 结构与刷新令牌双 Token、OAuth2 四种模式与 OIDC、SSO 单点登录 CAS、RBAC/ABAC 权限模型、扫码登录全流程。",
+    mastery: 0,
+  },
+  // ----- DevOps 与运维（5 个节点） -----
   {
     id: "be-container",
     title: "容器化（Docker/K8s/Helm/服务网格）",
@@ -258,6 +401,25 @@ const BACKEND_NODES: KnowledgeNode[] = [
     prerequisites: [],
     frequency: "中",
     summary: "Prometheus 指标采集与 PromQL、Grafana 仪表盘、ELK 日志采集、Jaeger/SkyWalking 链路追踪、告警规则与通知。",
+    mastery: 0,
+  },
+  {
+    id: "be-perf-troubleshoot",
+    title: "线上排查与性能调优（CPU100%/OOM/慢查询/压测）",
+    difficulty: 4,
+    prerequisites: ["be-jvm", "be-mysql"],
+    frequency: "高",
+    bigTech: true,
+    summary: "CPU 100% top+jstack 定位、OOM dump+MAT 分析、Full GC 频繁排查、慢 SQL explain 优化、Arthas watch/trace 实战、全链路压测与影子库、接口超时治理。",
+    mastery: 0,
+  },
+  {
+    id: "be-cloud-native",
+    title: "云原生进阶（Service Mesh/eBPF/Serverless/FinOps）",
+    difficulty: 4,
+    prerequisites: ["be-container"],
+    frequency: "中",
+    summary: "Istio Sidecar 与 Envoy 流量治理、eBPF 可观测与网络加速、Knative Serverless 冷启动、Karpenter 弹性伸缩、FinOps 成本治理、GraalVM Native Image。",
     mastery: 0,
   },
   // ----- AI 后端方向（5 个节点） -----
@@ -11187,6 +11349,5368 @@ PSI > 0.5:   严重漂移（紧急干预）
 踩坑：漂移检测需足够样本（日级数据量小，需周级聚合）；季节性误报（周末 vs 工作日分布不同）；概念漂移难检测（需标注数据对比）；LLM 漂移需监控 Prompt 效果（用户行为变化导致 Prompt 失效）。`,
     keyPoints: ["KS 检验+PSI 双指标", "文本漂移用 embedding 距离", "PSI>0.2 告警"],
     followUps: ["概念漂移如何检测？", "漂移后如何更新模型？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：TCP 与网络层（be-216 ~ be-222）=====
+  {
+    id: "be-216",
+    nodeId: "be-network-tcp",
+    question: "TCP 三次握手全过程？为什么是三次而不是两次或四次？SYN 泛洪攻击怎么防？",
+    bigTech: true,
+    answer: `结论：三次握手的本质是「双方互相同步初始序列号 ISN + 确认彼此收发能力正常」。两次无法让服务端确认客户端的接收能力；四次则浪费——服务端的 ACK 和 SYN 可以合并。
+
+过程拆解：
+1. SYN：客户端发 SYN=1, seq=x（随机 ISN），进入 SYN_SENT
+2. SYN+ACK：服务端回 SYN=1, ACK=1, seq=y, ack=x+1，进入 SYN_RCVD
+3. ACK：客户端回 ACK=1, ack=y+1，双方 ESTABLISHED
+
+为什么不是两次：两次握手下，服务端无法确认客户端是否收到自己的 SYN+ACK。若客户端的第一个 SYN 是网络滞留的旧报文，服务端会白白建立连接等资源浪费（历史连接初始化问题）。
+
+案例：12306 春运抢票曾出现大量半开连接——黄牛脚本发 SYN 后不回应第三次握手，服务端 SYN_RCVD 队列被打满，真实用户连不上。这就是 SYN 泛洪（SYN Flood）攻击。
+
+防御手段（Linux 内核参数）：
+\`\`\`bash
+# 1. 开启 SYN Cookie：队列满时不分配资源，用 cookie 编码 ISN 验证
+sysctl -w net.ipv4.tcp_syncookies=1
+# 2. 增大半连接队列
+sysctl -w net.ipv4.tcp_max_syn_backlog=8192
+# 3. 减少 SYN+ACK 重传次数（默认 5 次约 63s）
+sysctl -w net.ipv4.tcp_synack_retries=2
+\`\`\`
+
+\`\`\`text
+SYN Cookie 原理：服务端收到 SYN 不存状态，把连接信息编码进 ISN（时间戳+MSS+哈希）
+回给客户端；第三次握手收到 ACK 时反解校验，合法才建立连接。
+代价：丢失部分 TCP 选项协商能力，只作为兜底。
+\`\`\`
+
+踩坑：netstat 看到大量 SYN_RCVD 不一定是攻击——可能是服务端 CPU 满或 backlog 太小；tcp_syncookies=1 后仍然要配合 backlog 调大，否则正常高并发下也会丢握手；容器里改内核参数要确认 net.ipv4 命名空间是否隔离。`,
+    keyPoints: ["互相同步 ISN+确认收发能力", "SYN Cookie 防泛洪", "半连接队列 backlog 调优"],
+    followUps: ["TCP  Fast Open 怎么优化握手延迟？", "如何抓包验证三次握手（tcpdump）？"],
+    favorited: false,
+  },
+  {
+    id: "be-217",
+    nodeId: "be-network-tcp",
+    question: "四次挥手全过程？为什么主动关闭方要 TIME_WAIT 等 2MSL？线上大量 TIME_WAIT 怎么处理？",
+    bigTech: true,
+    answer: `结论：四次挥手因为 TCP 全双工——两个方向要各自独立关闭。TIME_WAIT 等 2MSL 是为了「保证最后一个 ACK 能重传 + 让旧连接的报文在网络中自然消亡」。
+
+过程：
+1. FIN：主动方发 FIN，进入 FIN_WAIT_1
+2. ACK：被动方回 ACK，进入 CLOSE_WAIT；主动方收到后 FIN_WAIT_2
+3. FIN：被动方应用关闭后发 FIN，进入 LAST_ACK
+4. ACK：主动方回 ACK，进入 TIME_WAIT（2MSL 后关闭）
+
+2MSL 的两个理由：
+- 最后一个 ACK 若丢失，被动方会重传 FIN，主动方在 TIME_WAIT 期间还能再回 ACK
+- 防止本连接的旧报文在网络里游荡，串到下一个相同四元组的新连接（MSL=报文最大生存时间，Linux 默认 60s，2MSL=120s）
+
+案例：美团外卖骑手 App 高峰期，网关服务器 netstat 出现 6 万+ TIME_WAIT——因为网关对上游短连接调用，主动关闭方在网关侧。后果是端口耗尽（默认 28232 个可用端口），新连接建失败。
+
+处理方案（按优先级）：
+\`\`\`bash
+# 1. 治本：改长连接/连接池，HTTP 加 Connection: keep-alive
+# 2. 扩大可用端口范围
+sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+# 3. TIME_WAIT 快速回收（仅客户端侧、开启 tcp_timestamps 时有效）
+sysctl -w net.ipv4.tcp_tw_reuse=1
+# 注意：tcp_tw_recycle 已在 Linux 4.12 移除，NAT 环境下会导致丢包，切勿再用
+\`\`\`
+
+\`\`\`text
+TIME_WAIT  vs  CLOSE_WAIT 排查口诀：
+TIME_WAIT 多 = 自己主动关别人太多（短连接滥用）→ 改长连接
+CLOSE_WAIT 多 = 别人关了，自己代码没 close（泄漏）→ 查代码
+\`\`\`
+
+踩坑：tcp_tw_reuse 只对「主动发起连接的一方」（客户端角色）生效，服务端角色无效；LVS/HAProxy 四层代理会把 TIME_WAIT 状态转移到代理层，瓶颈要一起看；HTTP/1.0 默认短连接是历史重灾区，升级 HTTP/1.1+keep-alive 才是根本。`,
+    keyPoints: ["全双工各自独立关闭", "2MSL=防 ACK 丢失+旧报文消亡", "TIME_WAIT 治本靠长连接"],
+    followUps: ["TIME_WAIT 状态下端口能被强制复用吗（SO_REUSEADDR）？", "为什么服务端主动断开长连接更危险？"],
+    favorited: false,
+  },
+  {
+    id: "be-218",
+    nodeId: "be-network-tcp",
+    question: "CLOSE_WAIT 状态过多说明什么问题？结合一次真实故障讲排查过程。",
+    bigTech: true,
+    answer: `结论：CLOSE_WAIT 过多 = 对端已经关闭连接（发过 FIN），但本端应用代码没有调用 close()——是本端的 bug，不是网络问题。典型根因：连接池泄漏、异常分支没关流、阻塞调用没超时。
+
+案例：字节跳动某推荐服务凌晨告警——文件描述符（fd）耗尽，服务假死但进程活着。排查过程：
+
+\`\`\`bash
+# 1. 看 fd 使用量：接近 ulimit -n 上限 65535
+ls /proc/<pid>/fd | wc -l
+# 2. 看 TCP 状态分布：CLOSE_WAIT 有 5 万+
+ss -ant | awk '{print $1}' | sort | uniq -c | sort -rn
+# 3. 看 CLOSE_WAIT 的对端地址：都指向内部 Redis 代理
+ss -antp | grep CLOSE_WAIT | head
+\`\`\`
+
+定位：DB 代理中间件升级后，空闲连接主动断开（发 FIN），但业务代码用的连接池在 borrow 时没做有效性校验，拿到已半关闭的连接用完也不还——close 永远没被调用。
+
+修复三件套：
+1. 连接池加 testOnBorrow 或 keepalive 探活
+2. 所有资源用 try-with-resources / defer close 兜底
+3. 客户端超时时间必须小于服务端空闲超时，否则永远拿死连接
+
+\`\`\`java
+// 反例：异常分支漏 close，对方关闭后永远停留在 CLOSE_WAIT
+Socket socket = pool.borrow();
+socket.read();  // 阻塞读，对端已 FIN → 返回 -1
+// 异常抛出，close() 没执行 → CLOSE_WAIT 泄漏
+
+// 正例：try-with-resources 保证关闭
+try (Socket socket = pool.borrow()) {
+    socket.setSoTimeout(3000);  // 必须有超时
+    socket.read();
+}  // 自动 close
+\`\`\`
+
+\`\`\`text
+TCP 状态速查（ss -ant 输出）：
+ESTABLISHED  正常通信
+TIME_WAIT    我方主动关，等 2MSL（看 be-217）
+CLOSE_WAIT   对方已关，我方没 close → 我方代码 bug
+FIN_WAIT_2   我方已关，等对方 FIN → 对方应用没 close
+\`\`\`
+
+踩坑：CLOSE_WAIT 不占用端口四元组可复用名额，但占 fd，堆到 ulimit 就炸；Netty/连接池框架的 IdleStateHandler 只能关空闲连接，关不掉「借出去没还」的；排查时 lsof -p <pid> 能看到每个 fd 对应的连接状态，比 ss 更直观。`,
+    keyPoints: ["CLOSE_WAIT=本端没 close 的 bug", "fd 耗尽导致假死", "连接池探活+超时+try 兜底"],
+    followUps: ["FIN_WAIT_2 过多又是谁的问题？", "如何给连接池配置合理的心跳探活？"],
+    favorited: false,
+  },
+  {
+    id: "be-219",
+    nodeId: "be-network-tcp",
+    question: "TCP 滑动窗口与拥塞控制？慢启动、拥塞避免、快重传、快恢复分别解决什么？",
+    bigTech: true,
+    answer: `结论：滑动窗口解决「收发双方速度匹配」（流量控制），拥塞控制解决「网络整体不过载」。发送窗口 = min(接收窗口 rwnd, 拥塞窗口 cwnd)。
+
+拥塞控制四板斧：
+1. 慢启动：cwnd 从 1 个 MSS 开始，每收到一个 ACK 翻倍（指数增长），直到慢启动阈值 ssthresh
+2. 拥塞避免：超过 ssthresh 后每个 RTT 只 +1 MSS（线性增长），谨慎试探
+3. 快重传：收到 3 个重复 ACK 立即重传丢失包，不等超时（RTO 通常是 200ms+，太慢）
+4. 快恢复：快重传后不回到慢启动，而是 ssthresh=cwnd/2, cwnd=ssthresh 直接进入拥塞避免（认为网络只是轻微拥塞）
+
+\`\`\`text
+cwnd 增长曲线：
+慢启动(指数) ──┐
+               ├─ 到达 ssthresh → 拥塞避免(线性) ── 丢包?
+               │                                ├─ 超时: ssthresh=cwnd/2, cwnd=1 重新慢启动
+               │                                └─ 3 dupACK: ssthresh=cwnd/2, cwnd=ssthresh 快恢复
+\`\`\`
+
+案例：阿里双 11 零点，CDN 回源链路跨机房。早期用默认 Reno 算法，一旦丢包 cwnd 直接砍半，大促带宽利用率只有 40%。后来切 Google BBR——不再以丢包为拥塞信号，而是实时测量带宽×RTT 瓶颈，主动控制发送速率，跨机房吞吐提升 30%+。
+
+\`\`\`bash
+# Linux 4.9+ 启用 BBR
+sysctl -w net.ipv4.tcp_congestion_control=bbr
+# 查看当前可用算法
+sysctl net.ipv4.tcp_available_congestion_control
+\`\`\`
+
+接收窗口 rwnd 由接收方通过 ACK 报文里的 Window 字段通告；窗口扩大选项（Window Scale）最多放大 2^14 倍，否则 64KB 上限在高带宽时延积（BDP）网络下根本跑不满——100Gbps×100ms 链路需要 1.25GB 窗口。
+
+踩坑：rwnd=0 会触发发送方 Zero Window Probe 死等，应用读写卡死常查这个；BBR 对小流量/低延迟内网场景收益不明显，不要盲目全量开；拥塞控制在 QUIC（用户态）里可以按连接单独配置，比内核态 TCP 灵活得多——这也是 HTTP/3 的优势之一。`,
+    keyPoints: ["发送窗口=min(rwnd,cwnd)", "慢启动指数→拥塞避免线性", "BBR 测带宽代替丢包信号"],
+    followUps: ["BBR 和 CUBIC 混部会互相欺负吗？", "如何用 iperf3 验证窗口对吞吐的影响？"],
+    favorited: false,
+  },
+  {
+    id: "be-220",
+    nodeId: "be-network-tcp",
+    question: "TCP 和 UDP 的核心区别？各自适用什么场景？QUIC 为什么选择基于 UDP？",
+    bigTech: true,
+    answer: `结论：TCP 面向连接、可靠有序、有流量/拥塞控制；UDP 无连接、不保证可靠、无拥塞控制但延迟低、头部仅 8 字节。选型本质是「可靠性 vs 实时性 vs 定制自由度」的权衡。
+
+\`\`\`text
+对比表：
+维度        TCP                          UDP
+连接        三次握手建立                  无连接
+可靠性      ACK+重传+序号保证             尽力而为，可能丢包
+有序性      保证按序交付                  不保证
+头部开销    20-60 字节                   8 字节
+拥塞控制    有（慢启动/拥塞避免）          无（应用层自己定）
+队头阻塞    有（一个包丢失全队等）         无
+典型应用    HTTP/1.1/2、MySQL、Redis     DNS、视频直播、游戏、QUIC
+\`\`\`
+
+适用场景：
+- TCP：一切不能丢数据的——交易、消息、数据库协议
+- UDP：实时性优先可容忍丢失的——音视频（丢一帧花屏好过卡顿）、实时游戏状态同步、DNS 查询、心跳探测
+
+案例：抖音直播连麦用 UDP 私有协议——连麦延迟要求 <400ms，TCP 一次重传就 200ms+，连续丢包延迟雪崩；丢包用 FEC 前向纠错 + NACK 选择性重传在应用层补，比 TCP 全量按序重传聪明。
+
+QUIC 基于 UDP 的三个理由：
+1. 绕过内核：TCP 实现焊死在操作系统内核，升级拥塞算法要等内核换代（十年周期）；UDP 之上 QUIC 在用户态，App 发版就能升级
+2. 解决队头阻塞：TCP 一个包丢失，后面所有流都等；QUIC 的多路复用流之间真正独立，stream A 丢包不影响 stream B
+3. 连接迁移：TCP 连接绑定四元组，WiFi 切 4G 就断；QUIC 用 Connection ID 标识连接，网络切换不断连——刷短视频进电梯不卡靠的就是这个
+
+\`\`\`text
+QUIC = UDP 外壳 + 用户态的「TCP 能力」：
+可靠传输、按序交付、拥塞控制（可插拔 BBR/CUBIC）
++ TLS1.3 内建（握手合并，0-RTT 恢复）
++ 连接迁移（Connection ID）
+\`\`\`
+
+踩坑：UDP 不是「不可靠所以快」，而是「把可靠性选择权交给应用」——乱用会自己重写一个更烂的 TCP；企业网络/运营商对 UDP 有限速甚至封禁，QUIC 需要 TCP 回退兜底；游戏场景 UDP 也要防 DDoS 放大攻击（无连接易伪造源 IP）。`,
+    keyPoints: ["可靠性 vs 实时性权衡", "QUIC 用户态可迭代", "连接迁移靠 Connection ID"],
+    followUps: ["QUIC 的 0-RTT 握手有重放风险吗？", "如何给自研 RPC 选 TCP 还是 QUIC？"],
+    favorited: false,
+  },
+  {
+    id: "be-221",
+    nodeId: "be-network-tcp",
+    question: "TCP 粘包和拆包是什么？为什么会产生？业界有哪几种解决方案？",
+    bigTech: true,
+    answer: `结论：TCP 是字节流协议，没有消息边界——应用层发的两条消息可能被合并成一次 TCP 段发出（粘包），也可能一条消息被拆成多个 TCP 段（拆包）。解决方案核心：应用层自己定义消息边界。
+
+产生原因：
+1. 发送方：Nagle 算法把小包合并发送（提高网络效率）
+2. 接收方：内核缓冲区数据被应用一次 read 全部取走
+3. 链路层：MSS（最大分段大小，通常 1460 字节）超限被 IP 层分片/重组
+
+四种解决方案：
+\`\`\`text
+方案对比：
+1. 定长消息：每条消息固定 N 字节，不足补空格
+   优点：解析最简单  缺点：浪费带宽  适用：金融报文（ISO8583）
+2. 分隔符：消息尾加特殊分隔符（如 \\n）
+   优点：紧凑  缺点：内容需转义分隔符  适用：文本协议（Redis RESP 用 \\r\\n）
+3. 长度字段+消息体（主流）：[4字节长度][消息体]
+   优点：高效无歧义  缺点：需先读头  适用：Dubbo、gRPC、私有 RPC
+4. 长度字段含自身：变长头部（Protobuf varint）
+   优点：头部更省  缺点：解析复杂  适用：极致带宽优化
+\`\`\`
+
+案例：微信早期私有协议就用「4 字节长度头 + Protobuf body」。一次线上 bug：客户端弱网下重连补发消息，长度头在弱网抖动时被拆到两个 TCP 段——服务端按固定 4 字节读头时读到了半个长度，解析出 2GB 的荒谬长度直接 OOM。修复：读头必须循环读满 4 字节，且长度要做合法性校验（上限+魔数）。
+
+\`\`\`java
+// Netty 一行解决：长度字段拆包器（生产级写法）
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    1024 * 1024,  // maxFrameLength：防恶意长度头 OOM
+    0,            // lengthFieldOffset
+    4,            // lengthFieldLength
+    0,            // lengthAdjustment
+    4             // initialBytesToStrip：解码后去掉长度头
+));
+pipeline.addLast(new BusinessHandler());  // 拿到的就是完整消息
+\`\`\`
+
+踩坑：HTTP 不需要处理粘包是因为它有 Content-Length / chunked 编码——应用协议设计时别忘了边界；手写 socket 解析必须先读固定长度头再按长度读体，且每步都要处理「没读够」；长度头必须设上限，否则一个伪造的 0x7FFFFFFF 长度就能让服务端申请 2GB 内存。`,
+    keyPoints: ["TCP 字节流无消息边界", "长度头+消息体是主流", "长度上限+魔数防 OOM"],
+    followUps: ["Netty 还有哪些内置拆包器？", "HTTP/2 的帧是怎么解决边界的？"],
+    favorited: false,
+  },
+  {
+    id: "be-222",
+    nodeId: "be-network-tcp",
+    question: "TCP Keepalive 和应用层心跳有什么区别？为什么生产环境都用应用层心跳？",
+    bigTech: true,
+    answer: `结论：TCP Keepalive 是内核层的连接保活探测（默认 2 小时才发第一个包），应用层心跳是业务自己定时发的小包（通常 30s~几分钟）。生产用应用层心跳，因为 TCP Keepalive 太慢、跨不了 NAT/代理、且探活语义不是「应用还活着」。
+
+\`\`\`bash
+# TCP Keepalive 默认参数（Linux）
+net.ipv4.tcp_keepalive_time = 7200    # 2小时空闲才开始探测
+net.ipv4.tcp_keepalive_intvl = 75     # 每 75 秒探一次
+net.ipv4.tcp_keepalive_probes = 9     # 9 次无响应才判定断开
+# 结论：最坏要 2小时+11分钟 才发现死连接——生产不可接受
+\`\`\`
+
+应用层心跳的三个不可替代价值：
+1. 穿透 NAT 保活：运营商 NAT 表项 5 分钟左右过期，微信/钉钉长连接每 4-5 分钟发一次心跳就是为了续命 NAT 映射，不是为了检测对端死活
+2. 应用级语义：进程还在但业务线程池打满、DB 连接池耗尽——TCP 层照样 ACK，只有应用层心跳包带「我健康吗」的语义
+3. 智能心跳：根据网络环境动态调整（WiFi 下 4 分钟，4G 下 5 分钟），省电省流量
+
+案例：微信 Android 端心跳机制——早期固定 270s 心跳，发现部分地市 NAT 超时只有 240s，连接频繁断开重连耗电。后来做「心跳自适应」：从 180s 开始，成功则 +20s 逐步逼近 NAT 超时上限，失败则回退记录该网络的 safe interval，全国各省网络环境差异一套算法自适应。
+
+\`\`\`java
+// Netty 空闲检测三件套（IM 长连接标配）
+pipeline.addLast(new IdleStateHandler(
+    60,   // readerIdleTime：60s 没读到数据
+    30,   // writerIdleTime：30s 没写就发心跳
+    0     // allIdleTime
+));
+pipeline.addLast(new ChannelInboundHandlerAdapter() {
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent e && e.state() == READER_IDLE) {
+            ctx.close();  // 读超时：判定客户端已死，释放资源
+        }
+    }
+});
+\`\`\`
+
+踩坑：心跳间隔不是越短越好——百万长连接每 30s 一次心跳就是 3.3 万 QPS 的心跳流量，纯浪费；心跳包要带序号和时间戳，否则乱序到达时无法判断延迟；服务端读超时时间要大于 2 倍心跳间隔，给弱网留重传余量；LB 的空闲超时（如阿里云 SLB 默认 900s）也要纳入心跳设计。`,
+    keyPoints: ["TCP Keepalive 默认 2 小时太慢", "心跳保 NAT 映射+应用健康语义", "微信智能心跳自适应"],
+    followUps: ["百万长连接的心跳风暴怎么优化？", "gRPC 的 keepalive 参数怎么配？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：HTTP/HTTPS/QUIC（be-223 ~ be-229）=====
+  {
+    id: "be-223",
+    nodeId: "be-network-http",
+    question: "HTTP/1.1、HTTP/2、HTTP/3 的核心差异？每一代解决了什么痛点又引入了什么新问题？",
+    bigTech: true,
+    answer: `结论：HTTP 演进主线是「对抗延迟」——1.1 解决连接复用，2 解决应用层队头阻塞，3 解决传输层队头阻塞。
+
+\`\`\`text
+三代对比：
+维度        HTTP/1.1                HTTP/2                    HTTP/3
+传输层      TCP                     TCP                       QUIC(UDP)
+并发        keep-alive+6连接/域名    单连接多路复用(stream)     单连接多路复用(真独立)
+队头阻塞    应用层阻塞(管线化失败)    TCP层阻塞(丢包全流等待)    彻底解决
+头部压缩    无(纯文本)               HPACK                     QPACK
+握手开销    TCP 1-RTT + TLS 2-RTT    TCP+TLS 3-RTT             首次1-RTT/恢复0-RTT
+连接迁移    不支持(四元组绑定)        不支持                    Connection ID 支持
+\`\`\`
+
+HTTP/2 的坑：多路复用把所有请求塞进一条 TCP 连接，TCP 层一个包丢失，所有 stream 一起等——弱网环境下比 HTTP/1.1 的 6 条连接还慢。这是 HTTP/3 立项的直接动机。
+
+案例：字节抖音 App 全面切 HTTP/3 后，弱网环境（电梯/地铁）视频首帧时间下降 20%+，因为 QUIC 的 stream 间独立 + 0-RTT 连接恢复 + WiFi/4G 切换不断连。
+
+服务端落地（Nginx 1.25+）：
+\`\`\`nginx
+server {
+    listen 443 ssl;
+    listen 443 quic reuseport;   # HTTP/3
+    http2 on;                    # HTTP/2
+    http3_max_concurrent_streams 128;
+    ssl_certificate     cert.pem;
+    ssl_certificate_key key.pem;
+    # 告诉客户端支持 h3（Alt-Svc 头是关键）
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+}
+\`\`\`
+
+踩坑：HTTP/2 的 6 连接限制是浏览器的，服务端 RPC 用 H2 单连接没这问题；QUIC 依赖 UDP 443，企业防火墙可能拦截，必须保留 H2 回退；HTTP/3 服务端 CPU 开销比 H2 高 1.5~2 倍（用户态协议栈），需要衡量；Nginx 的 quic 需要编译时带 quiche/boringssl，直接 yum 装的版本多半没有。`,
+    keyPoints: ["1.1 连接复用→2 应用层多路复用→3 传输层去队头阻塞", "H2 弱网反而更慢", "Alt-Svc 引导客户端升 h3"],
+    followUps: ["HTTP/2 的 HPACK 是怎么压缩头部的？", "QUIC 的 0-RTT 有什么安全隐患？"],
+    favorited: false,
+  },
+  {
+    id: "be-224",
+    nodeId: "be-network-http",
+    question: "HTTPS 的 TLS 握手全过程？TLS 1.3 比 1.2 快在哪里？",
+    bigTech: true,
+    answer: `结论：TLS 握手核心是「用非对称加密协商出对称会话密钥，之后全用对称加密传输」。TLS 1.2 要 2-RTT，TLS 1.3 砍到 1-RTT，恢复连接 0-RTT。
+
+TLS 1.2 握手（RSA 密钥交换，2-RTT）：
+1. ClientHello：支持的 TLS 版本、加密套件列表、客户端随机数 Random1
+2. ServerHello + Certificate + ServerHelloDone：选定套件、服务端随机数 Random2、证书链
+3. 客户端验证书 → 生成 Pre-Master Secret，用服务端公钥加密发送（ClientKeyExchange）
+4. 双方用 Random1+Random2+Pre-Master 算出 Master Secret → 派生会话密钥
+5. ChangeCipherSpec + Finished 互发确认，开始加密通信
+
+TLS 1.3 的四个提速点：
+1. 密钥交换只留 (EC)DHE：ClientHello 里直接带上自己的密钥共享（Key Share），服务端一次就能算出会话密钥——砍到 1-RTT
+2. 删除 RSA 密钥交换：没有前向安全性（私钥泄漏历史流量全被解密），DHE 每次会话密钥独立
+3. 砍掉弱算法：RC4、DES、3DES、MD5、SHA-1、CBC 模式全删，只留 AEAD（AES-GCM、ChaCha20-Poly1305），减少协商轮次
+4. 0-RTT 会话恢复：客户端用上次会话的 PSK（预共享密钥）直接加密应用数据发送
+
+\`\`\`text
+RTT 对比（跨太平洋 150ms 场景）：
+TLS 1.2：TCP 握手 1 + TLS 2 = 3 RTT = 450ms 才能发数据
+TLS 1.3：TCP 握手 1 + TLS 1 = 2 RTT = 300ms
+TLS 1.3 恢复：TCP 1 + 0-RTT = 1 RTT = 150ms
+\`\`\`
+
+案例：阿里云 CDN 全量开启 TLS 1.3 后，移动端首包时间平均降 100ms+；微信内部 RPC 框架用 TLS 1.3 的 0-RTT 做服务间调用，跨机房调用 P99 下降一个 RTT。
+
+踩坑：0-RTT 数据可以被中间人重放——支付/转账类接口禁用 0-RTT 或加防重放 nonce；TLS 1.3 的 ESNI/ECH 加密 SNI 会导致按域名的 SNI 路由失效，网关要同步升级；企业内网做 TLS 拦截审计的盒子很多不支持 1.3，灰度时留意握手失败率。`,
+    keyPoints: ["非对称协商+对称传输", "1.3 砍到 1-RTT 靠 Key Share", "0-RTT 有重放风险"],
+    followUps: ["TLS 1.3 的前向安全性怎么理解？", "session ticket 和 session id 复用区别？"],
+    favorited: false,
+  },
+  {
+    id: "be-225",
+    nodeId: "be-network-http",
+    question: "数字证书如何防止中间人攻击？证书链校验流程？为什么 Charles/Fiddler 能抓 HTTPS 包？",
+    bigTech: true,
+    answer: `结论：证书防中间人的核心是「CA 用私钥对证书签名，客户端用内置的 CA 公钥验签」——中间人伪造的证书过不了验签，除非客户端主动信任了中间人的根证书（Charles 抓包正是利用这一点）。
+
+证书链校验流程（以访问 api.example.com 为例）：
+1. 服务端发送证书链：服务器证书 → 中间 CA 证书（根 CA 证书通常不发，客户端内置）
+2. 客户端用内置根 CA 公钥验证中间 CA 证书签名
+3. 用中间 CA 公钥验证服务器证书签名
+4. 检查：域名匹配（CN/SAN）、有效期、吊销状态（CRL/OCSP）、密钥用途
+5. 全部通过 → 信任证书里的公钥 → 用它协商会话密钥
+
+中间人攻击为什么失败：攻击者没有 CA 私钥，伪造的证书签名验不过；直接转发真证书又拿不到对应的私钥，无法完成密钥交换。
+
+Charles 抓包原理（不是攻击，是「合法的中间人」）：
+1. 客户端手动安装并信任 Charles 的根证书
+2. Charles 对客户端扮演服务器：现场签发 api.example.com 的假证书（用 Charles 根证书签名，客户端信任根所以验签通过）
+3. Charles 对服务器扮演客户端：正常完成 TLS 握手
+4. 明文在两段 TLS 之间的 Charles 里可见
+
+\`\`\`text
+防抓包手段（App 加固）：
+1. 证书固定（Certificate Pinning）：App 内置服务端证书/公钥哈希，
+   不信任系统根证书 → Charles 假证书直接拒绝
+2. 双向 TLS（mTLS）：服务端也校验客户端证书，Charles 没有客户端私钥
+代价：Pinning 后服务端换证书要强制发版，否则会全网连不上（真实事故：
+某银行 App 证书到期忘记通知客户端，Pinning 导致全量用户无法登录）
+\`\`\`
+
+案例：2020 年 Let's Encrypt 根证书 DST Root CA X3 到期，大量老 Android 设备因不识别新根 ISRG Root X1 而 HTTPS 失败——证书链校验时老设备没有交叉签名的兜底路径，教训是根证书轮换要提前 2 年做兼容。
+
+踩坑：CRL/OCSP 吊销检查有性能开销且 OCSP 服务器挂了你怎么办（软失败 vs 硬失败取舍）；内网服务间通信用自签 CA 是常态，但必须把自签 CA 证书管理纳入资产；证书有效期已从 2 年缩到 1 年（Apple 推动），自动化续期（certbot/acme.sh）是刚需。`,
+    keyPoints: ["CA 签名链+内置根证书", "Charles=客户端主动信任的合法中间人", "Pinning 防抓包但有换证风险"],
+    followUps: ["OCSP Stapling 怎么兼顾吊销检查和性能？", "内网自签 CA 怎么管理最安全？"],
+    favorited: false,
+  },
+  {
+    id: "be-226",
+    nodeId: "be-network-http",
+    question: "HTTP 缓存机制：强缓存和协商缓存的区别？Cache-Control 各指令怎么用？",
+    bigTech: true,
+    answer: `结论：强缓存不发请求直接用本地副本（200 from cache），协商缓存发请求问服务端「变没变」，没变返回 304 省传输。两级配合：静态资源走强缓存+文件名哈希，HTML 走协商缓存或不缓存。
+
+强缓存（不发请求）：
+\`\`\`http
+Cache-Control: max-age=31536000, immutable   # 一年有效，现代首选
+# 过期时间相对「响应时间」计算；public 允许 CDN 缓存，private 仅浏览器
+# no-cache = 每次都要协商（不是"不缓存"!）  no-store = 真不缓存
+\`\`\`
+
+协商缓存（发请求，304 省 body）：
+\`\`\`http
+# 服务端给
+ETag: "v2.3-abc123"        # 内容指纹，优先于 Last-Modified
+Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT
+# 客户端下次带
+If-None-Match: "v2.3-abc123"
+If-Modified-Since: Wed, 21 Oct 2025 07:28:00 GMT
+# 没变 → 304 Not Modified（只有头没有体，省 99% 流量）
+\`\`\`
+
+ETag vs Last-Modified：ETag 精确（内容哈希），Last-Modified 秒级精度且「内容没变但文件 mtime 变了」会误判——有 ETag 时 If-Modified-Since 被忽略。
+
+案例：淘宝首页发版的缓存策略——
+- HTML：Cache-Control: no-cache + ETag（每次协商，保证新活动秒级生效，但内容没变就走 304 省流量）
+- JS/CSS：文件名带内容哈希 app.8f3a2b.js + max-age=31536000, immutable（内容变则文件名变，旧文件缓存一年不浪费请求）
+- 早期教训：JS 不带哈希 + max-age=86400，大促紧急修复发出去，用户端还是旧缓存，只能等 24 小时或手动清——从此静态资源全部哈希化。
+
+\`\`\`text
+决策树：
+响应要缓存吗？─否→ no-store
+└是→ 内容会原地变化吗（同 URL 内容更新）？
+   ├是→ no-cache + ETag（每次协商）
+   └否（变化即换 URL，如带哈希）→ max-age=一年 + immutable
+\`\`\`
+
+踩坑：max-age 相对响应生成时间计算，网关多层缓存会各自起算导致实际缓存时间超预期；CDN 节点缓存和浏览器缓存是两层，刷新 CDN 不等于用户端更新；no-cache 被无数开发者误解为「不缓存」而误用；Service Worker 的 CacheStorage 优先级高于 HTTP 缓存，PWA 场景要一起排查。`,
+    keyPoints: ["强缓存不发请求/协商缓存 304", "immutable+哈希文件名是静态资源终局", "no-cache≠不缓存"],
+    followUps: ["CDN 回源时缓存头怎么传递？", "Heuristic 缓存（没有显式头时浏览器的行为）是什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-227",
+    nodeId: "be-network-http",
+    question: "WebSocket、SSE、长轮询的区别？设计一个 IM 系统怎么选型？",
+    bigTech: true,
+    answer: `结论：三者都是「服务端主动推数据」的方案。WebSocket 全双工二进制帧、能力最强但要自建心跳/重连；SSE 单向文本流、基于 HTTP 自动重连；长轮询兼容性最好但开销最大。
+
+\`\`\`text
+对比表：
+维度        WebSocket              SSE                    长轮询
+方向        全双工                  服务端→客户端单向       伪双向(轮询模拟)
+协议        ws://独立协议(101升级)   纯 HTTP                纯 HTTP
+数据格式    文本+二进制              仅文本(UTF-8)           取决于实现
+自动重连    无(需自实现)             浏览器内建 EventSource  无(需自实现)
+连接数限制  无(独立协议)             HTTP/1.1 下受 6 连接限制 同左
+穿透性      代理/防火墙偶有拦截      好(就是 HTTP)           最好
+典型场景    IM/游戏/协同编辑         通知/股价/AI 流式输出   遗留系统兼容
+\`\`\`
+
+案例 1：ChatGPT/文心一言的流式输出用 SSE——AI 生成是服务端单向推送，SSE 够用且实现简单（后端就是持续写 chunk），EventSource 断线自动重连带 Last-Event-ID 续传。
+
+案例 2：微信网页版早期用长轮询（兼容老浏览器），2016 年后全面切 WebSocket；钉钉 IM 的 ws 长连接设计——单连接承载消息/已读回执/在线状态，应用层协议自定义 opcode 区分消息类型，心跳 30s，断线指数退避重连。
+
+IM 选型决策：
+- 消息双向实时 + 高频率 → WebSocket（IM 标准答案）
+- 只做通知推送 → SSE 成本最低
+- 客户端是 IoT 弱设备/老浏览器 → 长轮询兜底
+- 移动端 App → 直接 TCP 私有协议（参考微信 Mars），WebSocket 都嫌重
+
+\`\`\`java
+// Spring WebSocket 极简服务端
+@Component
+public class ImHandler extends TextWebSocketHandler {
+    private static final Map<String, WebSocketSession> SESSIONS = new ConcurrentHashMap<>();
+    @Override
+    public void afterConnectionEstablished(WebSocketSession s) {
+        SESSIONS.put(userIdOf(s), s);  // 上线注册
+    }
+    public void pushTo(String userId, String msg) throws IOException {
+        WebSocketSession s = SESSIONS.get(userId);
+        if (s != null && s.isOpen()) s.sendMessage(new TextMessage(msg));
+    }
+}
+\`\`\`
+
+踩坑：WebSocket 经 Nginx 必须配 proxy_set_header Upgrade/Connection 否则 400；LB 空闲超时（SLB 默认 900s）会静默断连，心跳必须小于它；SSE 在 HTTP/1.1 下占用 6 连接配额，多 tab 页会互相饿死，必须上 HTTP/2；长轮询的超时时间要小于网关读超时，否则网关先 504。`,
+    keyPoints: ["WebSocket 全双工/SSE 单向/长轮询兜底", "AI 流式输出选 SSE", "移动端终极方案是 TCP 私有协议"],
+    followUps: ["WebSocket 集群下如何做会话共享？", "SSE 的 Last-Event-ID 怎么实现断点续传？"],
+    favorited: false,
+  },
+  {
+    id: "be-228",
+    nodeId: "be-network-http",
+    question: "HTTP 状态码体系？生产环境 502 和 504 的排查思路有什么区别？",
+    bigTech: true,
+    answer: `结论：状态码分五段——1xx 信息、2xx 成功、3xx 重定向、4xx 客户端错、5xx 服务端错。502 是「网关收到了上游的非法/无响应」，504 是「网关等上游超时」，两者定位方向完全不同。
+
+高频状态码速记：
+\`\`\`text
+200 OK / 201 Created / 204 No Content / 206 断点续传
+301 永久重定向(缓存!) / 302 临时 / 304 协商缓存命中 / 307/308 保方法重定向
+400 参数错 / 401 未认证 / 403 无权限 / 404 不存在 / 405 方法不允许
+409 冲突(幂等) / 429 限流 / 431 头太大
+500 服务异常 / 502 上游无响应或响应非法 / 503 服务不可用(熔断) / 504 上游超时
+\`\`\`
+
+502 vs 504 排查思路：
+\`\`\`text
+502 Bad Gateway（上游「死了」或「说胡话」）：
+1. 上游进程挂了/端口不通 → telnet upstream_ip port
+2. 上游返回了非法响应（裸 TCP 数据当 HTTP 返回）
+3. 网关到上游的网络问题（防火墙/安全组）
+4. 典型场景：发布瞬间旧进程已死新进程未就绪 → 滚动发布+健康检查
+
+504 Gateway Timeout（上游「活着但太慢」）：
+1. 慢 SQL/下游 RPC 卡死 → 看 APM 链路追踪哪一段慢
+2. 线程池/连接池打满排队 → 看池监控
+3. 网关超时 < 上游处理时间 → 对齐超时配置
+4. 典型场景：大促时 DB 慢查询把 Tomcat 200 线程全占满
+\`\`\`
+
+案例：美团外卖午高峰 504 暴增——链路追踪显示订单服务调库存服务 P99 从 50ms 涨到 3s，Nginx proxy_read_timeout 2s 直接 504。根因是库存服务一条没走索引的统计 SQL 把 DB CPU 打满。修复：SQL 下线改写 + 网关超时分级（核心接口 5s，非核心 1s）+ 上游线程池隔离。
+
+\`\`\`nginx
+# 网关超时三件套（生产必须显式配置）
+proxy_connect_timeout 2s;   # 建连超时：内网应 <1s
+proxy_send_timeout    5s;   # 发请求超时
+proxy_read_timeout    5s;   # 等响应超时：按接口 SLO 分级
+# 重试陷阱：proxy_next_upstream 重试非幂等接口会重复下单！
+proxy_next_upstream error timeout;  # 不含 http_502/504 才安全
+\`\`\`
+
+踩坑：网关重试非幂等 POST 是资损事故高发区——504 后重试导致重复扣款，必须先做幂等；502 在 K8s 滚动发布时必现（Endpoints 摘除和 iptables 同步有延迟），需要 preStop 钩子+优雅退出；5xx 监控要区分「网关层」和「应用层」，否则告警互相甩锅。`,
+    keyPoints: ["502=上游死/非法响应，504=上游慢", "网关超时三件套显式配置", "非幂等接口禁止网关自动重试"],
+    followUps: ["K8s 滚动发布如何做到零 502？", "499 状态码是什么？谁产生的？"],
+    favorited: false,
+  },
+  {
+    id: "be-229",
+    nodeId: "be-network-http",
+    question: "DNS 解析全流程？DNS 劫持和污染怎么防？为什么大厂 App 都上 HTTPDNS？",
+    bigTech: true,
+    answer: `结论：DNS 是域名→IP 的分布式查询系统，解析路径「浏览器缓存→系统缓存→hosts→本地 DNS（LDNS）→根→顶级域→权威 NS」。传统 DNS 基于 UDP 明文，可被劫持/污染，HTTPDNS 用 HTTPS 直连大厂自己的解析服务绕过 LocalDNS。
+
+解析全流程（以 www.taobao.com 为例）：
+1. 浏览器缓存 → 系统缓存 → hosts 文件
+2. 问 LDNS（运营商分配的本地 DNS，如 114.114.114.114）
+3. LDNS 递归：根服务器（.）→ 顶级域（.com）→ 权威（taobao.com NS）
+4. 权威返回 A/AAAA 记录，LDNS 按 TTL 缓存后回给客户端
+
+两大威胁：
+- DNS 劫持：LDNS 或链路中间设备直接篡改应答，把 taobao.com 解析到钓鱼 IP——电商大促时友商流量被劫持到竞品页是真实发生过的
+- DNS 污染：针对 UDP 明文注入伪造应答（抢答），常见于跨境场景
+
+\`\`\`text
+防御手段对比：
+方案       原理                            局限
+Do53+校验  传统 DNS + 0x20 大小写随机化      弱，中间人仍可改
+DoH        DNS over HTTPS，443 加密          企业网难审计，部分被拦
+DoT        DNS over TLS，853 端口加密        端口特征明显易封
+HTTPDNS    App 走 HTTPS 直连厂商解析服务     依赖 SDK，需降级兜底
+\`\`\`
+
+为什么大厂 App 必上 HTTPDNS（阿里/腾讯都有商业化产品）：
+1. 防劫持：解析走 HTTPS，中间设备无法篡改——双 11 期间这是生死线
+2. 精准调度：传统 DNS 只能拿到 LDNS 的 IP 做就近调度，用户跨省用 LDNS 会被调度到错误机房；HTTPDNS 拿真实客户端 IP，调度准确率从 85%→99%
+3. 秒级生效：TTL 被 LDNS 私自延长导致切流不生效；HTTPDNS 解析结果实时可控，故障切流 30 秒完成
+
+\`\`\`text
+App 端容灾设计（降级链）：
+HTTPDNS 解析 ─失败→ 备用 HTTPDNS IP（预埋 IP 直连）
+           ─失败→ LocalDNS 传统解析兜底
+           ─失败→ 内置硬编码 IP 兜底（最后防线）
+\`\`\`
+
+踩坑：HTTPDNS 首次解析需要先有「HTTPDNS 服务器 IP」——这个 IP 必须预埋且多地域多副本；WebView/第三方 SDK（广告/统计）不走你的 HTTPDNS，劫持依然存在；IPv6 双栈下 A 和 AAAA 都要解析，只解析 A 会导致 IPv6-only 网络失败；CDN 场景 HTTPDNS 拿到的 IP 要和 CDN 调度系统打通，否则精准调度打折扣。`,
+    keyPoints: ["递归路径：LDNS→根→顶级→权威", "劫持靠 HTTPS 加密解析根治", "HTTPDNS 核心价值=防劫持+精准调度+秒级生效"],
+    followUps: ["DoH 和企业内网审计的矛盾怎么解？", "DNS 的 TTL 设置多少合理？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：操作系统与 Linux（be-230 ~ be-236）=====
+  {
+    id: "be-230",
+    nodeId: "be-os-linux",
+    question: "进程、线程、协程的核心区别？为什么 Go/Java 都在推协程（虚拟线程）？",
+    bigTech: true,
+    answer: `结论：进程是资源分配的最小单位（独立地址空间），线程是 CPU 调度的最小单位（共享进程资源），协程是用户态的轻量线程（由程序自己调度，不陷入内核）。演进方向是「把调度从内核搬到用户态」，用更低的成本支撑更高的并发。
+
+\`\`\`text
+对比表：
+维度        进程                  线程                  协程
+地址空间    独立                  共享进程               共享线程
+切换成本    高(切页表/TLB刷新)    中(内核态切换~1-10μs)  极低(用户态~100ns)
+内存开销    ~MB级                 ~MB级栈(Linux默认8MB)  ~KB级(Go初始2KB/8KB)
+创建上限    千级                  万级                   百万级
+调度者      内核                  内核                   语言运行时(Go GMP/JDK21)
+通信        IPC(管道/共享内存)    共享内存+锁            channel/挂起恢复
+\`\`\`
+
+为什么协程是趋势：互联网服务的瓶颈是 IO 等待不是 CPU——一个线程 99% 时间在等 DB/Redis/下游 RPC。1:1 内核线程模型下，10 万并发就要 10 万线程，光栈内存就 800GB，切换还把 CPU 吃光。协程让「写一个连接一个协程」的同步写法拥有异步的性能。
+
+案例：JDK 21 虚拟线程落地——阿里某网关从 Tomcat 线程池（200 线程扛 200 并发）迁移到 VirtualThreadPerTaskExecutor，单实例并发从 200→10000，代码不用改写成 Reactor 回调地狱。Go 更不用说：字节跳动微服务单实例百万 goroutine 是常态。
+
+\`\`\`java
+// JDK 21 虚拟线程：同步写法，异步性能
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i < 100_000; i++) {
+        executor.submit(() -> {
+            String result = httpClient.send(request, BodyHandlers.ofString()).body();
+            // 阻塞写法，但底层是挂起协程，不占内核线程
+            return result;
+        });
+    }
+}
+\`\`\`
+
+踩坑：虚拟线程里调 synchronized 块或 native 方法会 pin 住载体线程（JDK 21 已部分修复，用 ReentrantLock 替代）；协程泄漏比线程泄漏更隐蔽——goroutine 忘了退出会永久占用内存；CPU 密集型任务用协程没有收益，反而增加调度开销；虚拟线程的 ThreadLocal 滥用会导致内存爆炸（百万协程每个都挂一份）。`,
+    keyPoints: ["进程=资源/线程=调度/协程=用户态轻量线程", "协程让同步写法有异步性能", "JDK21 虚拟线程 200→10000 并发"],
+    followUps: ["Go 的 GMP 调度是怎么抢占协程的？", "虚拟线程下 ThreadLocal 该用什么替代（ScopedValue）？"],
+    favorited: false,
+  },
+  {
+    id: "be-231",
+    nodeId: "be-os-linux",
+    question: "进程间通信（IPC）有哪几种方式？各自适用什么场景？",
+    bigTech: true,
+    answer: `结论：七种主流 IPC——管道、命名管道、消息队列、共享内存、信号量、信号、Socket。选型核心看三点：是否跨机器、数据量大小、是否需要同步机制。
+
+\`\`\`text
+对比表：
+方式        速度    跨机器  数据类型    典型场景
+匿名管道    中      否      字节流      父子进程（shell 的 |）
+命名管道    中      否      字节流      无亲缘进程（MySQL 本地 sock）
+消息队列    中      否      结构化消息  任务分发（SysV/POSIX MQ）
+共享内存    最快    否      任意        大数据量（必须配信号量防竞争）
+信号量      -       否      计数器      不传数据，只做同步互斥
+信号        -       否      编号        异步通知（kill -15 优雅停机）
+Socket      慢      是      字节流      跨机器唯一选择，最通用
+\`\`\`
+
+共享内存为什么最快：其他方式都要「用户态→内核态→用户态」两次拷贝，共享内存让两个进程映射同一块物理页，零拷贝。代价是没有同步机制，必须配合信号量/自旋锁。
+
+案例 1：Chrome 浏览器多进程架构——渲染进程与主进程通信用 Mojo（基于共享内存+消息管道），页面崩溃不拖死浏览器。
+案例 2：Redis 的持久化 fork——父子进程通过管道同步状态；Nginx master/worker 通过 socketpair 传递 listen fd 实现热升级。
+
+\`\`\`c
+// 共享内存 + 信号量（高性能本地 IPC 标配）
+int shmid = shmget(IPC_PRIVATE, 4096, IPC_CREAT | 0666);
+void* addr = shmat(shmid, NULL, 0);   // 映射到本进程地址空间
+// 两个进程 addr 指向同一物理页 → 写入即对方可见（零拷贝）
+// 但必须用 semop() 做 P/V 操作保护临界区
+\`\`\`
+
+\`\`\`text
+选型决策树：
+跨机器？→ 是 → Socket（或上层的 gRPC/MQ）
+└否 → 数据量大？→ 是 → 共享内存+信号量
+     └否 → 要异步通知？→ 是 → 信号
+          └否 → 流式小数据 → 管道/消息队列
+\`\`\`
+
+踩坑：System V 系列 IPC（shmget/msgget）资源不随进程退出自动释放，kill -9 后会泄漏，要用 ipcs/ipcrm 清理；共享内存不写同步就是数据竞争的温床；Socket 本机通信用 unix domain socket 比 127.0.0.1 快一倍（不过协议栈）；信号处理函数里只能调 async-signal-safe 函数，printf 都不是安全的。`,
+    keyPoints: ["共享内存最快但要自配同步", "Socket 唯一跨机器方案", "SysV IPC 会泄漏要 ipcrm"],
+    followUps: ["unix domain socket 为什么比 loopback 快？", "mmap 能不能当 IPC 用？"],
+    favorited: false,
+  },
+  {
+    id: "be-232",
+    nodeId: "be-os-linux",
+    question: "虚拟内存是什么？分页机制和页面置换算法（LRU/FIFO/Clock）怎么工作？",
+    bigTech: true,
+    answer: `结论：虚拟内存给每个进程一个独立的、连续的虚拟地址空间，由 MMU 硬件+页表映射到物理内存。三大价值：进程隔离（A 崩了不影响 B）、超分配（物理 8G 跑总量 20G 的进程）、按需调页（只把用到的页加载进内存）。
+
+分页机制：
+- 虚拟地址 = 页号 + 页内偏移（页通常 4KB，大页 2MB/1GB）
+- CPU 查 TLB（页表缓存，~几十项），miss 则走多级页表（x86_64 四级，每级 512 项）
+- 页表项含：物理页框号、存在位、读写权限位、脏位、访问位（置换算法用）
+
+页面置换算法对比：
+\`\`\`text
+算法    原理                          优点        缺点
+OPT     置换未来最久不用(理论最优)     下界基准    无法实现
+FIFO    置换最早进入的                简单        Belady异常(帧多反而缺页多)
+LRU     置换最久未使用                接近最优    严格实现要链表+每访问都调整，太贵
+Clock   LRU近似：环形扫描访问位       开销低      精度略降
+LFU     置换使用次数最少              抗偶发      老热点赖着不走（要老化机制）
+\`\`\`
+
+Clock（第二次机会）算法：所有页排成环形，指针扫到访问位=1 就清 0 给第二次机会，扫到 0 就置换。Linux 的 LRU 实际是「活跃/不活跃双链表 + 访问位」的近似 Clock。
+
+案例：MySQL InnoDB Buffer Pool 的 LRU 魔改——原生 LRU 遇到全表扫描会把热点页全挤出去（缓存污染）。InnoDB 把链表分 young 5/8 + old 3/8，新页先插 old 区头部，且 old 区页被访问后要间隔 innodb_old_blocks_time（默认 1s）再次访问才升 young——全表扫描的大批页面只被读一次，永远留在 old 区被淘汰，热点页不受影响。
+
+\`\`\`bash
+# 观察系统内存与换页（si/so 持续非 0 = 内存在换页抖动）
+vmstat 1
+# procs -----------memory----------  ---swap--
+#  r  b   swpd   free   buff  cache   si   so
+#  2  0      0  1024M   512M  4.2G     0    0
+
+# 查看某进程的页错误（major fault = 要从磁盘调页，贵）
+ps -o maj_flt,min_flt -p <pid>
+\`\`\`
+
+踩坑：swap 开启时 Redis/JVM 堆被换出到磁盘会造成毫秒级毛刺，生产数据库/缓存服务器建议 swapoff 或 swappiness=1；TLB miss 在高频页表切换（大量进程切换）时显著，大页内存（HugePage）能减少页表层级，Oracle/RocksDB 都要求开；Belady 异常只有 FIFO 有，LRU/Clock 是栈式算法不会。`,
+    keyPoints: ["虚拟内存=隔离+超分配+按需调页", "LRU 太贵用 Clock 近似", "InnoDB young/old 分区防缓存污染"],
+    followUps: ["为什么 Redis 生产环境建议关 swap？", "大页内存对 JVM 有什么收益？"],
+    favorited: false,
+  },
+  {
+    id: "be-233",
+    nodeId: "be-os-linux",
+    question: "用户态和内核态的区别？一次系统调用到底有多贵？上下文切换的成本在哪？",
+    bigTech: true,
+    answer: `结论：CPU 分特权级（x86 的 Ring0 内核/Ring3 用户），用户程序要访问硬件/内存管理/进程调度必须通过系统调用陷入内核。一次系统调用的直接成本约 100ns~1μs（模式切换+参数校验），真正的贵在于「附带伤害」：缓存污染、TLB 刷新、潜在调度。
+
+系统调用全过程（以 read() 为例）：
+1. 用户态：参数压栈/寄存器，执行 syscall 指令
+2. CPU 切到内核态，查系统调用表跳到 sys_read
+3. 内核校验参数（指针是否合法、fd 是否有效）
+4. 执行（可能触发磁盘 IO、进程睡眠等待）
+5. 结果写回，iret 返回用户态
+
+\`\`\`text
+数量级感受（本机操作耗时）：
+L1 缓存            1ns
+主存              100ns
+系统调用(纯)      100ns-1μs
+上下文切换        1-10μs
+SSD 随机读        100μs
+同机房 RPC        500μs
+机械盘寻道        10ms
+跨太平洋网络      150ms
+→ 系统调用本身不贵，但如果你把它放在百万 QPS 的热路径上就很贵
+\`\`\`
+
+上下文切换的真正成本：
+1. 直接：保存/恢复寄存器、栈指针、程序计数器
+2. 间接（大头）：CPU 缓存失效——新线程的代码/数据不在 L1/L2，前几百 ns 全是缓存 miss；切进程还要刷 TLB（页表变了）
+
+案例：某电商秒杀服务 QPS 一高 CPU sys 占用 40%+（正常应 <10%）。strace 发现每次请求都 new Thread()，千级线程疯狂上下文切换。改线程池后 sys 降到 8%。另一个反例：Netty 的 EventLoop 把「连接数:线程数」做成 N:1，几万连接共用 16 个线程，几乎无切换——这就是 IO 多路复用省下的切换成本。
+
+\`\`\`bash
+# 查看上下文切换频率（cs 列，万级/秒就要警惕）
+vmstat 1
+# 单进程级别的自愿/非自愿切换
+pidstat -w -p <pid> 1
+# 追踪系统调用分布（排查 sys 高的神器）
+strace -c -p <pid>
+\`\`\`
+
+减少陷入的经典手段：vDSO（gettimeofday 不陷入内核）、io_uring（批量提交 IO，一次 syscall 干 32 件事）、sendfile 零拷贝（数据不出内核）、批量读写（readv/writev）。
+
+踩坑：sys CPU 高先 strace -c 看是什么调用在烧，别上来就调线程数；Java 的 Object.wait/notify 底层是 futex 系统调用，竞争激烈时 futex 风暴；容器里 pidstat 看到的是宿主机的视图，要看 cgroup 维度；虚拟化环境下 syscall 还有一层 hypervisor 开销。`,
+    keyPoints: ["系统调用 100ns-1μs+缓存附带伤害", "上下文切换大头是缓存/TLB 失效", "strace -c 是 sys 高第一排查工具"],
+    followUps: ["io_uring 为什么比 epoll 还能省？", "Java 的 futex 风暴怎么定位？"],
+    favorited: false,
+  },
+  {
+    id: "be-234",
+    nodeId: "be-os-linux",
+    question: "死锁产生的四个必要条件？如何预防和排查？给出一个真实的代码死锁案例。",
+    bigTech: true,
+    answer: `结论：死锁四条件缺一不可——互斥、持有并等待、不可剥夺、循环等待。破解任一条即可预防：破「循环等待」用固定顺序加锁（最常用），破「持有并等待」用一次性申请，破「不可剥夺」用 tryLock 超时退让。
+
+真实案例：转账系统经典死锁——
+\`\`\`java
+// 反例：两个线程按相反顺序加两把锁
+void transfer(Account from, Account to, int amount) {
+    synchronized (from) {        // 线程A锁甲账户
+        synchronized (to) {      // 线程B已锁乙账户，等甲 → 循环等待!
+            from.withdraw(amount);
+            to.deposit(amount);
+        }
+    }
+}
+// 线程A: lock(甲) → 等 lock(乙)
+// 线程B: lock(乙) → 等 lock(甲)   = 死锁
+
+// 正例 1：固定顺序（按账户 id 排序，破循环等待）
+void transfer(Account from, Account to, int amount) {
+    Account first = from.id < to.id ? from : to;
+    Account second = from.id < to.id ? to : from;
+    synchronized (first) {
+        synchronized (second) { /* 转账 */ }
+    }
+}
+
+// 正例 2：tryLock 超时退让（破不可剥夺）
+while (!done) {
+    if (from.lock.tryLock(100, MILLISECONDS)) {
+        try {
+            if (to.lock.tryLock(100, MILLISECONDS)) {
+                try { /* 转账 */ done = true; }
+                finally { to.lock.unlock(); }
+            }
+        } finally { from.lock.unlock(); }
+    }
+    Thread.sleep(random(50));  // 随机退避防活锁
+}
+\`\`\`
+
+排查实战（JVM 为例）：
+\`\`\`bash
+# 1. jstack 直接报死锁（Found one Java-level deadlock）
+jstack <pid> | grep -A 20 "deadlock"
+# 2. Arthas 一键定位（哪个线程 BLOCKED 在哪个锁上）
+thread -b
+# 3. 数据库死锁：InnoDB 自动检测并回滚代价小的事务
+SHOW ENGINE INNODB STATUS\\G  # 看 LATEST DETECTED DEADLOCK
+\`\`\`
+
+MySQL 死锁案例：两个事务都执行「UPDATE account SET balance=balance-100 WHERE id IN (1,2)」，但 WHERE 命中顺序不同（一个先锁 id=1 一个先锁 id=2）→ 行锁循环等待。修复：所有多行更新统一 ORDER BY 主键后按序加锁。
+
+\`\`\`text
+预防清单（评审 Checklist）：
+□ 全局加锁顺序文档化（锁编号，禁止逆序）
+□ 锁粒度最小化（锁内不调 RPC/不做 IO）
+□ 锁必须带超时（tryLock/SELECT ... FOR UPDATE NOWAIT）
+□ 开放调用（锁内调用外部方法）一律禁止——外部方法可能回来拿同一把锁
+\`\`\`
+
+踩坑：synchronized 锁内调用 RPC 是分布式死锁温床——本机锁没事，但锁住的线程等下游，下游又在等这台机器释放资源；tryLock 退让循环要加随机退避，否则两个线程同步退让同步重试形成活锁（活锁不是死锁，CPU 在跑但没进展）；数据库连接池+锁混用时，「锁内等连接、连接持有者在锁外等锁」也会死锁。`,
+    keyPoints: ["四条件缺一不可", "固定顺序加锁破循环等待", "jstack/Arthas thread -b 定位"],
+    followUps: ["活锁和饥饿怎么区分？", "分布式锁会不会死锁？怎么防？"],
+    favorited: false,
+  },
+  {
+    id: "be-235",
+    nodeId: "be-os-linux",
+    question: "线上服务器 CPU 负载飙高，你的完整排查流程是什么？（top/vmstat/iostat 实战）",
+    bigTech: true,
+    answer: `结论：标准动线「load 高 → 看 CPU 分类（us/sy/wa）→ 定位进程 → 定位线程 → 定位代码」。load 高 ≠ CPU 忙，也可能是 IO 等待（D 状态进程堆起来的）。
+
+第一步：总览
+\`\`\`bash
+uptime   # load average: 3.5 2.1 1.0（1/5/15分钟，看趋势）
+top      # 关注 us(用户态) sy(内核态) wa(IO等待) st(虚拟化被抢) 
+\`\`\`
+
+第二步：按 CPU 分布分流——
+\`\`\`text
+us 高（用户态计算）：业务代码在烧 CPU
+  → top -H 找高耗线程 → printf %x 转 16 进制 → jstack 找 nid 对应栈
+sy 高（内核态）：系统调用/切换过多
+  → strace -c -p <pid> 看什么调用在烧；vmstat 1 看 cs 上下文切换
+wa 高（IO 等待）：磁盘/网络存储瓶颈
+  → iostat -x 1 看 %util 和 await；iotop 找具体进程
+st 高（>5%）：虚拟机被宿主机超售抢走 CPU，找运维换机
+\`\`\`
+
+第三步：Java 进程 CPU 100% 定位到代码行——
+\`\`\`bash
+top -H -p <pid>                    # 找到 tid=12345 的线程 99%
+printf "%x\\n" 12345                # → 3039
+jstack <pid> | grep -A 30 "nid=0x3039"
+# 典型凶手：正则回溯、大对象序列化、HashMap 死循环(JDK7)、GC 线程
+\`\`\`
+
+案例：美团订单服务凌晨 CPU 100%——jstack 显示 200 个线程全在一个 JSON 反序列化栈上。根因：上游把 2MB 的订单快照整个塞进消息体，fastjson 解析大对象时产生海量临时对象+深递归。修复：消息体瘦身只传 id+版本，详情回源 DB，CPU 降到 15%。
+
+另一种形态：CPU 不高但 load 高——
+\`\`\`bash
+ps aux | awk '$8 ~ /^D/ {print}'   # 找 D 状态（不可中断睡眠）进程
+# 全是 D 状态等 NFS/磁盘 → load 高但 CPU 空闲 → 是 IO 问题不是计算
+\`\`\`
+
+\`\`\`bash
+# 内存也一起看了（free 的 available 才是真实可用，buff/cache 可回收）
+free -h
+iostat -x 1 3    # %util 接近 100% = 盘满了；await 高 = 响应慢
+\`\`\`
+
+踩坑：load 包含 D 状态进程，容器里 top 看到的 load 是宿主机的，要看 cgroup 的 cpu.stat；CPU 100% 的第一嫌疑永远是 GC——先看 jstat -gcutil 1s 排除 Full GC 再查业务；pidstat -t 比 top -H 更能看线程全貌；短时毛刺用 atop 录制回放，否则重启后现场全丢。`,
+    keyPoints: ["load 高≠CPU 忙，可能 IO/D 状态", "us/sy/wa/st 四分类定方向", "top -H + jstack nid 定位代码行"],
+    followUps: ["CPU 不高但 RT 毛刺怎么查（gc/锁/定时任务）？", "容器环境 CPU 排查有什么不同？"],
+    favorited: false,
+  },
+  {
+    id: "be-236",
+    nodeId: "be-os-linux",
+    question: "什么是僵尸进程和孤儿进程？fork 的写时拷贝（COW）机制是什么？",
+    bigTech: true,
+    answer: `结论：僵尸进程是「子进程已退出但父进程没 wait() 收尸」，残留 PCB 占 PID；孤儿进程是「父进程先退出，子进程被 init/systemd（PID 1）收养」，无害。fork 的 COW 让父子进程初始共享物理页，只读不写零拷贝，写时才复制——这是 Redis BGSAVE 和 Linux 高效创建进程的根基。
+
+僵尸进程的产生与处理：
+\`\`\`c
+pid_t pid = fork();
+if (pid == 0) { exit(0); }      // 子进程立即退出
+// 父进程不调 wait()/waitpid() → 子进程变 Z（zombie）
+\`\`\`
+\`\`\`bash
+ps aux | grep ' Z '    # STAT=Z 的就是僵尸
+# 处理：杀父进程（僵尸被 init 收养并回收）；根治：父进程注册 SIGCHLD 处理器 wait
+\`\`\`
+
+案例：某 Java 服务用 Runtime.exec() 调 shell 脚本做数据导出，脚本退出后 Process 对象没 destroy()/waitFor()，一个月堆了 3000 个僵尸，PID 耗尽（默认 32768）导致无法 fork 任何新进程，SSH 都登不上。修复：代码里 waitFor + 超时销毁，运维侧加 zombie 数监控。
+
+fork 的 COW 机制：
+1. fork() 时子进程只复制页表（虚拟地址），物理页与父进程共享，标记只读
+2. 任一方写某页 → 触发缺页异常 → 内核复制该页 → 各自独立
+3. 效果：fork 本身 O（页表大小） 极快，内存只按「实际修改的页」增长
+
+COW 的真实威力——Redis BGSAVE：
+\`\`\`text
+Redis 主进程 fork 子进程做 RDB 快照：
+- fork 瞬间：子进程共享主进程全部内存页（10GB 数据也不复制）
+- 快照期间：主进程继续服务，写命令触发 COW 只复制被改的页
+- 风险窗口：快照期间写入越猛，COW 复制的页越多
+  极端情况（全量重写一遍）内存翻倍 → OOM
+\`\`\`
+
+案例：阿里 Redis 大促容量规划——32GB 实例做 RDB 时预留 50% 空闲内存给 COW，且避开高峰做快照；某次没避开，双 11 零点 BGSAVE 撞上写入洪峰，COW 复制 28GB，触发 OOM Killer 把 Redis 杀了。教训：大内存实例用「从节点快照」或 AOF 替代。
+
+踩坑：fork 多线程进程时子进程只继承调用线程，其他线程的锁状态可能死锁（glibc 用 pthread_atfork 保护）；Java 的 fork+exec 大内存进程会因 commit 内存超 VM 限制失败，要用 posix_spawn；僵尸进程杀不死（它已经死了），只能杀它爹；容器里 PID 1 是你的应用进程时，它不回收僵尸——需要 tini/dumb-init 当 PID 1。`,
+    keyPoints: ["僵尸=父没收尸，杀父解决", "COW=共享只读页，写时复制", "Redis BGSAVE 内存翻倍风险"],
+    followUps: ["为什么容器需要 tini 做 PID 1？", "vfork/clone 和 fork 什么区别？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：IO 模型（be-237 ~ be-243）=====
+  {
+    id: "be-237",
+    nodeId: "be-io-model",
+    question: "五种 IO 模型（阻塞/非阻塞/多路复用/信号驱动/异步）的区别？同步和异步的真正分界线在哪？",
+    bigTech: true,
+    answer: `结论：一次 IO 分两个阶段——「等数据就绪」（网卡→内核缓冲区）和「拷贝数据」（内核→用户态）。前四种模型第二阶段都阻塞（所以都是同步 IO），只有异步 IO（AIO）两阶段都不阻塞——这是同步/异步的唯一分界线。
+
+\`\`\`text
+五种模型对比：
+模型          等数据就绪        拷贝数据        一句话
+阻塞 BIO       阻塞             阻塞           傻瓜式，一连接一线程
+非阻塞 NIO     轮询(忙等)        阻塞           自己轮询费 CPU
+多路复用       阻塞在epoll_wait   阻塞           一个线程管万连接（主流）
+信号驱动       信号通知(不阻塞)   阻塞           信号处理复杂，少用
+异步 AIO       不阻塞            不阻塞(内核拷完回调)  真异步，Linux 不成熟
+\`\`\`
+
+关键认知：select/poll/epoll 都是同步 IO——epoll_wait 只告诉你「就绪了」，read 拷贝阶段还是你自己阻塞完成。POSIX 定义里只有 aio_read 系列才是异步。
+
+演进主线：BIO 一连接一线程（C10K 瓶颈：1万线程×8MB栈=80GB）→ NIO 非阻塞忙轮询（CPU 100% 空转）→ 多路复用把「谁就绪」的检查交给内核 → 一个线程处理万级连接。
+
+案例：Nginx 用 epoll 多路复用+少量 worker（=CPU 核数），单机扛 10 万并发连接；而传统 Apache 的 prefork 一连接一进程，1 万连接就内存爆炸。这就是 2005 年 Nginx 靠 IO 模型代差干掉 Apache 的故事。
+
+\`\`\`java
+// Java NIO Selector（多路复用的 Java 形态）
+Selector selector = Selector.open();
+ServerSocketChannel server = ServerSocketChannel.open();
+server.configureBlocking(false);
+server.register(selector, OP_ACCEPT);
+while (true) {
+    selector.select();               // 阻塞直到有事件（底层 epoll_wait）
+    for (SelectionKey key : selector.selectedKeys()) {
+        if (key.isAcceptable()) { /* 注册读事件 */ }
+        else if (key.isReadable()) { /* read 还是同步拷贝 */ }
+    }
+}
+\`\`\`
+
+踩坑：Java 的 NIO.2（AsynchronousSocketChannel）在 Linux 底层还是 epoll 模拟的「伪异步」，Windows 上才是真 IOCP；io_uring（Linux 5.1+）才是真异步 IO 的方向，Netty/Redis 都在接入；多路复用只是省了「等」的成本，业务处理慢照样要配 worker 线程池，Redis 6 引入多线程处理 IO 也是这个思路。`,
+    keyPoints: ["分界线=拷贝阶段是否阻塞", "epoll 仍是同步 IO", "io_uring 是真异步方向"],
+    followUps: ["Redis 单线程为什么还这么快？", "io_uring 和 epoll 的性能对比实测？"],
+    favorited: false,
+  },
+  {
+    id: "be-238",
+    nodeId: "be-io-model",
+    question: "select、poll、epoll 的底层区别？epoll 为什么能支撑百万连接？",
+    bigTech: true,
+    answer: `结论：三者都是 IO 多路复用，差异在「如何管理监控的 fd 集合」。select 有 1024 上限+每次全量拷贝+O(n) 遍历；poll 去掉上限但仍是全量拷贝 O(n)；epoll 用红黑树管理 fd、就绪链表返回、回调机制 O(1)，且 fd 集合常驻内核不用每次拷贝。
+
+\`\`\`text
+对比表：
+维度        select               poll                epoll
+fd 上限     1024(FD_SETSIZE)     无                   无（百万级）
+数据结构    位图                 数组                 红黑树(全量)+就绪链表
+每次调用    全量 fd 从用户态      同左                 epoll_ctl 注册一次，
+            拷贝到内核                                 内核常驻
+返回方式    遍历所有 fd 找就绪    同左 O(n)            只返回就绪的 O(1)
+触发方式    水平触发             水平触发             LT+ET 边缘触发
+\`\`\`
+
+epoll 三大系统调用：
+\`\`\`c
+int epfd = epoll_create1(0);                    // 建红黑树
+epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &event); // 注册 fd（只此一次拷贝）
+int n = epoll_wait(epfd, events, maxevents, timeout); // 只拿就绪链表
+\`\`\`
+
+epoll 高效的三板斧：
+1. fd 集合常驻内核：select 每次调用都把 1000 个 fd 的位图拷贝进内核，epoll_ctl 注册一次永久生效
+2. 就绪回调：网卡中断→协议栈→epoll 注册的回调把 fd 挂进就绪链表，epoll_wait 直接摘链表，不用遍历全部
+3. mmap 共享（早期实现）+ 按需返回：用户态和内核共享事件数组，返回的就绪事件数远小于总 fd 数
+
+案例：单机百万连接的实测——8GB 内存跑 epoll，100 万连接（每个连接内核缓冲区+应用状态约 4KB）轻松hold住；同样场景 select 直接死在 FD_SETSIZE=1024 的硬限制上，poll 则在 epoll_wait 等价的每次遍历中把 CPU 烧光（100 万 fd 全量遍历一次 10ms+，QPS 根本上不去）。
+
+\`\`\`text
+什么时候 epoll 也没优势：
+连接少（<1000）且每个都很活跃 → 全量遍历的 O(n) 和就绪 O(1) 差别不大
+epoll 的优势区间 = 海量连接 + 稀疏活跃（IM/推送/网关的典型特征）
+\`\`\`
+
+踩坑：epoll_create 的 size 参数在现代内核已被忽略（历史遗留）；EPOLLONESHOT 用于多线程下防止同一 fd 事件被多个线程并发处理；fd 关闭后记得 epoll_ctl DEL，重用 fd 编号会导致幽灵事件；容器里 strace 看 Java Netty 就是 epoll_wait 循环，别误以为是 bug。`,
+    keyPoints: ["select 1024 上限/poll 无上限仍 O(n)", "epoll 红黑树+就绪链表+回调 O(1)", "优势区间=海量连接稀疏活跃"],
+    followUps: ["epoll 的就绪链表会不会丢事件？", "kqueue（FreeBSD）和 epoll 谁更强？"],
+    favorited: false,
+  },
+  {
+    id: "be-239",
+    nodeId: "be-io-model",
+    question: "epoll 的 LT（水平触发）和 ET（边缘触发）区别？为什么 Nginx/Netty 高性能场景选 ET？",
+    bigTech: true,
+    answer: `结论：LT 是「只要缓冲区还有数据就一直通知你」，ET 是「状态变化的那一下才通知你」。ET 减少了 epoll_wait 唤醒次数（性能高），但要求每次必须把数据读完（且 fd 必须非阻塞），否则剩余数据再也收不到通知——这是 ET 最大的坑。
+
+\`\`\`text
+直观类比（快递柜）：
+LT：柜里有包裹就每天发短信催你，直到取完
+ET：只有新包裹入柜那一刻发一次短信；你没取完，后续不再提醒
+
+行为对比：
+场景：收到 10KB 数据，应用每次只 read 2KB
+LT：每次 epoll_wait 都返回该 fd → 读 5 次，触发 5 次
+ET：只在数据到达瞬间触发 1 次 → 必须循环 read 到 EAGAIN
+\`\`\`
+
+ET 的正确姿势（必须同时满足）：
+\`\`\`c
+// 1. fd 必须设为非阻塞（否则最后一次 read 阻塞，整个 EventLoop 卡死）
+fcntl(sockfd, F_SETFL, O_NONBLOCK);
+// 2. 注册 ET 模式
+event.events = EPOLLIN | EPOLLET;
+epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &event);
+// 3. 读必须循环到 EAGAIN（一次性读干）
+while (true) {
+    n = read(sockfd, buf, sizeof(buf));
+    if (n < 0 && errno == EAGAIN) break;  // 读完了
+    if (n <= 0) { /* 关闭 */ break; }
+    process(buf, n);
+}
+\`\`\`
+
+为什么高性能选 ET：
+1. 唤醒次数少：LT 下大数据量要「wait→read→wait→read」反复，ET 一次 wait 循环读完
+2. 避免惊群：ET 只在事件变化时触发，多线程 epoll_wait 场景下唤醒更可控（配合 EPOLLONESHOT）
+3. Nginx 的选择：Nginx 默认 ET——worker 进程拿到事件后必须一次性把请求处理完，配合它的事件驱动架构天衣无缝
+
+案例：Netty 在 Linux 的 EpollEventLoop 支持 ET 模式（epollEdgeTriggered），美团长连接网关实测开启后 epoll_wait 系统调用次数下降 60%，单机 50 万长连接的 CPU 从 70% 降到 45%。
+
+\`\`\`text
+选型建议：
+LT（默认）：编程简单不易错，业务系统首选
+ET：极致性能（网关/代理/长连接），但必须「非阻塞 fd + 读到 EAGAIN」
+     少一步都是 P0 事故
+\`\`\`
+
+踩坑：ET 模式忘了循环读到 EAGAIN——剩 500 字节在缓冲区，客户端等响应永远不来，超时重发又堆在缓冲区，雪崩；ET 模式 fd 设成阻塞是自杀行为（最后一次 read 卡住整个 Reactor）；ET 下 listen socket 也要循环 accept 到 EAGAIN，否则新连接积压在 backlog；Libevent/Netty 默认 LT 是为了通用性，框架级组件才开 ET。`,
+    keyPoints: ["LT 有数据就通知/ET 变化才通知", "ET 必须非阻塞+读到 EAGAIN", "Nginx 默认 ET/Netty 可开 ET"],
+    followUps: ["EPOLLONESHOT 解决什么并发问题？", "epoll 惊群问题在现代内核怎么解决的？"],
+    favorited: false,
+  },
+  {
+    id: "be-240",
+    nodeId: "be-io-model",
+    question: "什么是零拷贝？sendfile/mmap/splice 三种实现有什么区别？Kafka 为什么靠它起飞？",
+    bigTech: true,
+    answer: `结论：零拷贝（Zero-Copy）指数据不经过用户态、在内核空间直接完成「磁盘→网络」的搬运，消除冗余拷贝和上下文切换。传统 read+write 要 4 次拷贝+4 次上下文切换，sendfile 优化到 2 次拷贝+2 次切换，支持 scatter-gather 的网卡甚至 1 次拷贝。
+
+传统方式的 4 次拷贝：
+\`\`\`text
+read(file, buf):  磁盘 --DMA--> 内核页缓存 --CPU--> 用户态 buf（2次）
+write(sock, buf): 用户态 buf --CPU--> socket缓冲区 --DMA--> 网卡（2次）
++ 4 次用户/内核态切换
+\`\`\`
+
+三种零拷贝实现：
+\`\`\`text
+方式       原理                              拷贝次数   局限
+sendfile   内核直接 文件页缓存→socket缓冲区   2(带SG-DMA:1)  数据不可修改
+mmap+write 文件映射到用户地址空间，省CPU拷贝    3           小文件映射开销不划算
+splice     管道在两个内核缓冲区间搬数据        2           要求一端是管道
+\`\`\`
+
+\`\`\`java
+// Java 里用 FileChannel.transferTo（底层就是 sendfile）
+FileChannel fileChannel = FileChannel.open(path);
+SocketChannel socketChannel = ...;
+fileChannel.transferTo(0, fileChannel.size(), socketChannel);
+// 数据全程不出内核：磁盘→页缓存→socket缓冲区→网卡
+\`\`\`
+
+Kafka 的案例（教科书级应用）：消费者拉取消息 = 从磁盘读日志段文件发到网络。传统方式每条消息走用户态，Broker CPU 被拷贝吃满；Kafka 用 sendfile 后——
+- 消息从页缓存直接到网卡，用户态零参与
+- 配合「页缓存命中」（写最近的数据马上被读，全在内存）+ 顺序写日志
+- 效果：单机 10 万 EPS，网络打满而 CPU 只用 20%——「用 O(1) 的磁盘跑出了内存的速度」
+
+对比 RocketMQ 的选择：用 mmap（MappedByteBuffer）把 CommitLog 映射进内存，因为 RocketMQ 要在 Broker 侧解析消息做过滤（tag/SQL92），数据必须进用户态——所以 mmap 省掉一次拷贝更合适，而不是 sendfile。
+
+\`\`\`text
+零拷贝选型：
+纯转发（下载/消息队列消费）→ sendfile/transferTo
+要在应用层处理数据（过滤/修改）→ mmap
+大文件 + 高带宽场景 → 都零拷贝，瓶颈在网卡
+小数据 + 高频次 → 零拷贝收益小，直接 read/write
+\`\`\`
+
+踩坑：sendfile 传输加密数据（TLS）会失效——加密必须在用户态做，所以 HTTPS 下载服务享受不到零拷贝（除非 kTLS 内核态 TLS）；mmap 对超大文件（TB 级）映射会占满虚拟地址空间（64 位没事，32 位死）；transferTo 在某些 JDK 版本对 >2GB 文件有 bug 要分段；零拷贝不省 CPU 的「协议处理」开销，别把一切慢都归咎于拷贝。`,
+    keyPoints: ["4 次拷贝→sendfile 2 次（SG-DMA 1 次）", "Kafka 消费用 sendfile 是起飞关键", "TLS 场景零拷贝失效（除非 kTLS）"],
+    followUps: ["RocketMQ 为什么选 mmap 而不是 sendfile？", "io_uring 的零拷贝又是什么玩法？"],
+    favorited: false,
+  },
+  {
+    id: "be-241",
+    nodeId: "be-io-model",
+    question: "Reactor 三种线程模型（单线程/多线程/主从）？Netty 用的是哪种，为什么？",
+    bigTech: true,
+    answer: `结论：Reactor 模式 = 「事件分发器（IO 多路复用）+ 事件处理器池」。单线程版 Redis 用，多线程版引入业务线程池，主从版把 accept 和 IO 读写拆到两组线程——Netty 用主从 Reactor，因为 accept 无竞争、IO 读写负载均衡，单机百万连接的标配。
+
+\`\`\`text
+三种模型对比：
+模型          结构                                  优点        缺点       代表
+单Reactor单线程 1个线程干全部(accept+read+业务+write) 无并发竞争   慢任务堵全局  Redis
+单Reactor多线程 IO线程+业务线程池                     IO不阻塞    单Reactor扛不住海量accept Memcached
+主从Reactor    MainReactor只管accept，
+               SubReactor池管IO读写+业务池           全链路无瓶颈 复杂       Netty/Nginx
+\`\`\`
+
+单线程版（Redis 6 之前）：
+\`\`\`text
+epoll_wait → 就绪事件 → 顺序处理（读→解析→执行→写回）
+为什么快：内存操作 100ns 级，单线程无锁无切换，
+         瓶颈在网络不在 CPU → 单线程足够 10 万 QPS
+什么时候死：执行 O(n) 命令（KEYS */大 SMEMBERS）→ 全库卡住
+\`\`\`
+
+主从版（Netty 标准写法）：
+\`\`\`java
+EventLoopGroup bossGroup = new NioEventLoopGroup(1);    // MainReactor：只管 accept
+EventLoopGroup workerGroup = new NioEventLoopGroup();   // SubReactor：CPU×2 个，管 IO
+ServerBootstrap b = new ServerBootstrap();
+b.group(bossGroup, workerGroup)
+ .channel(NioServerSocketChannel.class)
+ .childHandler(new ChannelInitializer<SocketChannel>() {
+     protected void initChannel(SocketChannel ch) {
+         ch.pipeline().addLast(new BusinessHandler());
+     }
+ });
+// accept 到的连接轮询注册到 workerGroup 的 EventLoop 上
+// 一个连接绑定一个 EventLoop 终身 → 无锁串行化，单连接内不用同步
+\`\`\`
+
+Netty 的精妙之处：
+1. EventLoop 与线程 1:1，Channel 与 EventLoop N:1——单连接的所有 IO 串行执行，业务代码不用加锁
+2. 耗时的业务（DB/RPC）必须扔到独立业务线程池，否则堵住同 EventLoop 上其他 6 万个连接
+3. Nginx 是同样思路：master（管理）+ worker（=CPU 核数，各自独立 accept_mutex/EPOLLEXCLUSIVE 抢连接）
+
+案例：钉钉消息网关单实例 100 万长连接——boss 1 线程 accept，worker 32 线程（16 核×2），每个 EventLoop 挂 3 万+连接；业务处理（消息路由/存储写）全走独立线程池，IO 线程只做编解码+转发，P99 延迟 <10ms。
+
+踩坑：把 DB 查询写进 Netty 的 IO 线程是新手第一宗罪——一个慢 SQL 堵死 3 万连接；worker 线程数不是越多越好，纯 IO 场景 CPU×2 足够，加多了全是切换开销；boss 线程挂了不会自动重连 accept，生产要监控；Channel 跨 EventLoop 迁移（如重连后）要重新注册，状态同步是高级坑。`,
+    keyPoints: ["单线程=Redis/多线程=Memcached/主从=Netty+Nginx", "Netty 单连接绑定单 EventLoop 免锁", "慢业务必须扔独立线程池"],
+    followUps: ["Proactor 模式和 Reactor 什么区别（AIO）？", "Netty 的 EventLoop 如何做到无锁串行？"],
+    favorited: false,
+  },
+  {
+    id: "be-242",
+    nodeId: "be-io-model",
+    question: "阻塞/非阻塞、同步/异步，这两组概念到底怎么区分？（面试官的送命题）",
+    bigTech: true,
+    answer: `结论：这是两个正交维度——「阻塞/非阻塞」描述的是调用发起后线程是否挂起（等待时的姿态）；「同步/异步」描述的是结果由谁「取」：同步=调用方自己等待/轮询拿结果，异步=被调方完成后主动通知（回调/信号）。排列组合出四种形态。
+
+\`\`\`text
+四象限（以「去银行办业务」类比）：
+                同步                          异步
+阻塞   同步阻塞：窗口排队干等              异步阻塞：取了号坐着等广播
+       read() 默认                         （罕见，设计失误）
+非阻塞 同步非阻塞：隔5分钟去问一次         异步非阻塞：办完短信通知你
+       read() + O_NONBLOCK 轮询            AIO callback / 消息队列
+\`\`\`
+
+关键点：Linux 的 epoll 属于「同步非阻塞」——epoll_wait 告诉你就绪了，但 read 拷贝数据还是你自己干的（自己取结果=同步）。只有 IOCP（Windows）/io_uring 的完成队列才是「异步」——数据内核帮你拷好，通知你直接拿去用。
+
+\`\`\`text
+语言/框架映射：
+Java BIO              同步阻塞
+Java NIO (Selector)   同步非阻塞（多路复用本质还是同步）
+Java NIO.2 (AIO)      异步（Linux 下是 epoll 模拟，伪异步）
+Node.js               同步非阻塞 epoll + 事件循环回调（异步语法糖）
+Go netpoller          同步非阻塞 epoll，但用 goroutine 包装成「同步写法」
+io_uring              真异步（内核完成队列）
+\`\`\`
+
+案例：Go 的哲学——「用同步的写法获得异步的性能」。goroutine 调 net.Conn.Read() 看似同步阻塞，底层是 netpoller 把 fd 注册进 epoll，goroutine 挂起（G 离开 M），数据就绪后调度器再唤醒 goroutine。程序员写的是最简单的同步代码，运行时干的是 epoll 的活。对比 Node.js：同样的 epoll，但程序员要手写 callback/async 处理异步心智负担。
+
+面试答法（反套路加分）：不要背「同步=阻塞、异步=非阻塞」这个常见错误，直接给分界线：
+- 判断阻塞看「线程状态」
+- 判断同步看「结果的获取方」
+- 然后补一句：epoll/AIO/select 全是同步 IO，POSIX 标准里只有 aio_* 系列算异步，但 Linux 的 aio 只支持文件（且是 glibc 用线程池模拟的），真异步看 io_uring。
+
+踩坑：Java 的 Future.get() 是「异步发起+同步等待」的混合体，get 的那一刻回到同步阻塞；Reactor/WebFlux 全链路异步要求每一环都非阻塞，中间夹一个 JDBC 同步调用就全盘皆输；Python 的 asyncio 同理，await 链里调 requests.get() 会把事件循环卡死（要用 aiohttp）。`,
+    keyPoints: ["阻塞看线程姿态/同步看结果获取方", "epoll 是同步非阻塞", "Go 用同步写法跑异步性能"],
+    followUps: ["Future/Promise 算什么模式？", "Reactor 全链路异步被 JDBC 卡住怎么救（虚拟线程）？"],
+    favorited: false,
+  },
+  {
+    id: "be-243",
+    nodeId: "be-io-model",
+    question: "从 C10K 到 C10M：单机支撑千万级连接要解决哪些层面的问题？",
+    bigTech: true,
+    answer: `结论：C10K（万级连接）靠 epoll 解决「调度」问题；C100K（十万）要解决内存与内核参数；C1M（百万）要解决网卡中断与多队列；C10M（千万）要绕过内核协议栈本身（DPDK/XDP）——每一级都是「离硬件更近一步」。
+
+\`\`\`text
+各阶段瓶颈与解法：
+阶段    瓶颈                    解法
+C10K    一连接一线程模型         epoll 多路复用（2003 年已解决）
+C100K   fd 上限/端口/TCP内存     ulimit 调大、tcp_mem 调优、缩缓冲区
+C1M     软中断集中 CPU0/accept锁  RPS/RSS 网卡多队列、SO_REUSEPORT
+C10M    内核协议栈本身(拷贝/锁)   DPDK 用户态协议栈/XDP/eBPF
+\`\`\`
+
+C1M 级别的内核调优清单：
+\`\`\`bash
+# fd 上限（每个连接一个 fd）
+ulimit -n 1048576
+# 全连接队列（accept 队列溢出会丢连接）
+sysctl -w net.core.somaxconn=65535
+# 端口范围（客户端角色时需要，服务端监听复用 80 不受限）
+sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+# TCP 内存三件套（低水位/压力/上限，单位是页）
+sysctl -w net.ipv4.tcp_mem="786432 1048576 1572864"
+# 每个连接读写缓冲区调小（默认 87KB×100万 = 87GB 爆炸）
+sysctl -w net.ipv4.tcp_rmem="4096 4096 16384"
+sysctl -w net.ipv4.tcp_wmem="4096 4096 16384"
+\`\`\`
+
+SO_REUSEPORT 解决 accept 瓶颈：多个进程/线程各自 listen 同一端口，内核负责把新连接均匀分到各队列——Nginx 1.9+ 开启后 accept 吞吐翻倍，消除了 accept_mutex 惊群锁。
+
+C10M 的终极形态（DPDK）：
+\`\`\`text
+内核路径（1M pps 封顶）：
+网卡 → 中断 → 内核协议栈（拷贝/锁/内存分配）→ socket → 应用
+
+DPDK 路径（100M+ pps）：
+网卡 --DMA--> 用户态轮询驱动（UIO）→ 应用直接处理报文
+绕过：中断、协议栈、拷贝、socket
+代价：协议栈自己实现（TCP 都没有）、独占 CPU 核轮询
+玩家：云厂商 LB（阿里 SLB）、高频交易、字节网关
+\`\`\`
+
+案例：阿里云 SLB 四层负载均衡用 DPDK 自研用户态转发，单机扛 1 亿并发连接、4000 万 CPS；作为对照，基于内核协议栈的 LVS 单机约 1000 万连接就到头了。字节跳动接入层同样走 DPDK+XDP 路线扛春晚红包流量。
+
+踩坑：百万连接不是「能建立」就完事——GC 停顿 1 秒，百万连接的心跳超时全断（JVM 用 ZGC/Shenandoah 把停顿压到 1ms 内）；连接状态每连接 4KB 应用元数据×1M = 4GB，内存规划先行；DPDK 独占网卡后 SSH 都连不上管理口，要双网卡分离；监控体系（Prometheus 指标每连接一个 label）在百万连接下自身先 OOM，指标必须聚合。`,
+    keyPoints: ["C10K=epoll/C1M=内核调优+多队列/C10M=绕开内核", "SO_REUSEPORT 消 accept 惊群", "DPDK 用户态协议栈是终局"],
+    followUps: ["XDP 和 DPDK 的取舍（内核兼容性）？", "百万连接下 GC 选型为什么是 ZGC？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：设计模式与 SOLID（be-244 ~ be-249）=====
+  {
+    id: "be-244",
+    nodeId: "be-design-pattern",
+    question: "手写线程安全单例：五种写法对比？为什么枚举单例是「最安全」的？（面试必手写）",
+    bigTech: true,
+    answer: `结论：五种写法——饿汉式、懒汉同步、双重检查锁（DCL）、静态内部类、枚举。面试标准答案是 DCL 或静态内部类，追问到反射/序列化攻击时祭出枚举。
+
+\`\`\`java
+// 1. 饿汉式：类加载即创建，天生线程安全；缺点是没用到也创建
+public class Singleton { private static final Singleton I = new Singleton(); }
+
+// 2. 双重检查锁 DCL（手写必考，volatile 是灵魂）
+public class Singleton {
+    private static volatile Singleton instance;  // volatile 禁止指令重排序!
+    public static Singleton getInstance() {
+        if (instance == null) {                  // 第一查：避免每次抢锁
+            synchronized (Singleton.class) {
+                if (instance == null) {          // 第二查：防并发重复创建
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+// volatile 为什么必须：new 分三步——分配内存→初始化→引用赋值，
+// 1.5 之前重排序会导致别的线程拿到「未初始化的半成品对象」
+
+// 3. 静态内部类（推荐：懒加载+无锁+天然安全）
+public class Singleton {
+    private static class Holder { static final Singleton I = new Singleton(); }
+    public static Singleton getInstance() { return Holder.I; }
+    // 靠类加载机制保证：内部类首次被引用时才初始化，JVM 保证线程安全
+}
+
+// 4. 枚举单例（Effective Java 推荐，终极方案）
+public enum Singleton {
+    INSTANCE;
+    public void doWork() {}
+}
+\`\`\`
+
+枚举为什么最安全——防住三种攻击：
+\`\`\`text
+攻击          DCL/静态内部类          枚举
+反射攻击      可 setAccessible 强new   反射 newInstance 枚举直接抛异常
+序列化攻击    反序列化生成新对象       JVM 保证枚举反序列化返回同一实例
+             (要加 readResolve)      （枚举的序列化由 JVM 特殊处理）
+克隆攻击      需禁 clone             枚举不可克隆
+\`\`\`
+
+案例：Spring 的 Bean 默认单例——但不是用上述任何写法，而是 ConcurrentHashMap（singletonObjects）+ synchronized 双重检查，因为 Spring 单例是「容器级单例」不是「JVM 级单例」，一个类可以有多个不同 name 的单例 Bean。
+
+踩坑：DCL 忘了 volatile 是最常见的扣分点；静态内部类Holder被显式 Class.forName 会提前初始化；枚举单例不能被 Spring 管理成普通 Bean（枚举不能实例化）；单例持有可变成员变量=全局状态，并发下是灾难，单例必须无状态或状态不可变；Android/多 ClassLoader 环境下「单例」可能不唯一（每个 ClassLoader 一份）。`,
+    keyPoints: ["DCL 必加 volatile 防重排序", "静态内部类靠类加载锁", "枚举防反射/序列化/克隆三攻击"],
+    followUps: ["Spring 单例和 JVM 单例区别？", "双重检查锁定在 C++ 里为什么失效（memory order）？"],
+    favorited: false,
+  },
+  {
+    id: "be-245",
+    nodeId: "be-design-pattern",
+    question: "简单工厂、工厂方法、抽象工厂三种工厂模式的区别？各自在 JDK/框架里的真实应用？",
+    bigTech: true,
+    answer: `结论：三者解决的问题逐层递进——简单工厂用「一个类+if-else」封装创建；工厂方法把创建延迟到子类（一个工厂一个产品）；抽象工厂解决「一族相关产品」的成套创建。
+
+\`\`\`text
+对比表：
+模式        结构                        扩展新产品      扩展产品族    真实应用
+简单工厂    一个工厂类+switch           违反开闭原则    不支持        Calendar.getInstance
+工厂方法    抽象工厂接口+每产品一实现    加类即可(开闭)   不支持        Collection.iterator
+抽象工厂    工厂接口=一族产品的成套方法  违反开闭        加工厂类即可   MyBatis SqlSessionFactory
+\`\`\`
+
+\`\`\`java
+// 1. 简单工厂（静态方法+分支，违反开闭但够用）
+public static PayChannel create(String type) {
+    return switch (type) {
+        case "alipay" -> new Alipay();
+        case "wechat" -> new WechatPay();
+        default -> throw new IllegalArgumentException(type);
+    };
+}
+
+// 2. 工厂方法（每产品一个工厂，新增产品不改老代码）
+interface PayFactory { PayChannel create(); }
+class AlipayFactory implements PayFactory {
+    public PayChannel create() { return new Alipay(); }
+}
+
+// 3. 抽象工厂（成套创建：订单场景=支付+消息+对账三件套）
+interface OrderServiceFactory {
+    PayChannel pay();       // 产品A
+    Notifier notifier();    // 产品B
+    Reconciler reconciler();// 产品C
+}
+class CnOrderFactory implements OrderServiceFactory { /* 国内三件套 */ }
+class IntlOrderFactory implements OrderServiceFactory { /* 海外三件套 */ }
+\`\`\`
+
+真实应用：
+- JDK Calendar.getInstance()：按 Locale/TimeZone 返回 BuddhistCalendar/JapaneseImperialCalendar 等——简单工厂
+- JDBC DriverManager.getConnection(url)：各数据库厂商实现 Driver 接口，SPI 加载——工厂方法变体
+- MyBatis 的 SqlSessionFactoryBuilder→SqlSessionFactory→SqlSession：三级创建链，Executor/StatementHandler 由 Configuration 成套装配——抽象工厂
+- Spring 的 BeanFactory/ApplicationContext：本质是超级工厂
+
+案例：美团支付中台的渠道路由——早期简单工厂 switch 20 个 case，每次接新渠道改主干代码出过一次资损；重构为「工厂方法+Spring Map 注入」（Map<String, PayChannel> 按渠道码自动装配），新渠道只需加一个 @Component，主干零改动。
+
+踩坑：过度设计——只有两个实现类时上抽象工厂是自找麻烦；简单工厂配合枚举/SPI 已经能覆盖 80% 场景；抽象工厂的「产品族」概念强行套业务（支付渠道之间其实互相独立，不是族）；工厂里塞业务逻辑，创建逻辑和业务逻辑不分层。`,
+    keyPoints: ["简单工厂违反开闭/工厂方法符合/抽象工厂管产品族", "MyBatis 三级创建链", "美团渠道重构案例"],
+    followUps: ["Spring 的 FactoryBean 和 BeanFactory 区别？", "建造者模式和工厂怎么分工（复杂对象组装）？"],
+    favorited: false,
+  },
+  {
+    id: "be-246",
+    nodeId: "be-design-pattern",
+    question: "JDK 动态代理和 CGLIB 代理的底层区别？Spring AOP 怎么选？",
+    bigTech: true,
+    answer: `结论：JDK 动态代理基于接口——运行时生成实现接口的代理类，通过反射分发调用；CGLIB 基于继承——ASM 字节码生成目标类的子类，方法重写拦截。Spring AOP 默认策略：有接口用 JDK 代理，无接口用 CGLIB（Spring Boot 2.x 起默认强制 CGLIB）。
+
+\`\`\`text
+对比表：
+维度        JDK 动态代理              CGLIB
+原理        实现接口+InvocationHandler  继承目标类+MethodInterceptor
+生成方式    Proxy.newProxyInstance     Enhancer + ASM 字节码
+目标要求    必须有接口                 不能是 final 类/final 方法
+调用开销    反射 invoke                FastClass 索引直调（更快）
+生成成本    低                        高（字节码生成+加载）
+JDK 版本    内置                      需引入（Spring 已内嵌）
+\`\`\`
+
+\`\`\`java
+// JDK 动态代理手写（理解原理必考）
+interface OrderService { void create(); }
+class OrderServiceImpl implements OrderService { public void create() {} }
+
+OrderService proxy = (OrderService) Proxy.newProxyInstance(
+    loader, new Class[]{OrderService.class},
+    (proxy1, method, args) -> {
+        System.out.println("before");           // 增强逻辑
+        Object r = method.invoke(target, args); // 反射调真实对象
+        System.out.println("after");
+        return r;
+    });
+// 生成的代理类：class $Proxy0 extends Proxy implements OrderService
+
+// CGLIB 手写
+Enhancer enhancer = new Enhancer();
+enhancer.setSuperclass(OrderServiceImpl.class);  // 继承!
+enhancer.setCallback((MethodInterceptor) (obj, method, args, methodProxy) -> {
+    System.out.println("before");
+    return methodProxy.invokeSuper(obj, args);   // FastClass 索引调用，无反射
+});
+\`\`\`
+
+案例：阿里 Pandaboot 启动优化——数万个 Bean 的 AOP 代理创建阶段，CGLIB 字节码生成占了启动时间 30%，切换部分场景回 JDK 代理+减少切面后启动快 20%。另一个方向的优化是 GraalVM Native Image 下 CGLIB 完全不可用（不能运行时生成字节码），Spring Boot 3 的 AOT 处理把代理提前到编译期生成。
+
+\`\`\`text
+Spring AOP 失效三大坑（代理模式的副作用）：
+1. this 自调用：方法A内部直接调this.B() → 不经过代理 → 事务/切面失效
+   解法：注入自身代理 / AopContext.currentProxy()
+2. final 方法：CGLIB 无法重写 → 静默失效（不报错!）
+3. 非 public 方法：JDK 代理只代理接口方法，private/protected 天生不可代理
+\`\`\`
+
+踩坑：Spring Boot 2.x 默认 proxyTargetClass=true（全 CGLIB），导致注入时按接口 @Autowired 找不到 Bean 的 NoSuchBeanDefinition 异常——按类型注入即可；CGLIB 代理类会使 jstack 里的类名变成 Target$$EnhancerBySpringCGLIB$$a1b2c3，排查时要认得；Mockito mock 老版本用 CGLIB，mock final 类需要 mockito-inline（ByteBuddy）；动态代理栈深，排查 NPE 时代理帧会干扰视线。`,
+    keyPoints: ["JDK=接口+反射/CGLIB=继承+ASM", "SB2 默认全 CGLIB", "自调用/final/非 public 三失效坑"],
+    followUps: ["ByteBuddy 比 CGLIB 强在哪？", "Spring Boot 3 AOT 怎么处理动态代理？"],
+    favorited: false,
+  },
+  {
+    id: "be-247",
+    nodeId: "be-design-pattern",
+    question: "观察者模式在 Spring Event 和消息队列里怎么用的？同步事件和异步事件怎么选？",
+    bigTech: true,
+    answer: `结论：观察者模式 = 发布订阅解耦——「我干事，不关心谁听」。三种形态：代码内回调（Listener）、JVM 内事件总线（Spring Event/Guava EventBus）、跨进程消息队列（RocketMQ）。复杂度递增，解耦程度递增。
+
+\`\`\`java
+// Spring Event 三件套（JVM 内观察者）
+// 1. 事件
+public record OrderCreatedEvent(Long orderId, Long userId) {}
+
+// 2. 发布
+@Service
+public class OrderService {
+    @Resource ApplicationEventPublisher publisher;
+    public void createOrder(Order o) {
+        orderMapper.insert(o);
+        publisher.publishEvent(new OrderCreatedEvent(o.getId(), o.getUserId()));
+        // 主流程只负责发事件，积分/通知/风控各自订阅
+    }
+}
+
+// 3. 监听（同步：同事务内执行）
+@EventListener
+public void onOrderCreated(OrderCreatedEvent e) { /* 加积分 */ }
+
+// 异步版本：@Async + @EventListener（独立线程，主流程不等）
+// 事务安全版本：@TransactionalEventListener(AFTER_COMMIT)
+// —— 事务提交后才执行，避免「积分发了但订单回滚了」
+\`\`\`
+
+\`\`\`text
+三种形态对比：
+维度        Spring Event(同步)  Spring Event(异步)   RocketMQ
+耦合        JVM内解耦           JVM内解耦            跨进程解耦
+可靠性      与主流程同生共死     线程池满会丢         持久化+重试，不丢
+事务一致性  同事务              @TransactionalEvent  最终一致(本地消息表)
+性能        最快(方法调用)       快(线程切换)          慢(网络+持久化)
+适用        强一致紧关联逻辑     可容忍延迟的旁路     跨服务/削峰/最终一致
+\`\`\`
+
+案例：淘宝下单链路的演进——早期 OrderService 里顺序调积分/通知/风控/推荐更新 8 个系统，接口 RT 2s+；第一步改 Spring Event 异步，RT 降到 300ms 但大促线程池打满丢事件；第二步核心链路（积分/库存）保留同步事件，非核心（通知/推荐）全部上 RocketMQ——RT 稳定 80ms，可靠性靠 MQ 持久化保证。
+
+踩坑：@EventListener 默认同步且在同一事务——监听者抛异常会导致主事务回滚（积分服务 bug 拖死下单！）；@Async 事件监听在多实例部署时每台机器都消费一次（发通知发 8 遍），需要 MQ 或分布式锁去重；@TransactionalEventListener 默认 AFTER_COMMIT，如果事务没提交事件就丢了（监控盲区）；事件对象必须不可变（用 record），否则异步线程读到被主线程改了一半的数据。`,
+    keyPoints: ["同步事件同事务会互相拖死", "@TransactionalEventListener 防回滚不一致", "JVM 事件→MQ 是量级跃迁"],
+    followUps: ["Guava EventBus 和 Spring Event 差异？", "事件溯源（Event Sourcing）和事件驱动什么关系？"],
+    favorited: false,
+  },
+  {
+    id: "be-248",
+    nodeId: "be-design-pattern",
+    question: "如何用「策略模式+模板方法」干掉一坨 if-else？给一个真实的重构案例。",
+    bigTech: true,
+    answer: `结论：策略模式解决「算法可替换」（运行时按类型选实现），模板方法解决「流程固定、步骤可变」（骨架父类定死，步骤子类实现）。两者合体是消灭「类型分支+重复流程」屎山的组合拳。
+
+重构前（真实屎山：结算系统按渠道算价）：
+\`\`\`java
+public BigDecimal settle(String channel, Order order) {
+    if ("alipay".equals(channel)) {
+        // 校验→算价→手续费→打款→记账（70行，和微信80%重复）
+    } else if ("wechat".equals(channel)) {
+        // 几乎一样但手续费率不同、打款接口不同
+    } else if ("unionpay".equals(channel)) { ... }
+    // 8 个渠道，500 行，每次加渠道要改这个类 → 改出过一次资损
+}
+\`\`\`
+
+重构后（策略处理差异 + 模板固定流程）：
+\`\`\`java
+// 模板方法：结算流程五步定死，差异步骤留给子类
+public abstract class AbstractSettleStrategy {
+    public final BigDecimal settle(Order order) {   // final 防重写
+        validate(order);          // 通用校验（模板实现）
+        BigDecimal price = calcPrice(order);        // 子类实现
+        BigDecimal fee = price.multiply(feeRate()); // 子类实现
+        doPayout(order, price.subtract(fee));       // 子类实现
+        record(order);            // 通用记账（模板实现）
+        return price.subtract(fee);
+    }
+    protected abstract BigDecimal calcPrice(Order o);
+    protected abstract BigDecimal feeRate();
+    protected abstract void doPayout(Order o, BigDecimal amount);
+    protected void validate(Order o) { /* 通用 */ }
+    protected void record(Order o) { /* 通用 */ }
+}
+
+@Component("alipay")
+class AlipaySettle extends AbstractSettleStrategy { /* 只填3个差异点 */ }
+
+// 策略选择：Spring 自动注入 Map，彻底消灭 if-else
+@Service
+public class SettleRouter {
+    private final Map<String, AbstractSettleStrategy> strategies; // key=bean名
+    public BigDecimal settle(String channel, Order o) {
+        return strategies.get(channel).settle(o);  // 新渠道=新加一个Component
+    }
+}
+\`\`\`
+
+效果：新接第 9 个渠道只新增一个类，主干零改动（开闭原则）；单测从「500 行巨型类难以下手」变成「每个策略独立测 3 个方法」。
+
+\`\`\`text
+什么时候不要上这套：
+- 分支只有 2-3 个且稳定不变 → 直接 if-else，模式是成本不是荣誉
+- 差异点之间互相穿插（A渠道的步骤2=B渠道的步骤5）→ 先梳理流程再抽象
+- 一次性的脚本/迁移代码 → 不值得
+\`\`\`
+
+案例：字节营销引擎的优惠计算——满减/折扣/券/积分 12 种玩法用「策略+责任链」：每种优惠一个策略，责任链按优先级串联（先券后满减再积分），新玩法上线不改主干。对比早期 if-else 版本，需求交付从 2 周缩到 2 天。
+
+踩坑：策略类的公共依赖（Mapper/Client）通过构造器注入，别在策略里再 new；Map<String, Strategy> 注入的 key 是 bean 名，团队要约定命名规范；模板方法里调用了子类抽象方法的流程必须是 final，否则子类重写整个 settle() 模板就形同虚设；策略选择失败的兜底（get 返回 null）要显式处理，NPE 在生产是资损。`,
+    keyPoints: ["策略消灭类型分支/模板固化流程", "Spring Map 注入消灭 if-else", "分支少且稳定时别过度设计"],
+    followUps: ["责任链和策略链怎么配合（Dubbo Filter）？", "状态模式和策略模式长得像，怎么区分？"],
+    favorited: false,
+  },
+  {
+    id: "be-249",
+    nodeId: "be-design-pattern",
+    question: "责任链和装饰器模式怎么区分？Dubbo Filter、MyBatis Plugin、Spring Interceptor 用的是哪个？",
+    bigTech: true,
+    answer: `结论：责任链是「请求沿着链条传递，每个节点决定是否处理/继续」——强调流程路由；装饰器是「层层包裹，每层加一层增强」——强调功能叠加。结构上像（都是链式），意图完全不同。三大框架用的都是责任链思想，但实现细节各异。
+
+\`\`\`text
+对比表：
+维度        责任链                      装饰器
+意图        传递请求，节点决定处理与否    包裹对象，叠加功能
+方向        可中断（某节点吃掉请求）      必然传递到最内层
+经典实现    链表 next 指针              组合持有被装饰者引用
+JDK 例子    Servlet FilterChain         InputStream 套娃
+           （chain.doFilter 决定是否继续）(BufferedInputStream 包 FileInputStream)
+\`\`\`
+
+三大框架的责任链实现：
+\`\`\`java
+// 1. Servlet Filter（标准责任链：容器穿链，doFilter 决定是否放行）
+public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain) {
+    if (!authed(req)) { return; }          // 中断：不放行
+    chain.doFilter(req, resp);              // 放行：交给下一个 Filter
+    // 回来还能做后置处理（try-finally 语义）
+}
+
+// 2. Dubbo Filter（AOP 式责任链：Invoker 层层包装）
+// 调用链：ConsumerInvoker → MockFilter → MonitorFilter
+//         → TimeoutFilter → ExceptionFilter → 网络发送
+// 每个 Filter 拿到下一个 Invoker，前置+invoke+后置
+
+// 3. MyBatis Plugin（动态代理套娃：拦截器层层代理四大对象）
+// Executor → CachingExecutor
+//   → PageInterceptor 代理 → LogInterceptor 代理 → 真实执行
+// 注意：这是「装饰器+责任链」混合——代理包装是装饰器，拦截点串联是责任链
+\`\`\`
+
+案例：Spring Cloud Gateway 的 Filter 链——一个请求过 20+ 个 GatewayFilter（鉴权→限流→熔断→改写→路由→重试），按 order 排序。早期版本所有 Filter 都执行，一个慢鉴权拖死全链路；后来支持「短路 Filter」（鉴权失败直接 401 不往下走），P99 降 40%。
+
+\`\`\`text
+选型口诀：
+要「审批/拦截/路由」语义 → 责任链（节点有权说"到此为止"）
+要「增强/包装」语义 → 装饰器（无论包几层，最终都要调到本尊）
+两个都要（如 Netty Pipeline：入站责任链+出站装饰） → 混合，但节点职责要单一
+\`\`\`
+
+踩坑：责任链顺序是 P0 级配置——鉴权放在限流后面，被刷接口时先烧鉴权服务（顺序反了）；Dubbo Filter 的 activate 按 SPI 文件顺序，自定义 Filter 不标 order 会插错位置；装饰器套太多层栈深难排查（jstack 里 15 层代理帧）；责任链节点里做耗时操作要慎重——链条是串行的，一个慢节点拖全链（Netty 的 Handler 禁止阻塞就是这个道理）。`,
+    keyPoints: ["责任链=可中断的路由/装饰器=必达的增强", "MyBatis Plugin 是两者混合", "链顺序是 P0 配置"],
+    followUps: ["Netty Pipeline 的入站出站设计妙在哪？", "Spring Security 的 FilterChainProxy 怎么动态组装链条？"],
+    favorited: false,
+  },
+  // ===== Java 框架：MyBatis 与 ORM（be-250 ~ be-256）=====
+  {
+    id: "be-250",
+    nodeId: "be-mybatis",
+    question: "MyBatis 的 #{} 和 \${} 有什么区别？为什么 \${} 会导致 SQL 注入？哪些场景不得不用 \${}？",
+    bigTech: true,
+    answer: `结论：#{} 是预编译参数占位符（JDBC PreparedStatement 的 ?），值以参数形式传入，天然防注入；\${} 是字符串原样拼接，值直接拼进 SQL 文本，可注入。能用 #{} 的地方绝不用 \${}，只有「表名/列名/ORDER BY」等不能预编译的场景才用 \${}，且必须白名单校验。
+
+\`\`\`xml
+<!-- #{}：预编译，安全 -->
+<select id="getUser" resultType="User">
+    SELECT * FROM user WHERE name = #{name}
+    <!-- 实际执行：PreparedStatement: SELECT * FROM user WHERE name = ?
+         参数: "张三"  → 值永远不会被解析成 SQL 语法 -->
+</select>
+
+<!-- \${}：字符串拼接，危险 -->
+<select id="getUser2" resultType="User">
+    SELECT * FROM user WHERE name = '\${name}'
+    <!-- 输入 ' OR '1'='1 后变成：
+         SELECT * FROM user WHERE name = '' OR '1'='1'  → 全表拖库 -->
+</select>
+\`\`\`
+
+注入攻击实例：
+\`\`\`text
+入参: x' OR '1'='1' --
+拼接后: SELECT * FROM user WHERE name = 'x' OR '1'='1' --'
+结果: 全表返回；进阶可 UNION SELECT 拖出密码字段
+\`\`\`
+
+不得不用 \${} 的三个场景 + 安全姿势：
+\`\`\`xml
+<!-- 1. 动态表名（分表场景）——白名单校验 -->
+SELECT * FROM order_\${tableSuffix}   <!-- tableSuffix 只允许 [0-9]{4} -->
+
+<!-- 2. ORDER BY 动态排序字段——白名单映射 -->
+ORDER BY \${orderColumn} \${orderDir}
+<!-- Java 侧：orderColumn = ALLOWED_COLUMNS.getOrDefault(input, "id") -->
+
+<!-- 3. LIKE 的陷阱：CONCAT 里用 #{}，别用 \${} -->
+WHERE name LIKE CONCAT('%', #{keyword}, '%')   <!-- 正确 -->
+WHERE name LIKE '%\${keyword}%'                <!-- 注入! -->
+\`\`\`
+
+案例：某金融公司 2023 年真实泄漏事件——导出报表接口的「排序字段」直接 \${sort} 拼接，攻击者构造 sort=(SELECT password FROM admin LIMIT 1) 拖出管理员密码哈希。修复：所有动态字段走枚举白名单，Code Review 加 Checkstyle 规则禁止 \${} 出现在 WHERE 值位置。
+
+\`\`\`java
+// 防御代码模板（所有 \${} 入参必须过这层）
+private static final Set<String> ALLOWED_SORT = Set.of("id", "create_time", "amount");
+public List<Order> list(String sort, String dir) {
+    if (!ALLOWED_SORT.contains(sort)) throw new IllegalArgumentException();
+    if (!"asc".equals(dir) && !"desc".equals(dir)) dir = "asc";
+    return orderMapper.listSorted(sort, dir);
+}
+\`\`\`
+
+踩坑：MyBatis-Plus 的 QueryWrapper.orderBy(true, true, column) 同样是拼接，column 不可信时一样注入；LIKE 用 \${} 是国产系统重灾区；预编译只防「值注入」，防不了「结构注入」（表名/列名/SQL 关键字位置无法参数化）；ORM 不是免死金牌——JPA 的 createQuery 字符串拼接照样注入，要用 Criteria API 或参数绑定。`,
+    keyPoints: ["#{}=预编译防注入/\${}=拼接可注入", "表名/列名/ORDER BY 才用 \${}+白名单", "LIKE 用 CONCAT+#{} "],
+    followUps: ["预编译为什么能防注入（词法分析阶段）？", "MyBatis 的 SqlInjector 在企业里怎么统一收口？"],
+    favorited: false,
+  },
+  {
+    id: "be-251",
+    nodeId: "be-mybatis",
+    question: "MyBatis 一级缓存和二级缓存的机制？生产环境为什么说二级缓存「坑比收益多」？",
+    bigTech: true,
+    answer: `结论：一级缓存是 SqlSession 级的 HashMap（默认开，同一会话内相同查询直接命中）；二级缓存是 Mapper 命名空间级（默认关，跨 SqlSession 共享）。一级缓存基本无害，二级缓存在分布式环境下是「数据一致性的定时炸弹」——生产建议关闭，用 Redis 替代。
+
+\`\`\`text
+对比表：
+维度        一级缓存                二级缓存
+作用域      SqlSession              Mapper namespace（跨会话）
+默认状态    开启（LOCAL）           关闭（要 <cache/> 显式开）
+存储        PerpetualCache HashMap   可插拔（默认内存/可接 Redis/Ehcache）
+失效        会话结束/执行增删改      同 namespace 任何写操作清空
+分布式安全  安全（会话私有）         不安全（多实例各自缓存，数据不一致!）
+\`\`\`
+
+\`\`\`xml
+<!-- 开启二级缓存（看着很美） -->
+<cache eviction="LRU" flushInterval="60000" size="512" readOnly="true"/>
+\`\`\`
+
+二级缓存三大坑：
+1. 多实例不一致：服务部署 8 个实例，A 实例缓存了用户余额=100，B 实例更新了余额=80，A 的缓存还活得好好的——用户看到自己余额在 100 和 80 之间横跳。MyBatis 二级缓存没有跨实例同步机制。
+2. 粒度太粗：一个 namespace 里任何写操作清空整个 namespace 缓存——订单表更新一条，几百个查询缓存全失效，命中率形同虚设。
+3. 多表关联污染：UserMapper 的查询 JOIN 了 order 表，order 表更新不会清 UserMapper 的缓存（缓存按 namespace 隔离）——脏数据。
+
+案例：某电商商品详情页用 MyBatis 二级缓存，运营后台改价后前台半小时不变价（flushInterval 没到期），大促期间价格不一致直接客诉+资损。修复：关二级缓存，商品读路径改「Redis 缓存 + Cache Aside + 变更消息失效」——改价后发 MQ 消息精确删除对应 key。
+
+一级缓存也有坑（虽然轻）：
+\`\`\`java
+// 同一 SqlSession 里，查询→更新→再查询，第二次查询还是旧数据？
+// 不会——增删改会清一级缓存。但：
+sqlSession.selectOne("getUser", 1);   // 缓存
+user.setName("改了内存对象");           // 直接改返回的对象!
+sqlSession.selectOne("getUser", 1);   // 命中缓存，拿到的是被改过的对象
+// 一级缓存存的是对象引用不是副本，改返回对象=污染缓存
+\`\`\`
+
+\`\`\`text
+生产最佳实践：
+- 二级缓存：<setting name="cacheEnabled" value="false"/> 全局关
+- 一级缓存：保持默认（会话内），但别依赖它做性能优化
+- 真正的缓存层：Redis + Cache Aside 模式，精确到 key 的失效控制
+- Spring 整合下 SqlSession 是方法级的（Mapper 代理每次新建），
+  一级缓存在非事务环境下≈不存在，别指望它
+\`\`\`
+
+踩坑：Spring 托管下只有「同一事务内」一级缓存才生效（事务内复用 SqlSession），无事务时每次查询都是新 SqlSession——很多人以为一级缓存没生效是 bug；readOnly="false" 时二级缓存靠序列化深拷贝，性能差且要求实体 Serializable；想用 Redis 当二级缓存（mybatis-redis 包）依然有多实例通知失效问题，不如直接业务层缓存。`,
+    keyPoints: ["一级=会话级引用缓存/二级=命名空间级", "二级缓存分布式必不一致", "生产用 Redis+Cache Aside 替代"],
+    followUps: ["Spring 事务如何影响一级缓存生效范围？", "Cache Aside 的读穿/写穿策略怎么选？"],
+    favorited: false,
+  },
+  {
+    id: "be-252",
+    nodeId: "be-mybatis",
+    question: "MyBatis 一次查询的完整执行流程？四大核心对象各自干什么？",
+    bigTech: true,
+    answer: `结论：执行链 SqlSession → Executor → StatementHandler → ParameterHandler/ResultSetHandler。四大对象：Executor（调度+缓存）、StatementHandler（JDBC 语句管理）、ParameterHandler（参数设置）、ResultSetHandler（结果映射）。插件（Interceptor）只能拦截这四个对象的方法。
+
+\`\`\`text
+全流程（以 mapper.selectList 为例）：
+1. MapperProxy.invoke         JDK 动态代理入口，方法→MappedStatement
+2. SqlSession.selectList      门面，委托 Executor
+3. Executor.query             先查一级缓存 → 未命中走 DB
+4. StatementHandler.prepare   创建 JDBC Statement，设超时/ fetchSize
+5. ParameterHandler.setParameters  TypeHandler 把 Java 参数→JDBC 类型，setXxx
+6. statement.execute()        真正执行 SQL
+7. ResultSetHandler.handleResultSets  按 resultMap 逐行映射：TypeHandler
+                                JDBC 类型→Java 类型，嵌套映射/懒加载代理
+\`\`\`
+
+\`\`\`java
+// 核心源码链路（简化）
+public <E> List<E> query(MappedStatement ms, Object parameter) {
+    BoundSql boundSql = ms.getBoundSql(parameter);      // 解析 SQL+参数映射
+    CacheKey key = createCacheKey(ms, parameter, boundSql);
+    List<E> list = localCache.getObject(key);           // 一级缓存
+    if (list == null) {
+        list = queryFromDatabase(ms, parameter, boundSql);
+        localCache.putObject(key, list);
+    }
+    return list;
+}
+\`\`\`
+
+四大对象与可拦截点：
+\`\`\`text
+对象                职责                      典型拦截场景
+Executor           调度、一二级缓存、批处理    分页/读写分离/慢查询统计
+StatementHandler   Statement 创建与执行       SQL 改写（加租户条件/脱敏字段）
+ParameterHandler   参数装配                    参数加密（手机号落库加密）
+ResultSetHandler   结果集映射                  结果脱敏（返回前打码）
+\`\`\`
+
+案例：某 SaaS 平台的多租户改造——所有 SQL 自动追加 tenant_id 条件，方案就是 Interceptor 拦截 StatementHandler.prepare，用 JSqlParser 解析 SQL AST 注入 tenant_id 谓词，2000 个 Mapper 零改动上线。同类应用：Seata 的 SQL 解析代理、ShardingSphere 的分片改写、敏感字段加解密。
+
+TypeHandler 的角色（容易被忽略）：
+\`\`\`java
+// Java 的 Instant ↔ DB 的 TIMESTAMP 互转就发生在这
+// 自定义枚举/JSON 字段/加密字段都是实现 TypeHandler
+@MappedTypes(Instant.class)
+public class InstantTypeHandler extends BaseTypeHandler<Instant> {
+    public void setNonNullParameter(PreparedStatement ps, int i,
+            Instant v, JdbcType t) throws SQLException {
+        ps.setTimestamp(i, Timestamp.from(v));
+    }
+}
+\`\`\`
+
+踩坑：Executor 有三种——Simple（每次新 Statement）/Reuse（复用 Statement）/Batch（攒批 executeBatch），批处理性能差十倍；拦截 Executor.query 改 SQL 时要重建 BoundSql 和 CacheKey，否则缓存错乱；ResultSetHandler 处理嵌套 collection 时 N+1 查询就发生在这里；插件拦截顺序=配置顺序的反向（后配置的先执行），多插件叠加要画清楚套娃图。`,
+    keyPoints: ["SqlSession→Executor→StatementHandler→两 Handler", "插件只能拦四大对象", "多租户/分片都靠 StatementHandler 改 SQL"],
+    followUps: ["Batch 模式为什么快十倍（rewriteBatchedStatements）？", "Interceptor 怎么拦截嵌套查询的懒加载？"],
+    favorited: false,
+  },
+  {
+    id: "be-253",
+    nodeId: "be-mybatis",
+    question: "MyBatis 插件（Interceptor）原理？分页插件 PageHelper 是怎么实现的？它的坑在哪？",
+    bigTech: true,
+    answer: `结论：插件机制 = JDK 动态代理 + 责任链——Plugin.wrap() 把四大对象层层包成代理，每个 Interceptor 声明拦截签名（对象+方法）。PageHelper 拦截 Executor.query，解析 SQL 重写为分页 SQL（LIMIT n,m），并先执行 COUNT 查询。
+
+\`\`\`java
+// 手写一个分页插件（理解原理）
+@Intercepts(@Signature(type = Executor.class, method = "query",
+    args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+public class PageInterceptor implements Interceptor {
+    public Object intercept(Invocation inv) throws Throwable {
+        MappedStatement ms = (MappedStatement) inv.getArgs()[0];
+        BoundSql boundSql = ms.getBoundSql(inv.getArgs()[1]);
+        // 1. 先执行 COUNT：SELECT COUNT(*) FROM (原SQL)
+        // 2. 改写 SQL：原SQL + " LIMIT ?, ?"
+        BoundSql newBoundSql = new BoundSql(ms.getConfiguration(),
+            boundSql.getSql() + " LIMIT " + offset + "," + size,
+            boundSql.getParameterMappings(), boundSql.getParameterObject());
+        // 3. 用新 BoundSql 重建 MappedStatement 继续执行
+        return inv.proceed();
+    }
+    public Object plugin(Object target) { return Plugin.wrap(target, this); }
+}
+\`\`\`
+
+\`\`\`text
+代理套娃结构（两个插件时）：
+Executor 真实对象
+  ← LogInterceptor 代理（先配的后执行）
+    ← PageInterceptor 代理（后配的先执行）
+      ← 调用入口
+执行顺序：Page → Log → 真实（后配置的先执行，像洋葱）
+\`\`\`
+
+PageHelper 的用法与原理：
+\`\`\`java
+PageHelper.startPage(1, 10);   // ThreadLocal 存分页参数
+List<Order> list = orderMapper.list();  // 紧挨着的下一个查询被分页
+// 原理：ThreadLocal<Page> → Interceptor 取出参数改写 SQL → finally 清除
+\`\`\`
+
+PageHelper 的经典坑（生产事故常客）：
+1. ThreadLocal 泄漏串页：startPage 后查询抛异常，Page 没清除，下一个无关查询被错误分页——某报表系统查出 10 条就以为没数据，业务丢单。新版加了 clearPage 兜底，但「startPage 和查询之间不能有任何其他 Mapper 调用」仍是铁律。
+2. 深分页性能：LIMIT 1000000, 10 要扫描并丢弃前 100 万行，DB CPU 打满——深度分页要改「WHERE id > 上次最大id LIMIT 10」（游标式）。
+3. COUNT 查询灾难：原 SQL 含 GROUP BY/大 JOIN 时，COUNT 包裹后比原查询还慢——复杂报表要自定义 COUNT SQL。
+
+\`\`\`text
+深分页优化对比：
+LIMIT 1000000, 10              扫描 1000010 行，10s+
+WHERE id > 1000000 LIMIT 10    走主键索引，毫秒级
+业务约束：游标式不能跳页（只能"下一页"），管理后台跳页场景
+        用 ES/ClickHouse 扛，别让 MySQL 深分页
+\`\`\`
+
+案例：美团订单列表迁移——骑手端订单列表从「offset 分页」改「游标分页」（WHERE id < lastSeenId），DB 慢查询从日均 3000 次降到 0；管理端需要跳页的用 ES 同步 binlog 扛。
+
+踩坑：插件里改 SQL 用字符串拼接是大忌（JSqlParser 解析 AST 才可靠）；分页插件和 ShardingSphere 分片改写同时用时，执行顺序决定 LIMIT 加在分片前还是分片后（加错位置每个分片都 LIMIT 一遍）；RowBounds 内存分页（查出全部再截取）在大结果集下直接 OOM，千万别用它代替物理分页。`,
+    keyPoints: ["插件=代理+责任链，签名单拦四大对象", "PageHelper=ThreadLocal+SQL改写", "ThreadLocal 串页+深分页两大坑"],
+    followUps: ["ShardingSphere 的分页改写和 PageHelper 冲突怎么解？", "游标分页在有筛选条件时怎么保证稳定排序？"],
+    favorited: false,
+  },
+  {
+    id: "be-254",
+    nodeId: "be-mybatis",
+    question: "MyBatis 的 Mapper 接口没有实现类，为什么能直接调？动态代理全过程是什么？",
+    bigTech: true,
+    answer: `结论：Mapper 接口由 MapperProxyFactory 用 JDK 动态代理生成代理对象，所有方法调用被路由到 MapperProxy.invoke → MapperMethod.execute，按 SQL 命令类型（SELECT/INSERT/...）转发给 SqlSession 对应方法。XML 里的 statement 和注解 SQL 在启动时注册成 MappedStatement，以「namespace.id」为 key 存 Configuration。
+
+\`\`\`text
+全链路：
+1. 启动解析：XML/注解 → MappedStatement 注册进
+   Configuration.mappedStatements（Map<String, MappedStatement>）
+   key = "com.x.OrderMapper.list"
+2. 注入代理：Spring 扫描 @MapperScan → 每个 Mapper 接口注册
+   MapperFactoryBean → getObject() 返回
+   mapperRegistry.getMapper(OrderMapper.class, sqlSession)
+3. 生成代理：Proxy.newProxyInstance(loader, [OrderMapper.class],
+   new MapperProxy(sqlSession, OrderMapper.class, methodCache))
+4. 调用分发：orderMapper.list() → MapperProxy.invoke
+   → 缓存方法为 MapperMethod → execute() 按类型分发：
+   SELECT → sqlSession.selectList("com.x.OrderMapper.list", param)
+   INSERT → sqlSession.insert(...)（返回影响行数）
+5. 参数处理：MethodSignature 解析 @Param，把方法参数转成
+   Map（param1/arg0 或命名参数）
+\`\`\`
+
+\`\`\`java
+// 关键源码（简化）
+public class MapperProxy<T> implements InvocationHandler {
+    public Object invoke(Object proxy, Method method, Object[] args) {
+        // Object 方法（toString/hashCode）直接本地执行
+        if (Object.class.equals(method.getDeclaringClass())) {
+            return method.invoke(this, args);
+        }
+        // 其他方法 → MapperMethod 缓存后执行
+        MapperMethod mapperMethod = cachedMapperMethod(method);
+        return mapperMethod.execute(sqlSession, args);
+    }
+}
+\`\`\`
+
+为什么用接口而不写实现类：
+- SQL 与代码解耦：实现类的「实现」就是 XML/注解里的 SQL，手写实现类纯属样板代码
+- 代理统一做：参数映射、结果映射、缓存、插件拦截——这些横切逻辑手写实现类根本没法优雅塞进去
+
+\`\`\`text
+同名不同参数的重载为什么报错：
+MappedStatement 的 key 是 "namespace.methodName"，
+不含参数签名 → 同一 Mapper 里方法名不能重载
+（Java 语法允许，MyBatis 注册时后者覆盖/启动报错）
+\`\`\`
+
+案例：自研轻量 ORM 的踩坑——团队模仿 MyBatis 写了个动态代理 ORM，Method 到 SQL 的映射每次调用都反射解析注解，QPS 3000 时反射占 CPU 25%。修复：照抄 MyBatis 的 methodCache（启动时预解析全部 MapperMethod），CPU 降到 2%。教训：动态代理的 invoke 是热路径，反射元数据必须缓存。
+
+踩坑：Mapper 接口方法加 default 实现会绕过代理直接执行（default 方法有方法体，MyBatis 特殊处理）；@Param 不写时参数名依赖 -parameters 编译参数，老项目只有 arg0/param1；多数据源场景 Mapper 代理绑定的是单一 SqlSessionTemplate，跨库 Mapper 要配独立 SqlSessionFactory；代理对象是线程安全的（方法级 SqlSession），可以单例注入。`,
+    keyPoints: ["JDK 代理+MappedStatement 注册表", "调用按命令类型分发 SqlSession", "Mapper 方法不可重载（key 不含签名）"],
+    followUps: ["MyBatis-Spring 的 SqlSessionTemplate 怎么保证线程安全？", "为什么接口代理比 CGLIB 类代理更适合 Mapper？"],
+    favorited: false,
+  },
+  {
+    id: "be-255",
+    nodeId: "be-mybatis",
+    question: "MyBatis-Plus 相比原生 MyBatis 增强了什么？哪些「方便」功能在生产里会变成坑？",
+    bigTech: true,
+    answer: `结论：MP 在 MyBatis 之上做「增强不做改变」——BaseMapper 通用 CRUD、QueryWrapper 条件构造器、自动分页、代码生成器、逻辑删除、自动填充、多租户/动态表名插件。收益是单表操作零 XML，代价是「方便的糖」用过头会绕过架构约束。
+
+增强清单：
+\`\`\`java
+// 1. BaseMapper：单表 CRUD 零 SQL
+public interface UserMapper extends BaseMapper<User> {}
+userMapper.selectById(1L);
+userMapper.updateById(user);
+
+// 2. QueryWrapper：链式条件（免 XML）
+userMapper.selectList(new QueryWrapper<User>()
+    .eq("status", 1).gt("age", 18).orderByDesc("create_time").last("LIMIT 10"));
+
+// 3. 逻辑删除：@TableLogic 标记，delete 变 update，查询自动带 deleted=0
+// 4. 自动填充：创建/更新时间自动赋值（MetaObjectHandler）
+// 5. 分页插件：PaginationInnerInterceptor（比 PageHelper 稳）
+\`\`\`
+
+生产四大坑：
+1. selectById 全家桶惯坏了团队：单表 CRUD 顺手后，复杂查询也硬拆成多次单表查询在内存里 JOIN——QPS 放大 10 倍打挂 DB。复杂关联必须回 XML 写 JOIN。
+2. QueryWrapper 的 last() 拼接注入：.last("ORDER BY " + userInput) 就是 SQL 注入；column 字符串同样拼进 SQL，前端传列名必须白名单。
+3. 逻辑删除的唯一索引冲突：deleted 标记后，「手机号唯一索引」照样被已删记录占用——唯一索引要建成 (phone, deleted) 或 deleted 用时间戳代替 0/1。
+4. updateById 的 null 不更新陷阱：MP 默认「字段为 null 不更新」（非空策略），想置空某字段要用 UpdateWrapper.set("col", null)——无数人以为更新成功了实际没生效。
+
+\`\`\`java
+// 坑 4 的正确写法
+// 目标：把用户的 profile 清空
+user.setProfile(null);
+userMapper.updateById(user);  // profile 不会被更新（null 被忽略）!
+
+// 正确：
+userMapper.update(null, new UpdateWrapper<User>()
+    .eq("id", user.getId()).set("profile", null));
+\`\`\`
+
+案例：某 SaaS 公司多租户插件误用——MP 的 TenantLineInnerInterceptor 自动加 tenant_id，但一条跨租户统计 SQL 忘加 @InterceptorIgnore，被自动拼了 tenant_id 条件，全平台统计数据只算了当前租户，财报偏差 30% 才被发现。修复：跨租户 SQL 统一注解豁免+代码评审清单。
+
+\`\`\`text
+MP 使用军规（团队规范模板）：
+□ 单表 CRUD 用 BaseMapper；两表以上 JOIN 回 XML
+□ QueryWrapper 的列名/last() 禁止接前端原始输入
+□ 逻辑删除表的唯一索引必须含 deleted 列
+□ 置空操作用 UpdateWrapper.set，不用 updateById
+□ 批量操作用 saveBatch（JDBC batch），别 for 循环 insert
+\`\`\`
+
+踩坑：saveBatch 要 JDBC URL 加 rewriteBatchedStatements=true 才是真批处理，否则还是逐条；MP 分页插件和 PageHelper 混用会双重分页；自动填充在 update(wrapper) 方式下不触发（拿不到实体）；代码生成器生成的 CRUD 直接暴露成 Controller 是安全灾难（水平越权重灾区）。`,
+    keyPoints: ["增强=BaseMapper+Wrapper+插件，不改变 MyBatis", "null 不更新/逻辑删除索引冲突是重灾区", "单表糖的尽头是复杂查询回 XML"],
+    followUps: ["MP 的多租户插件原理和豁免机制？", "JPA/Hibernate 和 MP 在企业里怎么选？"],
+    favorited: false,
+  },
+  {
+    id: "be-256",
+    nodeId: "be-mybatis",
+    question: "什么是 ORM 的 N+1 问题？MyBatis 里怎么产生的？怎么发现和根治？",
+    bigTech: true,
+    answer: `结论：N+1 = 查询 1 次主表拿到 N 条记录，再为每条记录各查 1 次关联表，总查询数 = 1+N。100 个订单各查一次用户信息就是 101 次 DB 往返——RT 从 5ms 变 500ms，DB 连接池被打爆。根治方案：JOIN 一次查出 / 批量 IN 查询。
+
+\`\`\`xml
+<!-- MyBatis 产生 N+1 的典型写法：嵌套查询 select -->
+<resultMap id="orderMap" type="Order">
+    <id property="id" column="id"/>
+    <!-- 每个订单都会执行一次 selectUserById！-->
+    <association property="user" column="user_id" select="selectUserById"/>
+</resultMap>
+<select id="listOrders" resultMap="orderMap">SELECT * FROM orders</select>
+<select id="selectUserById" resultType="User">
+    SELECT * FROM user WHERE id = #{userId}
+</select>
+<!-- 100 个订单 = 1 + 100 次查询 -->
+\`\`\`
+
+\`\`\`xml
+<!-- 根治 1：嵌套结果（JOIN 一次查）——推荐 -->
+<resultMap id="orderMapJoin" type="Order">
+    <id property="id" column="id"/>
+    <association property="user">
+        <id property="id" column="uid"/>
+        <result property="name" column="uname"/>
+    </association>
+</resultMap>
+<select id="listOrdersJoin" resultMap="orderMapJoin">
+    SELECT o.*, u.id AS uid, u.name AS uname
+    FROM orders o LEFT JOIN user u ON o.user_id = u.id
+</select>
+
+<!-- 根治 2：批量 IN（不适合 JOIN 的跨库场景） -->
+<!-- 先查 orders，再 SELECT * FROM user WHERE id IN (ids) 内存组装 -->
+\`\`\`
+
+\`\`\`text
+三种方案对比：
+方案          查询次数  适用
+嵌套 select    1+N       懒加载（要用时才查），但默认就踩坑
+JOIN 嵌套结果  1         关联少、数据量可控（笛卡尔积爆炸风险）
+批量 IN        2         跨库/分库场景，内存组装
+\`\`\`
+
+发现 N+1 的手段（别等出事）：
+1. 日志：mybatis 配置 log-impl=org.apache.ibatis.logging.stdout.StdOutImpl，压测时数 SQL 条数
+2. APM：SkyWalking/Arthas 的 DB 拓扑，一个接口产生几十条相同 SQL 必现 N+1
+3. 熔断指标：Druid 监控「单请求 SQL 数」超阈值告警
+
+案例：拼多多商家后台商品列表——每个商品嵌套 select 查店铺+类目，一页 50 条商品产生 101 次查询，分页接口 P99 3s+，DB CPU 90%。修复：改 JOIN + 店铺信息走 Redis 缓存（命中率 99%），P99 降到 60ms。
+
+\`\`\`java
+// 懒加载的正确姿势：fetchType=lazy + 按需触发，但生产慎用
+<association property="user" column="user_id"
+    select="selectUserById" fetchType="lazy"/>
+// 全局开关：mybatis.configuration.lazy-loading-enabled=true
+// 坑：序列化（JSON 返回）会触发全部懒加载 → 还是 N+1
+//     配 lazy-load-trigger-methods="" 或 VO 层只取需要的字段
+\`\`\`
+
+踩坑：懒加载开着 + Jackson 序列化 = 全量触发 N+1（getter 被序列化器调了个遍）；JOIN 方案对一对多（订单+订单项）会产生主表行重复，大结果集放大数据量（要去重或用 collection 映射）；批量 IN 超过 1000 个元素 Oracle 报错（MySQL 没事但有 max_allowed_packet）；JPA 的 @OneToMany 默认 LAZY 但 OpenSessionInView 开着时在视图层悄悄 N+1，关 OSIV 是 Spring Boot 2.x 的推荐姿势。`,
+    keyPoints: ["1 次主查+N 次关联查", "根治=JOIN 嵌套结果或批量 IN", "懒加载+JSON 序列化=全量触发"],
+    followUps: ["一对多 collection 映射怎么去重？", "GraphQL 的 DataLoader 怎么批量解决 N+1？"],
+    favorited: false,
+  },
+  // ===== 安全与认证：Web 安全（be-257 ~ be-263）=====
+  {
+    id: "be-257",
+    nodeId: "be-security",
+    question: "SQL 注入的原理是什么？预编译为什么能防注入？MyBatis 里还有哪些注入死角？",
+    bigTech: true,
+    answer: `结论：SQL 注入的本质是「数据和指令没有边界」——用户输入被拼进 SQL 字符串后，改变了 SQL 的语法结构。预编译（PreparedStatement）能防注入，是因为它把 SQL 模板先发给 DB 编译成执行计划，参数只作为「纯数据」传输，永远不会被当成 SQL 语法解析。
+
+\`\`\`java
+// 注入原理：字符串拼接
+String sql = "SELECT * FROM user WHERE name = '" + name + "'";
+// name = ' OR '1'='1  →  WHERE name = '' OR '1'='1' → 全表拖库
+// name = '; DROP TABLE user;--  → 删表（需 DB 允许多语句）
+
+// 预编译：模板和参数分离
+PreparedStatement ps = conn.prepareStatement("SELECT * FROM user WHERE name = ?");
+ps.setString(1, name);  // 参数在协议层单独传输，带类型标记
+// DB 收到 ' OR '1'='1 也只把它当成一个 8 字符的字符串字面值
+\`\`\`
+
+\`\`\`text
+预编译的两道防线：
+1. 语法树已固定：执行计划在参数到达前已生成，参数改不了树结构
+2. 协议层分离：MySQL 的 COM_STMT_PREPARE + COM_STMT_EXECUTE 是两条命令，
+   参数走二进制编码，不经过 SQL 词法分析器
+\`\`\`
+
+MyBatis 的注入死角（预编译不是银弹）：
+\`\`\`xml
+<!-- 1. \${} 纯文本替换 = 拼接，高危 -->
+ORDER BY \${orderField}   <!-- orderField=name; DROP TABLE user;-- 直接注入 -->
+
+<!-- 2. LIKE 拼接 % 用 concat 才是安全的 -->
+WHERE name LIKE CONCAT('%', #{kw}, '%')   <!-- ✅ -->
+WHERE name LIKE '%\${kw}%'                <!-- ❌ 注入 -->
+
+<!-- 3. IN 用 foreach 展开成 #{} 才安全 -->
+id IN <foreach collection="ids" open="(" separator="," close=")">#{id}</foreach>  <!-- ✅ -->
+id IN (\${ids})                           <!-- ❌ 注入 -->
+\`\`\`
+
+死角清单（order by / 表名 / 列名不能预编译）：动态排序字段必须白名单校验（\`Set.of("id","name","create_time")\` 查表），分表场景表名后缀必须 \`\\d+\` 正则校验，DB 账号最小权限（应用账号禁 DROP/GRANT），开启 MySQL 的 sql_safe_updates。
+
+案例：2018 某快递公司 API 按运单号查询接口用 \${} 拼接，被黑产注入拖走 3 亿条用户数据（姓名+电话+地址），暗网售卖；修复成本远超一次安全评审。Hibernate/JPA 也不是免疫——JPQL 拼接字符串照样注入，nativeQuery + 拼接是重灾区。
+
+踩坑：以为用了 ORM 就安全（Hibernate 的 HQL 拼接照样注入）；以为存储过程安全（存储过程内部 EXECUTE 拼接字符串一样中招）；WAF 能挡但挡不住编码绕过（宽字节 %df' 吃掉转义反斜杠）；预编译在 LIKE 通配符场景要转义 % 和 _ 本身，否则用户输入 % 实现「全模糊扫描」慢查询攻击。`,
+    keyPoints: ["预编译=语法树先固定+参数协议分离", "\\${}/order by/表名是注入死角，必须白名单", "DB 账号最小权限兜底"],
+    followUps: ["宽字节注入 %df 怎么绕过 addslashes？", "MySQL 的 sql_mode 和 safe_updates 怎么配？"],
+    favorited: false,
+  },
+  {
+    id: "be-258",
+    nodeId: "be-security",
+    question: "XSS 三种类型（存储/反射/DOM）的区别和防御？CSP 是什么？HttpOnly Cookie 防得住 XSS 吗？",
+    bigTech: true,
+    answer: `结论：XSS = 攻击者的 JavaScript 在受害者的浏览器里以「本站身份」执行。三型的区别在于「恶意代码的存储位置」：存储型存在服务端 DB（危害最大，所有访客中招）、反射型存在 URL 参数里（需要诱骗点击）、DOM 型不经过服务端，纯前端 JS 读写 DOM 时注入。
+
+\`\`\`text
+三型对比：
+类型    恶意代码位置        触发方式                典型案例
+存储型  服务端数据库        任何用户访问该页面      评论区留言 <script> 偷 Cookie
+反射型  URL 参数           诱骗点击钓鱼链接        ?q=<script> 搜索结果页原样回显
+DOM 型  前端 JS 的输入源    修改 location.hash 等   document.write(location.hash)
+\`\`\`
+
+\`\`\`java
+// 防御三板斧：
+// 1. 输出编码（核心！按上下文分别编码）
+//    HTML 上下文：& < > " ' → 实体
+//    JS 上下文：\\uXXXX 转义
+//    URL 上下文：URLEncoder
+//    CSS 上下文：禁止用户输入进 style
+<div th:text="\${user.nickname}"></div>   <!-- Thymeleaf text 自动转义 ✅ -->
+<div th:utext="\${user.nickname}"></div>  <!-- utext 不转义 = 自杀 ❌ -->
+
+// 2. CSP（Content-Security-Policy）：白名单脚本来源，内联脚本一刀切
+res.setHeader("Content-Security-Policy",
+  "default-src 'self'; script-src 'self' https://cdn.example.com; " +
+  "object-src 'none'; base-uri 'self'; report-uri /csp-report");
+// 即使注入成功，<script>alert(1)</script> 内联脚本被浏览器直接拒绝执行
+
+// 3. HttpOnly Cookie：document.cookie 读不到 → 偷不走 Session
+//    注意：HttpOnly 不防 XSS 本身！攻击者可以直接以你的身份发请求
+//    （XSS 里 fetch('/api/transfer') 照样带着你的 Cookie 走）
+\`\`\`
+
+富文本场景（评论支持加粗/图片）不能全转义——用白名单过滤库：Java 用 OWASP Java HTML Sanitizer / jsoup.clean(Safelist.relaxed())，前端用 DOMPurify。黑名单（过滤 script 标签）必被绕过：\`<scrscriptipt>\`、\`<img onerror=alert(1)>\`、\`<svg onload=alert(1)>\`。
+
+案例：新浪微博 2011 XSS 蠕虫——存储型 XSS + 短链接扩散，用户点链接自动发微博+关注，1 小时感染 3 万+用户；MySpace Samy 蠕虫 20 小时感染 100 万用户，作者被判缓刑+禁触网。现代前端框架默认转义插值，XSS 减少但没绝迹——React 的 dangerouslySetInnerHTML、Vue 的 v-html 是仅剩的高危口子。
+
+踩坑：innerHTML = data 是 DOM XSS 温床（用 textContent）；JSON 里嵌 HTML 字符串双重编码陷阱（服务端转一次前端再转一次反而引入 &amp; 注入）；富文本过滤后存入 DB 时做转义，污染原始数据且换展示端就漏（要存原文、输出时转义/过滤）；认为 SPA 没有 XSS（DOM 型在 SPA 里更猖獗）；CSP 配了 report-only 忘了切换成 enforce 模式=裸奔。`,
+    keyPoints: ["三型区别=恶意代码存储位置", "输出编码按上下文+CSP 白名单", "HttpOnly 防偷 Cookie 不防冒名发请求"],
+    followUps: ["富文本为什么用白名单不用黑名单过滤？", "Trusted Types API 怎么根治 DOM XSS？"],
+    favorited: false,
+  },
+  {
+    id: "be-259",
+    nodeId: "be-security",
+    question: "CSRF 攻击原理？为什么 SameSite Cookie 能防？JWT 放 localStorage 后还有 CSRF 吗？",
+    bigTech: true,
+    answer: `结论：CSRF = 借用浏览器的「自动带 Cookie」特性，让受害者在已登录状态下无感知地向目标站发出伪造请求。防御三件套：SameSite Cookie（治本，浏览器级）、CSRF Token（经典，服务端校验随机值）、校验 Origin/Referer（辅助）。
+
+\`\`\`text
+攻击链（你登录了 bank.com，访问了 evil.com）：
+1. evil.com 页面里 <img src="https://bank.com/transfer?to=hacker&amt=10000">
+2. 浏览器发请求时自动带上 bank.com 的 Cookie（不管请求从哪发起）
+3. bank.com 看到合法 Session → 执行转账
+关键：攻击者拿不到 Cookie 内容，只是「借用」浏览器自动携带的行为
+\`\`\`
+
+\`\`\`text
+SameSite 三个取值：
+Strict  任何跨站请求都不带 Cookie（从外部链接点进来也不带→用户体验差）
+Lax     跨站 GET 导航带，POST/img/iframe 不带（Chrome 80+ 默认值）
+None    都带（必须配合 Secure，用于跨域 SSO 场景）
+SameSite=Lax 后 <img>/<form POST> 跨站请求不再携带 Cookie → CSRF 基本断绝
+\`\`\`
+
+\`\`\`java
+// CSRF Token 方案（SameSite 不可用的老浏览器兜底）：
+// 1. 服务端生成随机 Token 绑定 Session，下发到表单隐藏域
+// 2. 提交时校验：Token 对不上就拒绝
+// 攻击者在 evil.com 无法读取 bank.com 页面内容（同源策略）→ 拿不到 Token
+// Spring Security 默认开启 CsrfFilter，GET 放行、POST/PUT/DELETE 必校验
+
+// 校验 Origin/Referer（辅助层，防子域 XSS 后绕过 SameSite）：
+String origin = request.getHeader("Origin");
+if (origin != null && !TRUSTED_ORIGINS.contains(origin)) return 403;
+\`\`\`
+
+JWT 放 localStorage 后：没有 Cookie 就没有 CSRF——浏览器不会自动带 localStorage 里的东西，请求头是 JS 手动加的 Authorization: Bearer。但代价是 XSS 一来全完蛋：localStorage 里的 JWT 被 document 任意 JS 读走，攻击者直接拿到「凭证本体」，比借 Cookie 更惨（可导出、可离线重放到过期）。所以：
+- Cookie(HttpOnly+SameSite) 模式：怕 CSRF（已防）不怕偷凭证
+- localStorage 模式：不怕 CSRF 怕 XSS 偷凭证
+两害相权，大厂主站多选 Cookie 模式，CSRF 防线成熟；纯内部系统/APP 内嵌可用 Bearer。
+
+案例：Gmail 2007 CSRF——攻击页面发请求修改受害者邮箱过滤器，把含特定关键词的邮件转发给攻击者，用于盗取域名注册确认邮件抢域名；ING Direct、YouTube 都中过 CSRF。抖音早期的「关注/点赞」接口曾因未校验 CSRF Token 被刷量平台利用。
+
+踩坑：把 CSRF Token 放在 Cookie 里再让 JS 读出来放 Header（Double Submit）——子域 XSS 可重写 Cookie 攻破，要配合加密绑定 Session；只校验 Referer 不校验 Origin，攻击者用 data: URL 或 meta referrer=no-referrer 让 Referer 为空，空校验默认放行=白给（空必须拒绝）；GET 接口做了写操作（CSRF Token 一般只验非 GET）——幂等规范也是安全规范；跨域 CORS 配 Access-Control-Allow-Origin: * + Allow-Credentials: true（浏览器会拦，但反射 Origin 的动态配置常见失误）。`,
+    keyPoints: ["CSRF 借用浏览器自动带 Cookie", "SameSite=Lax 治本+Token 兜底", "localStorage 免 CSRF 但 XSS 可偷凭证本体"],
+    followUps: ["Double Submit Cookie 怎么被子域 XSS 攻破？", "扫码登录场景 CSRF 怎么防（QR 码钓鱼）？"],
+    favorited: false,
+  },
+  {
+    id: "be-260",
+    nodeId: "be-security",
+    question: "SSRF 是什么？为什么比 XSS/CSRF 更危险？怎么防御（含绕过手法）？",
+    bigTech: true,
+    answer: `结论：SSRF = 攻击者诱导「服务端」代替他发起请求。危险之处在于：服务端在内网，能访问攻击者从公网够不到的资源——云元数据接口、内网管理后台、K8s API、Redis 未授权端口。一次 SSRF 可能直接打穿整个内网，这是「权限升级」漏洞，XSS/CSRF 只是客户端漏洞。
+
+\`\`\`text
+攻击链（头像 URL 抓取功能为例）：
+POST /avatar/fetch  { "url": "http://attacker.com/a.jpg" }   ← 正常用法
+POST /avatar/fetch  { "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/" }
+  → 云服务器元数据接口！返回临时 AK/SK → 控制整个云账号（阿里云/AWS 同套路）
+POST /avatar/fetch  { "url": "http://10.0.0.5:8080/actuator/env" }
+  → 内网 Spring Boot Actuator 泄露全部环境变量（含 DB 密码）
+POST /avatar/fetch  { "url": "gopher://10.0.0.6:6379/_*1%0d%0a$4%0d%0aEVAL..." }
+  → gopher 协议打内网未授权 Redis → 写 SSH 公钥
+\`\`\`
+
+\`\`\`java
+// 防御四层（缺一不可）：
+// 1. 协议白名单：只允许 http/https
+URI uri = new URI(url);
+if (!Set.of("http", "https").contains(uri.getScheme())) return 400;
+
+// 2. 域名/IP 黑白名单 + DNS 解析后校验（防 DNS Rebinding！）
+InetAddress addr = InetAddress.getByName(uri.getHost());
+if (addr.isLoopbackAddress() || addr.isSiteLocalAddress()
+    || addr.isAnyLocalAddress() || isCloudMetadata(addr)) return 400;
+// 关键：用解析后的 IP 发请求，不要让 HttpClient 自己再解析一次（TOCTOU 竞态）
+
+// 3. 禁 302 跳转跟随（跳转到内网地址绕过校验）
+HttpClient client = HttpClient.newBuilder()
+    .followRedirects(HttpClient.Redirect.NEVER).build();
+
+// 4. 出口隔离：抓图服务放独立 VPC，安全组只放行 80/443 出向，
+//    元数据接口走 IMDSv2（必须 PUT 拿 token 才能查）
+\`\`\`
+
+\`\`\`text
+常见绕过手法（审计自查清单）：
+短网址        t.cn/xxx 302 到内网                    → 禁跳转
+进制混淆      http://2130706433/ = 127.0.0.1         → 解析后统一校验
+DNS Rebinding 第一次解析返回公网 IP 过校验，TTL=0
+              第二次解析返回 10.x → 用解析出的 IP 直连
+@ 符号        http://evil.com@127.0.0.1/             → URI.getHost 正确处理
+IPv6          http://[::1]/、http://[::ffff:127.0.0.1]/
+0.0.0.0       Linux 下等于 127.0.0.1
+\`\`\`
+
+案例：Capital One 2019 数据泄露——SSRF 打 AWS 元数据接口拿到 IAM 临时凭证，拖走 S3 里 1 亿条用户信用记录，罚款 8000 万美元；特斯拉 2018 K8s 控制台未授权 + SSRF 被植入挖矿程序。国内：某大厂图片代理服务 SSRF 扫内网，Redis 未授权写 crontab 批量沦陷。
+
+踩坑：只校验字符串包含 "127.0.0.1"（进制/IPv6/@ 全绕过）；校验后 HttpClient 自动跟随 302 跳到内网；DNS 校验和请求发起之间有时间差（TOCTOU），攻击者控制 DNS 服务器返回短 TTL 记录；只防了 http 协议，gopher/file/dict/ftp 没堵（Java 默认不支援 gopher 是万幸，但 PHP curl 全家桶）；微服务内部 feign 调用信任 URL 参数，SSRF 从入口服务穿透到内部服务。`,
+    keyPoints: ["服务端代发请求=内网权限升级", "云元数据 169.254.169.254 是重灾区", "DNS 解析后校验+禁 302+协议白名单"],
+    followUps: ["IMDSv2 相比 v1 怎么缓解 SSRF？", "gopher 协议打 Redis 的完整利用链？"],
+    favorited: false,
+  },
+  {
+    id: "be-261",
+    nodeId: "be-security",
+    question: "对称加密、非对称加密、哈希、HMAC、国密分别解决什么问题？密码该用什么存？",
+    bigTech: true,
+    answer: `结论：四类原语解决四类问题——对称加密（AES/SM4）解决「大量数据的保密传输/存储」，快但有密钥分发问题；非对称（RSA/ECC/SM2）解决「密钥交换+身份认证（签名）」，慢只适合小数据；哈希（SHA-256/SM3）解决「完整性校验」，不可逆；HMAC = 哈希+密钥解决「消息认证」（防篡改+防伪造）。密码存储必须用「带盐的慢哈希」：BCrypt/Argon2，禁用 MD5/SHA-1/裸 SHA-256。
+
+\`\`\`text
+选型决策树：
+要保密+量大        → AES-GCM（自带完整性，淘汰 CBC）      例：DB 敏感列加密
+要保密+双方无信道   → 混合加密：RSA 加密 AES 密钥+AES 加密数据  例：HTTPS/TLS
+要证明「是我发的」  → 私钥签名 RSA/ECDSA/SM2               例：JWT RS256、代码签名
+要证明「没改过」    → HMAC-SHA256（双方有共享密钥时）       例：API 签名、Webhook 验签
+要存密码           → BCrypt(≥10)/Argon2id（盐+慢+内存硬）   例：用户表 password 列
+要指纹/去重        → SHA-256                               例：文件秒传、ETag
+国密合规           → SM2(非对称)+SM3(哈希)+SM4(对称)        例：政务/金融等保
+\`\`\`
+
+\`\`\`java
+// 密码存储正确姿势（Spring Security）
+PasswordEncoder encoder = new BCryptPasswordEncoder(12);  // cost=12，约 250ms/次
+String stored = encoder.encode(rawPassword);  // $2a$12$盐22字符+哈希31字符，盐自动生成
+boolean ok = encoder.matches(rawPassword, stored);
+// 为什么慢哈希：GPU 撞 MD5 每秒千亿次，撞 BCrypt(12) 每秒几百次——
+// 拖库后暴力破解从「分钟级」变「世纪级」
+
+// 敏感数据列加密（手机号/身份证）：AES-GCM
+Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+// GCM 自带认证标签，密文被篡改解密直接抛异常（CBC 会解出乱码不报错）
+
+// API 签名（Webhook 验签）：HMAC-SHA256
+Mac mac = Mac.getInstance("HmacSHA256");
+mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+String sig = Hex.encodeHexString(mac.doFinal((timestamp + "." + body).getBytes()));
+// 时间戳防重放（服务端校验 ±5min），body 进签名防篡改
+\`\`\`
+
+案例：CSDN 2011 拖库 600 万明文密码泄露——直接推动了全行业密码哈希化；LinkedIn 2012 用无盐 SHA-1 存密码，1.17 亿账号被撞库，2016 年暗网二次售卖。正面案例：微信支付回调用 HMAC-SHA256 验签 + 商户私钥签请求，双向认证；iCloud 端到端加密用 ECC 密钥包裹 AES 数据密钥。
+
+踩坑：MD5(password) 等于明文（彩虹表秒查）；SHA-256(password) 也等于明文（GPU 暴力破解太快）——「哈希」不等于「密码哈希」；盐全局固定一份（拖库后盐失去意义，必须每密码独立盐）；自己发明加密算法（密码学第一诫：Don't roll your own crypto）；AES 用 ECB 模式（相同明文块密文相同，企鹅图梗）；RSA 直接加密大文件（性能爆炸且 PKCS#1 v1.5 有 Bleichenbacher 攻击，混合加密才是正道）；密钥硬编码在代码里进 git（要用 KMS/Vault/环境变量+加密 session）。`,
+    keyPoints: ["AES 保密/RSA 交换密钥/签名认证/HMAC 消息认证", "密码=BCrypt/Argon2 慢哈希+独立盐", "AES-GCM 淘汰 CBC，禁 ECB"],
+    followUps: ["JWT 的 HS256 和 RS256 选型与安全差异？", "前向保密（PFS）是什么，TLS 1.3 怎么实现？"],
+    favorited: false,
+  },
+  {
+    id: "be-262",
+    nodeId: "be-security",
+    question: "开放 API 怎么设计防重放和防篡改？（签名机制完整设计）",
+    bigTech: false,
+    answer: `结论：开放 API 的安全基线 = HTTPS（传输层）+ 请求签名（防篡改）+ 时间戳+nonce（防重放）+ AppKey/AppSecret 密钥体系（身份）。核心思想：把「请求的全部关键要素」用共享密钥算出签名，服务端重算比对——任何一字节被改签名即失效。
+
+\`\`\`text
+完整签名流程（以微信支付 V3/阿里云 API 为蓝本）：
+
+1. 客户端构造待签名串（ Canonical Request ）：
+   HTTP方法 + "\\n" + URL路径 + "\\n" + 查询参数(排序后) + "\\n" +
+   请求体SHA256 + "\\n" + 时间戳 + "\\n" + nonce
+
+2. 计算签名：
+   signature = HMAC-SHA256(AppSecret, canonicalString)
+   （更高级：RSA 私钥签名，服务端公钥验——平台方不存商户私钥）
+
+3. 请求头携带：
+   Authorization: appid=xxx, timestamp=1700000000, nonce=a1b2c3, signature=xxx
+
+4. 服务端校验五道关卡：
+   ① AppKey 存在且未禁用
+   ② timestamp 与服务器时间差 < 300s（防重放窗口）
+   ③ nonce 在 Redis 中不存在 → SETEX nonce 300 1（窗口期内一次性）
+   ④ 按相同规则重算签名比对（常量时间比较防时序攻击）
+   ⑤ 权限范围校验（该 AppKey 是否允许调此接口）
+\`\`\`
+
+\`\`\`java
+// 服务端验签骨架（Spring 拦截器）
+public boolean preHandle(HttpServletRequest req, ...) {
+    String ts = req.getHeader("X-Timestamp");
+    if (Math.abs(System.currentTimeMillis()/1000 - Long.parseLong(ts)) > 300)
+        throw new SecurityException("timestamp expired");
+
+    String nonce = req.getHeader("X-Nonce");
+    if (!redis.setIfAbsent("nonce:" + appKey + ":" + nonce, "1", 300, SECONDS))
+        throw new SecurityException("replay detected");
+
+    String body = getCachedBody(req);  // 注意 body 流只能读一次，要缓存
+    String canonical = buildCanonical(req, body);  // 参数 TreeMap 排序拼接
+    String expect = hmacSha256(secretService.get(appKey), canonical);
+    if (!MessageDigest.isEqual(expect.getBytes(), got.getBytes()))
+        throw new SecurityException("bad signature");  // isEqual 防时序侧信道
+    return true;
+}
+\`\`\`
+
+案例：微信支付 V2 → V3 的演进——V2 用 MD5 签名（已破），V3 全面切 SHA256-RSA + 平台证书 + 回调也要验签；AWS Signature V4 把签名粒度做到「区域+服务+日期」派生密钥，主 Secret 从不上网线。反面案例：某开放平台早期只签名 body 不签名查询参数，攻击者改 ?amount= 参数金额被放大 100 倍。
+
+踩坑：签名串没包含查询参数/body（只签时间戳=没签）；参数排序规则双方不一致（URL 编码先后、大小写、数组表示法——要有明确的 canonical 规范文档）；时间戳窗口开太大（>10min 重放风险）或太小（时钟漂移误杀，客户端 NTP 校准+返回服务端时间纠正）；nonce 存储单机内存（分布式下重放打其他节点）必须 Redis 集中存储；GET 请求不验签（GET 也能改数据就完蛋）；日志打印 AppSecret/签名原文（脱敏！）；验签失败返回「签名错误，应为 xxx」把正确签名泄露给攻击者。`,
+    keyPoints: ["签名覆盖方法+路径+参数+body+时间戳+nonce", "timestamp 窗口+nonce 一次性防重放", "常量时间比较防时序攻击"],
+    followUps: ["mTLS 双向证书认证 vs 签名机制选型？", "AWS SigV4 的派生密钥设计好在哪？"],
+    favorited: false,
+  },
+  {
+    id: "be-263",
+    nodeId: "be-security",
+    question: "越权漏洞（IDOR）是什么？水平越权和垂直越权怎么防？",
+    bigTech: true,
+    answer: `结论：越权 = 「认证了但没授权」——你知道我是谁，但你没检查我能不能干这件事。水平越权：同角色用户 A 操作了用户 B 的数据（改订单 ID 看别人订单）；垂直越权：普通用户调了管理员接口（改 URL 进 /admin 删用户）。OWASP API Top 1，因为自动化扫描难发现，纯靠人工编码纪律。
+
+\`\`\`text
+攻击示例（都是真实高频事故）：
+GET /api/orders/10086        → 改成 /api/orders/10087 看到别人订单（水平）
+POST /api/user/profile       body {"userId": 9527, "phone": "138..."} 改别人手机（水平）
+GET /api/admin/users         普通用户直接调（垂直，接口只在前端隐藏了按钮）
+PUT /api/orders/123/cancel   取消别人订单（水平）
+\`\`\`
+
+\`\`\`java
+// ❌ 错误：信任客户端传的 ID
+@GetMapping("/orders/{id}")
+public Order getOrder(@PathVariable Long id) {
+    return orderService.findById(id);  // 谁的订单都返回！
+}
+
+// ✅ 正确：数据归属校验——查询条件强制带 owner
+@GetMapping("/orders/{id}")
+public Order getOrder(@PathVariable Long id, @AuthenticationPrincipal User me) {
+    Order o = orderService.findById(id);
+    if (o == null || !o.getUserId().equals(me.getId()))
+        throw new NotFoundException();  // 返回 404 而非 403，不暴露订单存在性
+    return o;
+}
+
+// ✅ 更好：SQL 层就把 owner 条件焊死（防漏写校验）
+@Select("SELECT * FROM orders WHERE id = #{id} AND user_id = #{meId}")
+Order findByIdAndOwner(@Param("id") Long id, @Param("meId") Long meId);
+
+// ✅ 垂直越权：方法级权限注解（Spring Security）
+@PreAuthorize("hasRole('ADMIN')")
+@DeleteMapping("/admin/users/{id}")
+public void deleteUser(...) { }
+\`\`\`
+
+\`\`\`text
+防御体系（纵深）：
+1. 不可猜测 ID：订单号用雪花 ID/UUID 而非自增（防遍历，但不能替代校验！）
+2. 统一鉴权切面：Controller 禁止裸查，数据访问层强制 owner 条件
+3. 方法级权限：@PreAuthorize 垂直越权防线
+4. 间接引用映射：/api/orders/me/3 → 服务端映射成真实 ID（第三方系统常用）
+5. 测试：每个接口写「用 B 的 token 访问 A 的资源必须 404/403」的用例
+\`\`\`
+
+案例：Facebook 2019 著名 IDOR——改通讯录 ID 可查看任意用户私密照片，影响 680 万用户；某票务平台改订单 ID 看别人身份证号和行程，被白帽子提交后上热搜；Parler 2021 自增 ID + 无鉴权，被脚本按序爬走全站 70TB 视频（包括删除标记的）。
+
+踩坑：只在 Controller 校验、Service 被内部调用时绕过（校验要下沉到数据访问层）；前端隐藏按钮当权限控制（垂直越权经典错误）；「管理员也走这套校验」时留了 if (isAdmin) skip 后门；列表接口校验了但详情/导出/打印接口漏了（同一资源的所有入口都要查）；微服务间内网调用信任 userId 头，网关被绕过后全穿（内网也要验签+归属校验下沉）；用 UUID 就觉得安全——UUID 防遍历不防「合法用户拿到别人 UUID 后访问」（比如分享链接泄露）。`,
+    keyPoints: ["查询条件强制带 owner，404 不暴露存在性", "校验下沉数据访问层", "UUID 防遍历不防越权"],
+    followUps: ["ABAC（属性级权限）怎么表达「只能看自己部门的数据」？", "分享链接的权限时效怎么设计？"],
+    favorited: false,
+  },
+  // ===== 安全与认证：认证授权（be-264 ~ be-270）=====
+  {
+    id: "be-264",
+    nodeId: "be-auth",
+    question: "Session-Cookie 和 JWT 的本质区别？分布式场景怎么选？",
+    bigTech: true,
+    answer: `结论：Session-Cookie 是「有状态凭证」——服务端存一份会话数据（Redis/内存），Cookie 里只放一把钥匙（sessionId）；JWT 是「无状态凭证」——用户信息自包含在 Token 里，服务端不存任何东西，靠签名防伪。本质差异：状态存哪。
+
+\`\`\`text
+对比表：
+维度          Session-Cookie              JWT
+状态          服务端存（Redis）           无状态，自包含
+吊销          删 Redis 立即生效           天然不可吊销（要等过期）
+体积          Cookie 几十字节            几百字节~几 KB（每次请求都带）
+跨域          Cookie 跨域受限             Header 携带天然跨域
+续期          滑动过期自动续              要么重签要么 Refresh Token
+多设备踢人    容易（删其他 session）      难（要额外维护黑名单）
+泄露面        XSS 偷不到(HttpOnly)        放 localStorage 可被 JS 读走
+\`\`\`
+
+\`\`\`text
+JWT 结构三段式（xxxxx.yyyyy.zzzzz）：
+Header   {"alg":"RS256","typ":"JWT"}                    Base64Url
+Payload  {"sub":"9527","role":"admin","exp":1700003600} Base64Url（不加密！）
+Signature 私钥签名(Header.Payload)                       防篡改
+关键认知：JWT 是签名不是加密，Payload 谁都能解码——别放密码/身份证！
+\`\`\`
+
+\`\`\`java
+// JWT 生成与校验（jjwt 示例）
+String jwt = Jwts.builder()
+    .subject(userId)
+    .claim("role", role)
+    .issuedAt(new Date())
+    .expiration(new Date(System.currentTimeMillis() + 30 * 60_000)) // 短！
+    .signWith(rsaPrivateKey, Jwts.SIG.RS256)   // 非对称：签发方私钥，校验方公钥
+    .compact();
+
+Jws<Claims> parsed = Jwts.parser()
+    .verifyWith(rsaPublicKey)
+    .build().parseSignedClaims(jwt);
+// 校验项：签名 + exp + iss/aud，缺一不可
+\`\`\`
+
+选型决策：
+- 单体/中小团队/强管控（要随时踢人、设备管理）→ Session+Redis 简单可靠
+- 微服务网关统一鉴权/跨域 SPA+APP 双端/第三方接入 → JWT（网关验签后内网传 userId 头）
+- 大厂主流：网关层 JWT（短 15-30min）+ Refresh Token（长 7-30 天，HttpOnly Cookie，可吊销）双 Token 组合——兼得「无状态验签性能」和「可吊销安全」
+
+案例：微信/支付宝的 access_token 体系本质是服务端可控的 Session（7200s，集中签发集中校验）；AWS/GCP 的 STS 临时凭证是 JWT 思路（自包含+短过期）；Auth0/Firebase Auth 标准双 Token：ID Token(JWT) + Refresh Token。
+
+踩坑：JWT 放敏感信息（Base64 解码即见）；alg=none 漏洞——早期库接受 alg:none 伪造 Token（必须服务端强制指定算法白名单）；HS256 和 RS256 混淆攻击——用公钥当 HMAC 密钥伪造签名（库要锁死算法）；Token 太长撑爆 Cookie（4KB 限制）放不进 Cookie 只好 localStorage；忘记校验 exp/iat；用 JWT 当「永不过期 API Key」发出去收不回；登出后客户端删 Token 但服务端没黑名单，Token 在过期前依然有效（要短过期+Refresh 轮换+关键操作二次验证）。`,
+    keyPoints: ["Session 有状态可吊销/JWT 无状态不可吊销", "JWT 是签名非加密，Payload 公开", "大厂=短 JWT+可吊销 Refresh Token"],
+    followUps: ["JWT 黑名单方案怎么做到高性能（Bloom Filter）？", "Refresh Token 轮换检测到重用怎么办？"],
+    favorited: false,
+  },
+  {
+    id: "be-265",
+    nodeId: "be-auth",
+    question: "为什么需要 Refresh Token？双 Token 机制和轮换检测怎么设计？",
+    bigTech: true,
+    answer: `结论：单 Token 有个死结——过期时间短则用户频繁掉线，长则泄露后攻击窗口大。双 Token 解法：Access Token 短寿命（15-30 分钟）无感使用，Refresh Token 长寿命（7-30 天）只用于换新。攻击者偷到 Access 只能用半小时；偷到 Refresh 但「轮换检测」会在他换新的瞬间暴露并全族吊销。
+
+\`\`\`text
+双 Token 时序：
+登录 → 颁发 AT(30min) + RT(30d，HttpOnly Cookie，仅存 /auth/refresh 路径)
+请求 → Authorization: Bearer AT
+AT 过期 → 前端静默调 /auth/refresh（带 RT Cookie）
+     → 服务端校验 RT（Redis 白名单）→ 颁发新 AT + 新 RT（旧 RT 作废=轮换）
+RT 也过期 → 重新登录
+\`\`\`
+
+\`\`\`text
+Refresh Token 轮换 + 重用检测（RFC 6819 推荐，Auth0/Google 同款）：
+1. 每次刷新：旧 RT 立即标记为「已使用」，颁发新 RT
+2. 若收到「已使用」的 RT → 判定为令牌被盗（重放）
+   → 吊销该用户整族 RT（攻击者和受害者一起下线，受害者重新登录后安全）
+3. Redis 结构：
+   rt:{userId}:{rtId} = { status: valid/used, familyId, exp }
+   family:{familyId} 被标记 compromised 时整族拒绝
+\`\`\`
+
+\`\`\`java
+// 刷新接口核心逻辑（伪代码）
+public TokenPair refresh(String oldRt) {
+    RefreshToken stored = redis.get("rt:" + hash(oldRt));
+    if (stored == null) throw new Unauthorized("unknown rt");
+    if (stored.status == USED) {
+        // 重用检测：RT 被偷了！整族吊销
+        redis.set("family:" + stored.familyId, "compromised", stored.familyTtl);
+        securityAudit.alert("rt-reuse", stored.userId);
+        throw new Unauthorized("rt reused, family revoked");
+    }
+    if (redis.exists("family:" + stored.familyId + "=compromised"))
+        throw new Unauthorized("family compromised");
+
+    stored.status = USED;  // 原子操作：SETNX/Lua 防并发双刷新
+    redis.save(stored);
+    return issuePair(stored.userId, stored.familyId);  // 新 AT + 新 RT
+}
+\`\`\`
+
+工程细节：
+- RT 存 HttpOnly + Secure + SameSite + Path=/auth/refresh 四重限制的 Cookie（XSS 读不到、CSRF 打不到、只有刷新接口收得到）
+- RT 本体只给哈希存 Redis（泄露 DB 也不能用）
+- AT 用 JWT（无状态验签快），RT 用不透明随机串（必须服务端校验，天然可吊销）
+- 多端登录：每端独立 family（设备 A 掉线不影响设备 B）
+
+案例：Google OAuth2——access_token 1h + refresh_token 长期，refresh 时轮换且检测重用；GitHub 2021 起 OAuth Token 全面支持过期+轮换；某电商未做轮换检测，RT 泄露后攻击者持续半年换 AT 盗刷，加检测后第二次重用即触发全族吊销+风控报警。
+
+踩坑：RT 也做成 JWT 且服务端不存（无法吊销=退化成单长 Token）；刷新接口不验 RT 有效性只看签名（泄露的 RT 永久可用）；旧 RT 不作废（新旧并存，泄露面翻倍）；重用检测误杀正常并发（前端两个请求同时 401 同时刷新——要用分布式锁单飞 + 短期缓存新 AT 返回给后到请求）；RT 无限续期等于永不过期（要设 absolute expiry，如 90 天后必须重登）。`,
+    keyPoints: ["短 AT 无感+长 RT 换新，攻击窗口最小化", "轮换+重用检测=RT 泄露即暴露", "RT 存哈希+HttpOnly Cookie+family 隔离"],
+    followUps: ["单点登出（全端下线）在双 Token 下怎么实现？", "OAuth2 的 PKCE 解决什么场景的 RT 泄露？"],
+    favorited: false,
+  },
+  {
+    id: "be-266",
+    nodeId: "be-auth",
+    question: "OAuth2 四种授权模式？授权码模式为什么要 code 换 token 两步走？",
+    bigTech: true,
+    answer: `结论：OAuth2 解决的是「让第三方应用有限访问你的资源，又不把密码给它」。四种模式：授权码（Authorization Code，标准首选）、简化（Implicit，已废弃）、密码（Resource Owner Password，仅限第一方）、客户端凭证（Client Credentials，服务间调用）。授权码模式两步走的精髓：code 走浏览器（可被看到），token 走服务器直连（不可见）——token 永远不经过浏览器历史/日志/Referer。
+
+\`\`\`text
+授权码模式全流程（你用微信登录知乎）：
+1. 知乎跳微信授权页：
+   https://wx.qq.com/oauth?response_type=code&client_id=zhihu&
+   redirect_uri=https://zhihu.com/callback&state=xyz&scope=userinfo
+2. 用户扫码同意 → 微信回调：
+   https://zhihu.com/callback?code=AUTH_CODE&state=xyz
+   （code 暴露在浏览器地址栏/历史记录，所以必须短寿命+一次性）
+3. 知乎后端用 code + client_secret 直连微信换 token：   ← 关键第二步！
+   POST wx.qq.com/token { code, client_id, client_secret }
+   这步是服务器到服务器，不经过浏览器 → token 不泄露
+4. 拿到 access_token → 拉取用户 OpenID/昵称 → 建立自己的会话
+\`\`\`
+
+\`\`\`text
+为什么必须两步（一步直接发 token 会怎样）：
+- Implicit 模式就是这么干的（token 直接放 URL fragment）
+- 问题：token 可能通过 Referer 头泄露给页面里的第三方资源；
+  浏览器历史/代理日志留存 token；无法校验 client 身份（没有 secret 环节）
+- OAuth2.1 已正式删除 Implicit，SPA 用「授权码+PKCE」
+\`\`\`
+
+\`\`\`text
+四种模式速查：
+授权码+PKCE   有后端的 Web / SPA / 移动 App（唯一推荐给第三方）
+密码模式      自家 App（官方客户端），用户信得过你拿密码（京东 App 登录京东）
+客户端凭证    没有「用户」的机器间调用：client_id+secret 换 token（微服务调开放平台）
+设备码        电视/命令行无浏览器设备（RFC 8628，扩展模式）
+\`\`\`
+
+\`\`\`java
+// PKCE（防 code 被截获，移动/SPA 必配）：
+// 1. 客户端生成 verifier（随机串）并算出 challenge
+String verifier = randomUrlSafe(64);
+String challenge = base64url(sha256(verifier));
+// 2. 授权请求带 challenge；回调后换 token 时带 verifier
+// 3. 授权服务器校验 sha256(verifier) == challenge
+// 效果：即使恶意 App 截获了回调 code，没有 verifier 也换不出 token
+\`\`\`
+
+案例：GitHub OAuth App 登录（gitkraken 等工具全走授权码）；微信开放平台/企业微信扫码登录；Google 登录的 gsi 客户端。安全事件：早期多款 App 用 Implicit 且 redirect_uri 校验不严（*.evil-cdn.com 也算匹配主域），token 被钓鱼页收割——redirect_uri 必须精确匹配，不能通配。
+
+踩坑：state 参数不校验 → CSRF 攻击者把自己的 code 塞给受害者浏览器完成「账号绑定劫持」（受害者的知乎被绑到攻击者微信上）；redirect_uri 用前缀/通配匹配被 open redirect 绕过；code 不限制一次性使用（重放换 token）；access_token 放 URL 里传（日志泄露）；把 OAuth2 当认证协议用——OAuth2 是授权协议，「拿到 token」不等于「验证身份」，身份层要用 OIDC（ID Token JWT 带 iss/sub/aud 校验）；aud 不校验 → 给 A 应用签的 token 拿去访问 B 应用（Confused Deputy）。`,
+    keyPoints: ["code 走浏览器 token 走服务器，token 不落地浏览器", "Implicit 已废，SPA 用授权码+PKCE", "state 防 CSRF，redirect_uri 精确匹配"],
+    followUps: ["OIDC 的 ID Token 和 access_token 职责区别？", "OAuth2 的 token 怎么设计撤销（RFC 7009）？"],
+    favorited: false,
+  },
+  {
+    id: "be-267",
+    nodeId: "be-auth",
+    question: "SSO 单点登录怎么实现？CAS 流程和 Cookie 域共享、JWT 方案各有什么坑？",
+    bigTech: true,
+    answer: `结论：SSO 的核心是「认证状态集中管理，业务系统信任认证中心的票据」。三种主流落地：CAS（票据回跳+后端验票，企业级老标准）、Cookie 域共享（*.corp.com 同域系产品最简单）、OIDC/SAML（跨组织标准，现代首选）。选型看一点：业务系统是否在同一个父域下。
+
+\`\`\`text
+CAS 全流程（用户访问 app1.corp.com 未登录）：
+1. app1 发现无会话 → 302 跳 CAS Server：
+   sso.corp.com/cas/login?service=https://app1.corp.com/cas/callback
+2. CAS 无全局会话 → 显示登录页 → 用户输密码
+3. CAS 建立全局会话（TGT Cookie，域=sso.corp.com）
+   → 302 回跳 service 地址 + 一次性票据 ST：
+   app1.corp.com/cas/callback?ticket=ST-1-abc
+4. app1 后端拿 ST 直连 CAS 验票（/p3/serviceValidate）   ← 类 code 换 token
+   → 返回 XML：用户名+属性 → app1 建立自己的局部会话
+5. 用户再访问 app2.corp.com → 跳 CAS → TGT Cookie 还在
+   → 直接发新 ST 回跳 → app2 验票建会话（全程无感）
+\`\`\`
+
+\`\`\`text
+三方案对比：
+方案            适用                    坑
+CAS             跨域企业集团应用         ST 一次性+短 TTL；验票走后端；
+                                       单点登出要 CAS 广播通知各 app 清会话
+Cookie 域共享   同父域 *.corp.com        跨不了域（taobao/tmall 就不行）；
+                sessionId Cookie        CSRF 面变大；Cookie 体积膨胀
+                Domain=.corp.com
+OIDC(JWT)      跨组织/SaaS/移动         公钥轮换（jwks 端点）；时钟偏移；
+               ID Token + 标准 claims   token 体积大；登出要 RP-Initiated Logout
+\`\`\`
+
+\`\`\`java
+// 单点登出（SLO）是 SSO 最难的部分：
+// 用户在 app1 点退出 → 清 app1 会话 → 跳 CAS /logout 清 TGT
+// → CAS 给所有登过的 app 发 back-channel 注销通知
+// → 各 app 收到通知清掉对应局部会话
+// 现实妥协：很多系统只清本地+清 TGT，其他 app 的局部会话等自然过期
+// （局部会话设短一点，如 30min，降低窗口）
+\`\`\`
+
+案例：Google 全家桶（accounts.google.com 是 CAS 角色，Gmail/YouTube/Drive 各有局部会话）；阿里统一登录（login.taobao.com，淘宝天猫飞猪互通，跨域用 token 传递+域名列表信任）；企业微信/钉钉应用市场的 OAuth2 授权即 SSO；大学统一身份认证 90% 跑 Apereo CAS。
+
+踩坑：CAS 的 service 参数不校验白名单 → 票据发给任意域名（钓鱼站拿 ST 换身份）；验票用前端 JS 直连（暴露 serviceValidate 响应篡改面，必须后端验）；局部会话和全局会话生命周期不分（CAS 登出了 app 还能用——登出通知必须实现或局部会话要短）；Cookie 域共享方案把 sessionId 放 .corp.com 父域，任一子域 XSS 全集团沦陷（收窄 path/域 + 子域安全基线）；跨域场景用 iframe 嵌登录页（第三方 Cookie 被浏览器拦截后失效）；SAML 断言不验证签名/Recipient/InResponseTo → 重放和伪造（XML 签名验证是著名雷区，XXE+签名包裹攻击）。`,
+    keyPoints: ["CAS=TGT 全局会话+ST 一次性票据+后端验票", "同域用 Cookie 共享，跨组织用 OIDC/SAML", "单点登出要广播通知，局部会话宜短"],
+    followUps: ["OIDC 的 RP-Initiated Logout 流程？", "SAML 签名包裹攻击（XSW）怎么防？"],
+    favorited: false,
+  },
+  {
+    id: "be-268",
+    nodeId: "be-auth",
+    question: "RBAC 权限模型怎么设计？RBAC vs ABAC？数据级权限怎么做？",
+    bigTech: true,
+    answer: `结论：RBAC = 「用户→角色→权限」三层解耦——权限不直接绑人，绑到角色上，人通过担任角色获得权限。这是后台系统的事实标准（95% 场景够用）。当权限判断需要「看上下文」（自己的数据/本部门/工作时间），就要升级 ABAC（属性基访问控制）或在 RBAC 上外挂数据权限规则。
+
+\`\`\`text
+RBAC 经典五表（SQL 建模）：
+user(id, name, dept_id)
+role(id, code, name)              -- admin / ops / finance
+permission(id, code, resource, action)  -- order:read / order:refund
+user_role(user_id, role_id)       -- 多对多
+role_permission(role_id, permission_id) -- 多对多
+
+演进方向：
+- 角色继承（role.parent_id）：高级客服 ⊇ 客服，减少权限重复配置
+- 用户组（group）：部门整体授角色，新人入职自动继承
+- 权限码规范：resource:action[:scope]，如 order:refund:own
+\`\`\`
+
+\`\`\`java
+// 接口级鉴权（垂直）：注解 + AOP
+@PreAuthorize("hasAuthority('order:refund')")
+@PostMapping("/orders/{id}/refund")
+public void refund(@PathVariable Long id) { }
+
+// 数据级权限（水平）——三种实现：
+// 1. SQL 改写拦截器（MyBatis 插件）：按用户数据范围注入 WHERE
+//    数据范围枚举：ALL / DEPT / DEPT_AND_SUB / SELF / CUSTOM
+String inject = switch (scope) {
+    case "SELF" -> " AND creator_id = " + me.getId();
+    case "DEPT_AND_SUB" -> " AND dept_id IN (" + subDeptIds(me) + ")";
+    default -> "";
+};
+// 2. 查询对象层：Repository 方法强制带 owner/dept 参数（编译期防漏）
+// 3. 行级安全（数据库原生）：PostgreSQL RLS、MySQL 8 无（要靠视图/中间件）
+\`\`\`
+
+\`\`\`text
+RBAC vs ABAC：
+维度      RBAC                        ABAC
+判断依据  你是谁（角色）               你是谁+资源属性+环境条件
+表达力    静态授权                     「本部门+金额<5万+工作时间」动态规则
+复杂度    低（配置即可）               高（规则引擎 XACML/OPA Rego）
+性能      角色权限可缓存               每次求值，需策略缓存
+适用      后台管理/ERP/CRM            云 IAM/零信任/金融风控
+现实方案  RBAC 为主体+数据范围外挂     AWS IAM（RBAC+Condition 混合=ABAC 化）
+\`\`\`
+
+案例：AWS IAM 是 ABAC 巅峰——policy 里 Condition 可写 \`"StringEquals": {"aws:PrincipalTag/team": "\${aws:ResourceTag/team}"}\` 实现「同 team 才能操作」；金蝶/用友 ERP 的 RBAC + 数据权限（按组织/仓库/客户维度过滤）；蚂蚁金服的 SOFA 权限体系把「功能权限+数据权限+字段权限」三层分离（敏感字段单独授权）。
+
+踩坑：权限只校验菜单可见性（前端隐藏按钮≠安全，接口必须独立鉴权）；超管权限硬编码 if (userId == 1)；角色爆炸——给每个人单独建角色（退化成 ACL，角色数>50 就该引入用户组/继承）；权限码用中文或模糊语义（「查看订单」和「订单查询」混用，必须 resource:action 规范）；数据权限在 Controller 层手写（漏一个接口就越权，必须用 MyBatis 拦截器统一注入）；权限变更不生效（缓存了用户权限集，改角色后没失效——版本号或短 TTL）；删除权限时没检查「正在被哪些角色引用」。`,
+    keyPoints: ["用户-角色-权限三层解耦+五表建模", "数据权限用 SQL 拦截器统一注入 WHERE", "复杂条件上 ABAC，AWS IAM 是范本"],
+    followUps: ["OPA（Open Policy Agent）在微服务里怎么做统一鉴权？", "字段级权限（手机号脱敏分级）怎么落地？"],
+    favorited: false,
+  },
+  {
+    id: "be-269",
+    nodeId: "be-auth",
+    question: "扫码登录的完整流程和状态机？二维码会不会被截胡？",
+    bigTech: false,
+    answer: `结论：扫码登录 = 「已认证设备（手机）替未认证设备（PC）做身份背书」。核心是一张临时二维码作为「会话凭证」在三个端（PC 浏览器、手机 App、服务端）间流转状态机：待扫码→已扫码→已确认→已失效。安全性靠：二维码短寿命 + 一次性 + 确认动作在手机端完成。
+
+\`\`\`text
+完整时序（以微信网页版为蓝本）：
+1. PC 请求生成二维码 → 服务端生成 qrId（UUID，120s 过期）+ 状态 PENDING
+   → Redis: qr:{qrId} = { status: PENDING } EX 120
+2. PC 展示二维码（内容= qrId 或带 qrId 的 URL）
+   PC 开始轮询（或长轮询/WebSocket）：GET /qr/status?qrId=xxx
+3. 手机 App 扫码 → 已登录的 App 带着自己的 token 调：
+   POST /qr/scan { qrId } → 状态变 SCANNED（PC 页面显示「已扫描，请在手机确认」）
+   → 此时还没登录！手机上弹出「确认登录网页版？」
+4. 手机点确认 → POST /qr/confirm { qrId }（带 App token）
+   → 服务端校验：qrId 状态=SCANNED + 扫描人与确认人一致
+   → 状态变 CONFIRMED，绑定 userId，生成 PC 会话凭证 ticket
+5. PC 轮询到 CONFIRMED → 用 qrId+ticket 换正式 Session/JWT → 登录成功
+6. 二维码 120s 无操作 → EXPIRED；确认过一次 → 立即作废（一次性）
+\`\`\`
+
+\`\`\`text
+状态机（防止非法跃迁是安全关键）：
+PENDING --scan--> SCANNED --confirm--> CONFIRMED --exchange--> CONSUMED
+   |                 |
+   +--120s--> EXPIRED +--cancel--> CANCELLED（手机点取消）
+\`\`\`
+
+\`\`\`text
+截胡攻击与防御：
+攻击1  钓鱼二维码：攻击者拿到自己的 qrId 做成「登录领红包」海报
+        受害者扫码确认 → 攻击者的 PC 登录了受害者账号！
+防御    手机确认页大字展示「登录地点/设备/IP」让用户判断；
+        扫码后显示的是「确认登录」而非静默登录（确认动作即授权）
+攻击2  二维码被旁人扫：地铁里别人扫了你的屏幕
+防御    qrId 一次性+短寿命；确认在手机端（攻击者扫了不确认=无效）
+攻击3  中间人改轮询响应
+防御    全链路 HTTPS；ticket 与 qrId 绑定且一次性
+\`\`\`
+
+案例：微信网页版/桌面客户端登录（行业标杆，确认页显示地点+设备型号）；钉钉/飞书扫码登录管理后台；任天堂 Switch 扫码绑定账号。真实攻击：2019 年黑产在网吧张贴「扫码领网费」二维码，实为攻击者 PC 的登录二维码，扫码者确认后 Steam/微信被盗——确认页信息展示和用户教育是最后防线。
+
+踩坑：qrId 用自增/可猜测 ID（攻击者批量轮询别人的二维码状态）；PC 轮询拿到 CONFIRMED 后直接信任 qrId 当凭证（必须换一次性 ticket 再换正式凭证，且 qrId 换完即焚）；没有 SCANNED 中间态（扫了=登录，钓鱼更容易）；二维码长期有效（打印张贴后被无限利用）；确认接口不校验扫描人和确认人是同一登录态（App 换账号确认漏洞）；轮询无频率限制被刷（用长轮询 30s+限流）；手机端确认页不显示登录位置信息（用户无法识别异地登录）。`,
+    keyPoints: ["已认证设备替未认证设备背书", "四态状态机+一次性+短寿命", "手机确认页展示设备/IP 防钓鱼"],
+    followUps: ["WebSocket 替代轮询时连接怎么鉴权？", "FIDO2/Passkey 会取代扫码登录吗？"],
+    favorited: false,
+  },
+  {
+    id: "be-270",
+    nodeId: "be-auth",
+    question: "「记住我」和「踢人下线」「全平台登出」分别怎么实现？（会话管理实战）",
+    bigTech: false,
+    answer: `结论：三个需求本质都是「会话生命周期的精细化管理」。记住我 = 双 Cookie 长效令牌（持久化+可轮换）；踢人下线 = 服务端会话索引（userId→sessionIds 反查删除）；全平台登出 = 吊销该用户全部会话+令牌版本号失效 JWT。
+
+\`\`\`java
+// 1. 记住我（Spring Security Remember-Me 持久化方案）
+// 登录时：生成 series + token 二元组存 DB，Cookie 存 "series:token" 14 天
+// 回来时：按 series 查库 → token 比对（哈希存储）
+//        → 通过则发新 token（轮换，旧 token 作废）+ 建立会话
+// 重用检测：series 对但 token 不对 → 被盗！删除该用户全部 remember-me 令牌
+// 敏感操作（改密/支付）：remember-me 登录的用户强制重新输密码
+//   Spring Security: isRememberMe() 时要求 fullyAuthenticated()
+\`\`\`
+
+\`\`\`text
+2. 踢人下线（单设备登录/强制下线）
+数据结构：
+  session:{sid}        = { userId, device, createdAt }   会话本体
+  user_sessions:{uid}  = Set<sid>                         反查索引
+单设备登录：登录时删除 user_sessions 里所有旧 sid（旧端下次请求 401）
+管理端踢人：按 uid 查索引 → 批量 DEL → 实时生效
+JWT 场景：维护 user 级 token_version，踢人时 version+1，
+         验签时比对 payload.tv != 当前 version → 拒绝
+         （JWT 黑名单太重的折中：全踢用版本号，单踢用短黑名单）
+\`\`\`
+
+\`\`\`text
+3. 全平台登出（改密码后/发现被盗）
+- Session 体系：删 user_sessions:{uid} 全量 sid（O(n) 但有索引所以快）
+- JWT 双 Token：吊销全部 Refresh Token family + token_version+1
+  → AT 在剩余寿命（<30min）内仍可用——要立刻生效就得网关查 version 缓存
+- Remember-Me：删该用户全部 series
+- OAuth：撤销第三方授权 token（RFC 7009）
+配套：给用户「登录设备列表」页（展示 device/IP/最后活跃，可逐台踢）
+\`\`\`
+
+案例：微信「登录设备管理」可删除历史设备（删后该设备需重新验证）；Google 账号安全页的「您的设备」支持远程退出任意设备；GitHub 改密码后自动吊销全部会话和所有 OAuth token（除了显式保留的 SSH key）；Netflix 2017 上线「Sign out of all devices」应对账号共享黑产，背后是全局会话索引+令牌吊销。
+
+踩坑：踢人只删 session 不删 remember-me 令牌（被踢端靠记住我自动登录回来）；Session 存内存（重启全掉线+多实例不一致，必须 Redis 集中存储）；JWT 踢人靠等过期（事故响应要求分钟级，version 机制是底线）；改密码后旧 Refresh Token 没吊销（被盗的手机还能换新 AT）；设备列表只存 UA 字符串（相同型号手机分不清，要存 device fingerprint + 登录时标记）；并发登录竞态——两端同时登录互相把对方挤掉形成「踢人乒乓」（登录加用户级分布式锁）；登出接口 CSRF 可打（强制 POST+Token，不然攻击者让受害者被动下线配合钓鱼）。`,
+    keyPoints: ["记住我=series+token 轮换+重用检测", "踢人=userId 会话索引反查删除", "JWT 全踢用 token_version，秒级生效"],
+    followUps: ["改密码后如何让进行中的 WebSocket 连接也断开？", "设备指纹的常用因子和隐私合规边界？"],
+    favorited: false,
+  },
+  // ===== Java 框架：Netty 网络编程（be-271 ~ be-277）=====
+  {
+    id: "be-271",
+    nodeId: "be-netty",
+    question: "Netty 的线程模型（主从 Reactor）是什么？EventLoop 和 EventLoopGroup 怎么分工？",
+    bigTech: true,
+    answer: `结论：Netty = 主从 Reactor 多线程模型。BossGroup（1 个线程就够）只处理 OP_ACCEPT 接收连接，把 SocketChannel 注册给 WorkerGroup 的某个 EventLoop；WorkerGroup 的每个 EventLoop 是一个「单线程执行器」，绑死一个 Selector，负责其上所有 Channel 的 IO 读写+任务执行。一个 Channel 一生只绑定一个 EventLoop → 同一连接的 IO 事件天然串行，无锁。
+
+\`\`\`text
+主从 Reactor 结构：
+              ┌── BossGroup (NioEventLoopGroup, 1 线程)
+客户端连接 ──→ │   Selector 只监听 OP_ACCEPT
+              └── 接受后把 SocketChannel 按策略(round-robin)注册到 ↓
+              ┌── WorkerGroup (默认 CPU核数×2 线程)
+              │   EventLoop-1: Selector + taskQueue + Channel[1,4,7...]
+              │   EventLoop-2: Selector + taskQueue + Channel[2,5,8...]
+              └── 每个 EventLoop 单线程跑死循环：select → processSelectedKeys
+                  → runAllTasks(定时任务+用户提交的任务)
+\`\`\`
+
+\`\`\`java
+// 标准服务端骨架
+EventLoopGroup boss = new NioEventLoopGroup(1);        // 只接连接
+EventLoopGroup worker = new NioEventLoopGroup();       // 默认 核数*2
+new ServerBootstrap()
+    .group(boss, worker)
+    .channel(NioServerSocketChannel.class)
+    .childHandler(new ChannelInitializer<SocketChannel>() {
+        protected void initChannel(SocketChannel ch) {
+            ch.pipeline()
+              .addLast(new LengthFieldBasedFrameDecoder(65536, 0, 4))
+              .addLast(new BusinessHandler());   // 业务 Handler
+        }
+    })
+    .bind(8080).sync();
+
+// 关键认知：BusinessHandler 的 channelRead 跑在 EventLoop 线程上
+// 同一 Channel 的事件串行 → Handler 里操作连接级状态不用加锁
+// 但！不同 Channel 可能共享单例 Handler → 成员变量仍是共享的
+// （@ChannelHandler.Sharable 的 Handler 必须无状态）
+\`\`\`
+
+为什么 EventLoop 里不能阻塞：一个 EventLoop 管几千个 Channel，你在 channelRead 里 sleep 100ms 或同步查 DB，这几千个连接的 IO 事件全部延迟——整个 EventLoop 瘫痪。正确姿势：耗时业务（DB/RPC/文件）丢给独立的业务线程池（DefaultEventExecutorGroup 或自家池），IO 线程只编解码+分发。
+
+\`\`\`java
+// 耗时业务卸载到业务池（两种姿势）
+// 姿势1：addLast 时指定 executor，该 Handler 整体在业务池执行
+pipeline.addLast(bizGroup, new BlockingDbHandler());
+// 姿势2：Handler 内手动提交（更细粒度）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    bizPool.execute(() -> {
+        Result r = heavyQuery(msg);
+        ctx.writeAndFlush(r);  // writeAndFlush 线程安全，会被塞回 EventLoop 执行
+    });
+}
+\`\`\`
+
+案例：Dubbo 的 NettyServer 默认 1 boss + 默认 worker，业务派发到 AllChannelHandler 线程池；RocketMQ Broker 用 Netty 处理上万并发的消息收发，发送/拉取/心跳各用独立 EventExecutorGroup 隔离；gRPC-Java 服务端基于 Netty，HTTP/2 多路复用单连接。
+
+踩坑：channelRead 里直接调阻塞 JDBC → 全 EventLoop 卡顿，线上表现为「部分连接全部超时、其他连接正常」；Sharable Handler 里用 SimpleDateFormat 成员变量（线程不安全经典事故）；EventLoop 提交任务时忘了优雅停机导致任务丢失（shutdownGracefully 有 quietPeriod）；ChannelHandlerContext 引用被业务线程池长期持有导致内存泄漏（要 retain/release ByteBuf）；把 boss 线程数开很大（纯属浪费，accept 无竞争）。`,
+    keyPoints: ["Boss 接连接 Worker 跑 IO，Channel 一生绑定一个 EventLoop", "EventLoop 禁阻塞，耗时业务卸载业务池", "Sharable Handler 必须无状态"],
+    followUps: ["Netty 的 FastThreadLocal 相比 ThreadLocal 快在哪？", "EpollEventLoop 相比 NioEventLoop 多了什么（边缘触发）？"],
+    favorited: false,
+  },
+  {
+    id: "be-272",
+    nodeId: "be-netty",
+    question: "TCP 粘包拆包是什么？Netty 的四种拆包器怎么选？",
+    bigTech: true,
+    answer: `结论：TCP 是字节流协议，没有消息边界——你发 3 个包，对端可能 1 次收完（粘包）也可能 5 次收完（拆包），原因是 Nagle 算法合并小包、MSS 切分大包、接收缓冲区大小不确定。应用层必须自己定义「帧格式」并拆包。Netty 提供四个现成解码器覆盖所有场景。
+
+\`\`\`text
+粘包成因三连：
+1. Nagle：应用连续写 3 个小包 → 内核合并成一个 TCP 段发出（省包头开销）
+2. MSS 切分：一个 8KB 应用包 → 被切成 6 个 1460B 的段
+3. 接收缓冲：对端 recv 缓冲区只有 2KB 剩余 → 一次 read 只拿半包
+TCP 只保证「字节按序不丢不重」，不保证「一次 read = 一次 write」
+\`\`\`
+
+\`\`\`text
+四种拆包器选型：
+解码器                          帧格式                  适用
+FixedLengthFrameDecoder        定长 N 字节              雷达/工控定长协议
+DelimiterBasedFrameDecoder     分隔符结尾($_/\\r\\n)      文本协议/Redis RESP
+LineBasedFrameDecoder          换行符结尾               日志采集/telnet
+LengthFieldBasedFrameDecoder   长度字段+消息体(私有协议)  Dubbo/gRPC/IM 全部用它
+\`\`\`
+
+\`\`\`java
+// 私有协议标配：LengthFieldBasedFrameDecoder 五参数（面试要能默写）
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    10 * 1024 * 1024,  // maxFrameLength：帧最大长度，防爆内存（安全阀！）
+    0,                 // lengthFieldOffset：长度字段偏移
+    4,                 // lengthFieldLength：长度字段本身占 4 字节
+    0,                 // lengthAdjustment：长度字段到消息体之间的额外字节
+    4                  // initialBytesToStrip：解码后跳过的字节数（剥掉长度头）
+));
+// 帧结构：| 4B length | N B body |
+// 带魔数防串线：| 2B magic | 4B length | N B body |
+//   → offset=2, length=4, adjustment=0, strip=6
+
+// 长度字段不包含自身是铁律；包含时用 lengthAdjustment 修正
+// 例如 | 4B len(含自身) | body | → adjustment = -4
+\`\`\`
+
+半包处理是拆包器内部完成的：缓冲区不够一帧就等下一批字节（cumulation 累积），绝不把半包丢给业务 Handler——业务永远拿到完整帧。
+
+案例：Dubbo 协议 = 16B 定长头（魔数 0xdabb + 状态 + 请求 ID + 数据长度）+ body，用 LengthFieldBasedFrameDecoder（offset=12, length=4）；RocketMQ 私有协议 = 4B 总长度 + 4B 头长度 + 头 JSON + body；Redis RESP 协议用分隔符 \\r\\n；HTTP/1.1 本质也是「请求头 \\r\\n\\r\\n 分隔 + Content-Length 定体」的混合拆包。
+
+踩坑：不设 maxFrameLength → 攻击者伪造 length=Integer.MAX_VALUE 的头，Netty 按长度预分配/累积内存，OOM（这是真实的 DDoS 手法）；粘包问题在本地测试不复现（localhost 不经过 Nagle/MSS，小包必达），一上生产跨机房就随机截断——压测要过真实网络；解码器放错 Pipeline 位置（在业务 Handler 后面 = 白配）；Delimiter 场景消息体本身含分隔符未转义（Redis 用长度前缀解决这个问题，纯分隔符协议要转义）；拆包后 ByteBuf 没释放（SimpleChannelInboundHandler 自动释放，ChannelInboundHandlerAdapter 手动处理）。`,
+    keyPoints: ["TCP 无消息边界：Nagle+MSS+缓冲区三因", "私有协议=长度字段法，五参数要会配", "maxFrameLength 是防 OOM 攻击的安全阀"],
+    followUps: ["Netty 拆包器的 cumulation 缓冲区怎么避免内存拷贝（CompositeByteBuf）？", "HTTP/2 的帧格式相比 HTTP/1.1 拆包优势？"],
+    favorited: false,
+  },
+  {
+    id: "be-273",
+    nodeId: "be-netty",
+    question: "ByteBuf 的引用计数和内存泄漏怎么排查？池化内存（PooledByteBufAllocator）收益在哪？",
+    bigTech: true,
+    answer: `结论：ByteBuf 不走 JVM GC，而是引用计数（ReferenceCounted）——创建时 refCnt=1，retain() +1，release() -1，归 0 时内存归还池/堆外。忘了 release 就泄漏（堆外内存 GC 管不着）；release 后又访问就报错。池化（PooledByteBufAllocator，默认开启）复用内存块，避免频繁的 malloc/free 和堆外内存零初始化开销——高并发下分配性能差 10 倍以上。
+
+\`\`\`java
+// 引用计数生命周期（谁消费谁释放是铁律）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    ByteBuf buf = (ByteBuf) msg;
+    try {
+        byte[] data = new byte[buf.readableBytes()];
+        buf.readBytes(data);
+        process(data);
+    } finally {
+        ReferenceCountUtil.release(buf);  // 必须释放！
+    }
+}
+// 省心替代：继承 SimpleChannelInboundHandler，框架自动 release
+
+// 异步场景：消息要传给业务线程池 → 先 retain 续命
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    ByteBuf buf = (ByteBuf) msg;
+    buf.retain();  // refCnt 2，IO 线程 release 后还剩 1
+    bizPool.execute(() -> {
+        try { process(buf); } finally { buf.release(); }  // 业务线程还账
+    });
+}
+\`\`\`
+
+\`\`\`text
+堆外 vs 堆内 vs 池化：
+alloc().directBuffer()   堆外内存，零拷贝直达 Socket，但分配慢（malloc）
+alloc().heapBuffer()     堆内数组，分配快，但写 Socket 要拷贝到堆外
+PooledByteBufAllocator   池化复用（默认）：jemalloc 式内存池，
+                         线程本地缓存(ThreadLocal) → 大部分分配无锁
+堆外总容量上限：-XX:MaxDirectMemorySize（默认≈Xmx），超限抛 OutOfDirectMemoryError
+\`\`\`
+
+泄漏排查三板斧：
+\`\`\`java
+// 1. 开泄漏检测（开发环境 paranoid，生产采样）
+-Dio.netty.leakDetectionLevel=PARANOID  // 每个 buf 都检测（慢）
+-Dio.netty.leakDetectionLevel=SIMPLE    // 1% 采样（生产可用）
+// 泄漏时日志打 LEAK: ByteBuf.release() was not called...附分配栈
+
+// 2. 监控指标：PooledByteBufAllocator.metric()
+long usedDirect = metric.usedDirectMemory();  // 持续上涨不回落=泄漏
+
+// 3. 物理排查：jstat 看不到堆外 → NMT(Native Memory Tracking)
+-XX:NativeMemoryTracking=summary  →  jcmd <pid> VM.native_memory
+\`\`\`
+
+案例：某 IM 网关消息转发 Handler 异常分支漏 release，堆外每天涨 2GB，FULL GC 无效（堆外不归 GC），一周后 OutOfDirectMemoryError——加 PARANOID 复现 10 分钟定位到异常分支；Cassandra/Elasticsearch 都用 Netty 传输层 + 池化；gRPC 的零拷贝优化用 CompositeByteBuf 合并 header+body 避免一次拷贝。
+
+踩坑：channelRead 里 try 中 return 提前跑了 finally 没写（必须 finally release）；ctx.writeAndFlush(buf) 后又 release(buf)——write 是异步的，release 后发送线程拿到的是已释放内存（框架写完会自己 release，调用方别再动）；异常处理器 exceptionCaught 里没 release 当前 msg；ByteBuf 转 byte[] 时直接 array()——direct buffer 没有底层数组，抛 UnsupportedOperationException（要判断 hasArray）；测试环境泄漏检测关着，泄漏代码带病上线。`,
+    keyPoints: ["refCnt 引用计数，谁消费谁 release", "异步传递先 retain 后还账", "Pooled 池化+SIMPLE 采样检测泄漏"],
+    followUps: ["Netty 零拷贝三板斧（Composite/Slice/FileRegion）？", "堆外内存被谁统计进容器 OOM（K8s 场景）？"],
+    favorited: false,
+  },
+  {
+    id: "be-274",
+    nodeId: "be-netty",
+    question: "长连接心跳机制怎么设计？Netty IdleStateHandler 和断线重连怎么做？",
+    bigTech: true,
+    answer: `结论：长连接会「假死」——NAT 表超时（家用路由 60-300s）、防火墙静默断链、对端宕机但 TCP 没收到 FIN（拔网线场景，TCP 本身要几小时才能探测到）。应用层心跳是唯一可靠手段：IdleStateHandler 检测读写空闲，超时触发事件，发心跳/断开。设计要点：心跳间隔 < 中间设备超时、带随机抖动防同步雪崩、失败重连要指数退避。
+
+\`\`\`java
+// 服务端心跳标配三件套
+pipeline.addLast(new IdleStateHandler(
+    60,   // readerIdleTime：60s 没读到数据（含心跳）→ 认为对端死了
+    0,    // writerIdleTime：服务端一般不设（靠客户端心跳）
+    0));  // allIdleTime
+pipeline.addLast(new ChannelInboundHandlerAdapter() {
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent e && e.state() == READER_IDLE) {
+            // 读超时=客户端 60s 没任何消息（含心跳包）→ 断开
+            ctx.close();  // 配合连接数指标告警，异常批量断开要熔断
+        }
+    }
+});
+
+// 客户端：写空闲就发心跳（应用层 PING 帧）
+pipeline.addLast(new IdleStateHandler(0, 20, 0, SECONDS)); // 20s 无写→触发
+public void userEventTriggered(ctx, evt) {
+    if (evt == WRITER_IDLE) ctx.writeAndFlush(PING);  // 保持 NAT 表活跃
+}
+\`\`\`
+
+\`\`\`text
+参数设计经验值：
+心跳间隔   20-30s（移动 4G NAT 超时最短约 270s，WiFi 路由约 60-300s，
+           取 1/3 安全边际；太短费电——微信心跳智能区间 4.5min~28min 自适应）
+读超时     = 心跳间隔 × 2~3（容忍丢包/延迟抖动，单次超时就断太敏感）
+双向心跳   IM/推送必须双向（服务端也要知道客户端活着）
+智能心跳   稳定网络下逐步拉长间隔，断网后缩短——微信/GCM 都这么干
+\`\`\`
+
+\`\`\`java
+// 断线重连（客户端）：指数退避 + 上限 + 随机抖动
+channel.closeFuture().addListener(f -> scheduleReconnect(1));
+
+void scheduleReconnect(int attempt) {
+    long delay = Math.min(1000L << attempt, 30_000)   // 2^n 秒，封顶 30s
+               + ThreadLocalRandom.current().nextLong(1000);  // 抖动防群起
+    eventLoop.schedule(() -> {
+        if (!shutdown) connect().addListener((ChannelFuture cf) -> {
+            if (!cf.isSuccess()) scheduleReconnect(Math.min(attempt + 1, 6));
+            else onReconnected();  // 重发订阅/补拉离线消息
+        });
+    }, delay, MILLISECONDS);
+}
+\`\`\`
+
+案例：微信移动端的智能心跳（按网络质量动态 4.5~28 分钟，省电量是核心竞争力）；阿里 ACCL 长连接网关——百万级设备每 30s 心跳，网关层 IdleStateHandler 读超时 90s 自动清理死连接；Dubbo 消费端与提供者之间 HeaderExchangeClient 60s 心跳保活；gRPC 的 HTTP/2 PING 帧 + keepalive 参数。
+
+踩坑：只在 TCP 层开 keepalive（默认 2 小时才探测，等于没有，必须应用层）；心跳包走业务线程池被阻塞任务排队（心跳要 IO 线程直发，最高优先级）；重连无退避——服务端重启瞬间几万客户端同时重连形成「重连风暴」直接把服务端打死（必须指数退避+抖动+限流）；心跳和断连事件没接监控，机房网络抖动导致的大规模掉线无人知晓；IdleStateHandler 的读超时在消息洪峰时误判——纯读业务（行情推送）客户端长时间只读不写，服务端应设 allIdle 而非 readIdle。`,
+    keyPoints: ["TCP 假死靠应用层心跳探测", "心跳 20-30s+读超时 2-3 倍+智能自适应", "重连指数退避+抖动防风暴"],
+    followUps: ["微信智能心跳的具体算法（网络类型×成功率）？", "QUIC 连接迁移对心跳设计的影响？"],
+    favorited: false,
+  },
+  {
+    id: "be-275",
+    nodeId: "be-netty",
+    question: "Pipeline 和 ChannelHandler 的责任链机制？入站出站事件怎么传播？",
+    bigTech: false,
+    answer: `结论：Pipeline = 双向链表串联的 Handler 责任链，每个 Channel 一条。入站事件（连接建立/读到数据/异常）从头传到尾，出站事件（write/flush/close）从尾传回头。编解码器、业务逻辑、日志、限流全拆成独立 Handler 挂链上——这是 Netty 可插拔架构的根基。
+
+\`\`\`text
+双向传播图：
+        入站方向（Inbound）：socket → head → Decoder → Decoder → BizHandler → tail
+        出站方向（Outbound）：BizHandler.write → Encoder → Encoder → head → socket
+
+handler 列表（典型 IM 网关）：
+[0] IdleStateHandler          入站：心跳超时检测
+[1] LengthFieldBasedDecoder   入站：拆包（ByteBuf→完整帧 ByteBuf）
+[2] MessageDecoder            入站：ByteBuf→业务 POJO
+[3] AuthHandler               入站：鉴权（失败直接 close，不往下传）
+[4] BizLogicHandler           入站：业务处理，write 响应 ← 出站从这里反向
+[5] MessageEncoder            出站：POJO→ByteBuf
+[6] MetricsHandler            双向：流量统计
+\`\`\`
+
+\`\`\`java
+// 传播控制（面试高频：事件怎么流动）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    if (msg instanceof PingFrame) {
+        ctx.writeAndFlush(PONG);   // write 从当前 Handler 反向找出站链
+        return;                    // 不调 fireChannelRead → 入站传播到此为止
+    }
+    ctx.fireChannelRead(msg);      // 手动放行到下一个入站 Handler
+}
+// 关键区别：
+ctx.write()        → 从当前 Handler 往前找出站（常用，跳过后面无关出站 Handler）
+channel.write()    → 从 tail 开始走完整出站链（要过全部 Encoder 时用）
+ctx.fireChannelRead() 不调用 = 消息被「吃掉」（鉴权拦截、防刷丢弃都这么实现）
+\`\`\`
+
+\`\`\`text
+Handler 类型速查：
+ChannelInboundHandlerAdapter   入站事件处理（channelRead/Active/Exception）
+ChannelOutboundHandlerAdapter  出站事件处理（write/bind/close）
+ChannelDuplexHandler           双向
+MessageToByteEncoder<T>        出站编码：POJO→ByteBuf（自动 release 源消息）
+ByteToMessageDecoder           入站解码基类（拆包器都继承它）
+MessageToMessageDecoder        入站转码：帧→POJO
+SimpleChannelInboundHandler<T> 入站+自动类型匹配+自动 release（业务首选）
+\`\`\`
+
+案例：Dubbo 的 Pipeline = ExchangeCodec（编解码）→ HeaderExchangeHandler（请求响应配对）→ DecodeHandler → 业务派发；gRPC 服务端 = Http2FrameReader/Writer（HTTP/2 帧）→ 流控 → 业务方法调用；APISIX 网关在 OpenResty 的 cosocket 之上抽象了类似的 phase 链（rewrite/access/content/log）——思想同源。
+
+踩坑：Handler 顺序放错——Encoder 放在 BizHandler 前面导致出站事件不经过它（出站是反向传播！）；一个 Handler 既处理入站又处理出站但只继承了一边基类，另一边事件被默默吞掉；在 HeadHandler 之后 addLast 永远执行不到（tail 是终点）；异常没重写 exceptionCaught → 默认实现打日志+不关连接，半死连接堆积；ctx.pipeline() 在 handlerAdded 里就遍历（还没加完，要在 channelRegistered 后）；共享 Handler（@Sharable）里存了 ctx 引用——ctx 属于特定 Channel，多连接共享时串线（数据发到别人连接上，线上大事故）。`,
+    keyPoints: ["入站头→尾，出站尾→头，write 从当前 Handler 反向", "不调 fireChannelRead=吃掉消息", "Sharable Handler 禁存 Channel 状态"],
+    followUps: ["Netty 的 Handler 热插拔（运行时 modify pipeline）应用场景？", "HTTP/2 的 stream 与 Channel 的映射关系？"],
+    favorited: false,
+  },
+  {
+    id: "be-276",
+    nodeId: "be-netty",
+    question: "Netty 相比原生 NIO 的优势？为什么 Dubbo/gRPC/RocketMQ 都选它？",
+    bigTech: true,
+    answer: `结论：原生 NIO 是「正确的零件，错误的体验」——API 反人类（Selector/Channel/Buffer 三层裸操作）、epoll 空轮询 bug、要手写粘包/心跳/重连/内存管理。Netty 把 NIO 包装成事件驱动的组件化框架：线程模型现成、拆包器现成、内存池现成、SSL 现成，且在零拷贝、无锁化、池化上做了 JVM 级深度优化。选它的本质：用 20% 的复杂度获得 95% 的裸 NIO 性能。
+
+\`\`\`text
+原生 NIO 的坑（Netty 逐个填平）：
+原生 NIO 痛点                    Netty 方案
+Selector 空轮询 CPU 100% bug    select 计数，空轮询超阈值重建 Selector（epoll bug 规避）
+ByteBuffer flip() 心智负担       ByteBuf 读写双指针分离，无需 flip
+半包粘包手写状态机               LengthFieldBasedFrameDecoder 开箱即用
+连接/读写/异常事件分发手写        Pipeline 责任链自动派发
+ByteBuffer 频繁分配 GC 压力大    PooledByteBufAllocator 池化+堆外
+线程模型自己设计                 主从 Reactor 开箱即用
+SSL/TLS 握手状态机极复杂         SslHandler 一行 addLast
+\`\`\`
+
+\`\`\`text
+Netty 的性能三板斧（超越原生 NIO 的部分）：
+1. 零拷贝
+   - CompositeByteBuf：逻辑合并多个 buf 不拷贝
+   - FileRegion.transferTo：文件直发 socket（sendfile）
+   - slice/duplicate：共享底层数组不同视图
+2. 无锁化
+   - 串行无锁：Channel 绑定唯一 EventLoop，连接内操作无锁
+   - FastThreadLocal：比 JDK ThreadLocal 快（数组索引替代哈希）
+   - 线程本地内存池：分配无竞争
+3. 对象复用
+   - Recycler 对象池（轻量，避免滥用）
+   - ByteBuf 池化（jemalloc 分区管理）
+\`\`\`
+
+\`\`\`text
+选型案例（为什么基础设施都选 Netty）：
+Dubbo       RPC 需要私有协议+长连接+心跳+异步调用——Netty 全包
+gRPC-Java   HTTP/2 帧编解码+流控，Netty 有现成 HTTP/2 codec
+RocketMQ    Broker 高吞吐收发+多种协议头，主从 Reactor+业务线程池隔离
+ES          节点间 transport 层，9300 端口二进制协议
+Cassandra   CQL 协议服务端
+Spark       节点间 Shuffle 数据传输（netty-rpc 替代 akka）
+EMQX/MQTT   百万连接 IoT 网关（单机 C10M 优化标杆）
+\`\`\`
+
+反面与边界：Netty 不是银弹——普通 CRUD Web 服务用 Spring Boot/Tomcat 足够（Servlet 模型+连接池成熟，没必要自己玩字节）；Netty 做 HTTP 服务端性能不如 Envoy/Nginx（C 实现的极致优化）；团队无网络编程积累时 Netty 的「自由度」是事故温床（内存泄漏/线程阻塞防不胜防，严格 code review+泄漏检测是底线）。
+
+案例：阿里双 11 的 RPC 框架 HSF 基于 Netty，单机支撑 10 万+ QPS；蚂蚁 SOFARPC 在 Netty 上做了 Bolt 协议（连接复用+无序列化开销的 oneway）；腾讯开源的 tRPC 同样 Netty 底座；Apache Pulsar 的 broker 和 bookie 全 Netty，支撑 Yahoo 百万 topic。
+
+踩坑：把 Netty 当 Web 框架用写 CRUD（杀鸡用屠龙刀，维护成本反噬）；盲目上 EpollEventLoop 但 so 库没打进去（回退 NIO 还不知道）；4.0 → 4.1 迁移时 ByteBuf 默认从非池化变池化，老代码按非池化写的 release 逻辑双重释放；EventLoop 数开成 CPU×4（IO 线程不是越多越好，上下文切换反噬，默认×2 是甜点位）；在容器里不感知 MaxDirectMemorySize，K8s limit 把堆外+堆内算一起 OOMKilled。`,
+    keyPoints: ["填平 NIO 五坑：epoll bug/flip/粘包/分发/内存", "零拷贝+无锁串行+池化三板斧", "CRUD 服务别用 Netty，基础设施才需要"],
+    followUps: ["Netty 怎么规避 epoll 空轮询 bug（rebuildSelector）？", "Netty 5 为什么夭折（ForkJoinPool 模型反思）？"],
+    favorited: false,
+  },
+  {
+    id: "be-277",
+    nodeId: "be-netty",
+    question: "用 Netty 手写一个极简 RPC 框架：客户端怎么实现同步调用？（请求-响应配对）",
+    bigTech: false,
+    answer: `结论：RPC 的核心难点是「异步网络 IO 上做出同步调用体验」。标准解法：每个请求带全局唯一 requestId，客户端发送后把 Future 挂进「请求映射表」，IO 线程收到响应按 requestId 找到对应 Future 并 setResult 唤醒——这就是 Dubbo 的 DefaultFuture 模式。
+
+\`\`\`java
+// ============ 协议设计（4B 魔数+8B requestId+4B 长度+JSON body）============
+record RpcRequest(long requestId, String method, Object[] args) {}
+record RpcResponse(long requestId, Object result, String error) {}
+
+// ============ 客户端核心：请求-响应配对 ============
+public class RpcClient {
+    private final Map<Long, CompletableFuture<RpcResponse>> pending =
+        new ConcurrentHashMap<>();                    // 请求映射表
+    private final AtomicLong idGen = new AtomicLong();
+    private Channel channel;  // 单连接长连接（生产要连接池）
+
+    public Object call(String method, Object... args) throws Exception {
+        long id = idGen.incrementAndGet();
+        CompletableFuture<RpcResponse> future = new CompletableFuture<>();
+        pending.put(id, future);                      // 先挂号再发送（顺序不能反！）
+
+        channel.writeAndFlush(new RpcRequest(id, method, args))
+               .addListener(f -> {                    // 写失败要清理挂号
+                   if (!f.isSuccess()) {
+                       pending.remove(id);
+                       future.completeExceptionally(f.cause());
+                   }
+               });
+        return future.get(3, SECONDS).result();       // 同步等待，带超时！
+    }
+
+    // IO 线程收到响应：按 requestId 唤醒等待的业务线程
+    class ClientHandler extends SimpleChannelInboundHandler<RpcResponse> {
+        protected void channelRead0(ChannelHandlerContext ctx, RpcResponse resp) {
+            CompletableFuture<RpcResponse> f = pending.remove(resp.requestId());
+            if (f != null) f.complete(resp);   // complete 唤醒 future.get() 的线程
+        }
+    }
+}
+\`\`\`
+
+\`\`\`text
+关键点逐条（面试追问点）：
+1. 为什么先 put 再 write：响应可能比 writeAndFlush 返回更快到达
+   （同机房 RT 微秒级），反了会丢响应→调用方超时
+2. 为什么 CompletableFuture 不用 wait/notify：
+   支持超时/取消/链式，且 complete 只生效一次（重复响应安全）
+3. 超时清理：future.get 超时后 pending 里的条目还在 →
+   要么 catch 后 pending.remove(id)，要么定时扫描清理（防泄漏）
+4. 服务端怎么实现：IO 线程解码 → 业务线程池执行方法 →
+   用同一个 requestId 写回响应（异步写完，IO 线程不阻塞）
+5. oneway 调用：不带 requestId 的 fire-and-forget（日志上报类）
+\`\`\`
+
+进阶（Dubbo 真实实现对比）：
+- 连接池：单连接扛不住时按「连接数×请求并发」扩容，Dubbo 默认共享连接+多路复用
+- 序列化：JSON → Hessian2/Protobuf（体积减半，CPU 省 70%）
+- 调用模式：同步（本文）/ 异步 future / callback / oneway 四种
+- 服务发现：注册中心（ZK/Nacos）订阅提供者列表 + 负载均衡（随机/轮询/一致性哈希）
+- 容错：失败重试（幂等接口）/ Failover / Failfast / Forking 并行调用
+
+案例：Dubbo 的 DefaultFuture（2.7 前用 JDK 同步器，后改 CompletableFuture）；gRPC 的 ClientCalls.futureUnaryCall 同样 requestId 配对（HTTP/2 streamId 天然充当 requestId）；某厂手写 RPC 忘了超时清理 pending map，大促时 100 万超时请求堆积 → OOM。
+
+踩坑：requestId 用时间戳（并发冲突，必须原子序列或 UUID）；future.get() 不带超时（服务端宕机=调用线程永久挂起，线程池打满雪崩）；响应超时才到达，pending 已 remove，日志报「unknown requestId」是正常现象（别当 bug 修，打 debug 日志即可）；一个连接上并发发送没控制 inflight 上限（TCP 缓冲区写爆，应该信号量限流）；重试不幂等——超时重试导致重复下单（重试必须配幂等 key）。`,
+    keyPoints: ["requestId+Future 映射表=异步 IO 上的同步体验", "先挂号再发送，超时必须清理", "重试必须配幂等"],
+    followUps: ["HTTP/2 streamId 怎么天然解决多路复用配对？", "RPC 超时时间怎么科学设定（P99 基线+熔断联动）？"],
+    favorited: false,
+  },
+  // ===== 分布式：协调服务 ZK/etcd（be-278 ~ be-284）=====
+  {
+    id: "be-278",
+    nodeId: "be-zk-etcd",
+    question: "ZooKeeper 的 ZAB 协议是什么？崩溃恢复和消息广播两个阶段怎么工作？",
+    bigTech: true,
+    answer: `结论：ZAB（ZooKeeper Atomic Broadcast）是为 ZK 定制的「主备原子广播」协议，类 Raft 但更早。两阶段：消息广播阶段（Leader 把写请求转成 Proposal 两阶段提交给 Follower，过半 ACK 即提交）；崩溃恢复阶段（Leader 宕机→选新主→数据同步，保证已提交的不丢、未提交的丢弃）。设计目标：单一 Leader 串行化写，保证全局顺序一致。
+
+\`\`\`text
+阶段一：消息广播（正常态，类似 2PC 但过半即成功）
+1. 客户端写请求到任意节点 → 转发给 Leader
+2. Leader 生成 Proposal（带 zxid = <epoch, 递增计数>，全局单调）
+3. Leader 把 Proposal 发给所有 Follower（各 Follower 写入本地事务日志）
+4. Follower 落盘成功 → 回 ACK
+5. Leader 收到过半 ACK → 发 COMMIT → 各节点应用变更到内存树
+关键：过半即提交，不需要全部 ACK（这是 ZAB 比纯 2PC 快的原因）
+
+读请求：本地直接读（不保证最新！），要最新需 sync() 或走 Leader
+\`\`\`
+
+\`\`\`text
+阶段二：崩溃恢复（Leader 挂了）
+1. 发现期：Follower 心跳超时 → 进入 LOOKING 状态发起选举
+2. 选举：投票 (myid, zxid)——zxid 大的优先（数据最新），
+   相同则 myid 大优先；得票过半者成为 Leader
+3. 同步期：新 Leader 与各 Follower 做数据对齐
+   - Follower 有 Leader 没有的未提交 Proposal → 丢弃
+   - Follower 落后 → Leader 按差异 SNAP/DIFF/TRUNC 同步
+4. 恢复完成 → 回到广播模式
+
+zxid 设计精髓：高 32 位 epoch（每届 Leader 任期）+ 低 32 位计数
+→ 新 Leader epoch+1，天然屏蔽旧 Leader 的所有消息（脑裂保护）
+\`\`\`
+
+\`\`\`text
+ZAB vs Raft 对比（面试高频）：
+维度        ZAB                       Raft
+选举依据    zxid（数据新优先）         日志 lastIndex+term（同样数据新优先）
+日志复制    Proposal→ACK过半→COMMIT    AppendEntries→过半→commitIndex 推进
+读一致      本地读（可能旧）           本地读或 ReadIndex/LeaseRead
+应用        ZK                        etcd/Consul/TiKV
+本质        都是「单 Leader+过半派」，思想同源
+\`\`\`
+
+案例：Kafka（KRaft 之前）用 ZK 做 Controller 选举+Broker 元数据，Controller 挂了就靠 ZAB 重新选主；HBase 的 HMaster 选举+RegionServer 上下线感知全靠 ZK；HDFS NameNode HA 的 Active/Standby 切换由 ZKFC 基于 ZK 临时节点+Watcher 实现；Dubbo 经典部署用 ZK 做注册中心（provider 注册临时节点）。
+
+踩坑：以为 ZK 读是强一致的——默认本地读可能读到旧数据（要 sync 或读走 Leader）；Follower 太多写变慢（写要过半 ACK，7 节点比 3 节点写延迟高，一般 3/5 足矣）；ZAB 广播阶段的事务日志磁盘 fsync 是写延迟大头（ZK 写性能不如 etcd 的原因之一）；把 ZK 当消息队列/KV 大对象存储用（znode 默认上限 1MB，它是协调服务不是数据库）；客户端 session 超时设太短（GC 停顿 10s 被误判宕机，临时节点全掉，服务大规模重注册——SessionTimeout 一般 10-30s 且要监控 GC）。`,
+    keyPoints: ["广播=Proposal+过半ACK+COMMIT", "恢复=按 zxid 选主+数据对齐", "ZK 读默认非强一致，要 sync"],
+    followUps: ["ZAB 怎么处理「已 COMMIT 但没送达」的 Proposal（历史补发）？", "Observer 节点为什么不参与选举（扩容读不拖累写）？"],
+    favorited: false,
+  },
+  {
+    id: "be-279",
+    nodeId: "be-zk-etcd",
+    question: "用 ZooKeeper 实现分布式锁：临时顺序节点怎么避免羊群效应？和 Redis 锁对比？",
+    bigTech: true,
+    answer: `结论：ZK 分布式锁的标准实现 = 临时顺序节点 + Watch 前一个节点。抢锁：在锁目录下创建 EPHEMERAL_SEQUENTIAL 节点（如 lock-0000000042）；判断：自己是不是序号最小的——是则持锁，否则 Watch 前一个序号节点；前驱删除（持锁方释放或宕机会话过期）→ 自己被唤醒重试。羊群效应的避免关键：只 Watch 前驱一个节点，而不是 Watch 整个锁目录。
+
+\`\`\`text
+羊群效应（naive 实现的灾难）：
+1000 个线程抢锁，都 Watch /lock 目录的 children 变化
+→ 锁释放瞬间，目录一变，ZK 给 1000 个客户端发通知
+→ 1000 个请求同时打向 ZK + 1000 个客户端同时重判断
+→ 惊群（thundering herd），ZK 被打爆
+
+正确实现：每个等待者只 Watch 自己的前驱节点
+lock-0001 ← Watch by lock-0002
+lock-0002 ← Watch by lock-0003
+...
+锁释放=只有「下一个」收到通知，链式唤醒，O(1) 通知
+\`\`\`
+
+\`\`\`java
+// Curator InterProcessMutex 核心逻辑（简化版）
+public void acquire() {
+    String path = client.create()
+        .creatingParentsIfNeeded()
+        .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)  // 临时+顺序
+        .forPath("/locks/order-" );
+    while (true) {
+        List<String> children = client.getChildren().forPath("/locks");
+        sort(children);  // 按序号排序
+        if (isFirst(path, children)) return;         // 最小=持锁
+        String prev = findPrev(path, children);      // 找前驱
+        // 只 Watch 前驱（stat 订阅删除事件），阻塞等待
+        CountDownLatch latch = new CountDownLatch(1);
+        client.checkExists().usingWatcher(e -> latch.countDown())
+              .forPath(prev);
+        latch.await(sessionTimeout, MILLISECONDS);   // 前驱删除→醒
+    }
+}
+public void release() { client.delete().forPath(myPath); }
+// 宕机安全：会话过期 → ZK 自动删除临时节点 → 锁自动释放（不死锁！）
+// 可重入：同线程重入计数（Curator 已封装）
+\`\`\`
+
+\`\`\`text
+ZK 锁 vs Redis 锁（选型必考）：
+维度        ZK 锁                        Redis 锁（Redisson）
+可靠性      CP，过半持久化，绝不丢锁      AP，主从切换瞬间可能双持锁
+            （脑裂时少数派不可写）        （Redlock 有争议，Martin Kleppmann 批过）
+死锁        临时节点+会话过期自动释放      EXPIRE 兜底，但业务超长易误释放
+            （宕机即释放，无残留）
+公平性      顺序节点天然 FIFO 公平锁       非公平（谁抢到谁得），
+                                        公平锁要靠 Lua 排队
+性能        写要过半提交，~千级 QPS        内存操作，~万级 QPS
+watch 唤醒   事件驱动，无轮询              订阅 pub/sub 或轮询
+运维        ZK 集群                      Redis 集群（更普及）
+\`\`\`
+
+案例：Hadoop HDFS NameNode HA 的 Active 选举锁用 ZK（宁可不可用不可双主）；Kafka Controller 选举锁；美团 Leaf 的 segment 号段分配用 ZK 锁防重复分配；支付对账任务的多机互斥执行（防重复跑批）用 Curator 锁。反面：某厂用 Redis setnx 锁但过期时间 3s，大促 GC 停顿 5s 锁被误释放，两个实例同时扣库存超卖。
+
+踩坑：ZK 锁拿到后业务执行超过会话超时（长 GC/FullGC）→ 会话过期锁被释放，业务还在跑=双持锁！解法：锁内做「临界区前检查锁仍有效」+  fencing token（锁版本号，存储层拒绝旧版本写入）；把 Watch 注册在锁目录上（羊群）；Curator 连接抖动抛出后认为锁丢了，实际服务端会话还有 30s 才过期（重连后要重新校验持锁状态）；跨机房用 ZK 锁（RT 几十 ms，锁吞吐雪崩，跨机房场景用各自机房本地锁+全局幂等）。`,
+    keyPoints: ["临时顺序节点+Watch 前驱=无羊群公平锁", "宕机自动释放不死锁", "CP 可靠 vs Redis 高性能， fencing token 防双持"],
+    followUps: ["Redlock 为什么被 Martin Kleppmann 质疑（时钟与 GC 暂停）？", "fencing token 在存储层怎么校验（单调版本号）？"],
+    favorited: false,
+  },
+  {
+    id: "be-280",
+    nodeId: "be-zk-etcd",
+    question: "ZooKeeper 的 Watcher 机制原理？为什么说它是「一次性」的？注册中心怎么用它做服务发现？",
+    bigTech: true,
+    answer: `结论：Watcher = 客户端对某个 znode 注册的「一次性回调」——节点创建/删除/数据变更/子节点变化时，ZK 服务端推送事件给注册过的客户端。一次性的含义：触发一次后自动注销，想继续监听必须重新注册。这是刻意设计：避免服务端维护永久订阅关系的状态爆炸+简化故障语义。
+
+\`\`\`text
+Watcher 工作原理：
+1. 客户端调用 getData(path, watch=true) / exists() / getChildren()
+   → 请求里带 watch 标记，服务端在该 znode 的 WatchTable 登记
+2. 事件类型：
+   NodeCreated / NodeDeleted / NodeDataChanged / NodeChildrenChanged
+3. 变更发生 → 服务端把事件塞进该客户端连接的发送队列（异步，不保证
+   「变更发生」和「收到通知」之间没有新变更——这就是一次性+重新注册
+   要搭配 getData 重新拉取的原因）
+4. 客户端收到 WatchedEvent → 回调 process() → 业务重新 getData+重新注册
+
+关键语义：「通知你变了，但不告诉你变成什么样」——
+新值要客户端自己拉。这样服务端只存「谁注册了哪个 path」，
+不传数据，推送成本 O(1)。
+\`\`\`
+
+\`\`\`java
+// 经典「永久监听」模板：触发后重新注册（面试手写题）
+public void watchConfig(String path) {
+    zk.getData(path, event -> {
+        if (event.getType() == EventType.NodeDataChanged) {
+            reloadConfig();       // 先处理
+            watchConfig(path);    // 再重新注册（一次性！）
+        } else if (event.getType() == EventType.NodeDeleted) {
+            log.warn("config deleted");
+        }
+    }, null);
+}
+// 生产别手写——Curator 的 NodeCache/TreeCache 已封装好自动重注册
+// + 连接抖动重放 + 本地缓存
+\`\`\`
+
+\`\`\`text
+服务注册发现的完整闭环（Dubbo-on-ZK 模式）：
+1. Provider 启动：创建 /dubbo/com.XService/providers/10.0.0.1:20880
+   （临时节点！宕机会话过期自动摘除——这是选 ZK 做注册中心的核心原因）
+2. Consumer 启动：getChildren(/dubbo/com.XService/providers, watch=true)
+   拿到全量地址列表 + 注册子节点 Watcher
+3. Provider 上下线 → 子节点变化 → Consumer 收到 NodeChildrenChanged
+   → 重新 getChildren+重注册 → 刷新本地路由表 → 负载均衡剔除死节点
+4. Consumer 自己注册到 /consumers/ 下（供治理台查询调用关系）
+\`\`\`
+
+案例：Dubbo 默认注册中心就是 ZK（2.x 时代绝对主流）；Canal 的 HA——server 和 client 都用 ZK 临时节点选主+位置存储；ElasticJob 的分片协调——实例上下线触发 Resharding；Apollo 的早期版本用 ZK 做配置变更通知（后改自研长轮询，因为 ZK 推送在十万级客户端下压力太大）。
+
+踩坑：忘了重新注册导致「只收到第一次变更」（最经典 bug）；在 Watcher 回调里做重活（回调跑在客户端 ZK 线程上，阻塞会丢后续事件）；Watch 了不存在的节点用 getData（要用 exists 注册，NodeCreated 才能收到）；大量客户端 Watch 同一热点节点，变更瞬间推送风暴（配置中心场景要分片或用长轮询替代，Nacos/Apollo 都因此弃用 ZK 推送模型）；会话过期后重连，之前的 Watcher 全没了（Curator 自动重放注册，原生 API 要自己在 process(SyncConnected) 里重挂）；以为 Watcher 保证不丢——「两次变更间隔极短」时第一次触发后还没重注册，第二次变更就丢了（所以重拉数据时要用 stat 版本号比对，漏了靠定时全量对账兜底）。`,
+    keyPoints: ["一次性触发+重新注册+重新拉数据三件套", "变更通知不带数据，O(1) 推送", "临时节点+子节点 Watch=注册发现闭环"],
+    followUps: ["Curator TreeCache 和 NodeCache 的适用场景差异？", "Nacos 为什么放弃推送改长轮询（gRPC 前）？"],
+    favorited: false,
+  },
+  {
+    id: "be-281",
+    nodeId: "be-zk-etcd",
+    question: "etcd 的 Raft 协议怎么选主和复制日志？为什么 etcd 能替代 ZooKeeper 成为云原生标配？",
+    bigTech: true,
+    answer: `结论：Raft 把一致性问题拆成三个子问题：选主（Leader Election）、日志复制（Log Replication）、安全性（Safety）。任期（term）单调递增，选主要求候选人日志「至少和我一样新」，复制要求过半持久化才算提交。etcd 凭 Raft 的简单可靠 + watch 长连接 + MVCC + 租约，取代 ZK 成为 K8s 元数据底座。
+
+\`\`\`text
+Raft 选主流程：
+1. 节点初始都是 Follower；Follower 在 election timeout（150-300ms 随机）
+   内没收到 Leader 心跳 → 转 Candidate
+2. Candidate：term+1 → 投自己 → 广播 RequestVote{term, lastLogIndex,
+   lastLogTerm}
+3. 收到投票请求的节点：若 term 比我新 且 候选人日志不比我旧
+   （lastLogTerm 大，或同 term 比 lastLogIndex）→ 投票（一任期只投一票）
+4. 过半票 → 成为 Leader → 立即发心跳（AppendEntries 空日志）压制其他选举
+5. 随机超时防平票：超时时间随机化，分裂投票概率指数级降低
+\`\`\`
+
+\`\`\`text
+Raft 日志复制：
+1. Leader 收到写请求 → 追加到本地日志（uncommitted）
+2. 并行发 AppendEntries{prevLogIndex, prevLogTerm, entries[], leaderCommit}
+   给所有 Follower
+3. Follower 校验 prevLog 匹配（一致性检查=归纳法保证前缀一致）
+   → 匹配则追加/覆盖冲突 → 回 ACK；不匹配则拒绝（Leader 回退
+   nextIndex 重试，直到找到共同前缀）
+4. 过半 ACK → Leader 推进 commitIndex → 应用到状态机 → 响应客户端
+   → 下次心跳把 leaderCommit 带给 Follower，它们也提交
+关键安全属性：Leader 只会提交「本任期」的条目后旧条目才算真提交
+（防旧任期条目被新 Leader 覆盖的著名边界 case）
+\`\`\`
+
+\`\`\`text
+etcd 胜过 ZK 的工程点（云原生选型原因）：
+对比        ZooKeeper                  etcd
+协议        ZAB（实现复杂，文档少）      Raft（论文易懂，实现多）
+API         自定义 TCP 协议+Java 客户端  gRPC+HTTP/JSON，语言无关
+数据模型    znode 树+1MB 限制           KV+MVCC 多版本+范围查询
+watch       一次性触发                  长流式 watch（gRPC stream），
+                                        可带历史 revision 重放
+租约        会话绑定临时节点             Lease 独立对象，可绑多个 key，
+                                        TTL 续租语义清晰
+存储        内存树+事务日志              BoltDB b+树，读性能强，
+                                        默认 2GB（配额告警）/可调 8GB
+生态        Hadoop 系老古董              K8s/CoreDNS/Rook/Calico 全家标配
+\`\`\`
+
+案例：K8s 全部元数据（Pod/Service/ConfigMap）存 etcd，apiserver 是唯一入口，Controller 靠 etcd watch 驱动调和循环；CoreDNS 从 etcd 读服务发现记录；Rook/Ceph 用 etcd 存集群拓扑；TiKV 的 PD（Placement Driver）内嵌 etcd 存 Region 元数据。
+
+踩坑：etcd 默认配额 2GB，K8s 集群 ConfigMap/Secret 膨胀写满后整个集群只读（要配 quota-backend-bytes+定期 compact+defrag）；watch 从太老的 revision 开始收「required revision has been compacted」（客户端要处理压缩错误并从当前版本重来）；把大量临时数据（心跳指标）写 etcd——Raft 写放大+快照频繁，集群抖动（心跳用 Lease+批量 key，指标别进 etcd）；跨机房部署 etcd（Raft 写要过半，跨机房 RT 20ms=写延迟 20ms+，同城三可用区是上限，跨地域用各集群独立 etcd+上层同步）；defrag 没安排导致磁盘只涨不降（compact 只标记，物理回收靠 defrag，且 defrag 期间阻塞读——要滚动做）。`,
+    keyPoints: ["Raft=选主+复制+安全性，任期单调+日志最新优先", "过半提交+前缀一致归纳", "etcd=gRPC 流式 watch+MVCC+Lease，云原生标配"],
+    followUps: ["Raft 的 PreVote 机制解决什么问题（网络分区节点回来搅局）？", "K8s 的 resourceVersion 和 etcd revision 怎么映射（list-watch 一致性）？"],
+    favorited: false,
+  },
+  {
+    id: "be-282",
+    nodeId: "be-zk-etcd",
+    question: "为什么协调服务集群必须奇数节点部署？脑裂是什么，怎么防？",
+    bigTech: true,
+    answer: `结论：奇数节点是「过半派（quorum）」机制的数学结果——N 节点集群容忍 ⌊(N-1)/2⌋ 个故障。3 节点和 4 节点都只能容忍 1 个故障（都要 2/3 或 3/4 过半），但 4 节点多一台机器、多一个故障点、选举更难收敛——偶数节点是纯粹的浪费。脑裂 = 网络分区把集群切成两半，若两边都选出 Leader 同时写，数据分叉。防御核心：quorum 保证「任何两个多数派必有交集」，少数派永远选不出 Leader。
+
+\`\`\`text
+奇数节点的数学：
+节点数   quorum(过半)   可容忍故障   写入代价(需ACK数)
+2        2              0           2（一挂全完，不如单机）
+3        2              1           2  ← 甜点
+4        3              1           3（容忍度同3但代价+1，纯亏）
+5        3              2           3  ← 高可用甜点
+6        4              2           4（容忍度同5但代价+1，纯亏）
+7        3→4            3           4
+结论：永远 3 或 5（7 以上选举/心跳成本陡增，ZK 官方建议 ≤7）
+\`\`\`
+
+\`\`\`text
+脑裂攻防战：
+场景：5 节点机房网络分区 {A,B} | {C,D,E}
+- C,D,E 侧：3 票过半 → 选出新 Leader，继续服务 ✓
+- A,B 侧：最多 2 票，永远过不了半 → 选不出 Leader，拒绝写 ✓
+- 分区恢复：A,B 发现集群 term 已更新，自己 term 旧 → 退回 Follower
+  并同步新日志（旧 Leader 的未提交写入被丢弃）
+本质：quorum 交集=任何合法多数派都包含「上一个提交」的见证者，
+     少数派物理上不可能形成多数派 → 数学层面杜绝双主
+\`\`\`
+
+\`\`\`text
+两个多数派必有交集（证明一句话版）：
+集合 S 有 N 个元素，两个子集大小都 > N/2
+→ |P| + |Q| > N → |P ∩ Q| = |P| + |Q| - |P ∪ Q| > N - N = 0
+→ 交集非空 ∎ 这个交集中的节点记得上一个 term 的投票/提交，
+  新选举必须经它同意 → 历史不会分叉
+\`\`\`
+
+防脑裂的工程补充（quorum 之外的防线）：
+- fencing：旧 Leader 恢复联系前，存储/资源层拒绝它的写（HDFS NameNode HA 的 sshfence/电源隔离 STONITH）
+- lease/term 检查：客户端/下游组件记录见过的最大 term，旧 term 请求直接拒
+- 部署拓扑：3 节点跨 3 个可用区（任一 AZ 挂了还剩 2/3 可服务）；5 节点跨 3 AZ 按 2-2-1 分布
+- 双节点陷阱：2 节点集群一挂即瘫，且网络抖动时互相以为对方死了（quorum=2，谁都凑不齐）——宁可用 1 主 1 备手动切换也别跑 2 节点 quorum 集群
+
+案例：Galera Cluster（MySQL 多主）偶数节点脑裂的著名事故——必须配 garbd 仲裁节点凑奇数；Elasticsearch 7 之前 minimum_master_nodes 配错（2 节点集群配 1）导致脑裂双 master 数据分叉，7.0 后改为内置投票配置自动管理；Redis Sentinel 也要奇数（3 哨兵）+ quorum 配置防双主。ZK 官方文档明确：「2 台比 1 台更不可靠，因为 2 台的 quorum=2，任何一台挂集群就不可用」。
+
+踩坑：为了「多一台更保险」上 4/6 节点（纯负收益）；3 节点全放一个机房（机房断电=全军覆没，quorum 救不了物理团灭）；ZK 的 observer 误参与选举配置（Observer 不算 quorum 成员，配错会缩小容忍度）；以为 quorum 能防「双机房各 50%」的对等分区（3-3 分布跨双机房，断网后两边都凑不齐 4/6？不，3+3=6 节点 quorum=4，两边各 3 都瘫痪——跨双机房必须第三地仲裁或 2-2-1 三机房）；容器环境 IP 漂移导致成员列表失效（etcd 要 --initial-cluster-state 重配或 K8s Operator 管理）。`,
+    keyPoints: ["N 节点容忍 (N-1)/2 故障，偶数节点纯浪费", "两个多数派必有交集=脑裂数学免疫", "跨 3 AZ 部署，双机房对等分区是无解局"],
+    followUps: ["etcd 的 learner 成员为什么不算 quorum（同步中不投票）？", "FlexiQuorum/分层 quorum 在大规模集群怎么降低写延迟？"],
+    favorited: false,
+  },
+  {
+    id: "be-283",
+    nodeId: "be-zk-etcd",
+    question: "基于 etcd 实现服务注册发现：Lease 租约和 Watch 怎么配合？和 ZK 方案对比？",
+    bigTech: false,
+    answer: `结论：etcd 注册发现三件套：注册 = 申请 Lease（TTL 如 10s）+ Put 服务地址 key 绑定 Lease；保活 = 客户端定时 KeepAlive 续租（宕机停止续租→TTL 到期→key 自动删除=自动摘除）；发现 = Watch 服务前缀，增量收 PUT/DELETE 事件。Lease 替代了 ZK 的「会话+临时节点」，语义更解耦（一个 Lease 可绑多个 key，多个 key 也可共享会话生命周期）。
+
+\`\`\`go
+// Go 客户端完整实现（面试手写框架）
+// 1. 注册 + 保活
+lease, _ := cli.Grant(ctx, 10)  // 10s TTL
+cli.Put(ctx, "/svc/order/10.0.0.1:8080", '{"weight":100}',
+        clientv3.WithLease(lease.ID))
+kaCh, _ := cli.KeepAlive(ctx, lease.ID)   // 自动续租 goroutine
+go func() {
+    for range kaCh { /* 收到续租响应即续命成功 */ }
+    // KeepAlive 通道关闭=租约丢失（网络分区/etcd 集群切换）
+    // → 重新 Grant+Put（自愈）
+}()
+
+// 2. 发现 + 增量订阅
+resp, _ := cli.Get(ctx, "/svc/order/", clientv3.WithPrefix())
+addrs := parseAddrs(resp.Kvs)              // 全量快照
+watchCh := cli.Watch(ctx, "/svc/order/", clientv3.WithPrefix(),
+                      clientv3.WithRev(resp.Header.Revision+1))
+for wresp := range watchCh {
+    for _, ev := range wresp.Events {
+        switch ev.Type {
+        case clientv3.EventTypePut:    addrs.upsert(ev.Kv)
+        case clientv3.EventTypeDelete: addrs.remove(ev.Kv.Key)
+        }
+    }   // 增量合并到本地路由表 → 负载均衡器热更新
+}
+\`\`\`
+
+\`\`\`text
+etcd 方案 vs ZK 方案（关键差异）：
+维度        ZK 临时节点+Watcher          etcd Lease+Watch
+生命周期    绑定会话（TCP 连接级）        绑定 Lease（逻辑对象）
+            连接断=会话危=节点危          连接断但 Lease 还在（重建连接续租）
+触发方式    一次性，要重注册              流式持续推送，带 revision 可断点续传
+推送内容    只有事件类型，数据要重拉       事件带完整 KV（新值/旧值都能给）
+历史追溯    无                           MVCC：可从任意 revision 重放
+多 key 绑   一个会话多个临时节点          一个 Lease 绑任意多 key，
+定          （会话死全死）               （Lease 死全死，也可各自独立）
+\`\`\`
+
+\`\`\`text
+生产级细节：
+1. 租约 TTL 选择：10-15s（太短→etcd 压力大+网络抖动误摘除；
+   太长→故障发现慢，调用方打到死节点）
+2. 心跳成本优化：KeepAlive 默认续租间隔=TTL/3；万级实例时
+   KeepAlive 请求是 etcd 的主要负载（可多个 key 共享一个 Lease 摊薄）
+3. 摘掉≠立刻摘除：消费方本地还要有「被动摘除」（调用失败 N 次
+   临时拉黑）——注册中心摘除有秒级延迟，双保险
+4. 优雅下线：实例收到 SIGTERM → 主动 Delete key + 等 2× 推送延迟
+   再停服务（防「摘了但流量还在飞」）
+\`\`\`
+
+案例：K8s Endpoint 的本质就是「Pod 注册+kubelet 心跳保活+watch 下发」（存在 etcd）；CoreDNS 的 etcd 插件做 DNS 记录动态发现；Apache APISIX 用 etcd 存路由配置，watch 毫秒级热更新（对标 Kong 的 DB+轮询）；go-zero/dubbogo 的注册中心默认 etcd。
+
+踩坑：KeepAlive goroutine 泄漏（实例注销了 goroutine 还在跑，持续续租=僵尸注册）；Watch 通道断开没重连（网络抖动后永远收不到事件，要 withRequireLeader+断线重 watch 从 lastRevision+1 续传）；全量拉取和 Watch 建立之间有窗口期丢变更（必须先 Get 拿 revision 再 WithRev 开 Watch，顺序反了就丢）；服务元数据（权重/标签）变更用 Put 同 key——消费方分不清是「重注册」还是「元数据更新」，要做内容 diff 再决定是否刷新连接池；etcd 集群Leader切换瞬间 watch 收 ErrCompacted 没处理（要捕获后重新全量 Get）。`,
+    keyPoints: ["Lease 租约=TTL+KeepAlive 续租+到期自动删", "先 Get 快照(带 revision)再 Watch 增量，无缝衔接", "注册中心摘除有延迟，消费方要被动摘除双保险"],
+    followUps: ["Lease 的续租为什么默认 TTL/3 间隔（租约到期判定细节）？", "K8s informer 的 Reflector 怎么处理 watch 断连和 relist？"],
+    favorited: false,
+  },
+  {
+    id: "be-284",
+    nodeId: "be-zk-etcd",
+    question: "ZK/etcd 集群的性能瓶颈在哪？十万级客户端的配置中心为什么不用它们直连？",
+    bigTech: false,
+    answer: `结论：协调服务的瓶颈是「写要过半共识 + 事件推送扇出」。写路径：每次写 = Leader 磁盘 fsync + 网络广播 + 过半 ACK，延迟下限 = 磁盘+网络 RT，吞吐天花板千级~万级 TPS。推送路径：一个 key 变更要扇出给 N 个 watcher，十万客户端 watch 同一配置 = 一次变更 10 万次网络推送，服务端 CPU/带宽瞬间打满。所以超大规模配置中心（Apollo/Nacos）都改用「长轮询/推拉结合」架构，协调服务只存元数据小对象。
+
+\`\`\`text
+ZK/etcd 性能画像：
+指标          ZK 3.6            etcd 3.5        说明
+写 TPS        ~1-2万(批量)       ~1-2万          单 key 写：百级 TPS
+写延迟        本地 DC ~2-5ms     ~2-5ms          fsync+过半 RT
+读 TPS        ~10万+             ~10万+          本地读/串行读
+线性读延迟    =一次共识 RT        =一次共识 RT     强一致的代价
+watch 扇出    单连接串行推送       gRPC 流式多路   10 万 watcher 一次
+                                                变更=10 万次发送
+单 key 大小   1MB                 1.5MB 建议值    大对象=共识日志膨胀
+数据总量      内存树(GB 级)        默认 2GB 配额   都不是数据库！
+\`\`\`
+
+\`\`\`text
+为什么十万客户端配置中心不直连协调服务：
+1. 推送风暴：变更瞬间 10 万推送 → 出口带宽打满 → 正常读写也卡
+2. 连接成本：10 万长连接的心跳/会话维持，ZK 的 session 管理器 OOM
+3. 羊群踩踏：配置变更后 10 万客户端同时重拉全量 → 读流量尖峰
+4. 故障半径：协调服务抖动=十万客户端集体重连=更大抖动（恶性循环）
+
+正确架构（Apollo/Nacos 模式）：
+客户端 ──长轮询──→ 配置中心集群（无状态，可水平扩）
+                      ↓ 变更监听
+                   协调服务/MySQL（只存配置本体+版本号）
+- 长轮询：客户端发请求挂起 30-60s，有变更立即返回，无变更超时重发
+  → 推送变「拉取」，服务端从扇出者变应答者，压力解耦
+- 变更通知只推「哪个 key 变了」，客户端再拉数据（削峰+天然版本校验）
+- CDN/边缘缓存兜底只读配置
+\`\`\`
+
+案例：Nacos 1.x 用 HTTP 长轮询（29.5s 挂起），2.x 改 gRPC 双向流但仍是「变更通知+客户端拉取」两段式；Apollo 的 NotificationController 挂起 60s，支撑携程十万级实例；Disconf/Archaius 同理。对比事故：某厂直连 ZK 做配置中心，3 万客户端 watch 同一节点，一次批量配置变更推送把 ZK Leader CPU 打满 100%，选举超时连续换主，半小时雪崩。
+
+协调服务的「正确打开方式」（什么该放什么不该放）：
+✅ 该放：集群元数据（服务地址列表、分片分配、leader 身份）、分布式锁、选主、小配置（KB 级，低频变更）
+❌ 不该放：业务数据、大配置（MB 级）、高频变更数据（秒级心跳指标）、消息队列、十万级客户端的直连推送
+
+踩坑：把 etcd 当 KV 数据库存业务（配额写满集群只读，K8s 真实事故）；watch 数量不设限（etcd 的 --watch-progress-notify 和 max-watch 要规划）；ZK 的 jute.maxbuffer 调大存大对象（事务日志膨胀，恢复时间从秒变分钟）；协调服务和业务服务抢同一物理机 IO（fsync 被业务磁盘 IO 拖慢，共识超时换主——ZK/etcd 的磁盘必须独立 SSD）；跨城部署当「全局注册中心」（RT 30ms 写延迟不可接受，应该每地域一套+上层联邦）。`,
+    keyPoints: ["写瓶颈=fsync+过半共识，推送瓶颈=扇出", "十万客户端用长轮询+通知拉取两段式", "协调服务只存元数据，不是数据库不是消息队列"],
+    followUps: ["Nacos 2.x gRPC 推送相比长轮询省了什么（连接数/包大小）？", "K8s apiserver 的 watch cache 怎么缓冲 etcd 压力？"],
+    favorited: false,
+  },
+  // ===== 数据与存储：分布式数据库（be-285 ~ be-291）=====
+  {
+    id: "be-285",
+    nodeId: "be-distributed-db",
+    question: "分库分表中间件（ShardingSphere）和 NewSQL（TiDB/OceanBase）的本质区别？怎么选？",
+    bigTech: true,
+    answer: `结论：分库分表是「应用层分片」——多个独立 MySQL 实例，靠中间件路由 SQL，分片逻辑侵入业务；NewSQL 是「数据库原生分布式」——存储层自带分片+共识复制+分布式事务，对应用透明，像用单机 MySQL 一样用。本质差异：分布式能力做在应用侧还是数据库内核侧。
+
+\`\`\`text
+架构对比：
+分库分表（ShardingSphere/MyCat）：
+  App → 中间件(路由/改写SQL/归并结果) → MySQL×N（实例间互不通信）
+  - 中间件只懂「分片键路由」，跨分片事务/Join/子查询是噩梦
+  - 每个 MySQL 还是单机主从，高可用靠 MHA/Orchestrator 外挂
+
+NewSQL（TiDB/OceanBase/CockroachDB）：
+  App → 计算层(无状态SQL层) → 存储层(Raft 多副本，自动分片均衡)
+  - 数据按 Range/Tablet 自动切分+搬迁，扩容对应用无感
+  - 原生分布式事务（Percolator/Paxos-2PC），跨「分片」无感
+  - 副本级高可用：单节点故障 Raft 自动选主，RPO=0
+\`\`\`
+
+\`\`\`text
+选型决策树：
+数据量 < 5000 万          单机 MySQL 足够，别折腾
+数据量大但模型简单         分库分表（订单按 user_id 分片，查询全带分片键）
+（纯按 ID 查/写）          成本最低，DBA 团队成熟
+复杂查询+跨分片事务        NewSQL（TiDB）：JOIN/聚合/事务透明
++弹性扩缩容+在线 DDL
+金融级强一致+高可用        OceanBase：Paxos+三地五中心，蚂蚁/支付宝背书
+全球化部署+跨洲一致        Spanner/CockroachDB：TrueTime/原子钟或 HLC
+团队无分布式 DBA           云 RDS 分库分表 或 TiDB Cloud（托管）
+\`\`\`
+
+\`\`\`text
+迁移路线的现实考量：
+1. 分库分表 → NewSQL 的触发点：
+   - 跨分片查询需求压不住（运营/财务要全量统计）
+   - 分片键选错历史包袱（早期按时间分，后来要按用户查）
+   - 扩容要停服迁数据（rehash 32→64 库痛不欲生）
+2. NewSQL 的代价：
+   - 硬件要求高（TiKV 要 SSD+大内存，三地部署×3 副本成本）
+   - 单机性能不如原生 MySQL（网络+共识开销，点查慢 2-5 倍）
+   - 运维复杂度上移（PD 调度/TiKV 参数/热点 Region 治理）
+\`\`\`
+
+案例：拼多多/字节跳动核心交易用 TiDB——分库分表时代大促前「扩库迁移」要备一个月，换 TiDB 后在线扩容；OceanBase 支撑支付宝核心账务，双 11 峰值 6100 万次/秒，三地五中心 RPO=0 RTO<8s（2023 数据）；京东物流用 ShardingSphere 扛运单（模型简单按运单号分片）；美团将酒店业务从 Mycat 迁移到自研 NewSQL（后开源为 Titan/内部转 TiDB）。
+
+踩坑：把 NewSQL 当「更快的 MySQL」用——点查场景 TiDB 延迟 2-5ms vs MySQL 0.5ms，纯 KV 场景血亏；分库分表后还用 SELECT * 不带分片键（广播全分片，中间件归并 OOM）；NewSQL 里滥用自增 ID 当主键（写入全压到尾部 Region 形成热点，TiDB 要 SHARD_ROW_ID_BITS 打散）；以为分布式事务免费——跨 Region 事务延迟是单机 10 倍，热点行冲突性能雪崩（账务类要把热点账户拆分）；分库分表的全局 ID 用数据库自增（步长错位法维护痛苦，直接上雪花 ID/号段）。`,
+    keyPoints: ["应用层分片 vs 内核级分布式", "NewSQL=透明分片+原生分布式事务+Raft 高可用", "点查场景 NewSQL 不如单机，复杂查询才回本"],
+    followUps: ["TiDB 的 SHARD_ROW_ID_BITS 和 AUTO_RANDOM 怎么防写热点？", "分库分表平滑迁移到 TiDB 的双写方案怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "be-286",
+    nodeId: "be-distributed-db",
+    question: "TiDB 的架构（TiDB Server/TiKV/PD）？数据怎么分布和调度？",
+    bigTech: true,
+    answer: `结论：TiDB 三层分离：TiDB Server = 无状态 SQL 计算层（解析/优化/执行，可水平扩）；TiKV = 分布式 KV 存储层（数据按 96MB Region 切片，每 Region 三副本 Raft 组）；PD（Placement Driver）= 集群大脑（存元数据+分配 TSO 全局时间戳+调度 Region 均衡/热点）。存储计算分离 + Raft 每 Region 独立选主，是它能弹性扩缩且 RPO=0 的根本。
+
+\`\`\`text
+数据分布全景：
+表数据 → 按主键范围切成多个 Region（默认 96MB/144 万行切分）
+每个 Region = 一个 Raft Group（3 副本：1 Leader + 2 Follower）
+Region 的副本分布在不同 TiKV 节点上（PD 保证跨机架/AZ）
+
+写入路径：
+SQL → TiDB Server → 找 PD 查「key 属于哪个 Region、Leader 在哪」
+  → 发请求给该 Region 的 Leader 副本 → Raft 复制到 2 个 Follower
+  → 过半提交 → 返回
+（PD 路由信息缓存在 TiDB Server，miss 或 Leader 迁移时刷新）
+
+扩容过程（加一台 TiKV）：
+1. PD 发现新节点 → 逐步把部分 Region 的副本「搬」过去
+2. 搬迁=新节点加入 Raft Group 作 Learner → 同步完 → 转 Voter
+   → 老副本删除（全程在线，业务无感）
+\`\`\`
+
+\`\`\`text
+PD 的三大职责：
+1. 元数据：Region→TiKV 的路由表（客户端查询入口）
+2. TSO（Timestamp Oracle）：全局单调递增时间戳分配
+   = 物理时间(18位前缀) + 逻辑计数，分布式事务的「全局时钟」
+   （TiDB 4.0 后 TSO 支持批量+本地缓存，不然 TSO 是瓶颈）
+3. 调度器：
+   - 均衡：各 TiKV 的 Region 数/Leader 数/存储量均衡
+   - 热点治理：热点 Region 拆分+迁移（follow-the-workload）
+   - 高可用：副本丢失（节点宕机）后补齐副本
+\`\`\`
+
+\`\`\`text
+Raft 在 TiKV 的优化（Multi-Raft）：
+单机可能有 10 万个 Region = 10 万个 Raft Group
+- 心跳合并：同一对 TiKV 之间的所有 Raft 心跳打包发送（Raft Message 合并）
+- 批量复制：日志 append 按批提交
+- 负载感知：Leader 不集中在某节点（PD 调度 Leader 均衡）
+- Hibernate Region：静默 Region（无流量）暂停心跳省 CPU
+\`\`\`
+
+案例：TiDB 在知乎已读服务——10 万亿行 KV，靠 Region 自动分裂合并承载；小红书将 MySQL 分库分表迁 TiDB，PD 热点调度扛住双 11 笔记流；神州数码用 TiDB 替换 Oracle 的 RAC，PD 的 TSO 支撑跨 Region 的 SI 隔离事务。热点治理案例：某厂按时间戳递增 ID 写日志表，尾部 Region 单点 5 万 QPS 打满，PD 自动 split + 手动 split region 打散。
+
+踩坑：Region 热点——顺序写入（自增主键/时间索引）永远压向最后一个 Region，其他节点围观（必须 AUTO_RANDOM 或预分裂）；PD 宕机=集群不可写新时间戳（PD 自身也是 Raft 3/5 节点，但 TSO 分配停顿=事务阻塞）；大范围扫表（count(*) 全表）打爆 TiKV 的 Coprocessor 线程池（要下推计算或走 TiFlash 列存）；大事务（单事务 100MB 上限）撑爆 TiKV 内存（拆批提交或开 BigTxn 优化）；跨机房三副本（RT 10ms=写延迟 10ms，同城三 AZ 是上限）；region merge 参数不当导致小 Region 过多（百万 Region 时 PD 心跳和元数据压力陡增）。`,
+    keyPoints: ["计算无状态+存储 Multi-Raft+PD 大脑", "Region 96MB 切片，搬迁=Learner→Voter", "TSO 全局时钟是分布式事务地基"],
+    followUps: ["TiKV 的 Coprocessor 下推了哪些计算（谓词/聚合）？", "PD 的 TSO 为什么不做成批量预分配（性能 vs 时钟回拨）？"],
+    favorited: false,
+  },
+  {
+    id: "be-287",
+    nodeId: "be-distributed-db",
+    question: "OceanBase 和 Google Spanner 各自怎么实现全球级强一致？（Paxos vs TrueTime）",
+    bigTech: false,
+    answer: `结论：两者都解决「跨地域部署下的强一致读写」，路线不同。OceanBase 走 Multi-Paxos——每个分区（Partition）独立 Paxos 组，多数派部署在多数城市，单机故障/单城灾难不影响多数派；Spanner 走 TrueTime——用原子钟+GPS 把「物理时钟不确定区间」变成可计算的 TT.after() 等待，实现全球外部一致性（线性一致），无需每次跨洲共识读。
+
+\`\`\`text
+OceanBase 的 Paxos 落地（三地五中心=蚂蚁经典部署）：
+- 数据按 Partition 分片，每 Partition 5 副本：
+  上海×2 + 杭州×2 + 深圳×1（或类似组合）
+- 多数派=3：上海+杭州任意组合即可达成多数 → 单城全灭不丢数据
+  （深圳挂了：沪杭 4 副本在；上海挂了：杭州 2+深圳 1=3 仍多数）
+- 写路径：Leader 在本城，日志同步多数派（跨城 RT 1-5ms 级，可接受）
+- 读优化：Follower 提供「弱一致读」分流；强读走 Leader 或
+  「读已提交的最大版本」（max_committed_ts 之后即可）
+- 存储：LSM 树（写友好），基线 SSTable + 增量 MemTable，
+  每日合并（merge）是著名运维点（大合并期间 IO 压力）
+\`\`\`
+
+\`\`\`text
+Spanner 的 TrueTime（2012 论文，全球分布式标杆）：
+问题：跨洲共识延迟无法接受每次读都走 Paxos（美欧 RT 100ms+）
+方案：让时钟本身成为「一致性凭证」
+1. 每个数据中心配 GPS 接收器+原子钟，全局校准
+2. TrueTime API 返回的不是一个时间点，而是区间 [earliest, latest]
+   （误差 ε 通常 1-7ms）
+3. 提交等待（Commit Wait）：
+   事务提交时间戳 s = TT.now().latest
+   必须等到 TT.after(s) 为真（真实时间确定越过 s）才返回客户端
+   → 任何后来的读（无论哪个洲）时间戳 > s，必然看到该事务
+   → 用「等待 ε」换来「全球线性一致」，ε 越小等待越短
+4. 读：快照读@时间戳，任何副本上满足 safe_time 即可服务，无需共识
+\`\`\`
+
+\`\`\`text
+对比总结：
+维度        OceanBase                Spanner
+一致性机制  Paxos 多数派              TrueTime+Paxos（写）+等待（提交）
+跨城写延迟  多数派 RT（同城级可优化）   跨洲 Paxos RT（100ms+，但批量摊薄）
+跨城读      弱读副本/强读 Leader       快照读本地副本（safe_time 内免费）
+硬件依赖    无特殊依赖                原子钟+GPS（云厂商才玩得起）
+开源/获取   开源+蚂蚁云               Google Cloud 独占（CockroachDB 是
+                                    开源平替，用 HLC 混合逻辑时钟）
+适用        国内金融级强一致           全球化业务（Google AdWords 账本）
+\`\`\`
+
+案例：OceanBase 在支付宝账务——双 11 核心链路三地五中心，2019 年 tpmC 7088 万破 TPC-C 纪录；江西银行/招商证券核心系统去 IOE 上 OB。Spanner 支撑 Google AdWords 广告账本——全球广告扣费的强一致；CockroachDB 用 HLC（无原子钟，ε 放宽到 250-500ms，commit wait 换 max_offset）在 Commerzbank 等欧洲银行落地；TiDB 的 follow-the-sun 多活借鉴 Spanner 的 placement 思路。
+
+踩坑：OB 的每日大合并没错峰（IO 打满业务抖动，要按 zone 轮转合并）；以为 Paxos 五副本没有成本（存储×5+网络×5，OB 的 2-2-1 是成本妥协）；Spanner 的 commit wait 在 ε 抖动时尾延迟飙升（GPS 信号受干扰时 ε 变大）；CockroachDB 把 max_clock_offset 配太小（时钟跳变直接致命错误 kill 节点）；把跨城强一致用于所有业务（80% 的业务最终一致就够，强一致留给账务/库存核心）。`,
+    keyPoints: ["OB=Paxos 多数派地理分布，三地五中心", "Spanner=TrueTime 区间+Commit Wait 换全球线性一致", "强一致有地域 RT 成本，核心链路才用"],
+    followUps: ["CockroachDB 的 HLC 在时钟回拨时怎么处理（restart 保护）？", "OB 4.x 的单机分布式一体化怎么降低小客户门槛？"],
+    favorited: false,
+  },
+  {
+    id: "be-288",
+    nodeId: "be-distributed-db",
+    question: "分布式事务怎么做？2PC、TCC、Saga、Percolator 各适合什么场景？",
+    bigTech: true,
+    answer: `结论：按「一致性强度×侵入性」分四档：2PC/XA = 强一致+零业务侵入但阻塞（数据库级，吞吐低）；Percolator = 强一致快照隔离+乐观锁（NewSQL 内核用，对应用透明）；TCC = 业务自己写 Try/Confirm/Cancel（强一致+高性能但侵入大，金融核心用）；Saga = 最终一致+补偿回滚（长流程用，如旅行预订）。选型一句话：内核能搞定的别写业务代码，写业务代码的选好幂等和防悬挂。
+
+\`\`\`text
+四种模式速览：
+模式        一致性    业务侵入  性能    典型应用
+2PC/XA      强一致    无        差      MySQL XA 事务（金融老系统联机）
+Percolator  快照隔离  无        中      TiDB/OceanBase 内核跨 Region 事务
+TCC         强一致    极大      高      蚂蚁金服从支付宝时代传承的核心交易
+Saga        最终一致  大        高      电商订单履约（下单→扣库存→支付→发货）
+本地消息表  最终一致  中        高      业务与 MQ 的一致性（最常用兜底）
+\`\`\`
+
+\`\`\`text
+Percolator（Google 论文，TiKV 实现）——快照隔离的分布式事务：
+核心数据结构：每行有 lock 列 + write 列（CF 存储）
+事务流程：
+1. 取 start_ts（TSO）
+2. Prewrite（所有写操作）：写 lock{primary: 主锁key, ts: start_ts}
+   检查：无其他锁 & 该 ts 之后无新写入（写写冲突检测）
+3. 取 commit_ts（TSO）
+4. Commit：先提交 primary lock（写 write{start_ts→commit_ts}，删 lock）
+   → 主锁提交成功=事务成功（原子点！），异步提交其他 secondary 锁
+读流程：遇到 lock → 检查 lock 的 ts 是否过期 → 过期则 resolve（回滚或
+补提交），未过期则等待/返回冲突
+故障恢复：任何节点挂了，其他事务靠 primary lock 状态推断事务结局
+（主锁没了+write 有记录=已提交；主锁还在且过期=回滚）
+\`\`\`
+
+\`\`\`java
+// TCC（Try-Confirm-Cancel）手写骨架——以扣款为例
+@Transactional
+public boolean tryDeduct(String txId, long userId, long amount) {
+    // Try：资源预留（冻结，不是真扣！）
+    if (accountMapper.freeze(txId, userId, amount) == 0) return false;
+    // 幂等：txId 唯一约束，重复 Try 直接返回已有记录
+    // 防悬挂：插入事务状态表 TRYING，空回滚时检查到就拒收 Cancel
+    return true;
+}
+public boolean confirmDeduct(String txId) {
+    // Confirm：真扣（冻结转实扣），必须幂等
+    return accountMapper.freezeToDeduct(txId) > 0;
+}
+public boolean cancelDeduct(String txId) {
+    // Cancel：解冻，必须幂等 + 防空回滚（没 Try 过的 Cancel 要记录）
+    return accountMapper.unfreeze(txId) > 0;
+}
+// 框架（Seata TCC/ByteTCC）负责驱动 Confirm/Cancel 重试直到成功
+\`\`\`
+
+\`\`\`text
+Saga 补偿（长流程标配）：
+正向：下单 → 扣库存 → 支付 → 发货
+补偿：       ↑释放    ↑退款    ↑拦截物流
+每个步骤失败 → 反向按序执行补偿（补偿也要幂等！）
+编排方式：
+- 编排式（Orchestration）：中央 Saga 状态机驱动（Seata Saga/Camunda）
+- 事件式（Choreography）：各服务听 MQ 事件接力（简单但链路难追踪）
+\`\`\`
+
+案例：蚂蚁核心交易全链路 TCC——支付宝转账的「冻结-扣款」模型支撑双 11 百万 TPS；TiDB 用 Percolator 支撑跨 Region 转账事务（知乎/拼多多在用）；Seata AT 模式（改进版 XA：全局锁+undo_log 自动补偿）在中腰部电商流行；Uber 自研 Saga（Cadence/Temporal 前身）编排打车长流程；本地消息表在美团外卖订单→积分发放链路兜底 MQ 一致性。
+
+踩坑：TCC 三异常全踩——空回滚（Cancel 先于 Try 到达：Try 网络超时触发 Cancel，要记录 Cancel 状态让后来的 Try 拒绝=防悬挂）、悬挂（Try 比 Cancel 晚到，资源永久冻结）、幂等（Confirm/Cancel 重试重复执行）；Saga 补偿本身失败（补偿要有独立告警+人工入口+死信队列）；2PC 的协调者单点+同步阻塞（参与者 locked 等协调者恢复，数据锁死——生产少用 XA 跨库）；Percolator 的热点行（所有事务改同一行=串行化，账务热点账户要拆分子账户）；Seata AT 的全局锁在长事务下锁竞争雪崩（AT 适合短事务，长流程上 Saga/TCC）。`,
+    keyPoints: ["2PC 阻塞/TCC 高性能高侵入/Saga 补偿最终一致", "Percolator=主锁原子提交点+快照隔离", "TCC 三防：幂等+空回滚+悬挂"],
+    followUps: ["Seata AT 的 undo_log 怎么实现自动补偿（前后镜像）？", "Percolator 的 async commit 怎么再省一次 RPC？"],
+    favorited: false,
+  },
+  {
+    id: "be-289",
+    nodeId: "be-distributed-db",
+    question: "PolarDB/Aurora 的存储计算分离架构是什么？为什么能 15 分钟扩容？",
+    bigTech: false,
+    answer: `结论：存储计算分离 = 计算节点（无状态，只跑 SQL 引擎）与存储节点（分布式共享存储，多副本）解耦，计算节点通过 RDMA 高速网访问共享存储。相比传统主从复制：数据只有一份（存储层三副本是存储自己的事），加只读节点不用拷数据（挂载即用）——这是「15 分钟扩 1 个只读节点 vs 传统几小时拷数据」的根本原因。核心黑科技：redo log 即数据（Aurora 名言：The log is the database）。
+
+\`\`\`text
+架构（以 Aurora/PolarDB 为蓝本）：
+计算层：1 主（读写）+ N 只读（最多 15 个），无状态
+  - Buffer Pool、undo、事务状态全在计算节点内存
+  - 崩溃恢复：重启后从共享存储拉 redo 回放，分钟级（传统要全量恢复）
+存储层：6 副本跨 3 AZ（Aurora）/ 3 副本（PolarDB PolarStore）
+  - 写入只发 redo log（不发数据页！）→ 网络流量降 10 倍+
+  - 存储节点后台把 redo 持续物化成数据页（page materialize）
+  - 读页：计算节点缺页 → 向存储节点请求「某页的某 LSN 版本」
+  - 写 quorum 4/6，读 quorum 3/6 → 容忍 2 副本写失败/3 副本读失败
+
+扩容为什么快：
+- 加只读 = 启动计算节点 + 挂载共享存储（数据已在）→ 分钟级
+- 传统主从加只读 = 全量备份恢复 + binlog 追平 → TB 级数据要数小时
+- 存储扩容 = 存储层按 10GB 块（Protection Group）自动条带化扩展，
+  对计算透明 → 单实例 128TB（Aurora）
+\`\`\`
+
+\`\`\`text
+redo log 即数据的深义：
+传统 MySQL 主从：binlog 复制 → 从库 SQL 线程重放 → 延迟且耗 CPU
+Aurora 模式：
+- 主库只把 redo log（物理日志，「某页某偏移改某字节」）发给存储层
+- 只读节点读数据时：页缓存 miss → 从共享存储读「最新物化页」
+- 只读延迟 = 主库 redo 到达存储层并被物化的延迟 ≈ 毫秒级
+  （传统主从复制延迟秒级~分钟级）
+- 存储层自行维护多副本一致（quorum 自愈：坏副本从好副本重建）
+\`\`\`
+
+\`\`\`text
+对比：存算分离 vs 传统主从 vs NewSQL
+维度        PolarDB/Aurora        传统 RDS 主从        TiDB(NewSQL)
+数据份数    1 份逻辑(存储多副本)   N 节点 N 份          每 Region 3 副本
+加只读      分钟级(挂载)           小时级(拷数据)        加 TiDB Server 秒级
+写扩展      单写节点(垂直扩)       单写节点              多节点并发写(水平)
+存储上限    128TB                 受单机磁盘限制        近乎无限
+写延迟      本地 quorum(微秒级)    本地写               Raft 过半(毫秒级)
+跨 AZ RPO   0(6副本)              异步复制 RPO>0        0(Raft)
+适用        单写多读大实例         中小业务              海量水平扩展
+\`\`\`
+
+案例：Aurora 是 AWS 增长最快的服务——Netflix/Samsung 的 MySQL 迁移目标；PolarDB 支撑阿里电商商品库，双 11 期间分钟级加只读节点扛读流量，2021 年 tpmC 破纪录；腾讯云 TDSQL-C（原 CynosDB）同架构服务微信读书；Socrates（微软 SQL Server 存算分离）把 page server 下沉到 Azure 存储。
+
+踩坑：以为存算分离=无限扩展（写节点只有一个！写 TPS 天花板 = 单计算节点性能，要分片还得靠 NewSQL 或分库分表）；只读节点的「读己之写」场景延迟（刚写完立刻读只读节点可能读到旧物化页，要 session 一致性/强制走主）；存储层按 IOPS 计费的模式（Aurora）在扫表大户账单爆炸；页物化延迟在写入洪峰时累积（redo apply 跟不上，只读延迟增大，要监控）；共享存储的单点逻辑（多副本防的是副本坏，存储层软件 bug 是全集群风险——云厂商的保险是快照+跨区复制）；本地 NVMe 缓存（PolarDB 的 PolarProxy/Aurora 的 cache）暖机期性能爬坡。`,
+    keyPoints: ["计算无状态+共享存储，加只读=挂载即用", "redo 即数据，网络只传日志", "单写节点是天花板，海量写要 NewSQL"],
+    followUps: ["Aurora 的 quorum 自愈怎么检测坏副本（gossip+crc）？", "存算分离下 Buffer Pool 失效后性能断崖怎么缓解？"],
+    favorited: false,
+  },
+  {
+    id: "be-290",
+    nodeId: "be-distributed-db",
+    question: "HTAP 是什么？TiDB 的 TiFlash 列存副本怎么实现「一份数据两种查询」？",
+    bigTech: false,
+    answer: `结论：HTAP = 同一套系统同时扛 TP（高并发小事务）和 AP（复杂分析查询）。传统方案是「MySQL + Canal 同步 + ClickHouse」两套系统——延迟分钟级+运维两套+口径不一致。TiDB 的解法：TiKV（行存，服务 TP）+ TiFlash（列存副本，服务 AP），两者用 Raft Learner 复制保持一致（毫秒~秒级延迟），优化器按代价自动选行存还是列存——业务一份数据，两种负载。
+
+\`\`\`text
+TiDB HTAP 架构：
+              ┌──────────── TiDB Server（SQL 层，MPP 引擎）
+              │      优化器：点查/小范围→TiKV；大聚合/扫表→TiFlash
+写入 → TiKV（行存 RocksDB，Raft Leader 服务读写）
+         │ Raft Log（Learner 角色：只复制不投票，不影响 TP 共识延迟）
+         ↓
+      TiFlash（列存，DeltaTree 引擎）
+         - 作为 Raft Learner 异步复制 TiKV 数据
+         - 列式存储：同一列连续存，压缩率 10x，聚合只读需要的列
+         - 向量化执行：一次处理一批（8192 行）而非一行，SIMD 加速
+         - MPP：大查询拆成子任务下发到多个 TiFlash 节点并行
+
+一致性读：TiFlash 收到查询 → 带 TSO 向 TiKV Leader 校验
+  「我的复制进度 ≥ 该 TSO？」→ 不够就等/补 → 保证快照一致
+\`\`\`
+
+\`\`\`text
+为什么行存 TP 快、列存 AP 快（本质）：
+行存（RocksDB/B+树）：
+  点查「id=9527 的整行」→ 一次 IO 全拿到 ✓
+  聚合「1 亿行的 amount 求和」→ 读 1 亿整行（含无用列）✗
+列存（DeltaTree/Parquet）：
+  点查 → 要拼装 N 个列文件 ✗（小查询放大 100 倍）
+  聚合 → 只读 amount 列 + 压缩 + SIMD 批量 → 快 100 倍 ✓
+  谓词下推+zone map（min/max 索引）跳过无关数据块
+\`\`\`
+
+\`\`\`text
+HTAP 方案横向对比：
+方案                    延迟      一致性      运维      代表
+ETL 同步到 OLAP          分钟~小时  最终一致    两套      MySQL+Canal+ClickHouse
+TiDB TiFlash            毫秒~秒    快照一致    一套      字节/小红书部分在用
+OceanBase 行列混存       秒级       强一致      一套      OB 4.x（行存+列存副本）
+PolarDB IMCI            秒级       快照一致    一套      阿里 IMCI 列索引
+Oracle In-Memory        实时       强一致      一套(贵)  老牌商用
+Google AlloyDB          秒级       快照一致    云托管    AWS/GCP 托管路线
+\`\`\`
+
+案例：小红书用 TiDB HTAP 支撑「交易订单实时看板」——订单写 TiKV，运营实时 SQL 直接打 TiFlash，告别凌晨 ETL；中通快递把 Oracle 报表迁 TiDB，运单轨迹实时分析从 T+1 变 T+10s；某券商用 OB 行列混存做盘后实时风控。反面：某厂把所有分析 SQL 打 TiFlash 但忘了设资源隔离，AP 大查询挤爆 CPU 导致 TP 点查超时（要开 MPP 资源组/独立 TiFlash 节点）。
+
+踩坑：以为 TiFlash 能完全替代 ClickHouse（极端宽表+超高压缩比的纯 AP 场景，专业 OLAP 仍领先 2-5 倍；HTAP 主打「新鲜度+一套系统」）；AP 查询没走 MPP（老版本 TiFlash 单节点执行，大查询慢，要确认 explain 里有 ExchangeSender）；行存索引在 AP 大查询里反而帮倒忙（优化器选错，要 hint read_from_storage(tiflash)）；Raft Learner 复制在写入洪峰时延迟拉大（AP 查询等待 snapshot 追赶，监控 tiflash_replica_read_delay）；列存副本默认 0（不建白搭），且要按表设置副本数，大表全列存成本翻倍（可以只给需要的表/分区开）。`,
+    keyPoints: ["TiKV 行存 TP+TiFlash 列存 AP，Raft Learner 异步复制", "优化器按代价选存储引擎", "HTAP 主打新鲜度和单系统，极端 AP 仍选专业 OLAP"],
+    followUps: ["TiFlash 的 DeltaTree 和 DeltaMerge 怎么处理更新（列存写难题）？", "MPP 的 Exchange 算子和 Spark 的 Shuffle 异同？"],
+    favorited: false,
+  },
+  {
+    id: "be-291",
+    nodeId: "be-distributed-db",
+    question: "分布式数据库的全局索引和局部索引区别？跨分片唯一约束怎么保证？",
+    bigTech: false,
+    answer: `结论：局部索引 = 每个分片只索引自己的数据（快，但非分片键查询要广播）；全局索引 = 索引本身也是一张按索引键分片的分布式表（非分片键点查直达，但写入要同步维护索引表=分布式事务开销）。跨分片唯一约束是分布式 DB 的硬骨头：单机靠 B+ 树唯一索引 O(1) 判重，跨分片必须让「同一唯一键值一定落到同一分片」或引入全局判重服务。
+
+\`\`\`text
+局部索引 vs 全局索引（以 TiDB/OceanBase 为例）：
+表：order(id PK, user_id, order_no, amount)，按 user_id 分片
+
+局部索引 idx_order_no(order_no)：
+  - 每个分片各自建 B+ 树，只含本分片数据
+  - 查询 WHERE order_no='X' → 不知道在哪个分片 → 广播所有分片各查一次
+    （分片越多扇出越惨，128 分片=128 次内部查询）
+  - 写入：索引和数据同分片，本地事务内更新，无额外开销
+
+全局索引（TiDB 5.x+ 支持）：
+  - 索引数据独立按 order_no 分片（和数据的分片规则不同）
+  - WHERE order_no='X' → 按 order_no 路由到索引分片 → 拿到主键
+    → 按主键回表 → 2 次 RPC 直达
+  - 写入：一笔订单写数据分片+写索引分片 → 跨分片 2PC 事务
+    → 写延迟翻倍，热点索引键（如 status 字段）会成为瓶颈
+\`\`\`
+
+\`\`\`text
+跨分片唯一约束的四种实现：
+1. 唯一键包含分片键（最常用！）
+   unique(user_id, order_no) → 同一 user_id 必同分片 → 本地唯一索引就够
+   业务设计时就该让唯一约束带上分片键（ShardingSphere 强制要求）
+2. 全局唯一索引（NewSQL 原生）
+   TiDB/OB：索引即表，unique 索引项按索引键分片，写入走分布式事务判重
+   成本：写放大+2PC，QPS 高的唯一键（手机号注册）要压测
+3. 全局判重服务（应用层）
+   手机号注册：先 Redis SETNX phone→uid（或独立的「分配表」单库）
+   成功才写分片 → 判重逻辑收敛到一个点
+4. 号段/雪花 ID 天然唯一（主键场景）
+   主键唯一性由 ID 生成算法保证，不靠数据库约束
+\`\`\`
+
+\`\`\`text
+选型经验：
+- 能用「分片键+业务键」做联合唯一就别上全局索引（零成本）
+- 非分片键查询 QPS 高且唯一 → 全局索引（NewSQL）或冗余映射表
+- 映射表（order_no → user_id 的一张全局小表，单库存放）
+  = 应用层全局索引，查询先路由映射表再路由数据，写入双写要事务
+- ES 异步索引：非实时场景把查询甩给搜索引擎，数据库不管
+\`\`\`
+
+案例：淘宝订单表按 buyer_id 分片，卖家查询走「卖家维度冗余表」（异构双写，数据团队维护一致性）——这就是应用层的全局索引思想；TiDB 全局索引支撑某电商「订单号直接查询」（订单号不含 user_id）场景；美团 Leaf 号段服务保证全局唯一 ID 不依赖分片约束；Instagram 早年用「逻辑时钟+用户 ID+序列」自研 ID，避免全局判重。
+
+踩坑：全局索引热点——给 status（只有 3 个值）建全局索引，所有写「status=1」索引项的事务挤一个分片；全局索引和数据一致性在「异步维护」方案里丢数据（消息队列同步索引挂了就索引缺失，要有对账任务）；全局唯一索引在 NewSQL 里写入 TPS 打 5-7 折（2PC 开销），注册中心级别的判重要 Redis 前置挡；分库分表下用 REPLACE INTO/INSERT IGNORE 依赖唯一约束（跨分片失效，变重复数据）；迁移期「老局部索引+新全局索引」并存，优化器选错导致查询扇出（要用 hint 钉死）。`,
+    keyPoints: ["局部索引快但要广播，全局索引直达但写放大", "唯一约束首选「分片键+业务键」联合唯一", "映射表=应用层全局索引"],
+    followUps: ["TiDB 全局索引的写入路径（index backfill）怎么做在线变更？", "MongoDB 分片集群的唯一索引限制（必须含分片键前缀）设计理由？"],
+    favorited: false,
+  },
+  // ===== 数据与存储：实时计算 Flink（be-292 ~ be-298）=====
+  {
+    id: "be-292",
+    nodeId: "be-flink",
+    question: "Flink 的状态（State）是什么？三种状态后端怎么选？RocksDB 状态为什么能扛 TB 级？",
+    bigTech: true,
+    answer: `结论：状态 = 流计算中「算子记住的历史信息」——窗口聚合的中间结果、去重用的集合、CEP 的匹配进度。无状态计算（map/filter）随便扩缩容，有状态计算的核心难题是「状态存哪、故障怎么恢复、扩缩容怎么迁移」。三种状态后端：Memory（堆内，测试用）、FsState（堆内+快照到 HDFS，生产中等状态）、RocksDB（本地磁盘 LSM，增量快照，TB 级状态生产标配）。
+
+\`\`\`java
+// 状态的两种形态（API 层）
+// 1. Keyed State（主流，按 key 分区存储）
+stream.keyBy("userId").process(new KeyedProcessFunction<>() {
+    private ValueState<Long> clickCount;      // 单值
+    private ListState<Event> recentEvents;    // 列表
+    private MapState<String, Long> pageStats; // Map
+    private ReducingState<Long> totalAmount;  // 聚合（自动 reduce）
+    public void open(Configuration c) {
+        clickCount = getRuntimeContext().getState(
+            new ValueStateDescriptor<>("cnt", Long.class));
+    }
+});
+// 2. Operator State（算子级，不按 key——Kafka 消费的 offset 就是典型）
+\`\`\`
+
+\`\`\`text
+三种状态后端对比：
+维度        MemoryStateBackend   FsStateBackend        RocksDBStateBackend
+运行时存    堆内对象             堆内对象              本地 RocksDB(堆外+磁盘)
+状态上限    MB 级                GB 级(受堆限制)       TB 级(受磁盘限制)
+访问延迟    纳秒级(对象引用)      纳秒级                微秒级(序列化+LSM 读)
+快照        全量，慢             全量到 HDFS           增量快照(只传变化 SSTable)
+OOM 风险    高                   中                    无(超内存自动落盘)
+适用        单元测试             中等状态(分钟级窗口)   生产大状态(小时/天级窗口)
+\`\`\`
+
+\`\`\`text
+RocksDB 扛 TB 级的原理：
+1. LSM 树：写先进 MemTable → 满则 flush 成 SSTable（顺序写，快）
+   读：MemTable → Block Cache → 逐层 SSTable（布隆过滤器过滤）
+2. 增量 Checkpoint：每次快照只需把「新增的 SSTable 文件」上传 HDFS
+   （已上传的文件不可变，引用计数共享）→ TB 状态分钟级快照
+3. 堆外内存：MemTable/BlockCache 走 native 内存，不受 GC 影响
+   （要配 taskmanager.memory.managed 系列参数，容器里注意总限额）
+4. 本地磁盘：SSD 是底线（HDD 随机读放大打死算子）
+\`\`\`
+
+案例：字节跳动广告计费——Flink 任务状态 10TB+（用户行为去重集），RocksDB + 增量 checkpoint 每分钟一次；美团实时数仓的 UV 明细状态用 RocksDB + TTL（StateTtlConfig 自动过期，防状态无限膨胀）；阿里双 11 实时大屏，单任务 keyed state 百亿条。反面：某厂用 FsStateBackend 跑 24 小时窗口去重，堆内存撑爆 Full GC 雪崩，换 RocksDB 后稳定。
+
+踩坑：状态不设 TTL——用户画像类任务状态只增不减，RocksDB 磁盘打满（StateTtlConfig 必配，按业务窗口+1 天）；RocksDB 的 BlockCache 没调大（默认 8MB 太小，读放大 CPU 飙高）；Checkpoint 目录复用（两个 job 写同一 HDFS 路径互相覆盖，恢复出别的 job 状态=数据错乱）；扩容改并行度后 KeyedState 重分布（KeyGroup 重分配，恢复时自动，但 rescale 瞬间吞吐下降要预案）；用小文件多的 HDFS 做 checkpoint（百万 checkpoint 文件打爆 NameNode，要 checkpoint 定期清理+合并）；State 里存不可序列化的对象（RocksDB 后端强制序列化，Kryo 注册表不一致恢复失败）。`,
+    keyPoints: ["KeyedState 按 key 分区，RocksDB 增量快照扛 TB", "State TTL 必配防无限膨胀", "生产大状态=RocksDB+SSD+增量 checkpoint"],
+    followUps: ["Flink 扩缩容时 KeyGroup 怎么重分布（rescale 不丢状态）？", "State 的 ForSt 新后端相比 RocksDB 改进在哪（存算分离）？"],
+    favorited: false,
+  },
+  {
+    id: "be-293",
+    nodeId: "be-flink",
+    question: "Flink 的滚动、滑动、会话窗口区别？事件时间 vs 处理时间怎么选？",
+    bigTech: true,
+    answer: `结论：窗口 = 把无限流切成有限批次做聚合的手段。滚动窗口（Tumbling）：固定长度、不重叠（每分钟一组）；滑动窗口（Sliding）：固定长度+步长、可重叠（每 10 秒统计最近 1 分钟）；会话窗口（Session）：按活动间隙切分（用户 30 分钟没操作就关窗）。时间语义：事件时间（Event Time，数据自带时间，乱序可纠正，生产必选）vs 处理时间（Processing Time，到达算子的系统时间，快但结果不可复现）。
+
+\`\`\`java
+// 三种窗口代码速览（DataStream API）
+// 1. 滚动：每分钟 UV
+stream.keyBy("page").window(TumblingEventTimeWindows.of(Time.minutes(1)))
+      .aggregate(new UvCounter());
+// 特点：12:00:00-12:01:00 一个窗，12:01:00-12:02:00 下一个，不重叠
+// 每条数据只属于 1 个窗口
+
+// 2. 滑动：每 10s 输出最近 1 分钟的均值（监控指标常用）
+stream.keyBy("metric").window(SlidingEventTimeWindows.of(
+      Time.minutes(1), Time.seconds(10))).aggregate(new Averager());
+// 特点：每条数据属于 6 个窗口（60/10），计算量×6，输出密
+
+// 3. 会话：用户行为会话切割（gap=30min）
+stream.keyBy("userId").window(EventTimeSessionWindows.withGap(Time.minutes(30)))
+      .process(new SessionAnalyzer());
+// 特点：窗口长度不固定，数据驱动；两个事件间隔<gap 就合并窗口
+\`\`\`
+
+\`\`\`text
+事件时间 vs 处理时间（面试必考对比）：
+维度        事件时间 EventTime           处理时间 ProcessingTime
+依据        数据里的 timestamp 字段       算子机器的系统时钟
+乱序        靠 Watermark 容忍             不存在乱序概念（来了就处理）
+重放结果    可复现（同数据同结果）        不可复现（重跑时间变了）
+延迟数据    可处理（allowedLateness）     无法识别
+时钟依赖    无（逻辑时钟推进）            依赖机器时钟
+适用        生产默认（报表/计费/对账）    实时监控（对绝对精度不敏感，
+                                   只要快——如 QPS 大屏）
+\`\`\`
+
+\`\`\`text
+窗口触发与迟到处理完整链路：
+1. Watermark 推进：WM = 观察到的最大事件时间 - 允许乱序(如 10s)
+2. 触发条件：WM > 窗口 endTime → 触发计算
+3. 迟到数据（WM 已越过窗口 endTime 后才到达）：
+   - allowedLateness(1min)：额外容忍 1 分钟，每条迟到数据触发重算
+   - sideOutputLateData：再晚的进侧输出流（单独收集对账/告警）
+4. 窗口销毁：WM > endTime + allowedLateness → 状态清理
+\`\`\`
+
+案例：阿里双 11 实时 GMV——事件时间+滚动窗口，Watermark 允许 5s 乱序，跨机房传输延迟靠 allowedLateness 30s 兜底；滴滴实时计费按行程事件时间开窗（手机弱网补传数据也能正确计费）；某厂用处理时间做实时对账，凌晨机房时钟跳变（NTP 校准）导致窗口数据重复计算，资损数万——计费类必须事件时间。会话窗口经典场景：App 用户行为分析（友盟/GrowingIO 的会话切割逻辑同源）。
+
+踩坑：滑动窗口步长太小（1min 窗口 1s 步长=60 倍计算量，metric 全聚合 CPU 爆炸）；会话窗口 gap 设太大（用户隔夜回来被并入昨天会话）或太小（一次浏览被切成多个会话，行业标准 gap=30min）；事件时间字段解析错（日志里多个时间戳，取了采集时间不是业务时间）；Watermark 设太保守（允许乱序 10min=所有窗口延迟 10min 出结果，老板看到的「实时」大屏是 10 分钟前的）；滑动窗口+长 allowedLateness 的状态膨胀（每窗都保留到 lateness 结束）；窗口里用 ProcessWindowFunction 全量缓存数据再算（应该用增量 aggregate，全量缓存大窗口必 OOM）。`,
+    keyPoints: ["滚动 1 对 1/滑动 1 对 N/会话数据驱动", "生产用事件时间+Watermark，处理时间只做粗监控", "迟到三档：乱序容忍→allowedLateness→侧输出"],
+    followUps: ["Watermark 多并发/多分区时怎么取最小值（对齐语义）？", "会话窗口的合并机制在 Checkpoint 里怎么保证一致？"],
+    favorited: false,
+  },
+  {
+    id: "be-294",
+    nodeId: "be-flink",
+    question: "Watermark 水位线机制详解：乱序数据怎么处理？为什么 idle 分区会导致窗口不触发？",
+    bigTech: true,
+    answer: `结论：Watermark = 「逻辑时钟的推进承诺」——算子看到 WM=t 就相信「事件时间 ≤ t 的数据已经全部到齐」（允许 t 之后仍有少量迟到，但不等它们）。WM = 已见最大事件时间 - 允许乱序时长。它是事件时间语义的引擎：窗口触发、定时器、状态清理全靠 WM 推进。idle 分区陷阱：多分区 WM 取所有分区的最小值，一个分区没数据（idle）就不推进 WM，全局 WM 卡住，窗口永远不触发——Flink 1.11+ 用 withIdleness 标记空闲分区解决。
+
+\`\`\`text
+Watermark 生成与传播：
+1. 源头生成（推荐在 Source 或最早的算子）：
+   assignTimestampsAndWatermarks(
+     WatermarkStrategy.<Event>forBoundedOutOfOrderness(Duration.ofSeconds(10))
+       .withTimestampAssigner((e, ts) -> e.getEventTime()))
+   含义：最多容忍 10s 乱序 → WM = maxEventTime - 10s
+
+2. 传播规则：
+   - 单算子多输入分区：WM = min(所有上游分区 WM) ← 木桶效应！
+   - 下游算子：拿到上游广播的 WM
+   - WM 单调递增（新 WM 必须 > 当前 WM 才更新）
+\`\`\`
+
+\`\`\`text
+idle 分区卡死问题（真实事故高发）：
+场景：Kafka 8 分区，夜间低峰只有 2 个分区有数据
+- 6 个 idle 分区不发数据也不发 WM
+- 下游算子 WM = min(8 个分区) = 卡在 6 个 idle 分区的旧 WM
+- 2 个有数据分区的数据疯狂缓存，窗口永不触发，任务看似 hang 死
+
+解法：
+WatermarkStrategy.<Event>forBoundedOutOfOrderness(...)
+    .withIdleness(Duration.ofMinutes(1));
+// 1 分钟没数据 → 该分区被标记 idle → WM 计算时排除它
+// 注意：idle 分区恢复有数据时自动「复活」
+// Kafka source 还会因「分区数 > 并行度」部分 subtask 无分区可消费
+// → 这些 subtask 也标 idle
+\`\`\`
+
+\`\`\`text
+乱序处理决策参数（面试追问「乱序程度怎么定」）：
+乱序容忍 = 业务可接受延迟 与 数据完整性 的权衡
+- 日志采集链路（Flume→Kafka）：典型乱序 2-10s → 设 10-15s
+- 移动端弱网（地铁断网补传）：乱序可达分钟级 → WM 容忍 1min
+  + allowedLateness 10min + 侧输出兜底（三层防线）
+- 跨洋专线（全球数据汇总）：乱序秒级但抖动大 → 按 P99 延迟设
+观测先行：先用 metric 统计 eventTime lag 分布（P50/P99），
+再定容忍值——拍脑袋设的值不是浪费内存就是丢数据
+\`\`\`
+
+案例：滴滴行程计费——乘客手机进隧道断网 5 分钟，出站后行程事件批量补传，WM 容忍 2min+lateness 10min 保证计费不重不漏；阿里云实时大屏全球机房数据汇总，跨洋链路 WM 设 30s+按机房分区对齐；某厂没配 withIdleness，Kafka 分区夜间 idle，凌晨报表窗口数据卡在 23:50 不触发，早高峰数据洪峰+积压数据齐发直接打挂下游——加 idleness 后解决。
+
+踩坑：WM 生成放错位置（在 keyBy 之后生成——keyBy 前数据已乱序，要在 source 或第一个算子）；以为 WM 能处理任意迟到（迟到超出容忍就靠 lateness/侧输出，WM 不是万能的）；多流 join 时两边 WM 不同步（双流对齐：各自 WM 都要越过 join 窗口才触发，一条流 idle 全卡住，两流都要 withIdleness）；WM 时间戳用错字段（日志的 @timestamp 是采集时间不是业务时间，乱序评估全错）；allowedLateness 内每条迟到数据触发一次重算（高频迟到=结果疯狂更新，下游写入放大，要评估下游幂等能力）；测试环境时钟和生产差时区（eventTime 是 UTC 解析成 CST，WM 差 8 小时，窗口全废）。`,
+    keyPoints: ["WM=maxEventTime-乱序容忍，多分区取最小", "idle 分区用 withIdleness 排除，否则全局卡死", "乱序容忍按 P99 lag 观测定，别拍脑袋"],
+    followUps: ["Watermark 对齐（watermark alignment）解决多源时钟倾斜？", "周期性 WM vs 标点式 WM 的取舍（生成频率 vs 延迟）？"],
+    favorited: false,
+  },
+  {
+    id: "be-295",
+    nodeId: "be-flink",
+    question: "Flink Checkpoint 机制（Chandy-Lamport）怎么实现分布式快照？对齐 vs 非对齐？",
+    bigTech: true,
+    answer: `结论：Checkpoint = 全局一致性快照，基于 Chandy-Lamport 算法变种：JobManager 注入 barrier（屏障标记）随数据流流动，算子收到 barrier 就快照自己的状态，barrier 流过即「这一刀切下去」——所有算子的快照拼起来就是全局一致状态（恰好处理到 barrier 位置的数据）。对齐 checkpoint：多输入算子等所有输入的 barrier 到齐才快照（期间缓存后到数据）；非对齐（1.11+）：barrier 优先「插队」通过，in-flight 数据一并入快照，反压时快照时间从分钟级降到秒级。
+
+\`\`\`text
+对齐 Checkpoint 完整流程（单并行度理解）：
+1. JM 触发 checkpoint-n → Source 记录 Kafka offset → 注入 barrier-n
+2. barrier 随数据流向下游流动（和数据一起排队，不插队）
+3. 算子收到 barrier：
+   - 单输入：立即快照状态 → barrier 继续往下游发
+   - 多输入（如 keyBy 后接收 8 个分区）：等所有 8 个分区的 barrier
+     到齐（barrier alignment），先到分区的数据缓存不处理 →
+     全到齐 → 快照 → 继续
+4. Sink 收到 barrier → 快照 → 上报 JM
+5. JM 收齐所有算子确认 → checkpoint 完成（状态已持久化到 HDFS/S3）
+恢复：从最近完成的 checkpoint 恢复所有状态 + Source 回到记录的
+offset 重放 → 端到端恰好一次
+\`\`\`
+
+\`\`\`text
+对齐的致命伤（为什么发明非对齐）：
+反压场景：下游慢 → 数据在 channel 里排队 → barrier 也排队
+→ barrier 到达时间 = 排队数据消费完的时间 = 分钟级
+→ checkpoint 超时失败 → 故障恢复点回退 → 状态更旧 → 更慢（恶性循环）
+
+非对齐 Checkpoint（Unaligned Checkpoint）：
+1. barrier 到达输入通道时「插队」到队首优先通过
+2. 被超越的 in-flight 数据（队列里未处理的）作为通道状态
+   一并快照（channel state）
+3. 算子无需等待对齐 → 快照耗时 ≈ 状态写 HDFS 时间 ≈ 秒级
+代价：快照体积变大（含 channel 数据），恢复时要先回放 in-flight
+适用：反压常态化的高吞吐任务（双 11 大促期默认开）
+\`\`\`
+
+\`\`\`text
+生产配置清单（面试加分项）：
+env.enableCheckpointing(60_000);                    // 间隔 1min
+conf.set(EXECUTION_CHECKPOINTING_MODE, EXACTLY_ONCE);
+conf.set(EXECUTION_CHECKPOINTING_TIMEOUT, 10min);   // 超时任其失败别强杀
+conf.set(EXECUTION_CHECKPOINTING_MIN_PAUSE, 30s);   // 两次 ck 最小间隔
+conf.set(EXECUTION_CHECKPOINTING_MAX_CONCURRENT, 1);// 串行，防资源争抢
+conf.set(ENABLE_UNALIGNED, true);                   // 反压任务开非对齐
+conf.set(EXECUTION_CHECKPOINTING_TOLERABLE_FAILED, 3); // 容忍失败次数
+state.backend.incremental=true;                     // RocksDB 增量快照
+externalized checkpoint：RETAIN_ON_CANCELLATION     // 取消任务保留快照
+\`\`\`
+
+案例：字节跳动推荐特征流——每秒千万事件，常态反压，非对齐 checkpoint 把快照时间从 8 分钟压到 20 秒；阿里实时数仓用增量 RocksDB checkpoint，10TB 状态每分钟快照仅上传 GB 级增量；Netflix Keystone 管道用 externalized checkpoint 做蓝绿部署（新旧任务从同一快照启动，对比输出）。反面：某厂 checkpoint 间隔 10s 且 max_concurrent>1，快照互相争抢 IO 全部超时，任务「永远恢复中」。
+
+踩坑：checkpoint 超时设太短（大状态全量快照 5 分钟，超时 1 分钟永远失败——要按观测逐步调）；HDFS 小文件（每次 ck 写几万小文件，NameNode 压力大，用 S3/合并上传）；非对齐 checkpoint 与「两阶段提交 sink」组合的版本兼容问题（老版本不支持，升 1.13+）；恢复时改并行度（KeyedState 按 KeyGroup 重分布没问题，OperatorState 的 ListState 会均分导致 offset 错乱——Kafka source 的 union redistribution 要懂）；checkpoint 成功但「上一次完成的 ck」被清理策略删掉（retained_checkpoints 数量要≥2）；barrier 在「多输入 join」算子对齐时缓存暴涨 OOM（反压+大窗口 join 开非对齐）。`,
+    keyPoints: ["barrier 切分数据流，算子快照拼全局一致", "对齐等齐/非对齐插队+通道状态", "反压任务必开非对齐+增量快照"],
+    followUps: ["Generic Log（changelog）快照和非对齐的关系？", "Savepoint 和 Checkpoint 的工程差异（手动触发+版本兼容）？"],
+    favorited: false,
+  },
+  {
+    id: "be-296",
+    nodeId: "be-flink",
+    question: "Flink 的 Exactly-Once 语义怎么实现端到端？Kafka→Flink→MySQL/ES 分别怎么做？",
+    bigTech: true,
+    answer: `结论：Exactly-Once 是「端到端」概念，三段缺一不可：Source 可重放（offset 记录进 checkpoint）、内部状态一致（barrier 快照保证）、Sink 幂等或事务（恢复重放时不产生重复副作用）。Flink 内部只保证状态级 exactly-once；端到端要靠 Sink 的两阶段提交（2PC Sink）或幂等写入。At-least-once（重放重复）和 Exactly-once 的差别只在 Sink 怎么处理重复。
+
+\`\`\`text
+三段拆解（Kafka → Flink → 外部系统）：
+1. Source 端：Kafka offset 作为 OperatorState 存入 checkpoint
+   → 故障恢复从记录的 offset 重读 → 输入不丢（可能重）
+2. Flink 内部：barrier checkpoint → 状态快照一致
+   → 恢复后状态 = barrier 切点状态（恰好一次处理到切点）
+3. Sink 端（决定成败）：
+   恢复后，barrier 之后的数据会重放 → Sink 必须消化重复：
+   方案A 幂等写入：按业务主键 upsert（重复写=覆盖，天然去重）
+   方案B 两阶段提交：预提交随 checkpoint，checkpoint 完成才真提交
+   方案C 事务性写入：写进事务，checkpoint 完成才 commit
+\`\`\`
+
+\`\`\`java
+// TwoPhaseCommitSinkFunction 模板（Flink 提供的 2PC Sink 基类）
+class KafkaProducerSink extends TwoPhaseCommitSinkFunction<Event, KafkaTxn, Void> {
+    // 1. beginTransaction：每个 checkpoint 周期开一个 Kafka 事务
+    protected KafkaTxn beginTransaction() {
+        producer.initTransactions();        // Kafka 0.11+ 事务 API
+        producer.beginTransaction();
+        return new KafkaTxn(producer);
+    }
+    // 2. invoke：数据写进事务（未提交，外部不可见——read_committed 隔离）
+    protected void invoke(KafkaTxn txn, Event e, Context ctx) {
+        txn.producer.send(new ProducerRecord<>("topic", serialize(e)));
+    }
+    // 3. preCommit：barrier 到达 → flush（仍未提交）
+    protected void preCommit(KafkaTxn txn) { txn.producer.flush(); }
+    // 4. commit：checkpoint 全局完成 → 真正提交事务
+    protected void commit(KafkaTxn txn) { txn.producer.commitTransaction(); }
+    // 5. abort：checkpoint 失败 → 丢弃事务（外部永远没看到这批数据）
+    protected void abort(KafkaTxn txn) { txn.producer.abortTransaction(); }
+}
+// Kafka→Flink→Kafka 全链路 exactly-once 官方支持（ReadCommitted 消费者）
+\`\`\`
+
+\`\`\`text
+常见 Sink 落地方案速查：
+MySQL      幂等：INSERT ... ON DUPLICATE KEY UPDATE（业务主键）
+           或事务 sink（JDBC exactly-once connector，XA 事务，性能差慎用）
+ES         幂等：document id = 业务主键 hash，bulk upsert（重复写覆盖）
+           注意 ES 刷新可见性与 checkpoint 间隔的配合（近实时一致）
+HBase      幂等：Put 按 rowkey 覆盖（天然幂等）✓ 最省心
+ClickHouse ReplacingMergeTree 引擎 + 版本列（重复写靠引擎去重）
+Redis      SET key value（覆盖幂等）/ HSET 同理；INCR 类不幂等要 2PC
+文件/S3    StreamingFileSink 的 Bucket 按 checkpoint 切文件，
+           pending → committed 的两段式（本质也是 2PC）
+\`\`\`
+
+案例：美团实时数仓 Kafka→Flink→ES——document id 用「日志主键+时间窗口」hash，恢复重放只是重复覆盖；字节电商 GMV 用 Kafka 事务链路（source+sink 全事务，read_committed 消费下游）；某厂 Flink→MySQL 裸 JDBC sink（无幂等无事务），任务重启后数据翻倍，资损对账差 200 万——改 ON DUPLICATE KEY UPDATE 后解决；Flink CDC→StarRocks 的 exactly-once 依赖 SR 的主键模型 upsert。
+
+踩坑：把「Flink 状态 exactly-once」当「端到端 exactly-once」（Sink 不幂等照样重复）；Kafka 事务 sink 的 transactional.id 没配前缀复用（多任务共用 producer 事务 fencing 失效，僵尸 producer 提交脏数据，要配 transactionIdPrefix+唯一）；幂等 upsert 但「更新逻辑依赖旧值」（counter += 1 的 SQL 重放=重复加，要改成写绝对值）；2PC sink 的 preCommit 后任务挂（恢复时会先 commit 残留事务再继续——TwoPhaseCommitSink 已处理，自研 sink 易漏）；checkpoint 间隔 10 分钟导致事务挂太久（Kafka 事务超时 transaction.timeout.ms 默认 15min，要大于 ck 间隔）；下游「read_uncommitted」消费者看到未提交数据（要配 isolation.level=read_committed）。`,
+    keyPoints: ["端到端=可重放 Source+barrier 状态+幂等/2PC Sink", "Kafka 全链路事务官方支持，MySQL/ES 靠主键幂等", "INCR 类相对写不幂等，要写绝对值"],
+    followUps: ["Kafka 事务的 fencing（producer epoch）怎么防僵尸提交？", "两阶段提交 sink 在「最后一次 checkpoint 完成前宕机」的恢复路径？"],
+    favorited: false,
+  },
+  {
+    id: "be-297",
+    nodeId: "be-flink",
+    question: "Flink 反压（Backpressure）是什么？怎么发现和定位反压源？",
+    bigTech: false,
+    answer: `结论：反压 = 下游处理速度跟不上上游发送速度，压力沿数据流逆向传导——本质是「流控」：Flink 没有消息队列缓冲（task 间直接 TCP 传输），下游慢就挤占上游的网络缓冲，上游 send 阻塞自然降速。反压本身是保护机制（防 OOM），但持续反压 = 吞吐下降 + checkpoint 超时（barrier 排队）。定位靠 Web UI 的 backpressure 标签 + 指标分层排查。
+
+\`\`\`text
+反压传导链路（基于 credit 的流控，1.5+）：
+上游 Task ──Netty channel──→ 下游 Task
+下游：按可用 buffer 数发 credit（信用额度）给上游
+上游：credit>0 才发送，credit=0 阻塞等待
+缓冲队列打满 → credit=0 → 上游输出阻塞 → 上游的输入也堆积
+→ 一路传导到 Source（Kafka 消费 lag 开始上涨=反压的最初信号）
+\`\`\`
+
+\`\`\`text
+定位反压五板斧（Web UI + Metrics）：
+1. Job 图颜色：Backpressure 标签 HIGH（红）=该算子被下游顶住
+   关键认知：标红的是「受害者」，病根在「它下游第一个不红的算子」
+2. 反压采样：taskmanager.backpressure.samples=100（默认）
+   栈采样显示 outPoolUsage（发送池使用率）=1.0 → 发送端被堵
+3. 指标三板：
+   - outPoolUsage=1 且 inPoolUsage 低 → 我是受害者，下游慢
+   - outPoolUsage 低 且 inPoolUsage=1 → 我是病根（我消费慢）
+   - busyTimeMsPerSecond → 接近 1000 说明算子真忙（CPU 瓶颈）
+                          低但反压 → 线程在等什么（外部调用/锁）
+4. 火焰图（1.13+ Flame Graph）：看算子 CPU 热点
+5. 检查外部依赖：Sink 调用的 MySQL/ES/Redis RT 是否飙升
+\`\`\`
+
+\`\`\`text
+常见反压根因与对策：
+根因                        症状                    对策
+并行度不足                   busyTime≈1000ms         扩并行度（状态后端支持 rescale）
+数据倾斜                    个别 subtask 忙死其他闲   key 打散（加盐两阶段聚合）
+外部 Sink 慢                busyTime 低但 inPool=1   Sink 加批量/异步/扩目标集群
+窗口/状态太大                RocksDB 读放大 CPU 高    调 block cache/上 SSD/拆窗口
+GC 停顿                     周期性卡顿               G1GC 调参/RocksDB 托管内存隔离
+checkpoint 对齐等待          对齐型 ck 期间吞吐跌     开非对齐 checkpoint
+Source 端积压（lag 涨）      lag 持续增长             这是结果不是原因，找下游
+\`\`\`
+
+\`\`\`text
+数据倾斜专项（最隐蔽的反压源）：
+症状：一个 keyBy 算子部分 subtask 反压 HIGH，其他 idle
+定位：Metrics 按 subtask 看 numRecordsIn，差距 10 倍+即倾斜
+对策：
+- 两阶段聚合：key 加随机后缀(0-N)局部预聚合 → 去后缀全局聚合
+- 热点 key 拆分：TOP100 热点 key 单独广播处理
+- AGG 算子的 mini-batch（攒批减少状态访问）
+\`\`\`
+
+案例：阿里双 11 实时任务常态微反压（可控），靠非对齐 checkpoint 保证快照不超时；某厂大促 ES Sink 集群磁盘 IO 打满，RT 从 5ms 涨到 500ms，反压传导导致 Kafka lag 涨 2 亿——临时扩 ES 节点+Sink 侧攒批（bulk 1000→5000）化解；滴滴实时派单的 keyBy(driverId) 倾斜（头部司机订单密度高），两阶段聚合后 CPU 降 40%。
+
+踩坑：只看 Job 整体反压不拆 subtask（倾斜被平均数掩盖）；反压就盲目扩并行度（外部 Sink 慢的话扩 100 倍也没用，反而打爆下游）；ignore in-flight data（非对齐 checkpoint 恢复时 in-flight 数据回放瞬间洪峰，要限流）；buffer timeout 调太小（吞吐换延迟过度，batch 攒不起来 CPU 反而高）；把 lag 高当反压唯一指标（Source 限流/上游 Topic 分区少也会 lag 高，要结合 outPoolUsage 判断）；RocksDB 反压时狂加 taskmanager 内存（该调的是 managed memory 比例和 block cache，不是总内存）。`,
+    keyPoints: ["credit 流控，下游慢逆传导到 Source lag 涨", "红的是受害者，病根在下游第一个不红的算子", "倾斜用两阶段聚合，外部慢用批量+扩集群"],
+    followUps: ["Flink 1.18 的 Universal checkpoint 怎么改善反压恢复？", "Reactive Mode 弹性扩缩容对反压的自动响应？"],
+    favorited: false,
+  },
+  {
+    id: "be-298",
+    nodeId: "be-flink",
+    question: "实时数仓怎么分层（ODS/DWD/DWS/ADS）？和离线数仓的分层差异？",
+    bigTech: false,
+    answer: `结论：实时数仓沿用离线分层思想但有取舍：ODS（原始日志接入 Kafka）、DWD（明细层：清洗+维度拉宽）、DWS（轻度汇总：按主题预聚合）、ADS（应用层：面向具体报表/接口）。核心差异：离线按「T+1 全量重算」设计，实时按「持续增量计算+状态维护」设计——实时 DWD 的维度拉宽要用「维度关联」（lookup join/广播流），实时 DWS 的聚合结果是「持续变化的指标流」而非静态分区。
+
+\`\`\`text
+实时数仓四层（Kafka 为核心管道）：
+业务库 ──CDC(Canal/Flink CDC)──→ ODS(Kafka topic：binlog 原始)
+日志 ──Flume/Filebeat─────────→ ODS(Kafka topic：原始日志)
+
+ODS → [Flink: 清洗/过滤/解析/标准化] → DWD(Kafka：明细宽表)
+       └─ 维度拉宽：lookup join MySQL 维表（+Guava 缓存/旁路 Redis）
+          或 broadcast stream 小维表全量进内存
+
+DWD → [Flink: 按主题预聚合，分钟级窗口] → DWS(Kafka：轻度汇总)
+       └─ 例：dws_trade_order_1min（品类+地区维度的单量/金额）
+
+DWS → [Sink 到服务层] → ADS
+       └─ OLAP(ClickHouse/Doris)：即席查询+报表
+       └─ Redis/HBase：点查服务（实时画像/大屏）
+       └─ MySQL：简单榜单
+\`\`\`
+
+\`\`\`text
+实时 vs 离线分层关键差异：
+维度        离线数仓                实时数仓
+存储        Hive/HDFS 分区表        Kafka topic（有保留期！）
+计算        T+1 全量重算            7×24 增量流式计算
+维度关联    直接 JOIN 维表分区       lookup join/广播流（维表变更难）
+修正数据    重跑分区即可            状态已污染，要回溯重刷（Kafka 重放）
+一致性      分区完成后一致          延迟+乱序，允许秒级误差
+成本        批量错峰廉价            常驻资源，大促要常驻扩容
+退化策略    无                     实时挂→离线补（Lambda 兜底）
+\`\`\`
+
+\`\`\`text
+实时特有的工程难题：
+1. 维表变更：DWD 拉宽时用户等级是「白银」，后来升级「黄金」，
+   历史明细要不要回溯？→ 常用方案：拉宽存当时值（事件时间快照），
+   需要当前值的查询在 ADS 层再关联一次
+2. 状态寿命：DWS 聚合状态不能无限存（TTL=窗口+1 天）
+3. Kafka 保留期：DWD 层要回溯重刷的话保留 3-7 天（成本与重刷需求权衡）
+4. 双流 join：订单流 join 支付流（间隔分钟级）→ interval join
+   +状态 TTL，别指望无限等
+5. 数据质量：实时没有「跑批失败重跑」，要监控埋点（topic lag/
+   解析失败率/迟到率）+ ADS 层与离线 T+1 对账
+\`\`\`
+
+案例：美团实时数仓——Flink+Doris 架构，DWD 层 40+ 主题宽表，ADS 直查 Doris 支撑骑手大屏；阿里菜鸟物流实时数仓：CDC→ODS→DWD（lookup join 菜鸟维表+Redis 旁路缓存命中率 95%）→ DWS 分钟级汇总→ Hologres 服务化；快手实时推荐特征：DWD 双流 join（播放+互动）interval join 窗口 30 分钟。反面：某厂实时数仓不做 DWD 拉宽，报表 SQL 全在 ADS 层临时 join，20 个报表任务各自关联维表，Redis 维表缓存被打穿。
+
+踩坑：实时 DWD 搞「全量维表 join」（流 join 批要用 lookup/broadcast，双流 join 维表=状态爆炸）；DWS 预聚合粒度太细（维度组合爆炸，状态几十亿条，要按主题收敛到常用维度子集）；Kafka topic 不规划分区数（DWD 分区少导致下游并行度上限被锁死，分区要≥最大预期并行度）；实时离线两套口径（GMV 实时版和离线版差 5%，老板面前打架——口径定义要同源，差异要可解释：实时含在途/离线只算完结）；ADS 直写 MySQL 大宽表（更新放大把 MySQL 打死，ADS 该写 OLAP/Redis）；没有降级开关（Flink 集群故障时 ADS 数据停更，要有离线兜底任务和口径标识）。`,
+    keyPoints: ["四层沿用离线思想，计算改增量+状态", "维度拉宽用 lookup join/广播流，别双流 join 维表", "实时挂离线补，口径同源可解释"],
+    followUps: ["Flink CDC 的 exactly-once 入仓怎么对齐 schema 变更？", "实时数仓的回溯重刷（reprocess）标准操作流程？"],
+    favorited: false,
+  },
+  // ===== 数据与存储：OLAP 与大数据（be-299 ~ be-305）=====
+  {
+    id: "be-299",
+    nodeId: "be-olap-bigdata",
+    question: "HBase 的 LSM 树存储和 Region 分裂机制？为什么适合写多读少？",
+    bigTech: false,
+    answer: `结论：HBase = BigTable 的开源实现，核心是 LSM 树（Log-Structured Merge Tree）：写先进 WAL（预写日志）→ MemStore（内存跳表）→ 满则 flush 成 HFile（不可变有序文件）→ 后台 compact 合并。写全是「内存追加+顺序写盘」→ 写吞吐极高；读要「MemStore + N 个 HFile 归并」→ 读放大靠布隆过滤器+BlockCache 缓解。数据按 rowkey 范围切 Region，Region 写大到 10GB 自动 split，RegionServer 管理多 Region——这就是「写多读少+海量数据+按 key 查询」场景的标准答案。
+
+\`\`\`text
+LSM vs B+ 树（MySQL InnoDB）：
+维度        LSM（HBase/Cassandra/RocksDB）  B+ 树（MySQL/PG）
+写          内存+顺序追加，O(1)              随机页更新，O(logN) 且写放大
+读          多路归并，有读放大               树高 3 层，2-3 次 IO 直达
+空间        未 compact 前有冗余              紧凑（页内填充）
+适用        写多读少/日志/时序               读多写少/事务/范围点查混合
+一句话：LSM 用「读放大+后台合并」换「写吞吐」
+\`\`\`
+
+\`\`\`text
+Region 分裂与分布：
+表按 rowkey 字典序切成 Region（连续区间 [startKey, endKey)）
+- 初始 1 个 Region → 写大到 10GB → 从中间 split 成两个
+- RegionServer（RS）管理数十~数百 Region，HMaster 负责分配均衡
+- 数据持久化在 HDFS（3 副本），RS 只是计算/缓存层
+  → RS 宕机：HMaster 把其 Region 分给其他 RS，
+    靠 WAL 回放恢复 MemStore（分钟级 RTO）
+rowkey 设计是生命线：
+- 单调递增 rowkey（时间戳前缀）→ 永远写最后一个 Region
+  = 热点（其他 RS 围观）→ 要加盐/hash 前缀/反转
+- 查询模式决定 rowkey：「按用户查最近行为」→ (userId + 逆序时间戳)
+\`\`\`
+
+\`\`\`text
+读写路径细节（面试深挖点）：
+写：WAL append（HDFS，防丢）→ MemStore（跳表插入）→ 返回
+    异步 flush：MemStore 128MB → 新 HFile
+读：BlockCache（读缓存）→ MemStore → 布隆过滤器逐个 HFile 判断
+    → 命中的 HFile 归并（多个版本+删除标记一并处理）→ 返回最新
+Compact：
+- minor compact：合并小 HFile，减少文件数
+- major compact：全量合并，物理删除过期版本/墓碑标记（IO 风暴，
+  业务高峰要禁：hbase.regionserver.majorcompaction 设 0 手动错峰）
+\`\`\`
+
+案例：小米用 HBase 存 MIoT 设备消息（万亿级 KV，写读比 9:1）；滴滴轨迹存 HBase（车辆 ID+时间逆序 rowkey，按车查轨迹）；快手用户信息 Feed 底层 HBase 支撑；Pinterest 的 Zen（图存储）构建在 HBase 上。反面：某厂用 HBase 当「大 MySQL」跑随机点查+频繁 update 同一 rowkey，读放大+version 堆积，P99 从 10ms 涨到 2s——compact 跟不上写入节奏。
+
+踩坑：rowkey 热点（时间戳开头必死，盐值/反转/MD5 前缀三选一）；Region 过多（单 RS 上千 Region，MemStore 内存挤爆+compaction 队列积压，要合并小 Region）；全表 scan 不设缓存批量（rpc 风暴，scan.setCaching(500)+ 禁 BlockCache 防缓存污染）；删除标记堆积（大量 delete 后没 major compact，墓碑拖慢读）；以为 HBase 有二级索引（原生没有！Phoenix/ES 双写二选一）；预分区不做（新表 1 个 Region 开局，导入期热点全压一台 RS，要按数据规模预分 100+ Region）；ZK session 超时导致 RS 自杀（GC 停顿>session timeout，RS 被 HMaster 判死后自己 shutdown——GC 调优是 HBase 运维日常）。`,
+    keyPoints: ["LSM=写内存+顺序盘，读归并有放大", "rowkey 设计决定热点与查询效率", "写多读少+海量 KV 选 HBase，点查事务别选"],
+    followUps: ["HBase 的 MOB（中等对象）存储怎么优化 100KB-10MB 场景？", "Cassandra 和 HBase 的一致性模型差异（AP tunable vs CP）？"],
+    favorited: false,
+  },
+  {
+    id: "be-300",
+    nodeId: "be-olap-bigdata",
+    question: "ClickHouse 为什么快？列存+向量化+MergeTree 的底层原理？",
+    bigTech: true,
+    answer: `结论：ClickHouse 的快感来自三板斧：列式存储（查询只读需要的列，IO 降 10-100 倍，同列数据类型一致压缩率 5-10 倍）；向量化执行（数据按列批次进 CPU 寄存器，SIMD 一条指令处理 4-8 个值，无虚函数调用）；MergeTree 引擎（数据按主键有序存成 part，稀疏索引跳块，后台 merge 去重/合并）。它不查索引找行，而是「暴力扫描+极致工程」——用全部 CPU 核并行扫，扫得比别人用索引还快。
+
+\`\`\`text
+列存+压缩的收益拆解：
+100 列表，查询只用 3 列：
+- 行存（MySQL）：读整行 1KB → 1 亿行 = 100GB IO
+- 列存（CH）：只读 3 列 ≈ 30 字节/行 → 3GB IO
+- 再压缩：同列数据相似（地区列就几十个值）→ LZ4/ZSTD 压到 1/5
+  → 实际 IO 600MB → 100 倍差距
+zone map：每个 part 按 granule（默认 8192 行）记录 min/max
+  → WHERE dt='2026-07-01' 直接跳过不满足的 granule（数据剪枝）
+\`\`\`
+
+\`\`\`text
+向量化执行 vs 传统火山模型：
+火山模型（MySQL/PG）：
+  for row in table:           # 一次一行
+      if filter(row): emit(row)   # 每行都要虚函数调用+分支预测失败
+向量化（CH/Doris/Arrow）：
+  for batch in table.batches(8192):     # 一次 8192 行的列数组
+      mask = simd_filter(batch.col)     # SIMD 指令批量比较
+      emit(batch.select(mask))
+  收益：CPU 缓存友好（列数据连续）+ 分支预测准 + SIMD 并行
+       + 无逐行虚函数 → 单核吞吐差 10 倍
+\`\`\`
+
+\`\`\`text
+MergeTree 家族（选型速查）：
+MergeTree              基础：按 ORDER BY 键有序，part 后台 merge
+ReplacingMergeTree     同主键去重（保留最新版本）→ 幂等写入救星
+SummingMergeTree       同主键数值列自动求和 → 预聚合报表
+AggregatingMergeTree   存聚合中间态（AggregateFunction 类型）
+                       → 物化视图的载体，实时聚合核心
+VersionedCollapsing..  带版本+状态列的折叠（订单状态变更场景）
+ReplicatedMergeTree    副本（ZK 协调，多机数据一致）
+Distributed            分布式表（不存数据，路由到各分片本地表）
+\`\`\`
+
+\`\`\`sql
+-- 生产建表示例（订单明细，亿级/日）
+CREATE TABLE orders_local ON CLUSTER 'ck'
+(
+    order_id UInt64, user_id UInt64, dt Date,
+    amount Decimal(18,2), status UInt8, province LowCardinality(String)
+    -- LowCardinality：低基数列字典编码，压缩+过滤双加速
+)
+ENGINE = ReplicatedReplacingMergeTree('/ck/tables/{shard}/orders', '{replica}')
+PARTITION BY toYYYYMM(dt)          -- 按月分区（分区是管理单元：删/移快）
+ORDER BY (province, dt, order_id); -- 排序键=稀疏索引：查询过滤维度打头
+-- Distributed 表路由：按 user_id 分片（sipHash64）
+\`\`\`
+
+案例：字节跳动用户行为分析（AB 测试平台）用 ClickHouse 集群支撑日均万亿行写入、秒级即席查询；腾讯音乐用户画像系统 CH 替代 Druid，查询延迟 P99 从 30s 降到 2s；Cloudflare 的 HTTP 分析（GraphQL API 背后就是 CH）。快手用 CH 支撑内部 BI，物化视图+AggregatingMergeTree 做分钟级预聚合。
+
+踩坑：高频小批量插入（每秒几十次小 insert → part 爆炸，「too many parts」写入拒绝——必须攒批：单次 10 万行+/秒级窗口）；UPDATE/DELETE 是 mutation（重写整个 part，巨慢——业务上要当「不可变数据」用，变更走 ReplacingMergeTree 新版本）；Distributed 表直连写（应该写 local 表或经分布式表但配 internal_replication，否则副本重复写）；JOIN 是弱项（右表要进内存 hash join，大 join 先过滤或用字典 dictGet 替代）；分页深翻（LIMIT 1000000, 20 照样扫前百万行，深分页用游标 WHERE id > last_id）；ORDER BY 键把高基数字段放前面（稀疏索引失效，过滤维度低基数的放前）；副本用 ZK 协调但 ZK 压力大（CH Keeper 替代，insert 频率高时 ZK 是瓶颈）。`,
+    keyPoints: ["列存+压缩=IO 降百倍，向量化=单核快 10 倍", "MergeTree 有序+稀疏索引+后台 merge", "攒批写入，mutation 是重写，当不可变数据用"],
+    followUps: ["ClickHouse 的 Projection 和物化视图差异（自动路由 vs 显式触发）？", "Sparse index 的 granule 大小怎么权衡（8192 行默认）？"],
+    favorited: false,
+  },
+  {
+    id: "be-301",
+    nodeId: "be-olap-bigdata",
+    question: "Doris/StarRocks 的 MPP 架构和 ClickHouse 对比？明细+聚合模型怎么选？",
+    bigTech: false,
+    answer: `结论：Doris/StarRocks = MPP（大规模并行处理）架构的 OLAP 新贵——查询被拆成分片在多个 BE 节点并行执行（每个节点向量化执行），再汇总。相比 ClickHouse：CH 强在单表极致扫描（大宽表一柱擎天），Doris/StarRocks 强在多表 JOIN（MPP shuffle join/broadcast join 成熟）+ MySQL 协议兼容+在线 DDL 友好。数据模型上 Doris 提供明细（Duplicate）、聚合（Aggregate）、主键（Unique）三种表模型，选错模型性能差 10 倍。
+
+\`\`\`text
+MPP 架构（Doris）：
+FE（Frontend）：元数据+查询规划+调度（类 TiDB 的 PD+SQL 层合一）
+BE（Backend）：存储+计算（列存+向量化）
+查询流程：
+SQL → FE 解析生成分布式执行计划（Fragment）
+  → 按数据分布把 Fragment 下发给相关 BE
+  → BE 本地扫描+局部聚合 → Exchange 节点跨机 shuffle
+  → 最终聚合返回
+关键：数据本身按「分桶（bucket）」分布在 BE 上，
+     分桶键=分布键，同分桶键的 join 可本地化（colocate join 免 shuffle）
+\`\`\`
+
+\`\`\`sql
+-- 三种表模型（Doris，选错是新手第一大坑）
+-- 1. Duplicate 明细模型：原样存，适合日志/明细（默认）
+CREATE TABLE logs (...) DUPLICATE KEY(dt, hour, user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 16;
+
+-- 2. Aggregate 聚合模型：同维度 key 自动预聚合（指标列指定聚合函数）
+CREATE TABLE ads_summary (
+    dt, channel, uv BIGINT REPLACE_IF_NOT_NULL,   -- 自定义聚合方式
+    pv BIGINT SUM, amount DECIMAL SUM
+) AGGREGATE KEY(dt, channel) ...;
+-- 写入即聚合，查询不用再 SUM——但失去明细！
+
+-- 3. Unique 主键模型（1.2+ 主流）：同主键覆盖，支持 UPDATE/CDC 同步
+CREATE TABLE orders (...) UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 16;
+-- Merge-on-Read（读时合并）vs Merge-on-Write（写时合并，查询快）
+-- CDC 场景必选 Unique（Flink CDC 同步 MySQL 订单表直接 upsert）
+\`\`\`
+
+\`\`\`text
+Doris vs StarRocks vs ClickHouse 速查：
+维度        Doris                 StarRocks            ClickHouse
+JOIN        强（colocate/bcast）   最强（CBO 优化器）    弱（大 join 要避免）
+单表扫描    强                    强                   最强
+并发能力    高（MPP 隔离好）       高                   中（默认 100 并发限制）
+CDC/更新    Unique 模型成熟        Primary Key 成熟     弱（mutation 慢）
+物化视图    有（异步/同步）        强（透明改写）       有（Aggregating）
+运维        简单（无 ZK 依赖）     简单                 中（ZK/Keeper）
+生态        百度/Apache            阿里系/镜舟          国际社区最活跃
+\`\`\`
+
+案例：美团外卖实时报表用 Doris——MySQL CDC 经 Flink 入 Unique 模型，骑手/商家双维度 colocate join 免 shuffle；快手商业化报表 StarRocks 支撑广告主自助多维分析（CBO 自动选 join 顺序）；网易严选从 Greenplum 迁 Doris，查询提速 10 倍且运维从专人变兼职；腾讯微信支付的实时对账用 StarRocks Primary Key 模型接 CDC 流。
+
+踩坑：Aggregate 模型当明细用（写入即聚合，发现要查明细时数据已丢，模型不可改要重建表）；分桶数乱设（bucket 数≈BE 数×2-4 为宜，太多元数据压力、太少并行度不足）；colocate join 表组没对齐（两张表分桶键/桶数/副本数必须完全一致才生效，建错就 shuffle join 性能打回原形）；大表 join 顺序靠人肉（StarRocks 的 CBO 要收集统计信息，analyze 不做优化器瞎猜）；Doris 的 tablet 版本爆炸（高频小批量导入，version 超 2000 拒绝写入——攒批+调大 compaction）；把 OLAP 当 KV 点查用（QPS 上万的点查该走 Redis/HBase，MPP 引擎 QPS 天花板低）。`,
+    keyPoints: ["MPP=查询分片并行+Exchange shuffle", "明细/聚合/主键三模型按场景选", "多表 JOIN 选 Doris/StarRocks，单表狂扫选 ClickHouse"],
+    followUps: ["Colocate join 的表组约束和扩容时的迁移代价？", "StarRocks CBO 的统计信息收集（直方图）怎么影响 join 顺序？"],
+    favorited: false,
+  },
+  {
+    id: "be-302",
+    nodeId: "be-olap-bigdata",
+    question: "Hive 的分区表和分桶表设计？小文件问题怎么治理？",
+    bigTech: false,
+    answer: `结论：分区（Partition）= 按业务维度（通常是日期）把数据物理分目录，查询按分区裁剪跳过无关目录——是 Hive 性能的生命线；分桶（Bucket）= 按某列 hash 把数据分散到固定数量的文件，用于抽样和 join 优化（SMB join）。小文件是 Hive 头号顽疾：一个文件=一个 HDFS block=一个 MapTask，万级小文件让 NameNode 内存爆炸+任务启动开销超过计算本身。治理三板斧：写入端合并（reduce 输出控制）、存量合并（compact/重跑）、存储格式换 ORC+合理批次。
+
+\`\`\`sql
+-- 分区表（静态分区）
+CREATE TABLE dwd_order (
+    order_id STRING, amount DECIMAL(18,2), user_id STRING
+) PARTITIONED BY (dt STRING)        -- 分区键不在列里！
+STORED AS ORC;
+INSERT INTO dwd_order PARTITION(dt='2026-07-26') SELECT ...;
+-- 查询裁剪：WHERE dt='2026-07-26' → 只扫该目录，跳过其他 365 个分区
+
+-- 动态分区（按查询结果自动建分区，注意配置）
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.max.dynamic.partitions=10000;    -- 防误建万级分区
+
+-- 分桶表（join/抽样优化）
+CREATE TABLE dwd_user CLUSTERED BY (user_id) INTO 32 BUCKETS ...;
+-- 两表同分桶键同桶数 → SMB（Sort-Merge-Bucket）join：
+--   map 端桶对桶 merge join，免 shuffle，大表 join 提速 5-10 倍
+-- 抽样：TABLESAMPLE(BUCKET 1 OUT OF 32) → 1/32 均匀样本秒出
+\`\`\`
+
+\`\`\`text
+分区设计经验法则：
+- 粒度：按天最常见；量大（>10GB/天）按天+小时二级；量小按月
+- 分区数：单表分区总数 < 10 万（ metastore 压力和 HMS API 变慢）
+- 分区键用低基数字段：dt/country 好；user_id 坏（亿级分区=自杀）
+- 查询 80% 带什么过滤条件，分区键就选什么
+\`\`\`
+
+\`\`\`text
+小文件治理三板斧：
+1. 写入端（治本）：
+   - 减少 reduce 数：hive.exec.reducers.bytes.per.reducer=1GB
+     （每个 reduce 一个输出文件，按输出量自动算个数）
+   - 合并输出：SET hive.merge.mapfiles=true;
+     hive.merge.sparkfiles=true; hive.merge.size.per.task=256MB
+   - Spark 写入：repartition(N) 控制输出文件数（别 coalesce 丢并行）
+2. 存量合并（治标）：
+   - ALTER TABLE ... PARTITION(...) CONCATENATE（ORC/RCFile 支持）
+   - 或 INSERT OVERWRITE 读自己重写一遍（重跑压缩）
+   - 定期任务：检测分区文件数>阈值自动 compact
+3. 架构端（根上避免）：
+   - Flume/采集端滚动参数：rollSize(128MB)/rollInterval(600s)
+     别 1 分钟滚一个 1KB 文件
+   - 实时入湖场景用 Hudi/Iceberg（自带小文件合并 compaction）
+\`\`\`
+
+案例：字节跳动 Hive 小文件治理——HMS 元数据从数十亿级降下来，NameNode heap 从 200GB 降到 80GB，靠「采集端滚动参数+每日 compact 任务+写入规范」三管齐下；美团离线数仓分区规范：dwd 层按天，dws 层按月+业务线二级；某厂 Flume rollInterval=60s，一年攒出 50 万小文件，NameNode Full GC 集群瘫痪——存量 CONCATENATE 合并跑了两周。
+
+踩坑：动态分区 SQL 没限制（一次 insert 建 5 万分区，metastore OOM 挂掉，所有查询瘫痪）；分区键类型用 string 存日期还和函数混用（WHERE dt=date_sub(current_date,1) 类型不匹配导致分区裁剪失效=全表扫，大忌！）；分桶表写入没 enforce bucketing（数据没按桶写，SMB join 失效还难发现）；小文件合并后没删原始文件（HDFS 配额双倍占用）；ORC 的 stripe 大小默认 64MB 不合理（配合 block size 128/256MB 调）；以为分区越多越好（按小时+渠道+省份三级分区，一次日更写 1000 个分区，每个分区 2MB 小文件——分区粒度要为查询服务不为美观服务）。`,
+    keyPoints: ["分区裁剪是生命线，分区键选低基数高过滤字段", "分桶用于 SMB join 和抽样", "小文件治本在写入端，治标靠 compact"],
+    followUps: ["Hive on Tez/Spark 相比 MR 怎么减少中间小文件？", "HMS（Metastore）分库分表方案（WaggleDance）适用场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-303",
+    nodeId: "be-olap-bigdata",
+    question: "数据湖三剑客 Iceberg/Hudi/Delta Lake 解决了 Hive 的什么痛点？怎么选？",
+    bigTech: false,
+    answer: `结论：Hive 表的四大绝症：不支持行级更新（改一条重写分区）、ACID 缺失（读写并发互相看见半成品）、schema 演进痛苦（加列重写数据）、时间旅行不可能（误删分区找不回）。数据湖格式三剑客在 HDFS/S3 之上加「表格式层」：用快照（snapshot）+ 元数据清单（manifest）管理文件版本，实现 ACID、行级 upsert/delete、schema 自由演进、时间旅行、增量读取。本质是「对象存储上的数据库表语义」。
+
+\`\`\`text
+三者架构速览：
+Iceberg（Netflix 发起，引擎中立王）：
+  元数据三层：catalog → metadata.json → manifest list → manifest file
+  快照=每次提交一个 manifest list；文件级统计（min/max）跳过数据
+  杀手特性：隐藏分区（partition transform，查询不用带原始列函数）、
+           引擎中立（Flink/Spark/Trino 通吃）、schema 映射按 ID 不按名
+
+Hudi（Uber 发起，upsert 之王）：
+  两种表：COW（写时复制：更新重写文件，读快写慢）
+          MOR（读时合并：更新进 delta log，读时合并，写快读慢）
+  杀手特性：upsert 性能最好、增量视图（pull 变更流）、
+           自带小文件合并/cleaning/clustering 服务
+
+Delta Lake（Databricks，Spark 亲儿子）：
+  事务日志 _delta_log（JSON 记录每次操作）+ parquet
+  杀手特性：Spark 生态无缝、OPTIMIZE+Z-ORDER 聚簇、
+           Change Data Feed、生态绑定深（非 Spark 要三思）
+\`\`\`
+
+\`\`\`text
+选型决策（2026 年视角）：
+场景                          推荐
+多引擎共存（Flink 写+Trino 查）  Iceberg（引擎中立做得最彻底）
+CDC 入湖/高频 upsert           Hudi MOR（upsert 性能最强，增量消费成熟）
+纯 Spark 栈                    Delta Lake（原生集成最少坑）
+实时数仓入湖（分钟级新鲜）      Hudi MOR 或 Iceberg+Flink
+云厂商托管                     AWS 主推 Iceberg；Databricks=Delta；
+                              阿里云 Hologres/MaxCompute 各有内建格式
+社区趋势                      Iceberg 增长最快（Snowflake/Tabular、
+                              AWS、Cloudera 全押注），REST catalog 标准化
+\`\`\`
+
+\`\`\`text
+数据湖落地架构（实时入湖主流）：
+MySQL → Flink CDC → Hudi MOR（5 分钟可见）→ 离线 Spark 读
+                  → 下游 Kafka（增量消费，Hudi 当 changelog 源）
+价值：替代「MySQL → Canal → Kafka → Hive T+1」老链路
+     入湖即 ACID，后续离线直接读湖，新鲜度从 T+1 → 分钟级
+运维重点：compaction（MOR 合并 delta log）、cleaning（清旧版本）、
+         clustering（重排文件优化查询）三服务必须常驻
+\`\`\`
+
+案例：Netflix 全公司数据平台建在 Iceberg 上（日 PB 级写入）；字节跳动推荐系统特征入湖用 Hudi MOR，upsert 支撑样本回流的秒级更新；Uber 出行数据 Hudi 鼻祖（行程状态高频变更场景）；腾讯广告用 Iceberg+Flink 构建实时湖仓，查询走 StarRocks 外表直查免搬运；苹果 iCloud 数据湖大规模采用 Iceberg（2023 公开分享）。
+
+踩坑：MOR 表 compaction 没跟上（delta log 堆积，查询越来越慢直到不可用——compaction 服务要独立资源常驻）；Iceberg 的 manifest 膨胀（高频提交产生海量小元数据文件，要 expire_snapshots+rewrite_manifests 定期维护）；以为数据湖=不用管小文件（三剑客的小文件问题一样存在，Hudi clustering/Iceberg rewrite_data_files/Delta OPTIMIZE 都要日常跑）；catalog 选择失误（HMS catalog 在大规模下是瓶颈，Iceberg 的 REST/JDBC catalog 或云厂商 glue catalog 更稳）；时间旅行不设置过期（snapshot 永不过期=元数据无限增长+存储成本翻倍，要 expire 保留必要窗口）；流批读写同表没隔离（Flink 流写+Spark 批读要配 snapshot 隔离级别，脏读半成品 part）。`,
+    keyPoints: ["表格式层=快照+清单，给对象存储加 ACID", "Iceberg 中立/Hudi 善 upsert/Delta 绑 Spark", "入湖三服务：compaction/cleaning/clustering 必须常驻"],
+    followUps: ["Iceberg 的 Puffin 统计文件对查询优化的作用？", "Hudi MOR 的 log 文件格式（HFile vs Parquet base）选择？"],
+    favorited: false,
+  },
+  {
+    id: "be-304",
+    nodeId: "be-olap-bigdata",
+    question: "Lambda 架构和 Kappa 架构的区别？实时数仓为什么演进向 Kappa/流批一体？",
+    bigTech: false,
+    answer: `结论：Lambda = 批处理层（全量准确，T+1）+ 速度层（实时但近似）双链路并行，查询时合并两个结果——用两套系统换「既快又准」；Kappa = 只用流处理一条链路，需要重算时用消息队列回放历史（Kafka 保留窗口内全量重放）。演进方向是 Kappa/流批一体：一套代码既能跑批（bounded stream）又能跑流（unbounded stream）——Flink 的流批一体和 Iceberg 的表语义统一让「双链路痛苦」终见出路。
+
+\`\`\`text
+Lambda 架构（2011 Nathan Marz 提出）：
+           ┌→ 批处理层(Hive/Spark T+1 全量) ──→ 批视图(准确但旧) ─┐
+数据源 → 分双写                                                ├→ 合并 → 查询
+           └→ 速度层(Flink/Storm 实时增量) ───→ 实时视图(快但近似) ┘
+优点：批层兜底准确性，速度层保证新鲜度
+缺点（五宗罪）：
+1. 两套代码：同一逻辑写两遍（Hive SQL 一遍，Flink 一遍），口径必漂移
+2. 双份资源：批集群+流集群常驻
+3. 合并复杂：查询端要处理「实时与批的重叠窗口去重」
+4. 运维翻倍：两套监控/告警/值班
+5.  schema 演进双改：加个字段两处同步改
+\`\`\`
+
+\`\`\`text
+Kappa 架构（2014 Jay Kreps 提出）：
+数据源 → Kafka(保留 3-7 天或更长) → 流处理(Flink) → 服务层
+重算需求（逻辑变更/数据修正）：
+  → 启新版本任务，从 Kafka 最早 offset 重放 → 输出新表 → 切换
+前提条件：
+1. MQ 能存够重放窗口的数据（Kafka 海量存储便宜 ✓）
+2. 流引擎吞吐足够（重放要追得上，Flink 批模式加速回放 ✓）
+3. 状态可重建（checkpoint/savepoint 管理 ✓）
+优点：一套代码一套资源一种口径
+缺点：超长历史重放成本高（30 天数据重放要小时级），
+     复杂批计算（全量 join 大维表）流式做仍然费劲
+\`\`\`
+
+\`\`\`text
+流批一体（2020s 终局形态，Flink 1.12+ 支持）：
+同一套 Flink SQL/代码：
+  - 流模式：消费 Kafka 无界流，秒级延迟
+  - 批模式：消费 Hive/Iceberg 有界流，全量重算，吞吐优先
+统一存储：Iceberg/Hudi 同时暴露「表视图」（批读）和
+         「changelog 视图」（流读）
+现实落法（大厂主流折中）：
+  - 核心指标：实时链路（Kappa）秒级
+  - 财务对账/精确报表：T+1 批链路复核（Lambda 遗产）
+  - 修正场景：批链路重算结果覆盖实时累积误差
+  = 「Kappa 为主，Lambda 兜底」的实用主义
+\`\`\`
+
+案例：阿里巴巴实时计算平台（Flink 流批一体）：双 11 同一套 SQL 白天跑实时大屏，凌晨跑批模式复核口径；美团把 Lambda 的「Storm+Hive」双链路改造成「Flink 统一」，维护人力减半；LinkedIn 的 Brooklin+Kafka 支撑 Kappa 架构下的事件重放（Samza）；小红书用 Iceberg 统一流批存储，Flink 流写、Spark 批读同一张表。反面：某厂 Lambda 架构下「实时 UV」和「离线 UV」差 8%，老板会上两套数据打架——口径漂移是 Lambda 的宿命，最后全量迁流批一体。
+
+踩坑：Kappa 重放时新旧任务双写同一结果表（要 Shadow 表+原子切换）；Kafka 保留期不够（逻辑改了要重放 30 天，retention 只有 7 天=数据无法重建，retention 要为「最大重算窗口」服务）；流批一体 SQL 里用了流特有的函数（CEP/interval join 批模式不支持，写 SQL 前要确认双模式兼容）；以为流批一体=不用学批优化（批模式的 join 策略/shuffle 和流模式完全不同，执行计划要分别 explain）；Lambda 速度层和批层的「窗口对齐」没做好（实时窗口 23:59 的数据和批层 T+1 分区边界重叠，合并时双计——要用事件时间严格切分）。`,
+    keyPoints: ["Lambda 双链路换快+准，Kappa 单链路+重放", "流批一体=一套代码两种模式+统一表格式", "现实方案：Kappa 为主，T+1 批复核兜底"],
+    followUps: ["Flink 批模式的 Shuffle 和流模式的差异（blocking vs pipelined）？", "Iceberg 的 changelog 视图（incremental read）怎么支撑流批一体？"],
+    favorited: false,
+  },
+  {
+    id: "be-305",
+    nodeId: "be-olap-bigdata",
+    question: "OLAP 引擎怎么选型？ClickHouse/Doris/StarRocks/Druid/Presto 各适合什么场景？",
+    bigTech: false,
+    answer: `结论：按「查询模式×数据新鲜度×并发量」三轴选型：大宽表暴力扫描+超高压缩 → ClickHouse；多表 JOIN+高并发报表+CDC 实时更新 → Doris/StarRocks；时序事件流+亚秒级摄入可查 → Druid/Pinot；联邦查询（跨 Hive/MySQL/ES 一把梭）→ Presto/Trino；明细点查高 QPS → 这活 OLAP 不接，去 HBase/Redis。没有银弹，大厂全是组合用。
+
+\`\`\`text
+五维对比表（2026 年生产视角）：
+维度        ClickHouse      Doris/StarRocks   Druid/Pinot      Presto/Trino
+查询模型    单表扫描之王      MPP 全功能        时序聚合特化      联邦查询引擎
+JOIN        弱(大 join 避开)  强(colocate/CBO)  弱(预打宽)        中(无存储，看源)
+数据更新    弱(mutation 慢)   强(Unique/PK)     中(流批双摄入)    不负责(只查)
+摄入新鲜度  秒级(攒批)        秒级(CDC/Stream)  毫秒级(流原生)    取决于源
+并发        中(100 默认)      高(千级)          高                中
+压缩率      最高(列存极致)    高                高(rollup)        无存储
+运维成本    中(ZK/Keeper)     低(FE+BE 两角色)  高(组件多)        低(无存储)
+典型场景    用户行为分析      经营报表/驾驶舱   监控告警/时序     跨源 ad-hoc
+\`\`\`
+
+\`\`\`text
+场景对号入座：
+1. 用户行为/AB 实验（万亿行，大宽表，天级批量+少量更新）
+   → ClickHouse（字节的答案）
+2. 老板驾驶舱/经营报表（多表 join，500+ 并发，CDC 分钟级新鲜）
+   → Doris/StarRocks（美团/快手的答案）
+3. 实时监控大盘（事件流毫秒入，聚合查询，维度相对固定）
+   → Druid（kylin 监控）/ Pinot（LinkedIn/Uber 的答案）
+4. 数据分析师自助查询（Hive/MySQL/ES 混查，一天几百次 ad-hoc）
+   → Presto/Trino（Presto 之父在 FB 的答案）
+5. 实时数仓服务层（亚秒查询+支撑 API）
+   → Doris/StarRocks（高并发）或 Pinot（极致延迟）
+6. 离线 T+1 报表（成本敏感）
+   → 别上 OLAP，Hive/Spark 够了
+\`\`\`
+
+\`\`\`text
+组合架构实战（真实大厂搭配）：
+字节跳动：ClickHouse(行为分析) + Doris(商业化报表) + Abase(点查)
+美团：Doris(实时报表) + Kylin(固定维度预计算) + Hive(离线)
+阿里：Hologres(实时服务) + MaxCompute(离线) + Lindorm(点查)
+LinkedIn：Pinot(实时特征) + Presto(ad-hoc) + Espresso(点查)
+规律：没有一个引擎吃全场，按查询模式分流
+\`\`\`
+
+案例：Uber 用 Pinot 支撑骑手 App 的实时热力图（毫秒摄入+亚秒查询，自研 Upsert 支持）；携程用 Doris 替换 Kylin+ClickHouse 双引擎，统一报表层运维减半；Shopee 用 StarRocks 支撑东南亚卖家中心的多维分析（CBO 处理 join 地狱）；Facebook 的 Presto 支撑全公司分析师（每天数万 ad-hoc 查询扫 Hive）；B站用 ClickHouse 扛弹幕/播放行为分析。
+
+踩坑：拿 Presto 当低延迟服务层用（它无存储，查询受源端限制，P99 不可控，不能扛 API）；ClickHouse 集群模式高并发报表（默认 max_concurrent_queries=100，报表并发一高排队雪崩，该场景换 Doris）；Druid 上做灵活 ad-hoc（预定义 schema+rollup 后维度改不动，分析师噩梦）；Doris 里全量大宽表不打星型模型（浪费 MPP 的 join 能力，维表复用率归零）；选型只看 benchmark 不看运维（Druid 六组件架构对小团队是运维地狱，Doris 两角色最省心）；忽略生态绑定（Pinot 强但社区小，遇到问题只能靠源码；ClickHouse 中文社区最活跃，Doris/StarRocks 国内响应快）。`,
+    keyPoints: ["按查询模式×新鲜度×并发三轴选型", "CK 单表/Doris 多表高并发/Pinot 时序/Presto 联邦", "大厂全是组合架构，没有银弹"],
+    followUps: ["Hologres 的 HSAP（分析服务一体）和传统 OLAP 差异？", "DuckDB 嵌入式 OLAP 对单机分析场景的颠覆？"],
+    favorited: false,
+  },
+  // ===== be-ddd：架构设计与 DDD（4 题） =====
+  {
+    id: "be-306",
+    nodeId: "be-ddd",
+    question: "单体→微服务→Serverless 架构演进的驱动力是什么？什么时候该拆、什么时候不该拆？",
+    bigTech: true,
+    answer: `结论：架构演进的核心驱动力是「团队规模×交付速度×系统复杂度」三者的剪刀差——单体扛不住团队并行开发，微服务扛不住运维成本，Serverless 扛不住冷启动和厂商锁定。拆不拆的判断标准不是"技术先进性"，而是"组织沟通成本"（康威定律：系统结构必然映射组织沟通结构）。
+
+\`\`\`text
+演进路线与触发条件：
+阶段          触发条件                       痛点
+单体          团队<8人，领域单一              代码耦合，发布互相阻塞
+垂直拆分       团队 8-20人，业务域清晰         跨域事务，数据一致性问题
+微服务        团队>20人，多业务线并行迭代      分布式复杂性，运维成本激增
+服务网格       服务>50个，多语言栈，治理复杂    Sidecar 性能开销
+Serverless    突发流量，事件驱动，长尾应用     冷启动，厂商锁定，调试困难
+\`\`\`
+
+\`\`\`text
+不该拆的四种场景（血泪教训）：
+1. 团队<5人拆微服务 → 80% 时间在联调运维，业务零产出
+2. 业务边界模糊时强拆 → 服务间频繁变更，分布式单体（看起来微服务，实际紧耦合）
+3. 数据强一致场景拆 → 分布式事务成本远超收益，性能断崖
+4. 流量小且稳定 → Serverless 冷启动反而拖垮 P99
+\`\`\`
+
+案例：Netflix 从单体拆到数百微服务（团队 2000+，全球化）；Amazon 的"两个披萨团队"原则（每服务对应一个可独立部署的小团队）；Uber 早期过度拆分导致"微服务地狱"（3000+ 服务，后来又合并）；LinkedIn 从单体到 SOA 再到微服务，中间经历多次架构回退。国内：阿里从"大中台小前台"到"多元化治理"（中台拆分），本质是组织架构调整驱动技术架构调整。
+
+踩坑：为了"技术先进"而拆微服务（忽视康威定律——组织没拆开，拆了也是分布式单体）；服务边界按技术层分（前端/后端/DB 各一个服务，应按业务能力分）；拆了服务没拆数据库（共享 DB 等于没拆，schema 变更互相阻塞）；没有 CI/CD 就上微服务（部署成本乘以服务数）；没有可观测性就上 Serverless（出问题全靠猜）。`,
+    keyPoints: ["康威定律：架构映射组织沟通结构", "拆分判断标准是团队规模×交付速度×复杂度", "分布式单体是最差形态——有微服务的成本没有微服务的收益"],
+    followUps: ["如何识别和治理「分布式单体」？", "中台战略为什么在阿里从集中走向多元化？"],
+    favorited: false,
+  },
+  {
+    id: "be-307",
+    nodeId: "be-ddd",
+    question: "DDD 的限界上下文（Bounded Context）怎么划分？上下文映射（Context Map）有哪几种关系？",
+    bigTech: true,
+    answer: `结论：限界上下文是 DDD 战略设计的核心——它划定的不是技术边界，而是「语言边界 + 模型边界 + 团队边界」。划分依据是「统一语言是否一致」：同一个词汇在不同业务域含义不同，就该拆成不同上下文。上下文映射描述上下文之间的协作关系，共9种，核心要掌握的是合作/共享内核/客户-供应商/跟随者/防腐层/开放主机服务/发布语言/各行其道/大泥球。
+
+\`\`\`text
+限界上下文划分四步法：
+1. 事件风暴（Event Storming）→ 列出所有领域事件
+2. 按事件聚类 → 识别聚合和业务流程
+3. 找统一语言边界 → 同名不同义的词汇是切分信号
+4. 验证团队边界 → 一个上下文对应一个可独立交付的团队
+
+判断"是否该拆"的信号词：
+- "订单"在交易域指交易凭证，在物流域指发货单 → 拆
+- "用户"在账户域指登录主体，在营销域指营销画像 → 拆
+- 同一个 Product 类被三个团队改 → 必须拆
+\`\`\`
+
+\`\`\`text
+上下文映射9种关系（面试必背核心5种）：
+关系              含义                          典型场景
+合作(Partnership)  双方依赖，共同协调              订单+支付同步迭代
+客户-供应商        上游服务下游，下游有话语权       营销(下游)←用户(上游)
+跟随者(Conformist) 下游被迫服从上游模型            接第三方SDK
+防腐层(ACL)        下游建翻译层隔离上游模型污染     对接遗留系统/第三方
+开放主机服务(OHS)  上游发布标准化API供所有下游用    对外开放平台
+共享内核           多上下文共享一部分模型（危险）   小团队过渡期
+发布语言           上游发布DTO/事件契约            消息驱动解耦
+各行其道           完全独立，无协作                无关业务域
+大泥球             烂摊子，无清晰边界              遗留系统
+\`\`\`
+
+案例：阿里交易域拆分为"交易/库存/营销/支付/物流"五个限界上下文，每个有独立的统一语言；某电商"商品"在商品中心指SPU/SKU，在搜索中心指可检索文档，在推荐中心指特征向量——三个上下文用 ACL 隔离，避免一个 Product 类被全公司改烂。
+
+踩坑：限界上下文等于微服务（错——一个上下文可以多服务，一个服务不该跨上下文）；共享内核滥用（短期省事，长期变成全公司耦合点）；ACL 建了不维护（上游一变 ACL 翻译逻辑没跟上，数据错乱）；按数据库表分上下文（应按业务语言分，不是按表分）。`,
+    keyPoints: ["限界上下文=语言边界+模型边界+团队边界", "上下文映射9种关系，核心掌握ACL/OHS/客户-供应商", "划分依据是统一语言是否一致，不是技术边界"],
+    followUps: ["事件风暴（Event Storming）怎么做？和用例分析的区别？", "防腐层（ACL）在微服务集成中的具体实现？"],
+    favorited: false,
+  },
+  {
+    id: "be-308",
+    nodeId: "be-ddd",
+    question: "充血模型 vs 贫血模型之争的本质是什么？聚合根（Aggregate Root）怎么设计？",
+    bigTech: false,
+    answer: `结论：贫血模型是"过程式编程披着OOP外衣"——数据和行为分离，业务逻辑散落在 Service 层；充血模型是"真正的OOP"——数据和操作数据的业务方法封装在一起。争论本质是「事务脚本 vs 领域模型」的范式之争。聚合根是 DDD 战术设计的核心——它是一组相关对象的一致性边界，外部只能通过聚合根访问内部对象。
+
+\`\`\`text
+贫血 vs 充血对比：
+维度        贫血模型                    充血模型
+结构        Entity只有getter/setter     Entity包含业务方法
+逻辑位置    Service层散落               Entity内聚
+可测试性    难(逻辑依赖Service)          易(纯领域逻辑)
+模型意义    失血的数据袋                真正的领域对象
+适用场景    CRUD简单业务                复杂领域规则
+\`\`\`
+
+\`\`\`text
+聚合根设计四原则：
+1. 一致性边界：聚合内强一致（事务），聚合间最终一致
+2. 引用外部聚合：只能引用ID，不能持有对象引用
+3. 通过聚合根操作：外部不能绕过根直接改内部对象
+4. 聚合要小：一个事务只改一个聚合（跨聚合用领域事件）
+
+聚合根设计示例（订单系统）：
+聚合根：Order（包含OrderItem列表）
+- 外部引用：只持有 orderId，不持有 Order 对象
+- 内部一致性：addItem() 内部校验库存、金额、数量
+- 跨聚合：库存扣减通过发 InventoryReservedEvent，库存聚合消费
+
+错误设计：
+- Order 聚合包含 User、Product、Inventory（太大，锁冲突严重）
+- 外部直接 order.items.add()（绕过聚合根校验）
+- 一个事务改 Order + Inventory（跨聚合事务，性能灾难）
+\`\`\`
+
+案例：Spring 官方从推荐贫血（早期 Spring MVC + Service + DAO）转向支持充血（Spring Data REST + DDD）；某电商把"订单金额计算"从 OrderService 搬进 Order 充血模型，单测从依赖20个mock变成纯领域逻辑测试，覆盖率从40%提到90%。
+
+踩坑：Service 层变成"上帝类"（贫血模型的必然结果，所有逻辑堆在 OrderService）；聚合设计过大（把整个对象图塞进一个聚合，锁竞争+性能差）；跨聚合强一致（用分布式事务保证，违背聚合设计原则，应该用领域事件+最终一致）；充血模型教条化（简单CRUD也硬塞充血，过度设计）。`,
+    keyPoints: ["贫血=过程式，充血=真OOP，本质是范式之争", "聚合根是一致性边界，外部只引用ID", "一个事务只改一个聚合，跨聚合用领域事件"],
+    followUps: ["领域事件（Domain Event）怎么落地？和消息队列的关系？", "Repository 模式和 DAO 的区别？"],
+    favorited: false,
+  },
+  {
+    id: "be-309",
+    nodeId: "be-ddd",
+    question: "整洁架构、六边形架构、洋葱架构的共同点和区别？落地时怎么选？",
+    bigTech: false,
+    answer: `结论：三者都是「依赖倒置」原则的架构落地——核心思想一致：领域模型在内层，基础设施在外层，依赖方向永远从外向内。区别在于隐喻和侧重点：整洁架构（Uncle Bob）强调层次和依赖规则；六边形架构（Alistair Cockburn）强调端口-适配器，应用平等对待所有外部交互；洋葱架构（Jeffrey Palermo）强调可测试性和层次像洋葱皮。落地选整洁架构最主流（Spring 生态支持好），六边形适合多通道接入（同一逻辑要接 HTTP/gRPC/MQ/CLI）。
+
+\`\`\`text
+三者共同核心：
+- 依赖方向：外层依赖内层，内层不依赖外层
+- 领域模型独立：不依赖框架、数据库、UI
+- 可测试性：领域逻辑可脱离基础设施单测
+
+三者差异：
+架构       核心隐喻        侧重点               适配器方向
+整洁架构    同心圆层次      依赖规则+层次清晰     外→内单向
+六边形     端口-适配器      对称性，多通道平等     应用←→外部双向
+洋葱架构    洋葱皮层        可测试性优先          外→内单向
+\`\`\`
+
+\`\`\`text
+整洁架构四层（最主流落地）：
+层次          职责                     依赖
+Entity        领域模型+业务规则          无
+Use Case      应用服务，编排领域逻辑      Entity
+Interface     Controller/Presenter      Use Case
+Infrastructure DB/MQ/外部API           Interface(通过接口)
+
+依赖倒置实现：
+- Infrastructure 实现 Use Case 层定义的 Port 接口
+- Spring 依赖注入把实现注入到 Use Case
+- 领域层不 import 任何 Spring/MyBatis 类
+
+六边形架构落地（多通道场景）：
+- 端口：应用定义的接口（Driving Port=API接口，Driven Port=仓储接口）
+- 适配器：HTTP Adapter/GRPC Adapter/MQ Adapter 实现 Driving Port
+- 好处：同一套应用逻辑，HTTP/MQ/CLI/gRPC 都能驱动
+\`\`\`
+
+案例：Spring 官方的 Spring Modulith 推崇模块化整洁架构；阿里 COLA 架构（Clean Object-Oriented and Layered Architecture）是整洁架构的 Java 落地；某支付系统用六边形架构，同一套支付逻辑同时接入 HTTP API、MQ 消息、定时任务、运维 CLI 四个通道，新增通道只需加适配器。
+
+踩坑：分层不彻底（Controller 直接调 DAO，绕过 Use Case，等于没分层）；Port 接口定义在 Infrastructure 层（依赖方向反了，应定义在应用层）；领域模型依赖 Spring（@Entity/@Service 注解污染领域层，无法脱离框架测试）；为了架构而架构（简单CRUD套四层整洁架构，过度设计，CRUD 用 Active Record 够了）。`,
+    keyPoints: ["三者核心都是依赖倒置，依赖方向外→内", "整洁架构最主流，六边形适合多通道接入", "领域模型必须独立于框架和基础设施"],
+    followUps: ["COLA 架构和整洁架构的关系？", "模块化单体（Modular Monolith）怎么落地？"],
+    favorited: false,
+  },
+  // ===== be-perf-troubleshoot：线上排查与性能调优（4 题） =====
+  {
+    id: "be-310",
+    nodeId: "be-perf-troubleshoot",
+    question: "线上 CPU 100% 怎么排查？给出完整的定位流程和工具链。",
+    bigTech: true,
+    answer: `结论：CPU 100% 排查的核心思路是「定位进程→定位线程→定位代码行」三步走。工具链：top 找进程 → top -Hp 找线程 → printf + jstack 找堆栈 → 代码定位。常见根因四类：死循环/无限重试、频繁 GC、正则回溯、序列化/反序列化大对象。
+
+\`\`\`text
+标准排查五步（Linux + JDK）：
+1. top 找占 CPU 最高的 Java 进程 PID
+2. top -Hp <PID> 找占 CPU 最高的线程 TID
+3. printf "%x\\n" <TID> 把十进制转十六进制（jstack 里是 nid=0x...）
+4. jstack <PID> | grep -A 30 <十六进制TID> 找到线程堆栈
+5. 看堆栈最上面的业务方法 → 定位到代码行
+
+一键脚本（生产实战）：
+\`\`\`bash
+# 找 CPU TOP1 线程的堆栈
+pid=$(top -bn1 | grep java | head -1 | awk '{print $1}')
+tid=$(top -bn1 -H -p $pid | head -8 | tail -1 | awk '{print $1}')
+nid=$(printf "%x" $tid)
+jstack $pid | grep -A 30 "nid=0x$nid"
+\`\`\`
+\`\`\`
+
+\`\`\`text
+四大常见根因与特征：
+根因            堆栈特征                     定位工具
+死循环/重试     业务方法栈顶，CPU 持续 100%   jstack 连续 dump 对比
+频繁 GC        GC 线程占 CPU，堆栈在 GC     jstat -gcutil <PID> 1000
+正则回溯        栈顶在 Pattern.matcher       检查正则表达式
+序列化         栈顶在 JSON/XML 序列化       检查序列化对象大小
+\`\`\`
+
+进阶工具：
+- Arthas（阿里）：thread -n 3 一键看 CPU TOP3 线程堆栈，dashboard 实时看 JVM 状态
+- async-profiler：生成火焰图，一眼看出 CPU 热点方法
+- JFR（Java Flight Recorder）：持续录制，事后分析，生产可用
+
+案例：某电商大促时订单服务 CPU 100%，jstack 发现是 Jackson 序列化一个 50MB 的订单对象（含全量商品快照），改为只序列化必要字段后 CPU 降到 20%；某支付系统 CPU 飙升，Arthas thread 命令看到是日志框架的 AsyncAppender 队列堆积，消费者线程死循环重试写磁盘（磁盘满了），根因是磁盘空间告警未处理。
+
+踩坑：只看 top 不看 jstack（知道 CPU 高但不知道在哪）；jstack dump 时机不对（要在 CPU 高时 dump，晚了堆栈已变）；忽视 GC 导致的 CPU 高（jstack 看到 GC 线程但误以为是业务线程）；生产用 jstack 卡住（大堆 dump 耗时，用 Arthas 替代，或加 -F 强制）。`,
+    keyPoints: ["三步走：进程→线程→堆栈→代码行", "Arthas thread -n 3 一键定位", "四大根因：死循环/GC/正则/序列化"],
+    followUps: ["频繁 Full GC 怎么排查？和 CPU 100% 的关系？", "Arthas 的 watch/trace 命令怎么用？"],
+    favorited: false,
+  },
+  {
+    id: "be-311",
+    nodeId: "be-perf-troubleshoot",
+    question: "线上 OOM 怎么排查？不同类型的 OOM 根因和定位方法分别是什么？",
+    bigTech: true,
+    answer: `结论：OOM 不是都"堆满了"——JVM 有6种 OOM，每种根因不同、排查方法不同。核心思路：先看错误信息判断 OOM 类型 → 拿 Heap Dump → MAT/jvisualvm 分析对象引用链 → 找内存泄漏点或容量不足点。生产必须预先配置 -XX:+HeapDumpOnOutOfMemoryError 自动 dump。
+
+\`\`\`text
+六种 OOM 类型与根因：
+错误信息                            根因                     排查方向
+Java heap space                     堆内存不足/内存泄漏        Heap Dump + MAT
+GC overhead limit exceeded          GC回收效率<1%持续5次       堆太小或泄漏，先dump
+Metaspace                           类元数据泄漏              检查动态生成Class
+Direct buffer memory                堆外内存未释放             检查NIO/Netty ByteBuf
+unable to create new native thread  线程数超限                检查线程池泄漏
+StackOverflowError                  栈深度超限                检查递归调用
+\`\`\`
+
+\`\`\`text
+Java heap space 排查四步：
+1. 确认 JVM 参数：-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/dump.hprof
+2. MAT 打开 dump → Leak Suspects 报告 → 看 Dominator Tree
+3. 找到占用最大的对象 → 查 GC Root 引用链
+4. 判断：泄漏（引用链指向静态变量/缓存/ThreadLocal）or 容量不足（正常业务对象太多）
+
+常见内存泄漏模式：
+- 静态集合只 put 不 remove（HashMap 当缓存，无淘汰策略）
+- ThreadLocal 没 remove（线程池复用，Entry 的 value 不释放）
+- 监听器/回调未注销（观察者模式注册后没反注册）
+- 内部类持有外部类引用（匿名内部类泄漏 Activity/大对象）
+- 连接未关闭（DB连接/HTTP连接/文件流泄漏）
+\`\`\`
+
+\`\`\`text
+Metaspace OOM 特殊排查：
+- 现象：Metaspace 持续增长不回落
+- 根因：动态生成 Class（CGLIB/字节码增强/反射Proxy）
+- 定位：jcmd <PID> GC.class_stats 查看类数量
+- 案例：某框架用 CGLIB 为每个请求生成代理类，ClassLoader 无法卸载，Metaspace 撑爆
+
+Direct buffer OOM 特殊排查：
+- 现象：堆正常但堆外内存涨
+- 根因：Netty/NIO 的 ByteBuf 未 release
+- 定位：-XX:NativeMemoryTracking=detail + jcmd <PID> VM.native_memory
+- 案例：Netty 的 ByteBuf 引用计数漏 release，堆外内存泄漏
+\`\`\`
+
+案例：某电商订单服务频繁 OOM，MAT 分析发现 OrderCache（Guava Cache）缓存了30天订单未设过期，堆里有500万 Order 对象；改成 Caffeine + W-TinyLFU + 最大容量10000后解决。某 RPC 框架 Metaspace OOM，定位到每次调用生成新的泛型擦除代理类，改为缓存代理类后解决。
+
+踩坑：OOM 后没 dump（重启就丢失现场，无法分析）；只看堆不看 Metaspace/直接内存（非堆 OOM 被忽略）；MAT 看不出问题就看 thread dump（方向错了，内存问题看 heap dump）；堆设太大掩盖问题（-Xmx 32g 让泄漏更晚暴露，应该先定位再调大）。`,
+    keyPoints: ["6种OOM类型，每种根因不同", "Heap Dump + MAT 找引用链是核心", "生产必配 HeapDumpOnOutOfMemoryError"],
+    followUps: ["ThreadLocal 内存泄漏的完整原理？", "Netty ByteBuf 的引用计数怎么排查泄漏？"],
+    favorited: false,
+  },
+  {
+    id: "be-312",
+    nodeId: "be-perf-troubleshoot",
+    question: "慢 SQL 怎么排查和优化？explain 执行计划怎么看？索引失效有哪些场景？",
+    bigTech: true,
+    answer: `结论：慢 SQL 优化核心思路是「定位慢 SQL → explain 看执行计划 → 判断扫描行数/索引/Join 方式 → 针对性优化」。优化的本质是减少"扫描的数据量"和"回表次数"。索引失效的根因是"优化器认为全表扫描比走索引成本更低"或"索引无法被使用"。
+
+\`\`\`text
+排查流程：
+1. 开启慢查询日志：slow_query_log=ON, long_query_time=1
+2. mysqldumpslow 分析 TOP N 慢 SQL
+3. EXPLAIN 看执行计划（核心）
+4. 针对性优化
+
+EXPLAIN 核心字段（面试必背）：
+字段         关注点                      好的值
+type         访问类型（扫描方式）          const/eq_ref/ref/range > index > ALL
+key          实际使用的索引                非 NULL
+rows         预估扫描行数                  越小越好
+Extra        额外信息                      Using index(覆盖索引) > Using where > Using filesort/temporary
+\`\`\`
+
+\`\`\`text
+type 字段从好到差（面试必背）：
+system > const > eq_ref > ref > range > index > ALL
+- const：主键/唯一索引等值查询（最优）
+- eq_ref：JOIN 用主键/唯一索引关联（一对一）
+- ref：非唯一索引等值查询
+- range：索引范围扫描（BETWEEN, >, <, IN）
+- index：全索引扫描（扫整棵索引树）
+- ALL：全表扫描（最差，必须优化）
+\`\`\`
+
+\`\`\`text
+索引失效十大场景（面试高频）：
+1. 函数操作：WHERE YEAR(create_time)='2024' → 改 WHERE create_time >= '2024-01-01'
+2. 隐式类型转换：phone 是 varchar，WHERE phone=13800138000（数字）→ 改 WHERE phone='13800138000'
+3. LIKE 左模糊：WHERE name LIKE '%张' → 改 '%张%' 或全文索引
+4. OR 连接非索引列：WHERE a=1 OR b=2，b无索引 → 全表扫描
+5. 联合索引非最左前缀：INDEX(a,b,c)，WHERE b=1 → 不走索引
+6. 范围查询后索引失效：INDEX(a,b)，WHERE a>1 AND b=2 → b 不走索引
+7. != / <> / NOT IN：WHERE status != 1 → 优化器可能放弃索引
+8. IS NULL / IS NOT NULL：取决于 NULL 比例
+9. 计算操作：WHERE id + 1 = 10 → 改 WHERE id = 9
+10. 字符集不匹配：JOIN 两表字符集不同 → 隐式转换失效
+\`\`\`
+
+\`\`\`text
+优化策略四象限：
+问题              优化手段                    效果
+全表扫描          加合适索引                   扫描量降90%+
+回表过多          覆盖索引(索引包含查询字段)    消除回表
+排序慢            索引有序性替代 filesort      消除 filesort
+分页深            游标分页/子查询优化           避免 LIMIT 1000000,10
+\`\`\`
+
+深分页优化示例：
+\`\`\`sql
+-- 慢：LIMIT 1000000, 10（扫1000010行）
+SELECT * FROM orders ORDER BY id LIMIT 1000000, 10;
+-- 快：游标分页（扫10行）
+SELECT * FROM orders WHERE id > ?last_id ORDER BY id LIMIT 10;
+-- 折中：子查询（扫1000010行索引，10行回表）
+SELECT * FROM orders o
+INNER JOIN (SELECT id FROM orders ORDER BY id LIMIT 1000000, 10) t ON o.id = t.id;
+\`\`\`
+
+案例：某订单列表查询从800ms优化到20ms——原 SQL 是 SELECT * + LIMIT 100000,20，优化为覆盖索引+子查询+游标分页；某报表 SQL 全表扫1亿行30秒，加 (tenant_id, create_time, status) 联合索引后降到200ms。
+
+踩坑：加索引不看基数（区分度<10%的列加索引无效甚至更慢，优化器可能不走）；忽视执行计划的 rows 预估（rows 远大于实际返回行数说明索引选错了）；只看单 SQL 不看整体（一个高频简单SQL比一个低频复杂SQL更值得优化）；优化后不复测（数据分布变化可能导致索引失效，需要定期巡检）。`,
+    keyPoints: ["EXPLAIN 核心看 type/key/rows/Extra", "type 从 const 到 ALL，ALL 必须优化", "索引失效十大场景，根因是优化器判断成本高或索引不可用"],
+    followUps: ["覆盖索引和回表的关系？怎么用覆盖索引优化？", "MySQL 优化器选错索引怎么办？FORCE INDEX 的使用场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-313",
+    nodeId: "be-perf-troubleshoot",
+    question: "全链路压测怎么做？影子库/影子表是什么？压测和容量规划的关系？",
+    bigTech: true,
+    answer: `结论：全链路压测是「在仿真环境模拟真实用户流量，验证系统容量上限和瓶颈点」的工程实践。影子库/影子表是「压测数据隔离」的核心机制——压测流量打影子表，不影响真实数据。压测的产出不是"QPS 多少"，而是"容量规划曲线"——多少机器扛多少 QPS，什么时候该扩容。
+
+\`\`\`text
+全链路压测五步法：
+1. 链路梳理：梳理入口→网关→服务→DB→缓存→MQ 全链路
+2. 流量建模：基于历史峰值 × 预期增长，构造压测模型
+   - 峰值QPS = 历史峰值QPS × (1 + 增长率) × 安全系数(1.5)
+3. 数据准备：影子表/影子库/影子队列，压测数据打标记隔离
+4. 执行压测：梯度加压（10%→30%→50%→80%→100%→120%），监控全链路
+5. 结果分析：找瓶颈点→优化→复测→输出容量规划
+
+压测策略三档：
+档位      目的              加压方式
+负载测试  找日常容量上限     梯度加压到响应变慢
+压力测试  找极限容量        持续加压到系统崩溃
+稳定性测试 验证长时间运行     80%峰值跑24-48小时
+\`\`\`
+
+\`\`\`text
+影子库/影子表/影子队列（数据隔离三种方案）：
+方案          原理                          优缺点
+影子表        同库建 _shadow 表，压测写影子表  隔离弱（同库资源争抢），实现简单
+影子库        独立DB实例，压测路由到影子库     隔离强，成本高
+影子队列      MQ 用独立 Topic，消费影子消费者  适合异步链路
+
+压测流量标记与透传：
+- 入口网关给压测请求打标：X-Pressure-Test: true
+- 全链路透传（HTTP Header → Dubbo Attachment → MQ Property）
+- 各中间件识别标记，路由到影子资源
+- 日志打到独立文件/独立ES索引
+\`\`\`
+
+\`\`\`text
+容量规划核心公式：
+单机容量 = 单机QPS上限（压测得出）
+集群容量 = 单机容量 × 机器数 × 水位系数(0.7)
+扩容阈值 = 集群容量 × 告警水位(0.6)
+
+容量规划四步：
+1. 压测得出单机 QPS 上限
+2. 按业务峰值计算所需机器数
+3. 设置 60% 水位告警，80% 自动扩容
+4. 定期复测（代码变化会导致单机容量变化）
+
+全链路瓶颈定位（木桶效应）：
+- 应用层：CPU/线程池/连接池打满
+- 数据层：DB 连接数/CPU/锁等待/慢SQL
+- 缓存层：热点Key/大Value/穿透/雪崩
+- 网络层：带宽打满/连接数超限
+- 中间件：MQ堆积/限流触发
+\`\`\`
+
+案例：阿里双11 全链路压测——影子库方案，数千个影子表，压测流量全链路标记隔离，双11当天用压测数据指导弹性扩容（从压测的800万QPS推算双11峰值1200万QPS所需机器）；某金融系统压测发现 DB 连接池是瓶颈（500连接打满），从50调整到200后系统容量翻倍；某电商压测发现 Redis 集群热点Key导致单分片CPU 100%，用本地缓存+多级缓存解决。
+
+踩坑：只压单接口不压全链路（单接口OK但全链路资源争抢暴露不出）；压测数据用生产真实数据（数据污染、合规风险，必须用脱敏数据或影子表）；只看QPS不看响应时间（QPS达标但P99从50ms涨到2s，不可接受）；压测完不复盘（瓶颈点没记录，下次又踩同样坑）；忽视第三方依赖限流（压测把下游第三方压挂了，要Mock或限流保护）。`,
+    keyPoints: ["全链路压测五步：梳理→建模→数据→执行→分析", "影子库/表/队列实现压测数据隔离", "压测产出是容量规划曲线，不是单点QPS"],
+    followUps: ["怎么构造真实的压测流量模型？", "弹性扩容的自动触发条件怎么设计？"],
+    favorited: false,
+  },
+  // ===== be-cloud-native：云原生进阶（3 题） =====
+  {
+    id: "be-314",
+    nodeId: "be-cloud-native",
+    question: "Service Mesh（Istio + Envoy）解决了什么问题？Sidecar 模式的利弊？什么时候该上？",
+    bigTech: true,
+    answer: `结论：Service Mesh 把「服务间通信的治理能力」（负载均衡/熔断/重试/限流/可观测/安全）从应用代码里剥离到 Sidecar 代理（Envoy）中，让业务代码只关心业务逻辑。它解决的核心问题是「多语言栈的服务治理一致性」和「治理能力与业务解耦」。Sidecar 的代价是：每 Pod 多一个代理容器，增加资源开销（CPU+内存）和链路跳数（多一跳，延迟+1-2ms）。上不上 Service Mesh 的判断标准是"服务数量×语言种类×治理复杂度"是否超过 SDK 方案的维护成本。
+
+\`\`\`text
+Service Mesh 演进路线：
+阶段1：SDK 治理（Spring Cloud/Dubbo）
+  - 治理能力在应用 SDK 里
+  - 问题：多语言难（每个语言一套SDK），升级难（SDK版本碎片化）
+阶段2：Sidecar 代理（Istio + Envoy）
+  - 治理能力下沉到 Sidecar
+  - 优点：语言无关，业务无侵入，统一升级
+  - 代价：资源开销 + 延迟开销
+阶段3：eBPF/Sidecarless（Cilium Service Mesh）
+  - 治理能力下沉到内核 eBPF
+  - 优点：无 Sidecar 开销，性能接近原生
+  - 现状：功能不如 Istio 完善，发展中
+\`\`\`
+
+\`\`\`text
+Istio 核心能力四象限：
+能力域        具体功能                        替代的传统方案
+流量管理      负载均衡/熔断/重试/灰度/流量染色   Ribbon/Hystrix/网关规则
+安全          mTLS/授权策略/证书轮转            手动TLS/ACL
+可观测        指标/链路追踪/访问日志            Skywalking/Prometheus手动接入
+策略          限流/黑白名单                     Sentinel/网关限流
+
+Sidecar 工作原理（数据平面）：
+- 应用 Pod 内注入 Envoy 容器（istio-init 初始化 + istio-proxy 运行）
+- 所有出入流量被 iptables 劫持到 Envoy
+- Envoy 执行治理逻辑后转发（应用无感知）
+- 控制平面（istiod）下发配置到所有 Envoy
+\`\`\`
+
+\`\`\`text
+Sidecar 开销实测（生产数据）：
+- CPU：每 Pod 额外 0.1-0.5 核（取决于流量）
+- 内存：每 Pod 额外 100-200MB
+- 延迟：P99 增加 1-2ms（多一跳+代理处理）
+- 大规模集群（1000+ Pod）资源开销显著
+
+什么时候该上 Service Mesh？
+✅ 服务数>50，多语言栈，治理需求复杂
+✅ 需要统一的安全策略（mTLS、零信任）
+✅ 需要细粒度流量治理（灰度、流量染色、流量镜像）
+❌ 服务数<20，单语言栈（Spring Cloud SDK 够了）
+❌ 对延迟极其敏感（金融交易，1ms 都不能多）
+❌ 资源紧张（Sidecar 开销对小集群不可忽视）
+\`\`\`
+
+案例：字节跳动用自研 Service Mesh（基于 Envoy）统一多语言（Go/Python/Node.js/Lua）治理，从各语言自维护 SDK 解放出来；阿里巴巴的 MSE（微服务引擎）提供托管式 Istio，降低运维门槛；某金融公司评估后不上 Service Mesh——核心交易系统延迟敏感，多 1ms 不可接受，且 Java 单语言栈用 Spring Cloud 足够。
+
+踩坑：盲目上 Istio（服务<20个，SDK 维护成本远低于 Sidecar 资源开销）；上了不监控 Sidecar（Envoy OOM/超时导致全链路抖动，排查困难）；全量开启 mTLS 不灰度（证书配置错误导致全站不可用）；忽视 istiod 性能（大规模集群控制平面推送延迟，配置生效慢）；Sidecar 版本和应用不兼容（iptables 劫持规则异常导致流量黑洞）。`,
+    keyPoints: ["Service Mesh 把治理能力从 SDK 下沉到 Sidecar", "代价是资源开销+1-2ms 延迟", "判断标准是服务数×语言种类×治理复杂度"],
+    followUps: ["eBPF 怎么实现 Sidecarless Service Mesh？", "Istio 的流量染色和灰度发布怎么做？"],
+    favorited: false,
+  },
+  {
+    id: "be-315",
+    nodeId: "be-cloud-native",
+    question: "eBPF 在云原生里解决了什么问题？相比传统方案的优势？典型应用场景有哪些？",
+    bigTech: false,
+    answer: `结论：eBPF（Extended Berkeley Packet Filter）是「Linux 内核里的可编程虚拟机」——允许在不修改内核源码、不加载内核模块的前提下，在内核态运行沙箱程序。它解决了云原生场景下「内核态观测和网络处理的高性能需求」——传统用户态方案需要数据穿越内核态/用户态边界，开销大；eBPF 直接在内核态处理，性能提升一个数量级。
+
+\`\`\`text
+eBPF 核心价值：
+1. 内核可编程：不改内核源码，动态加载程序到内核运行
+2. 安全沙箱：验证器（Verifier）确保程序不会崩溃内核
+3. 高性能：内核态处理，无用户态切换开销
+4. 动态性：运行时加载/卸载，无需重启
+
+工作原理：
+1. 用 C 写 eBPF 程序（受限子集）
+2. Clang/LLVM 编译成字节码
+3. 内核 Verifier 验证安全性（无死循环、无越界）
+4. JIT 编译成原生指令在内核运行
+5. 通过 Map 和用户态交互数据
+\`\`\`
+
+\`\`\`text
+四大典型应用场景：
+场景           传统方案痛点              eBPF 方案              代表项目
+网络           iptables 规则多性能差     XDP 内核态网络处理      Cilium
+可观测         用户态 Agent 开销大        内核态采集指标/链路     Pixie/Parca
+安全           内核模块危险              内核态安全监控          Falco/Tetragon
+调度           无法感知应用层            应用感知调度            Krypto
+
+场景1：网络（Cilium）
+- 替代 kube-proxy（iptables 模式）
+- iptables 在大规模集群（>1000 Service）规则匹配 O(n)
+- eBPF 用 Map 实现 O(1) 查找，性能不随规则数增长
+- Service Mesh Sidecarless：eBPF 在内核做 L4-L7 治理
+
+场景2：可观测（Pixie/Parca）
+- 传统 APM：应用埋点/Sidecar 采集，有开销
+- eBPF：内核态自动采集 HTTP/gRPC/SQL 调用
+- 零侵入：不改应用代码，不加 Sidecar
+- 全覆盖：所有进程自动观测
+
+场景3：安全（Falco/Tetragon）
+- 传统：内核模块（危险，可能崩溃）或用户态日志（不全）
+- eBPF：内核态监控 syscall/network/file 事件
+- 实时告警：检测容器逃逸/异常网络连接/敏感文件访问
+\`\`\`
+
+\`\`\`text
+eBPF vs 传统方案对比：
+维度        传统(用户态Agent)     eBPF(内核态)
+性能        有内核-用户态切换     纳秒级，无切换
+侵入性      需要改应用/加Sidecar  零侵入
+覆盖度      只看应用层            内核+应用全栈
+资源开销    每应用一个Agent       全局一个，共享
+调试难度    用户态易调试          内核态需要BPF工具链
+\`\`\`
+
+案例：Google GKE 用 eBPF 替代 kube-proxy，大规模集群网络延迟降低30%；字节跳动用 eBPF 做全链路追踪，零侵入采集 Go/Python/C++ 混合语言调用链；某金融系统用 Tetragon（基于 eBPF）实现容器运行时安全——检测到容器内执行 bash 立即告警阻断，替代传统 HIDS。
+
+踩坑：内核版本要求高（eBPF 功能依赖内核 4.10+，完整功能需要 5.4+，老内核用不了）；过度依赖 eBPF（简单场景用传统方案更易维护，eBPF 调试门槛高）；忽视 Verifier 限制（程序复杂度有限制，复杂逻辑可能无法通过验证）；生产直接上（eBPF 程序 bug 可能影响内核稳定性，需要充分测试）。`,
+    keyPoints: ["eBPF 是内核可编程虚拟机，不改内核源码", "内核态处理，无用户态切换，性能提升一个数量级", "四大场景：网络(Cilium)/可观测(Pixie)/安全(Falco)/调度"],
+    followUps: ["Cilium 怎么用 eBPF 替代 kube-proxy？", "eBPF 的 Verifier 怎么保证安全？"],
+    favorited: false,
+  },
+  {
+    id: "be-316",
+    nodeId: "be-cloud-native",
+    question: "Serverless / FaaS 的冷启动问题怎么解决？Knative 和传统 K8s 部署的区别？FinOps 是什么？",
+    bigTech: false,
+    answer: `结论：Serverless/FaaS 的核心卖点是「按用量付费+零运维+自动弹性」，最大痛点是「冷启动」——首次请求到来时需要拉镜像→启动容器→初始化应用，延迟从毫秒级飙到秒级。解决方案分三档：预热（保活）、加速（轻量运行时）、规避（事件驱动避免冷启动）。Knative 是 K8s 上的 Serverless 框架，核心是「Scale-to-Zero + 按需自动弹性」。FinOps 是「云成本运营」——把云资源当投资管，核心是让研发对成本负责。
+
+\`\`\`text
+冷启动四阶段与耗时：
+阶段           耗时           优化方向
+拉镜像          500ms-5s       镜像瘦身、镜像缓存
+启动容器        200ms-2s       轻量运行时（GraalVM Native Image）
+框架初始化      500ms-3s       预热、减少启动时初始化
+应用就绪        100ms-1s       健康检查优化
+
+冷启动优化三档：
+档位1：预热/保活
+- provisioned concurrency（AWS Lambda）：预置N个热实例
+- Knative min-scale：保底N个 Pod 不缩到0
+- 定时心跳：每分钟打一个请求保活
+
+档位2：加速启动
+- GraalVM Native Image：AOT 编译，启动 50ms（vs JVM 2s）
+- 镜像瘦身：Distroless/Scratch，镜像从 500MB→50MB
+- 框架轻量化：Quarkus/Micronaut 替代 Spring Boot（启动 0.3s vs 2s）
+
+档位3：规避冷启动
+- 事件驱动：用消息触发，用户不直接等待冷启动
+- 长连接保活：WebSocket/gRPC stream 保持实例不回收
+- 分级弹性：核心服务 min-scale=1（不缩到0），非核心允许冷启动
+\`\`\`
+
+\`\`\`text
+Knative vs 传统 K8s 部署：
+维度        传统 K8s Deployment      Knative Service
+副本数      固定 replicas 或 HPA     0 到 N，自动弹性
+缩容        需配 HPA + 手动          流量降后自动缩到0
+流量管理    Ingress/Service          Revision 蓝绿/灰度
+冷启动      无（副本固定）           有（Scale-from-0）
+计费        按实例数 × 时长           按请求次数 × 执行时长
+适用场景    长期稳定服务              突发/长尾/事件驱动
+
+Knative 三核心组件：
+- Serving：自动弹性 + Scale-to-Zero + 流量管理
+- Eventing：事件源→触发器→服务，事件驱动架构
+- Build（已独立为 Tekton）：源码到镜像的 CI/CD
+\`\`\`
+
+\`\`\`text
+FinOps（云成本运营）三阶段：
+阶段1：看见（Visibility）
+- 全资源打成本标签（team/service/env）
+- 每日成本报表，按团队/服务维度拆分
+- 异常成本告警（环比增长>20%告警）
+
+阶段2：优化（Optimization）
+- 闲置资源清理：未挂载的 EBS/未用的 ELB/僵尸 Pod
+- 实例规格优化：开发环境用 Spot/竞价实例，省70%
+- 采购优化：Reserved Instance/Savings Plan 预留，省40%
+- 架构优化：Serverless 替代常驻服务（长尾场景省80%）
+
+阶段3：治理（Governance）
+- 预算机制：每团队设月度预算，超支审批
+- 成本分摊：成本精确到服务/feature 级别
+- 研发赋能：让研发看到自己代码的成本影响
+
+FinOps 核心原则：
+- 成本是研发的"第一公民"（不是运维的事）
+- 按价值付费（为业务价值付费，不为闲置资源付费）
+- 持续优化（不是一次性活动）
+\`\`\`
+
+案例：AWS Lambda 用 provisioned concurrency 解决 API 冷启动（金融场景 P99 < 100ms）；某 BI 报表服务从 ECS 迁到 Knative，空闲时缩到0，成本降 70%（报表每天就跑几次）；字节跳动用 GraalVM Native Image 把 Spring Boot 应用启动从 3s 降到 80ms，支持 Serverless 场景；某公司 FinOps 治理——清理 300+ 闲置 EBS 卷、开发环境全换 Spot，月度云成本从 200 万降到 120 万。
+
+踩坑：盲目 Scale-to-Zero（核心服务冷启动用户可感知，不该缩到0）；冷启动只看延迟不看失败率（超时重试放大流量，雪崩）；FinOps 只看账单不看利用率（买了 RI 但利用率<60%，浪费）；Serverless 厂商锁定（Lambda 特性深度绑定AWS，迁移成本极高）；忽视 GraalVM 兼容性（Native Image 不支持反射/动态代理，Spring 应用需要大量改造）。`,
+    keyPoints: ["冷启动三档优化：预热/加速/规避", "Knative = Scale-to-Zero + 按需弹性 + 流量管理", "FinOps 三阶段：看见→优化→治理，让研发对成本负责"],
+    followUps: ["GraalVM Native Image 的原理和限制？", "Spot 实例被回收怎么保证服务可用性？"],
     favorited: false,
   },
 ];
