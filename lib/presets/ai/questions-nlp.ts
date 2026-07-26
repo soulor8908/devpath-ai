@@ -868,5 +868,235 @@ def judge_pair(a, b, prompt):
     favorited: false,
     bigTech: true,
   },
+
+
+  // ===== 从远程合入：ai-vector-retrieval =====
+  {
+    id: "ai-330",
+    nodeId: "ai-vector-retrieval",
+    question: "HNSW 原理？分层小世界图为什么能做到 O(log N) 检索？",
+    answer: `结论：HNSW（Hierarchical Navigable Small World）= 概率跳表 + 小世界图。每个节点以指数衰减概率被抽到更高层（层 0 必有，层 ℓ 概率 p^ℓ），高层是稀疏的"高速公路"，层 0 是稠密的"地面路网"。检索从最高层入口点贪心下降：在当前层找离 query 最近的节点，跳到层数更小时以它为入口继续贪心——高层大步长快速逼近目标区域（对数级步数，因为每层把搜索范围缩小常数倍），低层小步长精修。构图时同样分层插入，每层连接 M 个最近邻（用启发式选边：优先选"方向分散"的邻居保持图连通与多样性），efConstruction 控制建索引质量。复杂度直觉：小世界图的"六度分隔"性质保证任意两点短路径存在，分层贪心保证找到它——期望 O(log N) 跳数、每跳 O(M) 距离计算。参数三件套：M（每点最大边数，16-64，内存与质量旋钮）、efConstruction（建图候选池，200-500）、efSearch（查询候选池，运行时召回率-QPS 旋钮）。
+
+\`\`\`python
+import hnswlib
+idx = hnswlib.Index(space="cosine", dim=768)
+idx.init_index(max_elements=10_000_000, ef_construction=200, M=32)
+idx.add_items(vectors, ids)
+idx.set_ef(128)                    # 查询时调：召回率 vs 延迟
+labels, dists = idx.knn_query(query_vec, k=10)
+# 内存估算：M=32 时每点边表约 32*2*8B + 向量本体，千万 768 维 fp32 ≈ 30GB+
+\`\`\`
+
+实际案例：Milvus/Weaviate/Qdrant 默认索引都是 HNSW 或其变体；某搜索团队千万级商品向量 HNSW（M=32, ef=128）召回率 97%、P99 延迟 8ms，替代 IVF 后相关性指标 +2%；RAG 系统 90% 以上的向量库生产实例跑 HNSW。
+
+踩坑与 tradeoff：内存大户——图结构+原始向量全驻内存，亿级 768 维要数百 GB，成本敏感场景换 IVFPQ/DiskANN；高维诅咒依旧存在——维度 >1000 时距离区分度下降，召回率靠 efSearch 硬拉；删除支持弱（标记删除，图结构不收缩），删除率高的场景要定期重建；构建慢且难并行（图是有序插入的），批量建索引比 IVF 慢 3-5 倍；参数联动——M 加倍内存涨 40% 但召回只 +1-2%，efSearch 是线上唯一实时旋钮，A/B 时固定 M 只调 ef。`,
+    keyPoints: ["分层=跳表思想，高层粗搜低层精修，期望 O(log N)", "M 控内存与质量，efSearch 是线上召回-QPS 旋钮", "内存大户+删除弱，亿级场景看 DiskANN/IVFPQ"],
+    followUps: ["HNSW 的选边启发式为什么优先方向分散的邻居？", "标记删除累积后图质量如何衰减？何时该重建？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-331",
+    nodeId: "ai-vector-retrieval",
+    question: "IVF 倒排索引原理？nlist 与 nprobe 如何权衡？",
+    answer: `结论：IVF（Inverted File）用空间划分替代图遍历：先对全量向量跑 KMeans 得到 nlist 个聚类中心（质心），每个向量挂到最近质心的倒排桶里。查询时：①把 query 与 nlist 个质心算距离（这一步 O(nlist·d)）；②只钻进最近的 nprobe 个桶内暴力比对——计算量从全库 N 降到 nprobe·(N/nlist)。nlist 是构建期参数：桶越多每桶越瘦（N/nlist 小），单桶内比对快，但"query 该进哪个桶"的误差变大——真实近邻被分到相邻桶的概率上升，必须靠多探几个桶（大 nprobe）补偿。nprobe 是查询期参数：召回率随 nprobe 单调升，延迟也线性升。经验甜区：nlist ≈ 4√N（百万级 nlist=4096 常见），nprobe 从 nlist 的 1% 起调（4096 桶探 16-64 个）；召回率目标 95%+ 时 nprobe 往往要提到 5-10%，此时 IVF 性价比开始输 HNSW。
+
+\`\`\`python
+import faiss
+# nlist=4096 需训练质心（先用 30 万+ 样本训 KMeans）
+quantizer = faiss.IndexFlatIP(d)
+idx = faiss.IndexIVFFlat(quantizer, d, 4096, faiss.METRIC_INNER_PRODUCT)
+idx.train(train_vecs)
+idx.add(all_vecs)
+idx.nprobe = 32                    # 查询旋钮：1=最快，nlist=全库
+D, I = idx.search(query, k=10)
+\`\`\`
+
+实际案例：FAISS 官方十亿级 benchmark 标配 IVF4096+PQ；某内容社区 2 亿图文向量用 IVFPQ（nlist=8192, nprobe=64），召回 92%、单机 QPS 3000，成本只有 HNSW 内存方案的 1/5；推荐粗排候选集扩展（item2item 近邻表离线预计算）大量用 IVF。
+
+踩坑与 tradeoff：KMeans 质心代表真实分布——向量分布漂移（embedding 模型升级/业务扩张）后桶划分失配，召回率缓慢劣化，要监控桶大小分布偏斜度并定期重建；均匀分布假设常不成立——真实数据簇密度不均，大桶内仍要比对几万条（热点桶拖尾延迟），可用多层级 IVF 或按密度自适应 nlist；nprobe 调大后质心距离计算本身成瓶颈（nlist=65536 时光找桶就 1ms+），要对质心再建小索引；训练样本要够（≥50×nlist）否则质心过拟合；与标量过滤组合时先过滤后桶内搜索（post-filter）可能桶内候选不够，召回断崖——这是混合检索要单独设计的根本原因。`,
+    keyPoints: ["KMeans 分桶+只探 nprobe 桶，计算量降两个数量级", "nlist≈4√N，nprobe 从 1% 起调，召回 95% 后 IVF 输给 HNSW", "分布漂移让桶失配，需监控偏斜定期重建"],
+    followUps: ["为什么 nprobe 大后 IVF 性价比输给 HNSW？", "热点桶拖尾延迟怎么治理？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-332",
+    nodeId: "ai-vector-retrieval",
+    question: "PQ 乘积量化原理？为什么压缩 32 倍还能算距离？",
+    answer: `结论：PQ（Product Quantization）把 d 维向量切成 m 段子向量（如 768 维切 96 段、每段 8 维），每段独立跑 KMeans（k=256 个码本中心），向量每段用 1 字节码本 id 表示——d 维 fp32（4d 字节）压成 m 字节，压缩率 4d/m（768 维→96 字节=32 倍）。查询距离不用解压：ADC（非对称距离计算）——query 不压缩，预先算 query 各段与 256 个码本中心的距离表（m×256 次计算），然后对库里每个压缩向量查表累加 m 次即得近似距离，每向量成本 m 次内存查表+加法，比原始 d 次乘加还快。"非对称"是关键：query 保持全精度，只有库向量被量化，距离误差减半（对称方案两边都量化误差叠加）。误差来源：段内量化损失（8 维用 256 中心表示，残差不可避免）+段间独立性假设（各段独立量化忽略跨段相关性——OPQ 用一个可学习旋转矩阵 R 先把相关性转进段内再 PQ，召回率显著回升）。
+
+\`\`\`python
+import faiss
+# IndexPQ：d=768 切 m=96 段，每段 8bit → 96 字节/向量
+idx = faiss.IndexPQ(d=768, M=96, nbits=8)
+idx.train(train_vecs)     # 训 96 套独立 KMeans 码本
+idx.add(all_vecs)         # 存储只有 96 字节/条
+D, I = idx.search(query, 10)
+# OPQ 改进：先学旋转再 PQ
+opq = faiss.OPQMatrix(768, M=96)
+idx2 = faiss.IndexPreTransform(opq, faiss.IndexPQ(768, 96, 8))
+\`\`\`
+
+实际案例：FAISS 十亿向量标配 IVFPQ——1B×96 字节=96GB 单机能装（原始 fp32 要 3TB）；某电商平台 5 亿商品图向量 IVFPQ 召回率 91%（vs 精确检索）、内存降 96%、P99 12ms，支撑拍照购日千万次请求；Embedding 服务侧常用 PQ 压缩历史语料库做离线相似对挖掘。
+
+踩坑与 tradeoff：召回率损失 5-15% 是常态——排序敏感场景（精排候选）不能忍，方案是 PQ 粗召回 top-200 → 原始向量精排（rerank），内存只存热数据原始向量；nbits=8（256 中心）是甜点，nbits=4 召回再掉 5 个点以上；段数 m 越多误差越小但距离表计算 m×256 变大，m=d/8 是常见折中；PQ 假设各段方差均衡——embedding 某些维度方差极大时前几段吃满误差，OPQ 或先 PCA  whitening；内积/余弦场景注意：PQ 为 L2 设计，余弦要先归一化再用 L2 等价转换；量化码本随数据分布漂移，模型升级 embedding 后必须重训码本。`,
+    keyPoints: ["分段独立量化：d 维→m 字节，32 倍压缩", "ADC 查表算距：query 全精度+库向量压缩，比原始计算还快", "OPQ 旋转救段间相关性，PQ 粗召回+精排是生产范式"],
+    followUps: ["为什么 ADC（非对称）比对称量化误差小？", "PQ 在余弦相似度场景为什么要先归一化？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-333",
+    nodeId: "ai-vector-retrieval",
+    question: "IVFPQ 组合索引为什么是工业主流？OPQ 与残差量化如何进一步提效？",
+    answer: `结论：IVF 与 PQ 解决的是两个正交的瓶颈——IVF 减少"要比对的向量数"（空间划分，N→N/nlist·nprobe），PQ 减少"每条向量的存储与比对成本"（d 维→m 字节+查表）。组合后十亿级向量单机可检索：1B 向量 IVFPQ 存储≈100GB、查询先钻桶再 PQ 查表，召回 90%+ 时 QPS 数千。细节加分项：①残差量化——IVF 桶内向量不直接 PQ，而是先减所属质心（r = x - centroid）再对残差 PQ，残差动态范围小得多，量化误差降一半（FAISS 的 IndexIVFPQ 默认开启）；②OPQ 旋转——PQ 分段独立假设被 embedding 维度相关性破坏，OPQ 学一个正交旋转 R（最小化量化误差的目标交替优化），把相关性"转匀"到各段，同字节预算下召回 +3-8 个点；③重排级联——IVFPQ 快速召回 top-k×10 候选，用原始向量（或更精确的 SQ8）重排取 top-k，两阶段把召回率拉回 97%+。选型阶梯：百万级以内 HNSW 省心；千万-亿级 IVFPQ(+OPQ)+重排；十亿级或 SSD 场景 DiskANN。
+
+\`\`\`python
+import faiss
+# 工业标配：OPQ 旋转 → IVF 分桶 → 残差 PQ
+d, M, nlist = 768, 96, 8192
+opq = faiss.OPQMatrix(d, M=M)
+coarse = faiss.IndexFlatL2(d)
+ivfpq = faiss.IndexIVFPQ(coarse, d, nlist, M, 8)   # 默认残差量化
+idx = faiss.IndexPreTransform(opq, ivfpq)
+idx.train(train_vecs); idx.add(all_vecs)
+idx.nprobe = 64
+# 两阶段：PQ 召回 500 → fp32 原始向量重排取 50
+D, I = idx.search(q, 500)
+final = rerank_with_raw(q, I)   # 只拉 500 条原始向量，内存可控
+\`\`\`
+
+实际案例：某搜索引擎图文召回 8 亿向量，IVF8192+OPQ+PQ96+fp32 重排，召回率 96.5%、P99 延迟 15ms、单机内存 220GB（纯 HNSW 方案要 1.2TB）；Meta/Facebook 的十亿级相似图片检索（FAISS 论文场景）同款架构；Milvus 生产集群 60% 以上索引类型是 IVFPQ 系。
+
+踩坑与 tradeoff：三个组件各有训练集要求——KMeans 要 50×nlist 样本、PQ 码本要百万级、OPQ 优化不稳定需多随机种子取优，训练样本不足时索引质量静默劣化（不报错但召回低）；nprobe×桶大小决定真实计算量，幂律分布下大桶拖尾（热点 query 词全落同一语义桶），监控每桶 P99；OPQ 旋转矩阵在分布漂移后失效且不易察觉，A/B 灰度重建；GPU-FAISS 对 IVFPQ 加速 10 倍但 OPQ/重排链路在 GPU 上实现受限，混合架构工程复杂；别忘了标量过滤联合查询（post-filter 后桶内候选可能不足 k，要扩 nprobe 兜底逻辑）。`,
+    keyPoints: ["IVF 减候选数、PQ 减单条成本，正交组合吃十亿级", "残差量化（减质心再 PQ）误差减半，OPQ 旋转再提召回", "PQ 粗召回+fp32 重排两段式拉回 97%+"],
+    followUps: ["残差量化为什么比直接量化误差小？", "OPQ 的优化目标是什么？为什么要多随机种子？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-334",
+    nodeId: "ai-vector-retrieval",
+    question: "LSH 局部敏感哈希原理？相比图与量化方法何时该用？",
+    answer: `结论：LSH 用一族"碰撞概率随距离单调"的哈希函数把向量映射到桶：随机超平面哈希（SimHash，适合余弦）——随机画 k 个超平面，向量在平面同侧记 1 异侧记 0，k 位签名碰撞概率=1-θ/π（θ 是向量夹角），近邻大概率同签名；p-stable LSH（适合 L2）——随机投影加随机偏移后按宽度 w 分桶。多表策略：建 L 张独立哈希表，每张用 k 位签名，查询并集 L 张表的同桶候选——k 控精度（位多桶纯但候选少）、L 控召回（表多候选全）。理论保证：对 (r, cr)-近似近邻，查准查全有显式概率界（这是 LSH 区别于启发式方法的卖点）。复杂度亚线性但常数不小：达到 95% 召回往往需要 L=几十张表，内存翻倍。与 HNSW/IVFPQ 对比：LSH 胜在理论保证+流式友好（新增向量算签名插桶即可，无图结构维护）+天然二值签名可与位运算/倒排索引结合；输在相同召回下内存与延迟常数普遍劣于 HNSW（图法）和 IVFPQ（量化法）——2019 年后纯向量检索基准上 LSH 基本退出主流。
+
+\`\`\`python
+import numpy as np
+# SimHash（余弦 LSH）：k 个随机超平面
+planes = np.random.randn(k, d)
+sig = (vectors @ planes.T > 0)        # (N, k) 布尔签名
+q_sig = (query @ planes > 0)
+candidates = np.where((sig == q_sig).all(axis=1))[0]   # 同桶候选
+# datasketch 库：MinHash LSH（Jaccard 场景）
+from datasketch import MinHashLSH
+lsh = MinHashLSH(threshold=0.5, num_perm=128)
+\`\`\`
+
+实际案例：Google SimHash 网页去重是 LSH 成名战（百亿网页 64 位签名，海明距离 ≤3 判重复）；推荐系统 i2i 近邻表离线计算仍有团队用 LSH 做初筛（Spark 上比精确比对快 20 倍）；MinHash LSH 在集合相似度（文档 shingle、用户行为集合）场景至今是标配——datasketch 支撑大量去重/聚类管线。
+
+踩坑与 tradeoff：理论保证在高维稀释——维度上千时为保持召回要把 k 调小、L 调大，内存和候选集膨胀，实测常不如调好的 HNSW；参数 (k, L) 互相耦合且随数据分布变，调参比 HNSW 的 ef 单旋钮痛苦；LSH 对"近邻都在同一个小区域"的密集簇表现好，对长尾稀疏向量差；二值签名丢精度，最后一步仍要原始向量精排；今天选型口诀：在线向量检索选 HNSW/IVFPQ，离线大规模去重/聚类（Jaccard/余弦粗筛）用 MinHash/SimHash LSH，需要流式插入+理论保证的细分场景才考虑 LSH 索引。`,
+    keyPoints: ["碰撞概率随距离单调，SimHash 签名=随机超平面同侧性", "k 控精度 L 控召回，理论有显式概率界", "流式友好但常数劣于 HNSW，现役主场是离线去重/集合相似"],
+    followUps: ["MinHash 为什么估计的是 Jaccard 相似度？", "LSH 的 (r,cr)-近似保证具体形式是什么？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-335",
+    nodeId: "ai-vector-retrieval",
+    question: "十亿级向量检索怎么做？DiskANN 与 ScaNN 的思路？",
+    answer: `结论：内存放不下时两条路线。DiskANN（微软）：把图索引搬到 SSD——核心洞察是"图的遍历天然是局部访问，SSD 随机读 4KB 只要几十微秒，一条遍历路径的 IO 次数可控"。三个设计：①Vamana 图算法（比 HNSW 更激进的长边剪枝，直径更小，遍历步数少 → IO 次数少）；②布局优化：SSD 上每个 4KB 扇区存"一个节点的完整向量+邻居表"，一跳一次读盘不浪费带宽；③两级精度：SSD 存全精度向量（图遍历用），内存只放 PQ 压缩向量做距离初算，候选节点再读盘精算——内存占用压到原始 1/30，十亿向量单机（64GB 内存+NVMe）QPS 数千、召回 95%+。ScaNN（Google）：留在内存但把量化做到极致——各向异性量化损失：不最小化向量重构误差，而是直接最小化"内积误差对 MIPS 排序的影响"（高分向量的内积保真权重大），同压缩率下内积检索精度超 PQ 一档，加上 AVX2 寄存器级查表，是当时 recall-QPS 双榜第一。选型：内存装得下→HNSW/ScaNN；装不下但有 NVMe→DiskANN；超大规模多副本→分布式 IVF（Milvus/FAISS index shard）。
+
+\`\`\`python
+# DiskANN（diskannpy）
+import diskannpy as dap
+idx = dap.builder.build_disk_index(
+    data=vectors_file, distance_metric="l2",
+    index_directory="ann_index",
+    complexity=64,             # 图度数
+    graph_degree=64,
+    num_threads=16,
+    pq_disk_bytes=0,           # PQ 向量也放盘上的极端省内存模式
+)
+# 查询：内存 PQ 粗排 → SSD 读候选精排
+labels, dists = dap.disk_aligned_search(
+    "ann_index", query, k=10, search_list_size=75, beam_width=4)
+\`\`\`
+
+实际案例：Bing 搜索的向量召回层公开承认用 DiskANN 支撑百亿级段落向量；微软 Azure AI Search 十亿向量档默认 DiskANN 后端；某电商拍照搜商品 20 亿 SKU 图向量，从 128 节点内存 HNSW 集群迁到 8 节点 DiskANN，年成本降 85%、P99 从 25ms 升到 45ms 但仍在预算内。
+
+踩坑与 tradeoff：SSD 寿命与 IO 争抢——DiskANN 高 QPS 下读盘 IOPS 拉满，消费级 NVMe 一年写穿（重建索引时），生产要企业级 SSD+写入限速；冷启动灾难——page cache 未热时延迟 10 倍，需要 warmup 脚本预热热点分区；更新不友好：图索引合并新点代价高，DiskANN 用 FreshDiskANN（内存小图+定期合并）兜增量；ScaNN 的各向异性量化对内积/余弦场景优势明显，L2 场景提升收窄；别忽视"召回率定义"——DiskANN 论文 recall@10 是与精确结果比，业务上常只需"业务相关 item 进候选"，验收口径先对齐。`,
+    keyPoints: ["DiskANN：Vamana 小直径图+扇区对齐布局+内存PQ/SSD全精度两级", "ScaNN：各向异性量化直接优化内积排序误差", "选型阶梯：内存→HNSW/ScaNN，NVMe→DiskANN，分布式→IVF shard"],
+    followUps: ["Vamana 的长边剪枝为什么减少遍历 IO 次数？", "FreshDiskANN 的增量合并机制？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-336",
+    nodeId: "ai-vector-retrieval",
+    question: "ANN 索引如何评估？召回率-QPS-内存的基准测试怎么做？",
+    answer: `结论：三轴评估缺一不可，只报召回率是耍流氓。①召回率（Recall@k）：ANN 返回 top-k 与精确暴力检索 top-k 的交集比例——注意口径：recall@10 严格于 recall@100，业务常用"目标 item 进 top-100 候选"的宽松口径；②QPS/延迟：单机压测报 P50/P99（P99 才反映尾延迟，对检索服务更重要），并发从 1 到满载阶梯加压，记录拐点；③内存/建索引成本：常驻内存（图+向量+码本）、构建时间、训练样本需求。标准流程：固定数据集（SIFT1M/GIST1M/Deep1B 或业务抽样 100 万）→ 暴力精确检索存 ground truth → 扫参数网格（HNSW 扫 efSearch、IVF 扫 nprobe、PQ 扫段数）→ 画召回-QPS 帕累托曲线——同一图上比较方法才公平（ann-benchmarks 标准做法）。业务验收再加两条：增量更新后召回衰减曲线（插入 10% 新数据后是否劣化）、标量过滤联合查询召回（带过滤条件时召回往往掉 10 个点，必须单测）。
+
+\`\`\`python
+import numpy as np, time
+def recall_at_k(ann_ids, gt_ids, k=10):
+    return np.mean([len(set(a[:k]) & set(g[:k])) / k
+                    for a, g in zip(ann_ids, gt_ids)])
+def bench(idx, queries, gt, k=10):
+    idx.set_ef(64)  # 或 idx.nprobe = 32，单参数扫描
+    t0 = time.perf_counter()
+    ids = idx.knn_query(queries, k=k)      # 批量查询
+    qps = len(queries) / (time.perf_counter() - t0)
+    return recall_at_k(ids, gt, k), qps
+# 扫 efSearch ∈ {16,32,64,128,256} 画帕累托曲线
+\`\`\`
+
+实际案例：ann-benchmarks 公开榜曾是选型事实标准（HNSW 长期霸榜内存场景）；某搜索团队迁移前用 100 万业务向量+10 万真实 query 做基准：HNSW(ef=64) 召回 96%/QPS 8000/内存 48GB vs IVFPQ(nprobe=32) 召回 91%/QPS 12000/内存 9GB，最终按"召回 95% 硬线"选 HNSW；embedding 模型每次升级都重跑基准——同一索引参数在新向量分布下召回可能漂移 5 个点。
+
+踩坑与 tradeoff：基准最大的坑是数据分布失真——用均匀随机向量测出的召回率普遍虚高 10+ 个点（真实 embedding 有簇结构，近邻重叠严重），必须用业务向量；query 分布也要真实（热门 query 的近邻密集，难度低）；QPS 数字依赖核数/NUMA/页缓存，跨机器比较没意义，报告必须带硬件配置；批量查询（batch）QPS 好看但掩盖单查询延迟，在线服务要用逐条压测；构建成本常被忽略——HNSW 亿级建索引数小时，重建窗口影响发布节奏，评估报告要含"构建时间/增量支持"列；召回-QPS 曲线会随数据量增长平移，上线后每季度复测。`,
+    keyPoints: ["召回@k 口径+P99 延迟+内存三轴，帕累托曲线公平比较", "业务向量+真实 query 分布，随机数据召回虚高 10+ 点", "验收加增量更新衰减与带过滤召回两条线"],
+    followUps: ["为什么真实 embedding 分布让 ANN 更难？簇结构的影响？", "标量过滤+向量检索为什么召回会掉？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-337",
+    nodeId: "ai-vector-retrieval",
+    question: "向量+标量混合检索（filtered search）怎么设计？pre-filter 与 post-filter 对比？",
+    answer: `结论：生产查询几乎都是"向量相似 + WHERE 条件"（如：语义相近的商品 AND 类目=女装 AND 库存>0 AND 上架<30 天）。两种执行顺序：post-filter（先向量检索 top-k 再过滤）——实现简单但致命缺陷：过滤把候选筛光，返回不足 k 条（过滤率 90% 时要先取 10k 候选才剩 1k，延迟爆炸或召回崩塌）；pre-filter（先用标量条件缩小集合再在子集内向量检索）——召回有保证，但子集可能很小（过滤率 99.9% 时只剩几千条），此时暴力比对反而比走索引快且精确。工程正解是按过滤率自适应：高过滤率（剩 <1%）→ pre-filter+暴力；中过滤率（1-20%）→ 受约束的图遍历（HNSW 遍历时跳过不满足条件的节点，Qdrant/Weaviate 实现，图遍历不被条件打断是关键——如果起点邻域全被过滤，遍历会"卡死"在局部，需要允许少量条件外节点做"跳板"）；低过滤率 → post-filter 直接筛。索引组织上：标量建倒排/Bitmap 索引（Roaring bitmap 求交毫秒级），与向量索引并列，查询规划器先估算各条件的基数（cardinality）再选策略。
+
+\`\`\`python
+# Qdrant：过滤条件下推到 HNSW 遍历（受约束遍历）
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+results = client.search(
+    collection_name="products",
+    query_vector=emb,
+    query_filter=Filter(must=[
+        FieldCondition(key="category", match=MatchValue(value="女装")),
+        FieldCondition(key="stock", range={"gt": 0}),
+    ]),
+    limit=10,
+)
+# 自适应规划伪码
+if selectivity < 0.01:      # 高过滤：倒排查 id 后暴力
+    cand_ids = inverted_index.query(filter)
+    return brute_force(query_vec, cand_ids)
+else:                       # 中低过滤：受约束图遍历
+    return constrained_hnsw_search(query_vec, filter_bitmap)
+\`\`\`
+
+实际案例：电商"图搜+类目过滤"是标配场景，某平台自适应策略上线后，高过滤查询（长尾类目）召回率从 62% 修复到 98%，P99 延迟从 340ms 降到 28ms；RAG 企业知识库按租户隔离（tenant_id 过滤）是最常见混合检索，Qdrant 为此设计了 tenant 专用的 partition 索引。
+
+踩坑与 tradeoff：基数估算是基石——没有直方图/采样统计时规划器选错策略（把 50% 过滤率当 5% 处理）性能差 10 倍，CBO（cost-based optimizer）思路同样适用于向量 DB；受约束遍历的"跳板"比例是质量旋钮（全禁止跳板召回掉、全放开等于没过滤），Qdrant 用"允许访问不满足条件的节点但不计入结果"；多租户场景把 tenant 建物理分区比逻辑过滤快 10 倍（牺牲跨租户灵活性）；时间范围类条件（上架<30 天）值域连续变化，bitmap 要按时间分桶；别忘记组合条件的相关性——category=女装 AND color=红 的实际基数远小于独立估算的乘积。`,
+    keyPoints: ["post-filter 会筛光候选，高过滤率必须 pre-filter", "中过滤率用受约束图遍历（跳板机制防遍历卡死）", "基数估算选策略，Roaring bitmap 做标量求交"],
+    followUps: ["受约束 HNSW 遍历的跳板节点如何选择？", "多租户 RAG 为什么物理分区优于逻辑过滤？"],
+    favorited: false,
+    bigTech: true,
+  },
+
 ];
 

@@ -993,4 +993,222 @@ for block in dit_blocks:
     favorited: false,
     bigTech: true,
   },
+
+
+  // ===== 从远程合入：ai-diffusion-advanced =====
+  {
+    id: "ai-322",
+    nodeId: "ai-diffusion-advanced",
+    question: "DDPM 为什么训练时预测噪声 ε 而不是直接预测原图 x₀？",
+    answer: `结论：DDPM 的 ELBO 展开后，每一步反向过程的最优解是让模型预测"前向加噪时混入的那个噪声"——重参数化后训练目标可写成 ||ε - ε_θ(x_t, t)||²，就是一句话：随机取时间步 t、给 x₀ 加标准高斯噪声得到 x_t、让网络猜这个噪声。为什么预测 ε 优于预测 x₀：①信号信噪比——直接预测 x₀ 在 t 大（噪声强）时输入几乎纯噪声，目标 x₀ 与输入相关性极低，学习信号弱且输出方差大；而 ε 与输入 x_t 始终有明确统计关系（x_t = ᾱ_t x₀ + √(1-ᾱ_t) ε），残差学习更稳。②与 score function 的联系：预测 ε 等价于估计 ∇log p(x_t)（score matching 的尺度变换版本），理论更干净。③实验事实：DDPM 论文消融显示预测 x₀ 样本质量明显差于预测 ε，且预测 x₀ 需要额外处理方差项。后续的 v-prediction（预测 ᾱ_t ε - √(1-ᾱ_t) x₀ 的组合）在高分辨率生成（SDXL/SD3 采用）进一步稳定训练，因为它在 t 两端都不退化。
+
+\`\`\`python
+import torch
+# DDPM 训练一步（极简版）
+t = torch.randint(0, T, (B,))
+eps = torch.randn_like(x0)
+x_t = sqrt_alpha_bar[t] * x0 + sqrt_one_minus_alpha_bar[t] * eps
+eps_pred = unet(x_t, t, context=text_emb)   # 网络猜噪声
+loss = F.mse_loss(eps_pred, eps)            # 就这一行，不用真算 ELBO
+# v-prediction 变体
+v_target = sqrt_alpha_bar[t] * eps - sqrt_one_minus_alpha_bar[t] * x0
+\`\`\`
+
+实际案例：Stable Diffusion 全系用 ε-prediction 在 latent 空间训练；SDXL/Stable Diffusion 3 的高分辨率阶段切 v-prediction，大分辨率伪影明显减少；某图像生成团队在 1024px 训练从 ε 切 v 后，FID 从 11.2 降到 8.7。
+
+踩坑与 tradeoff：ε-prediction 在 t→0 时输入几乎就是 x₀，网络学"从干净图猜微量噪声"意义不大，采样末端细节差——用 v-prediction 或对低 t 加权（loss weighting）缓解；信噪比加权（Min-SNR，权重= min(SNR,5)/SNR）把大 t 步的 loss 压小，收敛快 2-3 倍，是近年标配；别混淆训练目标与采样器：训练预测 ε，采样器（DDIM/Euler/DPM++）决定怎么用这个预测走回去，两者正交可自由组合。`,
+    keyPoints: ["预测 ε=重参数化的 ELBO 简化，训练就一行 MSE", "预测 x₀ 在高噪声段信号弱，ε-prediction 全程稳定", "v-prediction+Min-SNR 加权是高分辨率标配"],
+    followUps: ["Min-SNR 加权为什么能加速收敛？", "score matching 与 ε-prediction 的等价推导？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-323",
+    nodeId: "ai-diffusion-advanced",
+    question: "DDIM 原理？为什么能把 1000 步采样压缩到 50 步？",
+    answer: `结论：DDPM 的反向过程是马尔可夫链：x_{t-1} 只能依赖 x_t，每一步都加随机噪声，必须小步走（1000 步），且轨迹随机不可复现。DDIM 的关键观察：DDPM 的训练目标只约束边缘分布 q(x_t|x₀)，并不约束联合分布——于是可以构造一族非马尔可夫前向过程，其边缘分布与 DDPM 完全相同（模型不用重训！），但反向过程变成确定性的隐式映射：x_{t-1} = ᾱ_{t-1}·x̂₀(x_t) + √(1-ᾱ_{t-1}-σ_t²)·ε_θ(x_t) + σ_t·z，其中 x̂₀ 是由 ε_θ 反推出的干净图。σ_t=0 时完全确定（ODE 极限），采样步长可以任意跳：把 1000 步的时间轴均匀抽 50 个点照样走，因为每步不再依赖"小步马尔可夫近似"。η 参数（0=确定 DDIM，1=退回 DDPM）在质量与多样性间调。数学本质：DDIM 是扩散 ODE（probability flow ODE）的一阶离散化——这解释了为什么确定性、可逆（能从图走回噪声做编辑）。
+
+\`\`\`python
+# DDIM 采样一步（η=0 完全确定）
+x0_pred = (x_t - sqrt(1-ab_t) * eps_pred) / sqrt(ab_t)   # 反推干净图
+x_prev = sqrt(ab_prev) * x0_pred + sqrt(1-ab_prev) * eps_pred  # 无随机项
+# diffusers 一行
+from diffusers import DDIMScheduler
+pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+image = pipe(prompt, num_inference_steps=50).images[0]
+\`\`\`
+
+实际案例：Stable Diffusion 生态早期标配 50 步 DDIM，把出图从秒级×10 压到亚秒级；图像编辑（DDIM inversion：真实照片反演到噪声再按新 prompt 走回）是 Null-text inversion/Prompt-to-Prompt 等编辑方法的地基；某设计工具用 DDIM inversion 做"保留构图换风格"，付费转化率 +18%。
+
+踩坑与 tradeoff：步数砍太狠（<20）细节崩——一阶离散化误差累积，要换高阶求解器（DPM-Solver++、UniPC，20 步质量媲美 50 步 DDIM）；CFG 强度大时 DDIM inversion 误差被放大（每步外推偏差），编辑任务要控制 guidance≈1 或用 null-text 优化补偿；η=0 牺牲了随机多样性——同一噪声种子只出一个结果，创意场景要保留一点 η；DDIM 不是唯一快采样路线：蒸馏（4 步 LCM/Turbo）、Consistency Model、Rectified Flow 直线路径是更激进的方向，选型看"步数预算 vs 训练成本"。`,
+    keyPoints: ["训练只约束边缘分布 ⇒ 可构造非马尔可夫确定性反向", "DDIM=扩散 ODE 一阶离散化，确定可逆支撑图像编辑", "η 调随机性，<20 步需换高阶求解器"],
+    followUps: ["DDIM inversion 的误差从哪来？Null-text inversion 怎么补？", "DPM-Solver++ 为什么 20 步能追平 50 步 DDIM？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-324",
+    nodeId: "ai-diffusion-advanced",
+    question: "Classifier-Free Guidance（CFG）原理？guidance scale 如何权衡质量与多样性？",
+    answer: `结论：条件生成要的是 p(x|text)，但扩散模型学的是 p(x|text) 的 score——classifier guidance（早期方案）额外训一个噪声鲁棒的分类器，用其梯度 ∇log p(text|x_t) 引导采样，多训一个模型且分类器梯度在高噪声段不可靠。CFG 的巧思：贝叶斯 p(text|x) ∝ p(x|text)/p(x)，取对数求梯度得 ∇log p(text|x_t) = ∇log p(x_t|text) - ∇log p(x_t)——分类器梯度=条件 score 减无条件 score，而这两个 score 同一个网络就能给：训练时以一定概率（10-20%）把文本条件随机置空（drop），同一个 U-Net 既能算 ε(x_t, text) 又能算 ε(x_t, ∅)。采样时外推：ε̂ = ε_uncond + w·(ε_cond - ε_uncond)，w 即 guidance scale。几何直觉：沿"条件方向"超调，w>1 时实际上在采样一个尖化分布 p(x|text)^w·p(x)^(1-w)——文本对齐度上升、分布方差收缩、多样性下降。
+
+\`\`\`python
+# CFG 训练：随机丢条件
+cond = text_emb if torch.rand(1) > 0.1 else null_emb
+loss = F.mse_loss(unet(x_t, t, cond), eps)
+# CFG 采样：双路前向外推（可 batch 合并成一次）
+eps_u, eps_c = unet(x_t, t, null_emb), unet(x_t, t, text_emb)
+eps = eps_u + guidance_scale * (eps_c - eps_u)   # w=7.5 是 SD 默认
+\`\`\`
+
+实际案例：Stable Diffusion 默认 w=7.5 是"质量-多样性"甜区；Midjourney 类强风格产品 w 更高（10+）保证提示词强服从；某电商素材生成平台发现 w>12 时商品边缘出现饱和伪影（颜色过饱和、纹理炸），用 dynamic thresholding（每步把 x̂₀ 高分位截断）消除后，素材可用率从 82% 提到 96%。
+
+踩坑与 tradeoff：w 不是越大越好——w 过大导致过饱和/对比度失真/构图僵化（分布被过度尖化），w=1 退化为纯条件采样；CFG 让每步计算翻倍（条件+无条件两次前向），推理成本敏感的端侧用蒸馏（SDXL-Turbo 把 CFG 蒸进单模型）；有限区间问题：ε̂ 外推可能把 x̂₀ 推出 [-1,1] 合法像素域，dynamic thresholding 或 rescale（CFG++ 的改进）是工程刚需；DDIM inversion 与高 w 不兼容（外推破坏可逆性）；现代替代：Autoguidance（用差模型自己做引导）、APG（限制外推方向）在 2025-2026 新模型中逐步替代裸 CFG。`,
+    keyPoints: ["贝叶斯分解：分类器梯度=条件score-无条件score，一模型两路", "w 外推尖化分布：文本对齐↑多样性↓，7.5 是经典甜区", "w 过大过饱和，dynamic thresholding/rescale 是工程标配"],
+    followUps: ["CFG 为什么让 DDIM inversion 失效？", "Autoguidance 相比 CFG 的改进点？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-325",
+    nodeId: "ai-diffusion-advanced",
+    question: "Noise schedule 如何设计？linear 与 cosine 有何影响？",
+    answer: `结论：noise schedule β_t（或等价的信噪比 SNR(t)=ᾱ_t/(1-ᾱ_t)）决定加噪节奏，直接塑造模型"在哪些噪声水平上花容量"。DDPM 原版 linear schedule：β 从 1e-4 线性涨到 0.02——在 64×64 小图上工作良好，但 Improved DDPM 指出其缺陷：linear 在 t 末端加噪过快，序列还没充分破坏 ᾱ_t 就≈0（信息在 t≈700 已毁完），末端 300 步几乎纯噪声，浪费训练容量且采样末端质量差。cosine schedule（Nichol & Dhariwal）：ᾱ_t = cos²((t/T+s)/(1+s)·π/2)，加噪前慢后快，中段 SNR 变化均匀，小偏移 s=0.008 防 t=0 处 β 过小数值不稳——ImageNet 上 FID 显著优于 linear，成为后续标配。更本质视角（EDM/Karras）：schedule 的选择=在 log-SNR 轴上分配训练密度，连续时间下一切 schedule 都是 σ(t) 的参数化，Karras 给出 ρ=7 的幂律 schedule 把密度集中在"感知最敏感"的中等噪声段。
+
+\`\`\`python
+import numpy as np
+def cosine_alpha_bar(t, T=1000, s=0.008):
+    f = np.cos(((t/T + s) / (1+s)) * np.pi/2) ** 2
+    return f / f[0]                     # 归一化使 ᾱ_0=1
+def linear_beta(t, T=1000):
+    return 1e-4 + (0.02-1e-4) * t/T
+# 对比末端：linear 的 ᾱ_999≈0.005，cosine 更平缓
+# diffusers 切换
+from diffusers import DDPMScheduler
+sched = DDPMScheduler(beta_schedule="squaredcos_cap_v2")
+\`\`\`
+
+实际案例：Improved DDPM 用 cosine schedule 把 ImageNet 64×64 FID 从 26 打到 12；Stable Diffusion 训练用 scaled_linear（linear 的平方缩放版），社区微调实验切 cosine 后细节质感可感知提升；某视频生成团队按 EDM 思路自定义 log-normal 密度 schedule，把训练容量集中到人物面部关键噪声段，人脸崩坏率降 40%。
+
+踩坑与 tradeoff：schedule 与分辨率强耦合——1024px 图的有效信息在更高噪声段才被破坏，直接套 64px 的 schedule 高分辨率训练浪费严重（SDXL 用 v-prediction+多分辨率训练部分缓解）；schedule 决定 loss 在各 t 的分布，和 loss weighting（Min-SNR）是同一枚硬币两面，别两边都猛调；采样器 schedule（推理时选哪些 t 子序列）与训练 schedule 是两个东西，Karras/uniform/logSNR 推理步各有拥趸；改 schedule 必须重训（ε_θ 的 t 条件分布变了），线上模型迭代成本极高——新项目起步直接 cosine/Karras 别踩 linear 的坑。`,
+    keyPoints: ["linear 末端加噪过快浪费容量，cosine 中段均匀成标配", "现代视角：schedule=log-SNR 轴上的训练密度分配", "schedule 与分辨率/loss 加权耦合，改动需重训"],
+    followUps: ["EDM 的 ρ=7 Karras schedule 推导思路？", "为什么高分辨率需要向高噪声段偏移 schedule？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-326",
+    nodeId: "ai-diffusion-advanced",
+    question: "Score matching 与 SDE 统一视角？DDPM 与 Score SDE 是什么关系？",
+    answer: `结论：Song & Ermon 的 Score SDE 论文把两条线统一：扩散模型与 score-based 模型是同一过程离散化 vs 连续化的两面。核心对象：前向 SDE dx = f(x,t)dt + g(t)dw 把数据连续推向噪声（VE-SDE 对应 SMLD，VP-SDE 对应 DDPM——DDPM 就是 VP-SDE 在 t∈{0..1000} 的离散采样）；Anderson 定理给出反向 SDE dx = [f - g²∇log p_t(x)]dt + g dw，唯一未知量是 score ∇log p_t(x)——训练目标就是 score matching：min E||s_θ(x_t,t) - ∇log p_t(x_t|x₀)||²，而 ∇log p_t(x_t|x₀) = -ε/√(1-ᾱ_t)，所以 score matching 与 DDPM 的 ε-prediction 只差一个噪声尺度的常数因子——同一目标两种参数化。统一视角的红利：①probability flow ODE——与反向 SDE 共享边缘分布的确定性 ODE，DDIM 就是其离散化，引出所有快速求解器（DPM-Solver/UniPC 本质都是 ODE 高阶求解）；②SDEdit/反演编辑有了连续极限的理论语言；③噪声尺度统一后可以在任意 σ 上采样（EDM 框架）。
+
+\`\`\`python
+# 三种参数化的换算（VP 情形）
+# score  = -eps / sigma_t
+# eps    = -sigma_t * score
+# x0_hat = (x_t + sigma_t**2 * score) / alpha_t   # Tweedie 公式
+def to_x0(x_t, score, alpha_t, sigma_t):
+    return (x_t + sigma_t**2 * score) / alpha_t
+# Probability Flow ODE（无随机项）：dx/dt = f(x,t) - 0.5*g(t)**2 * score
+def pf_ode_step(x, t, dt):
+    return x + dt * (f(x, t) - 0.5 * g(t)**2 * s_theta(x, t))
+\`\`\`
+
+实际案例：DPM-Solver 系列直接站在 ODE 视角推导 2/3 阶求解器，10-20 步达到 100 步 DDIM 质量，已是 diffusers 默认推荐；EDM（Karras 2022）用统一框架重调预条件与 schedule，ImageNet FID 1.36 刷新纪录；某音乐生成团队用 VP-SDE 连续框架做音频超分（低采样率音频当"加噪版本"），一个模型覆盖 8k→48k 全部倍率。
+
+踩坑与 tradeoff：score 参数化与 ε 参数化数值范围不同（score 随 σ→0 发散），混用框架换算错一个 σ 因子全盘皆输——面试手写换算公式是高频考点；VE/VP/sub-VP 三种 SDE 的噪声几何不同，VE 末端 σ 巨大（~100）数值范围考验精度，VP 有界更工程友好；ODE 视角下"采样器竞赛"本质是数值方法竞赛，步数预算 <10 时离散化误差主导，模型再好也救不回来——这是蒸馏/Consistency Model 路线的存在理由；理论上 SDE 采样比 ODE 多点"纠错随机性"，极低步数时 ODE 反而更准，中等步数 SDE 多样性更好。`,
+    keyPoints: ["DDPM=VP-SDE 离散化，ε-prediction 与 score 只差 σ 因子", "Anderson 反向 SDE 唯一未知量是 score", "Probability Flow ODE 统一解释 DDIM 与所有快速求解器"],
+    followUps: ["Tweedie 公式如何从 score 一步估计 x₀？", "VE 与 VP 噪声几何差异对工程的影响？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-327",
+    nodeId: "ai-diffusion-advanced",
+    question: "DiT（Diffusion Transformer）架构？为什么 Transformer 正在取代 U-Net？",
+    answer: `结论：DiT（Peebles & Xie，2023）把扩散模型的 backbone 从 U-Net 换成标准 ViT：图像切 patch → 加位置编码 → 过 N 层 Transformer block，条件信息（时间步 t、文本/类别）通过 adaLN-Zero 注入——把 LayerNorm 的 scale/shift 参数用条件向量回归出来，且每 block 的调制参数初始化为零（训练起点等价恒等映射，稳定性关键）。取代 U-Net 的三个理由：①可扩展性——DiT 论文核心发现是 FID 随模型 GFLOPs 平滑下降（ scaling law 在生成模型上首次清晰成立），U-Net 堆容量收益递减而 Transformer 线性吃到红利；②统一性——文本/图像/视频/3D 都能 patch 化成 token 序列，一个架构吃所有模态（Sora、SD3、可灵全是 DiT 变体），U-Net 的 2D 卷积归纳偏置反而成枷锁；③全局依赖——自注意力天然建模长程结构（整体构图、人物对称），U-Net 靠小卷积核堆感受野效率低。代价：注意力 O(n²) 在高分辨率 token 数爆炸，要窗口注意力/稀疏化/先在 latent 空间降维。
+
+\`\`\`python
+import torch.nn as nn
+class DiTBlock(nn.Module):
+    def __init__(self, dim, cond_dim, heads=16):
+        super().__init__()
+        self.norm1, self.attn = nn.LayerNorm(dim, elementwise_affine=False), MHA(dim, heads)
+        self.norm2, self.mlp = nn.LayerNorm(dim, elementwise_affine=False), MLP(dim)
+        self.adaLN = nn.Linear(cond_dim, 6*dim)      # scale/shift/gate ×2
+        nn.init.zeros_(self.adaLN.weight); nn.init.zeros_(self.adaLN.bias)  # Zero 初始化
+    def forward(self, x, c):
+        s1, b1, g1, s2, b2, g2 = self.adaLN(c).chunk(6, dim=-1)
+        x = x + g1 * self.attn(self.norm1(x)*(1+s1) + b1)
+        return x + g2 * self.mlp(self.norm2(x)*(1+s2) + b2)
+\`\`\`
+
+实际案例：Sora 用时空 patch 的 DiT 做视频生成；Stable Diffusion 3 用 MMDiT（文本图像双流 DiT）取代 SD1.5/SDXL 的 U-Net，文字渲染和构图能力跃升；PixArt-α 证明 DiT 训练成本可压到 SD1.5 的 1%（高效数据+T5 条件），某设计 SaaS 基于 PixArt 微调，海报生成质量追平 Midjourney V5 而成本自可控。
+
+踩坑与 tradeoff：DiT 吃数据吃算力——同参数量下小规模数据 U-Net 反而更稳（卷积归纳偏置=免费先验），数据 <百万级慎切；adaLN 比 cross-attention 省参数但条件表达弱，文本条件强的模型（SD3）用双流+joint attention；patch size 是质量-成本旋钮（16→8 质量升算力 4 倍）；Transformer 缺多尺度结构，靠 VAE latent 压缩（8×）和 patch 层级弥补；训练初期 adaLN-Zero 让梯度过小收敛慢，warmup 和 lr 要比 U-Net 更激进；U-Net 并未死——音频扩散、小模型端侧仍是 U-Net 天下。`,
+    keyPoints: ["DiT=ViT+adaLN-Zero 条件注入，FID 随算力平滑 scaling", "统一 token 序列吃图像/视频/3D，Sora/SD3 皆 DiT", "数据少时 U-Net 归纳偏置仍是优势，别盲目换"],
+    followUps: ["adaLN-Zero 的零初始化为什么稳定训练？", "SD3 的 MMDiT 双流结构与传统 cross-attention 差异？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-328",
+    nodeId: "ai-diffusion-advanced",
+    question: "Flow Matching / Rectified Flow 原理？相比 DDPM 有什么优势？",
+    answer: `结论：Flow Matching（Lipman 2023，Meta）把生成建模从"学反向扩散"换成"学速度场"：定义一条从噪声分布 π₁ 到数据分布 π₀ 的概率路径 p_t，训练网络回归沿路径的条件速度场 v_t(x)=dx/dt。最简实例 Rectified Flow：直接取噪声 x₁ 与数据 x₀ 的直线插值 x_t = (1-t)x₀ + t·x₁，真实速度恒定 v = x₁ - x₀（指向数据方向的匀速直线），训练目标一行 ||v_θ(x_t,t) - (x₁-x₀)||²。相比 DDPM 的优势：①路径直——DDPM 的概率流 ODE 轨迹弯弯曲曲（曲率大），大步长离散误差爆炸所以必须小步走；Rectified Flow 轨迹接近直线，直线可大步走不丢精度，采样 4-16 步质量即可打平 DDPM 50 步；②训练-采样对齐——Reflow 操作（用当前模型生成 (x₀,x₁) 配对再重训）迭代拉直轨迹，两轮 reflow 后 1-2 步可生成；③理论干净——直连最优传输（OT）条件，配对用 OT minibatch 进一步优化路径。SD3（MM-DiT+RF）、Flux、Stable Audio 全部转投 Flow Matching，2026 年已是图像/视频生成事实标准。
+
+\`\`\`python
+import torch
+# Rectified Flow 训练（完整核心就这些）
+t = torch.rand(B, 1, 1, 1)
+x_t = (1 - t) * x0 + t * noise            # 直线插值
+v_target = noise - x0                     # 恒定速度场
+loss = F.mse_loss(model(x_t, t, cond), v_target)
+# 采样：Euler 解 ODE，8 步即可
+x = torch.randn_like(x0)
+for t in torch.linspace(1, 0, 9)[:-1]:    # t: 1→0
+    x = x - (1/8) * model(x, t.expand(B), cond)
+\`\`\`
+
+实际案例：Stable Diffusion 3 用 Rectified Flow + MM-DiT，官方消融显示同算力下 FID/CLIP 分全面优于 DDPM 版本；Flux.1（Black Forest Labs）全 RF 路线，8 步出图成行业标配；某视频生成团队从 DDPM 迁 RF 后，16 步采样质量追平原 50 步，推理成本降 65%；SD3.5 的 Turbo 版 reflow+蒸馏做到 4 步。
+
+踩坑与 tradeoff：时间步采样分布敏感——均匀采 t 在中段（t≈0.5，插值最模糊区域）学习信号不足，logit-normal 采样（SD3 用）把密度压向中段，不采对 loss 曲线明显变差；RF 的"直线"只在一阶近似成立，paired reflow 数据本身有模型偏差，迭代 3 轮以上收益消失且多样性受损；与 CFG 组合时高 w 照样过饱和，老问题不消失；从 ε-prediction 存量模型迁移无捷径，必须重训；理论优雅不等于无条件更好——音频/分子等小规模数据上精调 DDPM 与 RF 差距常在噪声内。`,
+    keyPoints: ["学速度场而非反向噪声，直线插值 v=x₁-x₀ 一行 loss", "轨迹直 ⇒ 大步长低误差，4-16 步打平 DDPM 50 步", "Reflow 迭代拉直轨迹，SD3/Flux 已成事实标准"],
+    followUps: ["logit-normal 时间步采样为什么优于均匀采样？", "OT minibatch 配对如何进一步拉直路径？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-329",
+    nodeId: "ai-diffusion-advanced",
+    question: "视频生成模型（Sora 类）的架构要点？时空建模怎么做？",
+    answer: `结论：视频=带时间轴的图像序列，难点在时序一致性（帧间不闪烁、物体不消失）与长序列算力。Sora 公开的技术路线要点：①时空 patch 化——视频先过时空 VAE（3D causal VAE，时间空间同时压缩，如 4×8×8）压成 latent 立方体，再切成 spacetime patches 展平成 token 序列喂 DiT——图像就是 T=1 的特例，所以同一架构原生混训图像和视频（混合训练还解决了视频数据不足）；②可变时长/分辨率/宽高比——patch 化天然支持任意 token 长度，训练时原生多分辨率，推理按需求切；③文本条件强——重标注（recaptioning，用 GPT-4V 给训练视频写详细描述，DALL·E 3 同款技术）解决视频-文本数据对齐差；④规模出涌现——足够算力下出现运镜连贯、物体恒存、简单物理交互的"世界模型"雏形。开源阵营（Open-Sora/可灵/混元视频）架构趋同：Causal 3D VAE + MM-DiT 双流 + Rectified Flow，时序靠 full attention（帧数短时）或时空分解注意力（空间 attn + 时间 attn 交替，省算力）。
+
+\`\`\`python
+# 时空分解注意力（省算力主流做法）
+def st_attn_block(x):          # x: (B, T*H*W, D)
+    x = rearrange(x, "b (t s) d -> (b t) s d", t=T)
+    x = x + spatial_attn(x)    # 帧内空间注意力
+    x = rearrange(x, "(b t) s d -> (b s) t d", t=T)
+    x = x + temporal_attn(x)   # 帧间时间注意力（建模运动）
+    return x
+# 时空 VAE：时间维 causal 压缩（不用未来帧）
+lat = causal_vae_3d.encode(video)   # (B, C, T/4, H/8, W/8)
+\`\`\`
+
+实际案例：可灵（快手）用 3D VAE+DiT 做到分钟级长视频，C端产品月活千万级；Sora 重标注管线后提示词遵循显著提升，60 秒长镜头一致性远超同期；某短视频平台用视频扩散做"图片动起来"特效，日生成量破亿，相比 GAN 时代时序闪烁投诉降 90%。
+
+踩坑与 tradeoff：算力是真门槛——60 秒 24fps 视频 token 数十万，full attention 不可行，时空分解/稀疏/序列并行是标配，训练千卡月级；数据质量>数量——抖动/剪辑跳变/水印视频直接教坏模型，清洗管线（镜头检测、光流稳定性过滤、美学打分）占工程量一半；时序一致性与动态幅度矛盾——时间注意力太强视频变"静态图微动"，太弱则闪烁，temporal module 初始化和训练比例要精调；评测没有银弹——FID/FVD 测不出闪烁和物理错误，人工评分+VBench 多维度是当下现实；长视频的"记忆"（3 秒前的人长什么样）靠 latent 一致性而非显式机制，超过训练时长的生成一致性仍靠 sliding window 硬撑。`,
+    keyPoints: ["时空 patch+3D causal VAE，图像=T=1 特例原生混训", "重标注解决视频-文本对齐，多分辨率原生训练", "时空分解注意力是算力现实，数据清洗占一半工程量"],
+    followUps: ["为什么时间维 VAE 要 causal（因果）压缩？", "长视频生成的 sliding window 一致性怎么维持？"],
+    favorited: false,
+    bigTech: true,
+  },
+
 ];
