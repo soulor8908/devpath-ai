@@ -1,13 +1,14 @@
 // lib/presets/backend.ts
-// 后端工程师（含 AI 后端方向）预设：30 知识节点 + 215 道高频面试题 + 学习计划
-// 覆盖：语言基础（Java/Python/Go）→ 数据存储（MySQL/Redis/MQ/NoSQL/ES）→
-//       架构与设计（微服务/分布式/系统设计/高并发/高可用/API）→
-//       运维与工程（容器/CI-CD/监控）→ AI 后端方向（推理/管线/网关/成本/评估）
+// 后端工程师（含 AI 后端方向）预设：38 知识节点 + 287 道高频面试题 + 学习计划
+// 覆盖：语言基础（Java/Python/Go）→ 网络编程（epoll/Netty）→
+//       数据存储（MySQL/存储引擎/Redis/MQ/Kafka 进阶/NoSQL/ES/分库分表）→
+//       架构与设计（微服务/分布式/共识协议/系统设计/高并发/高可用/稳定性/API/API 安全）→
+//       运维与工程（容器/K8s/CI-CD/监控）→ AI 后端方向（推理/管线/网关/成本/评估）
 // 大厂高频题标注 bigTech: true，答案结合真实项目场景（阿里双 11、美团外卖、字节抖音、腾讯微信等）
 
 import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 
-// ===== 知识节点（30 个）=====
+// ===== 知识节点（38 个）=====
 
 const BACKEND_NODES: KnowledgeNode[] = [
   // ----- Java 语言（5 个节点） -----
@@ -20,6 +21,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "HashMap 底层红黑树、ConcurrentHashMap 分段锁→CAS、泛型擦除、NIO Buffer/Channel/Selector、反射与动态代理、注解处理器 APT。",
     mastery: 0,
+    customOrder: 1,
   },
   {
     id: "be-java-concurrent",
@@ -30,6 +32,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "线程池七参数与拒绝策略、AQS CLH 队列、synchronized 锁升级、volatile 内存屏障、CompletableFuture 编排、JDK21 虚拟线程。",
     mastery: 0,
+    customOrder: 2,
   },
   {
     id: "be-jvm",
@@ -40,6 +43,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "堆/栈/元空间、G1/ZGC 收集器、双亲委派模型、JIT C2 编译、OOM 与内存泄漏排查、jstack/jmap/Arthas 调优。",
     mastery: 0,
+    customOrder: 3,
   },
   {
     id: "be-spring-core",
@@ -50,6 +54,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "IoC 容器刷新流程、AOP JDK/CGLIB 动态代理、Bean 生命周期、循环依赖三级缓存、事务传播与 @Transactional 失效场景。",
     mastery: 0,
+    customOrder: 4,
   },
   {
     id: "be-spring-boot",
@@ -60,6 +65,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "@Conditional 自动装配、Starter 开发、Actuator 健康检查、Profile 多环境、配置加载优先级、启动事件流程。",
     mastery: 0,
+    customOrder: 5,
   },
   // ----- Python 后端（3 个节点） -----
   {
@@ -71,6 +77,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "GIL 与多线程瓶颈、asyncio 事件循环、装饰器与 functools.wraps、元类 metaclass、生成器与 yield、引用计数+分代 GC。",
     mastery: 0,
+    customOrder: 6,
   },
   {
     id: "be-fastapi",
@@ -80,6 +87,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "async/await 路由、Depends 依赖注入、Pydantic v2 校验、OpenAPI 自动文档、中间件、后台任务、WebSocket。",
     mastery: 0,
+    customOrder: 7,
   },
   {
     id: "be-django",
@@ -89,6 +97,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "ORM select_related/prefetch_related、中间件链、Celery 异步任务、WSGI vs ASGI、信号机制、Django 安全防护。",
     mastery: 0,
+    customOrder: 8,
   },
   // ----- Go 后端（3 个节点） -----
   {
@@ -100,6 +109,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "interface 隐式实现与 nil 陷阱、slice 扩容机制、map 底层哈希表、error wrapping、defer 执行顺序、channel 底层 hchan。",
     mastery: 0,
+    customOrder: 9,
   },
   {
     id: "be-go-concurrent",
@@ -110,6 +120,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "GMP 调度模型、context 取消传播、sync.Mutex/RWMutex/WaitGroup、happens-before 内存模型、goroutine 泄漏排查、sync.Map。",
     mastery: 0,
+    customOrder: 10,
   },
   {
     id: "be-go-web",
@@ -120,8 +131,21 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "Gin 中间件洋葱模型、gRPC 四种调用模式、Protobuf 编码原理、Gin radix-tree 路由、拦截器、优雅退出。",
     mastery: 0,
+    customOrder: 11,
   },
-  // ----- 数据库（5 个节点） -----
+  // ----- 网络编程（1 个节点） -----
+  {
+    id: "be-network",
+    title: "网络编程（epoll/Reactor/Netty/零拷贝/粘包拆包）",
+    difficulty: 4,
+    prerequisites: ["be-java-core"],
+    frequency: "高",
+    bigTech: true,
+    summary: "BIO/NIO/AIO 对比、epoll LT/ET、Reactor 主从线程模型、Netty EventLoop 与内存池、粘包拆包解码器、零拷贝 FileRegion、TCP 参数调优。",
+    mastery: 0,
+    customOrder: 12,
+  },
+  // ----- 数据库（8 个节点） -----
   {
     id: "be-mysql",
     title: "MySQL（索引/事务/MVCC/分库分表）",
@@ -131,6 +155,18 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "B+ 树索引、聚簇/非聚簇索引、MVCC undo 版本链、四种隔离级别、explain 执行计划、分库分表 ShardingSphere。",
     mastery: 0,
+    customOrder: 13,
+  },
+  {
+    id: "be-storage-engine",
+    title: "存储引擎（InnoDB 页/Buffer Pool/redo/undo/LSM-Tree）",
+    difficulty: 5,
+    prerequisites: ["be-mysql"],
+    frequency: "高",
+    bigTech: true,
+    summary: "InnoDB 16KB 数据页结构、Buffer Pool LRU 分代、redo/undo/binlog 两阶段提交、change buffer 写缓冲、double write、LSM-Tree 分层压缩与 B+ 树读写放大对比。",
+    mastery: 0,
+    customOrder: 14,
   },
   {
     id: "be-redis",
@@ -141,6 +177,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "5 种基础结构+Stream、跳表实现、RDB/AOF 持久化、Cluster 16384 槽、Redisson 分布式锁、缓存穿透/击穿/雪崩、热点 key。",
     mastery: 0,
+    customOrder: 15,
   },
   {
     id: "be-mq",
@@ -151,6 +188,18 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "Kafka Broker/Partition/ISR、RocketMQ 事务消息、消息可靠性 ack、顺序消息、消息堆积、Exactly-Once、消费幂等。",
     mastery: 0,
+    customOrder: 16,
+  },
+  {
+    id: "be-mq-advanced",
+    title: "消息队列进阶（Kafka ISR/重平衡/KRaft/Pulsar）",
+    difficulty: 5,
+    prerequisites: ["be-mq"],
+    frequency: "高",
+    bigTech: true,
+    summary: "Kafka ISR 伸缩与 unclean 选举、KIP-848 新重平衡协议、KRaft 去 ZooKeeper、日志段稀疏索引、积压治理实战、Pulsar 存算分离、延迟消息与死信队列。",
+    mastery: 0,
+    customOrder: 17,
   },
   {
     id: "be-nosql",
@@ -160,6 +209,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "MongoDB 文档模型与分片、ES 倒排索引、Neo4j 图查询 Cypher、InfluxDB 时序存储、选型对比。",
     mastery: 0,
+    customOrder: 18,
   },
   {
     id: "be-search",
@@ -170,8 +220,20 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "ES 倒排索引 FST、IK 分词器、BM25 相关性评分、聚合分析、集群分片与副本、深度分页 scroll/search_after、写入 translog。",
     mastery: 0,
+    customOrder: 19,
   },
-  // ----- 架构与分布式（6 个节点） -----
+  {
+    id: "be-sharding",
+    title: "分库分表与分布式 ID（扩容迁移/跨片查询/Leaf）",
+    difficulty: 5,
+    prerequisites: ["be-mysql"],
+    frequency: "高",
+    bigTech: true,
+    summary: "分片键设计与数据倾斜治理、停机/双写/平滑扩容迁移、跨分片查询与全局表、基因法路由、Snowflake/Leaf/号段模式对比、分库分表下事务与唯一约束。",
+    mastery: 0,
+    customOrder: 20,
+  },
+  // ----- 架构与分布式（9 个节点） -----
   {
     id: "be-microservice",
     title: "微服务（注册发现/熔断/链路追踪/网关）",
@@ -181,6 +243,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "Nacos 注册中心、Sentinel 熔断限流、SkyWalking 链路追踪、Spring Cloud Gateway、OpenFeign、分布式 ID 雪花算法。",
     mastery: 0,
+    customOrder: 21,
   },
   {
     id: "be-distributed",
@@ -191,6 +254,18 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "CAP/BASE 理论、一致性哈希虚拟节点、Seata AT/TCC/Saga、Raft 选举日志复制、2PC/3PC、Paxos、本地消息表最终一致。",
     mastery: 0,
+    customOrder: 22,
+  },
+  {
+    id: "be-consensus",
+    title: "分布式共识协议（Paxos/Raft 进阶/ZAB/EPaxos）",
+    difficulty: 5,
+    prerequisites: ["be-distributed"],
+    frequency: "中",
+    bigTech: true,
+    summary: "Basic/Multi-Paxos 两阶段与活锁、Raft 日志一致性与联合共识成员变更、ZAB 崩溃恢复、EPaxos 无 Leader 冲突、PBFT 拜占庭容错、etcd/Consul/Nacos 工程应用。",
+    mastery: 0,
+    customOrder: 23,
   },
   {
     id: "be-system-design",
@@ -201,6 +276,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "秒杀系统分层削峰、短链生成与跳转、Feed 流推拉结合、IM 长连接与消息存储、抢红包分布式锁、排行榜 ZSet。",
     mastery: 0,
+    customOrder: 24,
   },
   {
     id: "be-high-concurrency",
@@ -211,6 +287,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "令牌桶/漏桶/滑动窗口限流、多级缓存、异步化 MQ 削峰、读写分离、接口幂等、分布式限流 Redis+Lua。",
     mastery: 0,
+    customOrder: 25,
   },
   {
     id: "be-high-availability",
@@ -221,6 +298,18 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "容灾同城双活/异地多活、主从自动切换、降级策略与开关、熔断半开恢复、故障演练混沌工程、SLA 99.99%。",
     mastery: 0,
+    customOrder: 26,
+  },
+  {
+    id: "be-stability",
+    title: "稳定性治理（熔断/隔离/超时重试/自适应限流/降级）",
+    difficulty: 4,
+    prerequisites: ["be-high-availability"],
+    frequency: "高",
+    bigTech: true,
+    summary: "Sentinel 熔断规则与 LeapArray 滑动窗口、Resilience4j 状态机、线程池/信号量舱壁隔离、超时与重试风暴治理、BBR 自适应限流、热点参数限流、降级预案体系。",
+    mastery: 0,
+    customOrder: 27,
   },
   {
     id: "be-api-design",
@@ -230,8 +319,20 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "RESTful 资源设计、GraphQL Schema 与 N+1、gRPC Protobuf 接口、API 版本管理、Swagger/OpenAPI 文档、API 安全认证。",
     mastery: 0,
+    customOrder: 28,
   },
-  // ----- DevOps 与运维（3 个节点） -----
+  {
+    id: "be-api-security",
+    title: "API 安全（OAuth2/OIDC/JWT/签名防重放/越权）",
+    difficulty: 4,
+    prerequisites: ["be-api-design"],
+    frequency: "高",
+    bigTech: true,
+    summary: "OAuth2 授权码+PKCE、OIDC ID Token、JWT 算法混淆与撤销、AK/SK HMAC 签名、timestamp+nonce 防重放、SSO 单点登录、水平/垂直越权防护、mTLS 服务间认证。",
+    mastery: 0,
+    customOrder: 29,
+  },
+  // ----- DevOps 与运维（4 个节点） -----
   {
     id: "be-container",
     title: "容器化（Docker/K8s/Helm/服务网格）",
@@ -241,6 +342,18 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "Docker 多阶段构建镜像优化、K8s Pod 调度与亲和性、Service 服务发现、HPA 弹性伸缩、Helm Chart、Istio 服务网格。",
     mastery: 0,
+    customOrder: 30,
+  },
+  {
+    id: "be-k8s",
+    title: "Kubernetes 实战（调度/Service/Gateway API/HPA/排障）",
+    difficulty: 4,
+    prerequisites: ["be-container"],
+    frequency: "高",
+    bigTech: true,
+    summary: "K8s 控制面组件职责、Pod 调度与污点容忍、Service 与 kube-proxy IPVS、Ingress 到 Gateway API 演进、HPA/VPA/Karpenter 弹性、StatefulSet 存储、探针与优雅下线、CrashLoopBackOff 排障。",
+    mastery: 0,
+    customOrder: 31,
   },
   {
     id: "be-ci-cd",
@@ -250,6 +363,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "Jenkins Pipeline 流水线、GitLab CI/CD、GitHub Actions、蓝绿发布、金丝雀灰度、GitOps ArgoCD、制品仓库 Nexus。",
     mastery: 0,
+    customOrder: 32,
   },
   {
     id: "be-monitoring",
@@ -259,6 +373,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "Prometheus 指标采集与 PromQL、Grafana 仪表盘、ELK 日志采集、Jaeger/SkyWalking 链路追踪、告警规则与通知。",
     mastery: 0,
+    customOrder: 33,
   },
   // ----- AI 后端方向（5 个节点） -----
   {
@@ -270,6 +385,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "vLLM PagedAttention 显存管理、TGI 连续批处理、TensorRT-LLM 内核优化、KV Cache 管理、动态批处理、GPU 资源调度。",
     mastery: 0,
+    customOrder: 34,
   },
   {
     id: "be-ai-pipeline",
@@ -279,6 +395,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "ETL 数据清洗、特征工程与 Feature Store、向量数据入库 Milvus/Pinecone、批流一体 Flink、数据质量监控、增量更新。",
     mastery: 0,
+    customOrder: 35,
   },
   {
     id: "be-ai-gateway",
@@ -289,6 +406,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     bigTech: true,
     summary: "模型路由与负载均衡、Token 级限流、按 Token 计费、多模型热切换、降级到小模型、灰度发布、Prompt 模板管理。",
     mastery: 0,
+    customOrder: 36,
   },
   {
     id: "be-ai-cost",
@@ -298,6 +416,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "Token 成本分析与优化、语义缓存 GPTCache、Batch API 批处理折扣、模型分级路由、降级策略、GPU 利用率提升、成本监控面板。",
     mastery: 0,
+    customOrder: 37,
   },
   {
     id: "be-ai-eval",
@@ -307,10 +426,11 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "中",
     summary: "输出质量监控、数据漂移检测、A/B 测试流量切分、用户反馈闭环、评估指标设计与 benchmark、红队安全测试、在线监控告警。",
     mastery: 0,
+    customOrder: 38,
   },
 ];
 
-// ===== 面试题（215 道）=====
+// ===== 面试题（287 道）=====
 
 const BACKEND_QUESTIONS: Question[] = [
   // ========== be-java-core（be-1 ~ be-7） ==========
@@ -4678,6 +4798,213 @@ net.ipv4.tcp_congestion_control = bbr
     favorited: false,
   },
 
+  // ========== be-network：网络编程与 Netty（be-315 ~ be-323） ==========
+  {
+    id: "be-315",
+    nodeId: "be-network",
+    question: "Reactor 线程模型有哪三种？Netty 为什么选主从 Reactor？",
+    bigTech: true,
+    answer: `核心原理：Reactor 模式把"连接接入"与"IO 读写处理"分离，由事件分发器（Reactor）监听就绪事件并派发给 Handler。三种形态：1）单 Reactor 单线程——一个线程既 accept 又 read/write/业务处理，Redis 6.0 前即此模型（业务是纯内存操作足够快才敢这么干），瓶颈是业务耗时阻塞整个事件循环；2）单 Reactor 多线程——Reactor 单线程管 accept+IO 读写，业务逻辑扔给业务线程池，瓶颈是单 Reactor 在高并发接入（如百万连接）时 accept+编解码成为热点；3）主从 Reactor——MainReactor（1 个线程）只管 accept，把连接注册到 SubReactor（N 个线程，通常 CPU 核数）分管 IO 读写，业务再独立线程池。Netty 选主从模型：BossGroup（对应 MainReactor）默认 1 线程处理 OP_ACCEPT，WorkerGroup（SubReactor）处理 OP_READ/OP_WRITE，且 Channel 一生只绑定一个 EventLoop——同一连接的所有事件串行化，天然无锁，这是 Netty 高吞吐的关键设计（避免多线程处理同一 channel 的同步开销）。
+\`\`\`java
+// Netty 主从 Reactor 标准骨架
+EventLoopGroup boss = new NioEventLoopGroup(1);        // MainReactor
+EventLoopGroup worker = new NioEventLoopGroup();       // SubReactor, 默认 2*CPU
+new ServerBootstrap()
+    .group(boss, worker)
+    .channel(NioServerSocketChannel.class)
+    .childHandler(new ChannelInitializer<SocketChannel>() {
+        protected void initChannel(SocketChannel ch) {
+            ch.pipeline().addLast(new LineBasedFrameDecoder(1024));
+            ch.pipeline().addLast(new BizHandler());   // 业务 Handler
+        }
+    }).bind(8080);
+\`\`\`
+实际案例：某支付网关单机支撑 30 万长连接，用主从模型 + 业务线程池隔离耗时操作（风控调用），P99 延迟稳定在 15ms；曾把加解密直接放 EventLoop 线程，QPS 从 8 万掉到 1.2 万——教训是 EventLoop 里绝不能有阻塞/重 CPU 操作。踩坑：1）业务 Handler 阻塞 EventLoop（应交给 businessGroup：new DefaultEventExecutorGroup）；2）BossGroup 线程数开太多没意义（accept 是串行瓶颈，1-2 个足够）；3）ChannelHandler 加了 @Sharable 却在内部存状态，导致并发串数据。`,
+    keyPoints: ["接入与 IO 分离", "Channel 绑定单 EventLoop 串行无锁", "EventLoop 禁止阻塞"],
+    followUps: ["Netty 的 EventLoop 如何选型 NIO 与 epoll？", "耗时业务如何优雅地切出 EventLoop？"],
+    favorited: false,
+  },
+  {
+    id: "be-316",
+    nodeId: "be-network",
+    question: "Netty 高性能的原因有哪些？从线程模型、内存管理、零拷贝三方面分析。",
+    answer: `核心原理（三层递进）：1）线程模型——主从 Reactor + Channel 与 EventLoop 终身绑定，同一连接事件串行处理，消除锁竞争；EventLoop 单线程执行所有 IO 与任务队列（taskQueue），既处理 IO 又执行定时任务，避免线程切换。2）内存管理——ByteBuf 池化（PooledByteBufAllocator，基于 jemalloc 思想的 PoolArena 分块管理：tiny/small/normal 规格），高频申请回收不走 JVM 堆分配，降低 GC 压力；堆外内存（DirectBuffer）避开 JVM 堆到内核的额外拷贝。3）零拷贝——三层含义：FileRegion 包装 transferTo（sendfile，内核直发不落用户态）；CompositeByteBuf 逻辑合并多 Buf 免物理拷贝；slice/duplicate 共享底层数组只改读写指针。此外细节优化：Selector 空轮询 bug 重建规避、无锁化 MPSC 队列、FastThreadLocal（用数组下标替代 ThreadLocal 哈希，快约 30%）。
+\`\`\`java
+// 池化 + 堆外 + 零拷贝组合
+ServerBootstrap b = new ServerBootstrap();
+b.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT); // 池化
+// 发送文件零拷贝：FileRegion 底层 transferTo
+FileChannel fc = FileChannel.open(Paths.get("big.log"));
+ctx.writeAndFlush(new DefaultFileRegion(fc, 0, fc.size()));
+// CompositeByteBuf：header+body 逻辑合并，不拷贝
+CompositeByteBuf c = Unpooled.compositeBuffer();
+c.addComponents(true, headerBuf, bodyBuf);
+\`\`\`
+实际案例：某 IM 消息网关用 Netty 承载 500 万长连接，池化堆外内存把 Young GC 从每分钟 3 次降到每 20 分钟 1 次，STW 抖动消失；文件下载业务改 FileRegion 后网卡打满前 CPU 只用了 40%。踩坑：1）池化 ByteBuf 必须配对 release（引用计数归零），漏 release 造成内存泄漏，开 -Dio.netty.leakDetectionLevel=PARANOID 压测期全量检测；2）堆外内存不受 -Xmx 限制，超限报 OutOfDirectMemoryError，用 -XX:MaxDirectMemorySize 显式控制；3）误用 Unpooled.buffer() 在大流量场景等于退回 JVM 堆分配，GC 飙升。`,
+    keyPoints: ["Channel 串行化免锁", "PooledByteBuf 池化降 GC", "FileRegion/Composite 零拷贝", "引用计数泄漏检测"],
+    followUps: ["Netty 引用计数与 JVM GC 如何协同？", "jemalloc 分块思想在 PoolArena 中如何落地？"],
+    favorited: false,
+    bigTech: true,
+  },
+  {
+    id: "be-317",
+    nodeId: "be-network",
+    question: "TCP 粘包拆包的根本原因？Netty 提供哪些解码方案、如何选型？",
+    bigTech: true,
+    answer: `核心原理：TCP 是字节流协议，没有消息边界——发送端两次 write("AB","C")，接收端可能一次读到"ABC"（粘包）或"AB"、"C"（拆包）。根因三层：1）发送方 Nagle 算法攒小包合并发送；2）接收方内核缓冲区按 MSS（通常 1460 字节）分段重组；3）应用层 read 时机随机，读到多少算多少。注意 UDP 无此问题（数据报天然有边界），所以解决粘包的本质是"在字节流上重建消息边界"。四种方案：1）定长解码 FixedLengthFrameDecoder（补 padding，浪费带宽，仅固定协议如某些金融终端）；2）分隔符 DelimiterBasedFrameDecoder（如 \\r\\n，Redis RESP 协议即此，要求内容转义分隔符）；3）长度字段 LengthFieldBasedFrameDecoder（最通用，head 存 length+body，Dubbo/gRPC/私有协议主流）；4）行解码 LineBasedFrameDecoder（文本协议）。选型标准：二进制私有协议一律"魔数+长度+序列化类型+body"的长度字段方案；对外文本 API 用行/分隔符；定长只用于硬件对接。
+\`\`\`java
+// LengthFieldBasedFrameDecoder 五参数（面试必背）
+ch.pipeline().addLast(new LengthFieldBasedFrameDecoder(
+    1024 * 1024,  // maxFrameLength：防恶意大包撑爆内存
+    0,            // lengthFieldOffset：长度字段偏移
+    4,            // lengthFieldLength：4 字节 int
+    0,            // lengthAdjustment：长度值到 body 的调整
+    4));          // initialBytesToStrip：解码后跳过头 4 字节，只留 body
+// 私有协议帧格式：| magic(2) | length(4) | body(length) |
+\`\`\`
+实际案例：某物联网平台接入 50 万台设备，早期用分隔符方案，设备固件 bug 发出含分隔符的原始数据导致全线解析错乱；改长度字段方案 + maxFrameLength 限制 1MB 后，再未出现解析雪崩。踩坑：1）LengthFieldBasedFrameDecoder 参数算错（lengthAdjustment 是高频错点）导致半包错位且错误会累积放大；2）不设 maxFrameLength 被攻击者发 2GB 声明长度直接 OOM；3）解码器不可共享（有状态），@Sharable 乱加会串包。`,
+    keyPoints: ["字节流无边界是根因", "长度字段方案最通用", "maxFrameLength 防 OOM"],
+    followUps: ["HTTP/2 如何用帧（frame）解决边界与多路复用？", "编解码器为何必须是无状态或每连接实例？"],
+    favorited: false,
+  },
+  {
+    id: "be-318",
+    nodeId: "be-network",
+    question: "Netty ByteBuf 的堆内/堆外/池化如何选择？堆外内存泄漏如何排查？",
+    answer: `核心原理：ByteBuf 三个维度选型。堆内（HeapBuffer）：走 JVM 堆分配，分配快、受 GC 管理，但 IO 写 socket 时 JVM 需把堆数据拷贝到堆外临时缓冲（因为 NIO 要求物理地址连续），多一次拷贝；适合小对象、短生命周期、业务内部流转。堆外（DirectBuffer）：DirectByteBuffer 分配在堆外（Unsafe.allocateMemory），IO 零拷贝直达内核，但分配/回收成本高（不走 GC 主流程，靠 Cleaner + 引用计数），适合 IO 密集、大报文、长生命周期缓冲。池化（Pooled）：基于 jemalloc 思想的 PoolArena 按 tiny(16-496B)/small(512B-4KB)/normal(8KB-16MB) 分档，超 16MB 走非池化；池化把"分配=取缓存位图"，QPS 10 万+ 场景 GC 压力降一个数量级。生产组合：PooledByteBufAllocator.DEFAULT + 堆外，是 Netty 默认且推荐配置。
+泄漏排查三板斧：1）开启泄漏检测 -Dio.netty.leakDetectionLevel=PARANOID（采样 100%，仅压测环境；生产用 SIMPLE 1% 采样），泄漏时输出 "LEAK: ByteBuf.release() was not called" 及最近访问栈；2）监控堆外使用量——JMX 读 java.nio.BufferPool.direct 或 Netty 的 PooledByteBufAllocator.metric()，配合 Prometheus 告警（堆外持续增长而 QPS 平稳即泄漏）；3）定位代码——泄漏报告里的访问栈指向最后 touch 位置，重点查：异常分支漏 release、异步转存（把 buf 存到队列却由消费方负责 release）、@Sharable Handler 误存引用。
+\`\`\`java
+// 引用计数规范：谁消费谁释放；SimpleChannelInboundHandler 自动 release
+// 手动处理时：
+ByteBuf buf = ctx.alloc().directBuffer(1024);
+try {
+    buf.writeBytes(data);
+    ctx.writeAndFlush(buf);   // writeAndFlush 后由 Netty 负责 release
+} finally {
+    if (buf.refCnt() > 0) buf.release(); // 兜底，防异常分支泄漏
+}
+\`\`\`
+实际案例：某网关在灰度环境 PARANOID 模式下发现每条响应泄漏 1 个 buf——根因是自定义编码器 catch 住异常后直接 return 未 release；修复后堆外占用从日均增长 2GB 变为平稳。踩坑：1）以为堆外内存 OOM 会触发 Full GC 回收（其实 DirectByteBuffer 仅靠 Cleaner 在 Full GC 时顺带回收，JDK 里 System.gc() 禁用时（-XX:+DisableExplicitGC）堆外无法被动回收，只能撞到 MaxDirectMemorySize 报错）；2）retain() 后少 release（引用计数>1 时 release 只减计数）。`,
+    keyPoints: ["IO 用堆外、业务用堆内、生产必开池化", "泄漏检测 PARANOID 仅压测", "异常分支兜底 release"],
+    followUps: ["DirectByteBuffer 的 Cleaner 机制与 JDK 25 有何变化？", "PoolArena 的分档策略如何减少内存碎片？"],
+    favorited: false,
+  },
+  {
+    id: "be-319",
+    nodeId: "be-network",
+    question: "BIO/NIO/AIO 的本质区别？为什么 AIO 在生产环境用得少？",
+    answer: `核心原理（IO 两阶段模型）：一次 IO 分"等待数据就绪"和"内核→用户态拷贝"两阶段，三种模型的差异就在这两阶段是否阻塞。BIO（阻塞 IO）：两阶段都阻塞——accept/read 挂起线程，一线程一连接，连接数=线程数，C10K 即瓶颈（线程栈 1MB×万级 + 上下文切换开销）；适合连接少且固定的场景（如内部工具）。NIO（非阻塞 IO + 多路复用）：第一阶段用 epoll 等机制由单个线程监听万级 fd 的就绪事件，只拷贝阶段仍由工作线程同步完成；本质是"同步非阻塞"——拷贝阶段线程依然占用，但连接数与线程数解耦，C10M 可达。AIO（异步 IO）：理想形态是两阶段都由内核完成，完成后回调通知（Proactor 模式）。AIO 生产少用四大原因：1）Linux 的 AIO（io_submit）长期只支持 Direct IO 文件操作，不支持 socket；JDK 的 AsynchronousSocketChannel 在 Linux 上底层是 epoll 模拟（IOCP 只有 Windows 真异步），相比 NIO 没有内核级收益；2）编程模型复杂——回调嵌套（回调地狱）比 Netty 的 pipeline 难维护，排障栈追踪断裂；3）生态弱——Netty/Vert.x/gRPC 全部基于 NIO 模型，AIO 缺中间件支撑；4）实测性能与 NIO 持平甚至略差（epoll 模拟多一层队列）。
+\`\`\`java
+// NIO 多路复用骨架（Selector 单线程管万级连接）
+Selector selector = Selector.open();
+ServerSocketChannel ssc = ServerSocketChannel.open();
+ssc.configureBlocking(false);
+ssc.register(selector, SelectionKey.OP_ACCEPT);
+while (selector.select() > 0) {
+    for (SelectionKey key : selector.selectedKeys()) {
+        if (key.isAcceptable()) acceptAndRegister(key);
+        else if (key.isReadable()) syncRead(key); // 拷贝阶段仍同步
+    }
+    selector.selectedKeys().clear();
+}
+\`\`\`
+实际案例：某金融网关 2018 年从 BIO 迁 NIO（Netty），单机连接容量从 2 千提到 12 万；曾评估 AIO，压测显示吞吐量与 NIO 无差异且 Debug 成本翻倍，放弃。踩坑：1）误信"AIO 一定比 NIO 快"（Linux 下不成立）；2）BIO 线程池加大掩盖问题——线程池 2000 时上下文切换吃掉 30% CPU；3）NIO 的 Selector 空轮询 bug（JDK epoll 实现缺陷，Netty 通过重建 Selector 规避）。2026 年视角：io_uring 是 Linux 真异步 IO 的出路（5.1+ 内核引入，支持 socket），Netty 已提供 io_uring transport 孵化器模块，但生产普及仍需时间。`,
+    keyPoints: ["两阶段是否阻塞是本质", "Linux AIO 是 epoll 模拟", "io_uring 才是真异步方向"],
+    followUps: ["epoll ET/LT 模式与 Netty 的选择？", "io_uring 相比 epoll 解决了哪些系统调用开销？"],
+    favorited: false,
+  },
+  {
+    id: "be-320",
+    nodeId: "be-network",
+    question: "长连接系统如何设计心跳保活？Netty IdleStateHandler 原理？",
+    answer: `核心原理：长连接的沉默死亡是最大隐患——NAT 表项超时（家用路由 UDP 常 30s-5min、TCP 更长）、运营商链路空闲回收、对端进程崩溃不触发 FIN，都会留下"半开连接"：本地 ESTABLISHED 但对端早已不可达，消息发出去石沉大海。TCP 层 keepalive（SO_KEEPALIVE 默认 2 小时首探）周期太长不可控，所以必须应用层心跳：客户端每 N 秒发 PING，服务端读空闲 3N 秒判定死亡并关连接。Netty IdleStateHandler 三个时间参数：readerIdleTime（读空闲，服务端判客户端死亡）、writerIdleTime（写空闲，触发自动发心跳）、allIdleTime（读写任一）。实现机制：每次 channelRead/writeComplete 更新 lastReadTime/lastWriteTime；EventLoop 定时任务每 min(各 idleTime)/2 扫描一次，空闲超时触发 IdleStateEvent 抛给 userEventTriggered，业务在此发心跳或关闭连接——注意它只"探测并抛事件"，发包/关连接动作由业务实现。
+\`\`\`java
+// 服务端：60s 读空闲判定客户端死亡
+ch.pipeline().addLast(new IdleStateHandler(60, 0, 0, SECONDS));
+ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent
+            && ((IdleStateEvent) evt).state() == IdleState.READER_IDLE) {
+            ctx.close(); // 三次心跳未达，释放半开连接
+        }
+    }
+});
+// 客户端：20s 写空闲发 PING（服务端 60s = 3 次心跳容错）
+ch.pipeline().addLast(new IdleStateHandler(0, 20, 0, SECONDS));
+\`\`\`
+实际案例：某 IM 系统 200 万长连接，心跳周期定为客户端 25s 写空闲 + 服务端 90s 读空闲（容忍 3 次丢包），配合消息重发（ack 超时 5s 重发）把消息到达率做到 99.99%；曾用心跳 5s，空连接心跳流量占带宽 18%，后按网络类型动态调整（WiFi 30s/4G 45s，弱网加大防误判）。踩坑：1）心跳周期太短——百万连接下心跳本身就是流量与 CPU 风暴；2）只用 writerIdle 不设 readerIdle，服务端无法发现半开连接，连接数虚高直至 fd 耗尽；3）重连无退避——断网恢复瞬间百万客户端同时重连形成"重连风暴"，必须随机抖动（如 1-5s 随机）+ 指数退避；4）NAT 超时因运营商而异，心跳周期要小于最严格环境（移动 4G 约 5min，留 2 倍余量）。`,
+    keyPoints: ["半开连接必须应用层心跳", "IdleStateHandler 只探测不处理", "重连需随机抖动+指数退避"],
+    followUps: ["心跳包如何设计以兼顾省流量与及时性？", "百万级心跳如何用时间轮（HashedWheelTimer）优化？"],
+    favorited: false,
+    bigTech: true,
+  },
+  {
+    id: "be-321",
+    nodeId: "be-network",
+    question: "高并发服务常用的 TCP/内核参数调优有哪些？backlog、TIME_WAIT、keepalive 怎么处理？",
+    answer: `核心原理（按问题域分类）：1）连接接入——三次握手时内核维护半连接队列（SYN queue）与全连接队列（accept queue，长度=min(backlog, net.core.somaxconn)）；突发并发建连超过队列长度时丢 SYN/ACK，客户端表现为偶发 connect timeout。调优：net.core.somaxconn 从默认 128 调到 32768，应用 listen backlog 同步调大（Java 的 ServerSocket/Netty 默认 SOMAXCONN 已较好），并开 net.ipv4.tcp_max_syn_backlog 与 tcp_syncookies=1（SYN flood 防御，队列满时用 cookie 验证而非分配资源）。2）TIME_WAIT——主动关闭方等 2MSL（默认 60s），高并发短连接下 TIME_WAIT 堆积（每个占一条 conntrack + 端口）；调优：优先改架构（客户端长连接/连接池，别让服务器主动关），其次 net.ipv4.tcp_tw_reuse=1（仅对出方向连接安全复用，需开 tcp_timestamps），net.ipv4.ip_local_port_range 扩到 "1024 65535" 增加可用端口。禁用 tcp_tw_recycle（NAT 环境下丢弃合法连接，Linux 4.12 已移除）。3）keepalive——net.ipv4.tcp_keepalive_time 默认 7200s 太长，应用层心跳替代（见 be-320）；长连接中间件（如 LB→后端）设 300-600s 防中间设备静默断链。4）吞吐——net.core.rmem/wmem_max 与 tcp_rmem/tcp_wmem 调大支持 BDP（带宽时延积，跨机房 RTT 50ms×10Gbps 需约 62MB 窗口）；tcp_slow_start_after_idle=0 防长连接空闲后重新慢启动。
+\`\`\`bash
+# /etc/sysctl.conf 高并发网关基线
+net.core.somaxconn = 32768
+net.ipv4.tcp_max_syn_backlog = 32768
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_slow_start_after_idle = 0
+net.core.netdev_max_backlog = 65536   # 网卡收包队列
+# 生效：sysctl -p；验证：ss -s 看 timewait，netstat -s 看 listen overflow
+\`\`\`
+实际案例：某电商大促网关单机 8 万 QPS，上线前压测发现"每 3 分钟一批 connect timeout"——netstat -s 显示 listen queue overflow 持续增长，somaxconn 128 是元凶，调到 32768 后归零；另一案例：调用方短连接访问导致服务端 6 万 TIME_WAIT，根因是客户端没开 HTTP keep-alive，改连接池后 TIME_WAIT 降到 200。踩坑：1）把 TIME_WAIT 当病治——它是 TCP 可靠性设计（防旧报文串扰新连接），量级内（<1 万）无需处理；2）tw_reuse 只对客户端角色生效，服务端入方向 TIME_WAIT 只能靠长连接减少；3）conntrack 表（nf_conntrack_max）满导致丢包，K8s/高并发场景要调大或规避。`,
+    keyPoints: ["somaxconn 决定 accept 队列", "TIME_WAIT 优先改长连接架构", "tcp_tw_recycle 禁用"],
+    followUps: ["ss/netstat 哪些字段反映队列溢出？", "K8s 下 conntrack 与 Service IPVS 如何影响这些参数？"],
+    favorited: false,
+  },
+  {
+    id: "be-322",
+    nodeId: "be-network",
+    question: "Netty 写缓冲区高低水位是什么？如何利用它做出站流量整形？",
+    answer: `核心原理：应用 write 的消息先进 ChannelOutboundBuffer（内存队列），再由 EventLoop 刷到 socket 内核缓冲区。当下游慢（客户端网络差/消费不过来）而上游狂写时，出站队列无限堆积 → OOM。Netty 用高低水位（WriteBufferWaterMark）做背压（backpressure）：队列字节数超过高水位（默认 64KB）→ channel.isWritable() 返回 false；队列降到低水位（默认 32KB）以下 → 恢复 true。正确姿势：写前检查 isWritable，false 时停止写入并注册监听，等 channelWritabilityChanged 事件恢复后续写。高低水位之间设差值（而非同一值）是为防抖——队列在临界点上下抖动会触发海量状态切换事件。注意：write() 本身永远不拒绝，水位只是"信号灯"，不检查 isWritable 照样 OOM，这是新手最大误区。
+\`\`\`java
+// 拉模式消费：下游不可写就暂停从 MQ 拉消息（背压传导）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    if (!ctx.channel().isWritable()) {
+        pausePulling();           // 停止从 Kafka/RocketMQ 拉取
+        return;
+    }
+    ctx.write(msg);
+}
+public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+    if (ctx.channel().isWritable()) resumePulling(); // 恢复拉取
+}
+// 水位线调优：大报文场景调高水位减少抖动
+bootstrap.childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
+    new WriteBufferWaterMark(256 * 1024, 512 * 1024));
+\`\`\`
+实际案例：某直播弹幕推送服务向 10 万客户端广播，早期不查 isWritable，遇到一批弱网用户后单节点出站队列堆到 6GB 触发 OOM；改造为两级策略——isWritable=false 时对非关键消息（弹幕）直接丢弃并计数，对关键消息（礼物、PK 结果）落 Redis 延迟补推，此后大促零 OOM，弱网用户消息延迟从"无限堆积"收敛到 P95 2s。踩坑：1）默认 64KB 高水位对大文件/大消息场景太小，writability 疯狂抖动（每 32KB 一切换），应按消息体积调大到 256KB-1MB；2）把丢弃逻辑写成静默丢，无监控无告警，故障时无从察觉——丢弃必须埋点；3）Http2 等多路复用协议是"每 stream 独立水位"，全局水位不能替代 stream 级流控；4）writeAndFlush 太频繁（每小消息一 flush）系统调用爆炸，应攒批 flush（Netty 的 flush 合并已做一部分，但业务层攒批收益更大）。`,
+    keyPoints: ["出站队列背压防 OOM", "isWritable=false 停写+监听恢复", "高低水位差防抖"],
+    followUps: ["背压如何跨线程传导到 MQ 消费速率？", "Reactive Streams 的 request(n) 与 Netty 水位有何异同？"],
+    favorited: false,
+  },
+  {
+    id: "be-323",
+    nodeId: "be-network",
+    question: "设计一个 RPC 框架的网络层：协议格式、编解码、连接管理各注意什么？",
+    bigTech: true,
+    answer: `核心设计（三层拆解）：1）私有协议设计——定长头 + 变长体是标准答案。头里必备字段：magic（2 字节，防端口误接/快速识别非法流量，收到非 magic 直接断连）、version（协议演进）、serializeType（1 字节：1=Hessian 2=Protobuf 3=JSON）、msgType（request/response/heartbeat）、requestId（8 字节 long，用于异步请求-响应配对，这是 RPC 与 HTTP 的本质差异——单连接多路复用靠它）、bodyLength（4 字节，粘包拆包边界）。body 用 Protobuf（跨语言+schema 演进）或 Hessian2（Java 生态免 IDL）。2）编解码——LengthFieldBasedFrameDecoder 解粘包 + 自定义 codec；编解码器必须无状态或每连接实例（不能 @Sharable 共享）；序列化选型看三维：性能（Protobuf > Kryo > Hessian2 > JSON）、跨语言（Protobuf/JSON）、可读性（JSON 排障友好）。3）连接管理——单连接 + 异步化是高性能 RPC 的根基：客户端对同一服务维持 1-4 条长连接，请求发出后把 requestId→CompletableFuture 存 pending map，IO 线程收到响应按 requestId 唤醒对应 future，超时定时扫描（HashedWheelTimer 时间轮，默认 3s）清理 pending 防泄漏；连接空闲心跳保活；断线重连用指数退避+随机抖动。
+\`\`\`text
+// 协议帧布局（类 Dubbo）
+| magic(2B) | version(1B) | serType(1B) | msgType(1B) | requestId(8B) | bodyLen(4B) | body(bodyLen B) |
+// 请求-响应异步配对
+send(req): pending.put(reqId, future) -> write -> return future
+onResponse(resp): future = pending.remove(resp.requestId) -> future.complete(resp)
+\`\`\`
+实际案例：某中台自研 RPC 承载日均 200 亿次调用，单连接多路复用把连接数从"调用方实例×服务实例×16"降到 ×1，Eureka 式连接爆炸消失；一次事故：pending map 用普通 HashMap 且只在响应到达时 remove，超时请求堆积 2 小时 OOM——改 ConcurrentHashMap + 时间轮定时驱逐 + 容量上限（10 万）三连才根治。踩坑：1）requestId 用自增 AtomicLong 多实例会重复（需加实例前缀或用雪花 ID，同进程内自增即可但要保证唯一性边界清晰）；2）序列化协议中途切换未走 version 字段，新老节点互调反序列化炸出大量 ERROR；3）同步等待用 future.get() 不带超时，下游 hang 死拖垮全部业务线程；4）编解码放 EventLoop 执行，大 body 反序列化（>10MB JSON）阻塞 IO 线程——大报文应切业务线程池解码。`,
+    keyPoints: ["定长头含 requestId 支撑单连接多路复用", "pending map 必须超时驱逐", "编解码器不可共享"],
+    followUps: ["RPC 与 HTTP/2 的多路复用差异在哪？", "如何做跨版本协议兼容与灰度升级？"],
+    favorited: false,
+  },
+
   // ========== be-mysql（be-78 ~ be-84） ==========
   {
     id: "be-78",
@@ -5772,25 +6099,27 @@ if (rows == 0) return; // 已被修改，幂等跳过
     id: "be-99",
     nodeId: "be-nosql",
     question: "MongoDB 文档模型与索引设计？何时用嵌套文档何时用引用？",
-    answer: `结论：嵌套文档适合一对一、少量一对多且数据一起读的场景；引用适合多对多、数据量大、需独立更新的场景。索引设计遵循 ESR 原则（Equality > Sort > Range）。
-
-案例：抖音用户资料存储用 MongoDB，用户基本信息+标签嵌套存储（一次读取拿到全部），但视频列表用引用（视频独立增长、分页查询）。
+    answer: `核心原理：MongoDB 以 BSON 文档为最小存储单元，单文档操作原子（无需多表事务即可保证"订单+明细"一致性）。设计的第一性原理是"按读取模式建模"——一起读的数据放一起（嵌套），独立生长/独立读的数据分开（引用）。嵌套文档优点：一次 find 拿全量、单文档原子写；代价：文档上限 16MB、数组无限增长会触发文档频繁迁移（写放大）、嵌套层级深时更新路径长。引用（$ref/手动 id）优点：文档小、可独立分页更新；代价：多次查询或 $lookup 聚合（本质是应用层 join，性能随基数上升）。
+索引设计遵循 ESR 原则：Equality（等值字段在最前，可精确定位索引区间）→ Sort（排序字段居中，利用索引天然有序避免 sort 阶段）→ Range（范围字段最后，范围扫描后索引顺序失效）。遵循 ESR 可让查询走"索引内排序"（SORT 阶段消失），某内容平台把 feed 查询从 SORT 阶段的 800ms 优化到 12ms。
 
 \`\`\`javascript
-// 嵌套文档：用户+地址
+// 嵌套：用户与收货地址（一对一/少量一对多、一起读）
 db.users.insertOne({
   name: "张三",
-  addresses: [{ city: "北京", zip: "100000" }]
+  addresses: [{ city: "北京", zip: "100000" }]  // 上限几十条可控
 });
-// 建索引：ESR 原则
+// 引用：用户与订单（一对多且无限增长、独立分页）
+db.orders.insertOne({ userId: ObjectId("..."), amount: 99 });
+// ESR 建索引：等值 status → 排序 createTime → 范围 amount
 db.orders.createIndex({ status: 1, createTime: -1, amount: 1 });
-// 复合索引：等值在前、排序在中、范围在后
-db.events.createIndex({ type: 1, date: -1, price: 1 });
+// explain 验证：stage 应为 IXSCAN + FETCH，无 SORT 阶段
+db.orders.find({ status: "paid", amount: { $gt: 50 } })
+  .sort({ createTime: -1 }).explain("executionStats");
 \`\`\`
 
-踩坑：嵌套文档上限 16MB；数组索引需注意多键索引（multikey）；嵌套太深影响查询性能；索引不是越多越好（写放大）。`,
-    keyPoints: ["嵌套 vs 引用选型", "ESR 索引原则", "16MB 文档上限"],
-    followUps: ["MongoDB 索引底层是什么结构？", "覆盖查询如何优化？"],
+实际案例：某短视频平台用户资料用嵌套（画像+标签一次读出，P99 3ms）；作品列表用引用（作品独立增长至百万级，按 authorId+createTime 索引分页）。踩坑：1）数组无限增长（如把"用户所有行为日志"嵌进用户文档）导致 16MB 溢出与 chunk 迁移风暴，应用 bucket 模式（按天/按千条分桶）；2）多键索引（multikey）一个文档产生多条索引项，写放大严重，数组字段建索引要慎重；3）索引不是越多越好——每多一个索引写延迟加一次 B 树维护，写多读少的集合保持 3 个以内；4）嵌套超过 3 层后 dot notation 更新路径长且无法利用索引，应拆集合。`,
+    keyPoints: ["按读取模式建模", "单文档原子写+16MB 上限", "ESR 原则消除 SORT 阶段", "bucket 模式防数组膨胀"],
+    followUps: ["MongoDB 索引底层 B 树与 WiredTiger 缓存如何配合？", "覆盖查询（covered query）如何做到零 FETCH？"],
     favorited: false,
     bigTech: true,
   },
@@ -6197,28 +6526,23 @@ while (true) {
     id: "be-113",
     nodeId: "be-microservice",
     question: "微服务架构 vs 单体架构？什么时候该拆？拆分原则？",
-    answer: `结论：单体适合早期快速迭代，微服务适合团队规模大、业务复杂、需独立扩展的场景。拆分原则：按业务领域（DDD）、高内聚低耦合、数据库独占、接口稳定。
-
-案例：抖音从单体 Java 演进到微服务（视频/推荐/用户/评论独立部署），团队 50+ 时拆分；早期美团外卖从 PHP 单体拆为 Java 微服务（订单/配送/支付/商家独立）。
+    answer: `核心原理：架构拆分的本质是康威定律——系统结构会复制组织沟通结构。单体把所有模块塞进一个进程，方法调用即通信，部署简单但随规模增长出现"代码耦合→改一处全量回归→发布排队"的协作瓶颈；微服务把模块拆成独立进程，网络调用替代方法调用，换来独立部署/独立扩缩容/技术栈自由，代价是分布式固有复杂度（网络不可靠、分布式事务、可观测性、运维成本）。判断何时拆看三个量化信号：1）发布冲突——单体内超过 3 个团队共享代码库，每周发布窗口互相等待；2）扩容浪费——10% 的热点模块（如订单）消耗 80% 资源，却只能整体扩副本；3）变更半径失控——一次小改动要回归全量用例，交付周期从小时级变周级。2026 年的趋势是"模块化单体优先"：中小团队先用模块化单体（清晰包边界+独立模块+单库分 schema）拿到边界收益，达到上述信号再物理拆分，避免 10 人团队维护 50 个服务的运维灾难。
+拆分原则：1）按 DDD 限界上下文拆（订单/支付/库存），不按技术层拆（controller/service/dao 拆三个服务是反模式）；2）数据库独占——共享库的微服务是"分布式单体"，改表结构仍需协调所有服务；3）同步调用链不超过 3 跳（每多一跳可用性相乘，99.9%³≈99.7%）；4）先拆读多写少、边界清晰的模块（如商品、内容），交易核心最后拆。
 
 \`\`\`text
-// 拆分前（单体）
+// 拆分前（单体，共享 DB）
 app/
-  controllers/order.ts
-  controllers/payment.ts
-  controllers/delivery.ts
-  // 共享一个数据库
-
-// 拆分后（微服务）
-order-service/      -> 独立 DB
-payment-service/    -> 独立 DB
-delivery-service/   -> 独立 DB
-// 各服务独立部署、独立扩展
+  order/ payment/ delivery/   -> 互相 import，共享 200 张表
+// 拆分后（微服务，DB 独占 + 明确契约）
+order-service    -> order_db      -> 暴露 OrderAPI（DTO 契约）
+payment-service  -> payment_db    -> 事件驱动：PaymentCompletedEvent
+delivery-service -> delivery_db   -> 订阅支付事件异步履约
+// 跨库一致性用 Saga/本地消息表，不用 2PC
 \`\`\`
 
-踩坑：不要过早拆分（团队小时分布式成本 > 收益）；拆太细变"纳米服务"（运维爆炸）；数据库不能共享（否则耦合）；跨服务事务难处理。`,
-    keyPoints: ["DDD 领域驱动拆分", "数据库独占", "高内聚低耦合"],
-    followUps: ["微服务拆多细合适？", "如何评估拆分收益？"],
+实际案例：某出行平台从单体拆分：先拆派单（热点模块独立扩容 10 倍应对早晚高峰）、再拆支付（合规隔离），交易主链路保持单库两年后才拆，全程可用性维持 99.95%+。踩坑：1）过早拆分——5 人团队拆 20 个服务，联调成本超过开发成本；2）拆成"纳米服务"（每类一个服务），调用链 10+ 跳，P99 延迟从 50ms 涨到 800ms；3）共享数据库假拆分，一次 DDL 拖垮五个服务；4）忽视数据一致性，拆分后没有 Saga 补偿，资损率上升到 0.01% 被迫回滚。`,
+    keyPoints: ["康威定律驱动拆分", "三信号：发布冲突/扩容浪费/变更半径", "模块化单体优先", "DB 独占+调用链≤3 跳"],
+    followUps: ["微服务拆多细合适？如何度量粒度？", "拆分过程中如何做数据迁移与灰度切流？"],
     favorited: false,
     bigTech: true,
   },
@@ -11187,6 +11511,1239 @@ PSI > 0.5:   严重漂移（紧急干预）
 踩坑：漂移检测需足够样本（日级数据量小，需周级聚合）；季节性误报（周末 vs 工作日分布不同）；概念漂移难检测（需标注数据对比）；LLM 漂移需监控 Prompt 效果（用户行为变化导致 Prompt 失效）。`,
     keyPoints: ["KS 检验+PSI 双指标", "文本漂移用 embedding 距离", "PSI>0.2 告警"],
     followUps: ["概念漂移如何检测？", "漂移后如何更新模型？"],
+    favorited: false,
+  },
+  // ========== be-storage-engine：存储引擎（InnoDB 页/Buffer Pool/redo/undo/LSM）（be-423 ~ be-431） ==========
+  {
+    id: "be-423",
+    nodeId: "be-storage-engine",
+    question: "InnoDB 16KB 数据页的内部结构是怎样的？行格式 DYNAMIC 与 COMPACT 有何区别？行溢出怎么处理？",
+    bigTech: true,
+    answer: `核心原理：页是 InnoDB IO 最小单位（默认 16KB），页内分 7 区：File Header（38B，页号/页类型/本页 LSN）、Page Header（56B，槽数/堆记录数/空闲指针）、Infimum+Supremum 两条虚拟哨兵记录（页内边界）、User Records（实际行，按主键序单向链表）、Free Space、Page Directory（槽目录，把行按 4-8 条分组）、File Trailer（8B，校验和+LSN 低位，刷盘完整性校验）。定位一行：B+ 树到页 → Page Directory 槽二分 → 槽内链表遍历，页内并非全扫。行格式决定物理布局：COMPACT 把变长字段长度表+NULL 位图放记录头，超长列存前 768 字节前缀+溢出页指针；DYNAMIC（5.7 起默认）完全溢出，页内只留 20 字节指针，行更紧凑。
+\`\`\`sql
+-- 查看表行格式
+SELECT NAME, ROW_FORMAT FROM information_schema.INNODB_TABLES WHERE NAME='shop/orders';
+-- 页分裂填充率（8.0.23+），写多读少可调低预留更多分裂空间
+SET GLOBAL innodb_fill_factor = 90;
+\`\`\`
+实际案例：某电商订单表带 TEXT 类型扩展 JSON 字段，行均 8KB，单页只放 2 行，B+ 树长到 4 层，随机 IO 放大，QPS 到 3000 就打满磁盘；把 JSON 拆到扩展表（行均降到 300B，单页 50+ 行、树降回 3 层）后 QPS 升到 2.4 万，P99 从 80ms 降到 6ms。
+踩坑：1）行宽按字段实际存储算，VARCHAR(255) 定义大但存短值不占空间；2）主键乱序插入导致页分裂与碎片，顺序写入性能差，定期 online DDL 重建；3）DYNAMIC 下行溢出查询要额外 IO，宽 JSON/TEXT 列必须冷热分离；4）innodb_page_size 建实例后不可改，OLTP 保持 16K 即可。`,
+    keyPoints: ["16KB 页 7 区+槽目录二分", "DYNAMIC 完全溢出仅留 20B 指针", "行宽决定树高与单页行数"],
+    followUps: ["页分裂与页合并的触发条件是什么？", "为什么主键建议用自增短整型？"],
+    favorited: false,
+  },
+  {
+    id: "be-424",
+    nodeId: "be-storage-engine",
+    question: "Buffer Pool 的 LRU 为什么要改造成 young/old 分代？预读与缓存污染问题如何解决？",
+    bigTech: true,
+    answer: `核心原理：朴素 LRU 有两个致命场景：1）预读（read-ahead）把"可能用到"的页提前加载，没被访问却占着链表头部；2）全表扫描（mysqldump、无索引大查询）一次读入海量页，把热数据全部挤出。InnoDB 把 LRU 链表切两段：new sublist（头部约 5/8）与 old sublist（尾部约 3/8，innodb_old_blocks_pct=37）。新读入的页先插 old 区头部；只有在 old 区停留超过 innodb_old_blocks_time（默认 1000ms）后再次被访问，才晋升 young 头部。全表扫描的页在 1 秒窗口内连续读，始终滞留 old 区并被快速淘汰，污染不到 young 区。配套结构：free list（空闲页）、flush list（脏页，按 oldest_modification 的 LSN 排序，是 checkpoint 推进依据）；多实例（innodb_buffer_pool_instances）降 LRU 互斥锁竞争；8.0 支持按 128MB chunk 在线扩缩容。
+\`\`\`sql
+-- 命中率应 >99%：1 - Innodb_buffer_pool_reads / Innodb_buffer_pool_read_requests
+SHOW GLOBAL STATUS LIKE 'Innodb_buffer_pool_read%';
+SET GLOBAL innodb_old_blocks_time = 2000;          -- 防扫描污染
+SET GLOBAL innodb_buffer_pool_dump_at_shutdown = ON; -- 停机保存热页清单，重启 warmup
+\`\`\`
+实际案例：某零售 BI 平台夜间全量报表把 Buffer Pool 污染，早高峰 P99 从 15ms 飙到 200ms。治理三板斧：innodb_old_blocks_time 调到 2000ms、报表流量切只读从库、开启停机热页 dump 做 warmup，命中率从 89% 回升到 99.2%。
+踩坑：1）old_blocks_time 调太大副作用是真热页晋升变慢，冷启动抖动更久；2）Buffer Pool 不是越大越好——超过热数据集后收益递减，还挤压 OS page cache（redo/binlog/排序都要用）；3）大表 inplace ALTER 也会把页读进来造成污染，务必低峰执行；4）多实例只降锁竞争，不解决污染。`,
+    keyPoints: ["old 区停留超 1s 才晋升", "扫描页滞留 old 区快淘汰", "flush list 按 LSN 排序供 checkpoint"],
+    followUps: ["Buffer Pool 与 OS page cache 如何分工？", "为什么生产上命中率要盯 reads 而不是 read_requests？"],
+    favorited: false,
+  },
+  {
+    id: "be-425",
+    nodeId: "be-storage-engine",
+    question: "为什么需要 redo log？innodb_flush_log_at_trx_commit 三档怎么选？组提交与 checkpoint 如何工作？",
+    bigTech: true,
+    answer: `核心原理：WAL（Write-Ahead Logging）思想——先写日志再改数据页，把随机写（数据页散落全表）变成顺序写（redo 追加），这是 InnoDB 写性能的根本。redo 是物理日志（"5 号页 offset 100 改成 X"），固定大小环形覆写；先写 log buffer 再按策略刷盘。三档：1=每次 commit 都 write+fsync（最安全，已提交不丢）；0=每秒后台刷，宕机丢 1s；2=commit 只 write 到 OS page cache，mysqld 崩不丢、OS 崩丢 1s。组提交（group commit）：多个事务的 redo 合并成一次 fsync，5.6 起 binlog 也纳入三段组提交（flush/sync/commit 队列由 leader 代刷），高并发下 fsync 次数降一个量级。checkpoint：脏页不能等 redo 覆写才刷——fuzzy checkpoint 按 IO 容量（innodb_io_capacity）、脏页比例（innodb_max_dirty_pages_pct=75%）、redo 剩余水位持续刷脏；checkpoint_age = 当前 LSN - checkpoint LSN，逼近 redo 总容量会触发同步刷脏、写被阻塞。
+\`\`\`ini
+innodb_flush_log_at_trx_commit = 1   # 金融"双1"之一；日志型可 2
+innodb_redo_log_capacity = 8G        # 8.0.30+ 统一配 redo 总量
+innodb_io_capacity = 2000            # 按 SSD IOPS 给，决定刷脏速度
+\`\`\`
+实际案例：某支付账务库用双 1 扛 8000 TPS；某日志平台改 =2 + sync_binlog=100，吞吐翻 3 倍且业务接受 1s 丢失。反例：某电商大促因 redo 只配 512MB，写放大触发 furious flushing，TPS 锯齿状掉 40%，扩到 8GB 后曲线平滑。
+踩坑：1）redo 是物理日志，不能用于回滚（回滚靠 undo）；2）=0/=2 的丢失边界要说清（mysqld 进程崩溃 vs OS 崩溃）；3）监控 checkpoint_age 防写停顿；4）关 binlog 反而丢失 binlog 组提交优化，高并发主库别乱关。`,
+    keyPoints: ["WAL 随机写转顺序写", "三档刷盘丢失边界不同", "组提交摊薄 fsync", "checkpoint_age 决定恢复窗口"],
+    followUps: ["redo 与 undo 的分工边界在哪里？", "为什么 redo 用固定大小环形文件？"],
+    favorited: false,
+  },
+  {
+    id: "be-426",
+    nodeId: "be-storage-engine",
+    question: "redo log 与 binlog 为什么要两阶段提交？崩溃恢复时如何判定事务该提交还是回滚？",
+    bigTech: true,
+    answer: `核心原理：两条日志服务不同目的——redo 是 InnoDB 引擎层的崩溃恢复（保证已提交事务的脏页可重放），binlog 是 Server 层的逻辑日志（主从复制+时点恢复 PITR）。若先写 redo 再写 binlog，redo 落盘后宕机 binlog 缺失：主库恢复出数据，从库永远收不到 → 主从不一致；反过来先 binlog 后 redo：从库多出一条主库没有的数据。两阶段提交（内部 XA）：prepare 阶段写 redo 并标记事务 prepare → commit 阶段先写 binlog 再写 redo commit 标记。崩溃恢复规则：扫描 redo 发现 prepare 状态事务，拿 XID 去 binlog 查——binlog 有完整记录则提交（补 redo commit），否则回滚。binlog 在此充当"事务是否生效"的仲裁者，两份日志借此达到逻辑等价。
+\`\`\`sql
+-- 崩溃恢复视角看未决事务（8.0 需 XA_RECOVER_ADMIN 权限）
+XA RECOVER;
+-- 判定依据：拿 XID 去 binlog 搜，搜到即提交
+mysqlbinlog --start-datetime="2026-07-20 10:00:00" binlog.000123 | grep -A5 "Xid"
+\`\`\`
+实际案例：某支付平台对账发现零星主从不一致，追溯到 sync_binlog=0 叠加宕机窗口 binlog 未落盘。改双 1（sync_binlog=1 + flush_log_at_trx_commit=1）+ 组提交，吞吐损失约 12%，但主从一致率做到 99.999%；恢复演练用 mysqlbinlog 做 PITR，RTO 从 4 小时压到 25 分钟。
+踩坑：1）sync_binlog=0/N 时两阶段提交无法保证 binlog 必在，崩溃可能回滚已返回成功的事务——金融场景必须 =1；2）5.7 已优化掉 prepare_commit_mutex，8.0 无需再调这把锁；3）XA RECOVER 看到的 in-doubt 事务别手动 ROLLBACK，先查 binlog 判定；4）8.0 redo 重构为 mtr 无锁并发写 log buffer，老版本调优文章别照搬。`,
+    keyPoints: ["两份日志职责不同需仲裁", "prepare 事务按 binlog 有无判定", "双 1 是一致性基线"],
+    followUps: ["binlog 组提交三段队列如何提升吞吐？", "为什么 XA RECOVER 的事务不能直接回滚？"],
+    favorited: false,
+  },
+  {
+    id: "be-427",
+    nodeId: "be-storage-engine",
+    question: "change buffer 的原理是什么？为什么唯一二级索引用不了？merge 时机与收益如何评估？",
+    answer: `核心原理：更新非唯一二级索引时，若目标页不在 Buffer Pool，直接读盘改页是昂贵随机 IO。change buffer 把"某页上的索引变更"缓存在一棵专用 B+ 树（存系统表空间）里，事务即可提交；待该页被读入 Buffer Pool 时（或后台线程定期），把缓存修改 merge 进去。收益=随机写转内存操作+同页多次修改合并成一次物理写。唯一索引用不了的原因：唯一性约束要求插入时立即读页校验冲突，页反正要被读进内存，缓冲失去意义。change buffer 占 Buffer Pool 比例上限 innodb_change_buffer_max_size 默认 25%，写多读少可调 50%。适用画像：写多读少、非唯一二级索引多、变更后短期不按该索引读——账单流水、操作日志类表最典型。
+\`\`\`sql
+-- 观察 change buffer 的 merge 与缓存规模
+SHOW ENGINE INNODB STATUS;  -- 看 INSERT BUFFER AND ADAPTIVE HASH INDEX 段
+SET GLOBAL innodb_change_buffer_max_size = 50;
+\`\`\`
+实际案例：某支付流水表日增 4 亿行、带 6 个非唯一二级索引，插入 TPS 卡在 1.2 万；确认全部二级索引非唯一后把 max_size 调到 50，merge 集中在夜间低峰，插入 TPS 升到 3.8 万。反例：某 IM 消息表写后立即按索引查（写读比 1:1），change buffer 只带来 merge 开销与 ibdata 膨胀，关闭后 P99 降 18%。
+踩坑：1）change buffer 有 redo 保护，宕机不丢；2）innodb_fast_shutdown=2 跳过 merge 加速关库，起库后后台继续 merge；3）老版本 ibdata1 曾因 change buffer 暴涨撑满磁盘，5.6+ 可独立表空间并回收；4）写后立刻读的索引开它是负收益，按 workload 画像决定 innodb_change_buffering。`,
+    keyPoints: ["非唯一索引变更先缓冲后 merge", "唯一索引需即时读页校验故无效", "写多读少收益最大"],
+    followUps: ["change buffer 与 redo log 如何配合保证持久性？", "自适应哈希索引 AHI 适合什么场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-428",
+    nodeId: "be-storage-engine",
+    question: "double write buffer 解决什么问题？为什么 redo log 修不了部分写损坏的页？",
+    bigTech: true,
+    answer: `核心原理：InnoDB 页 16KB，而 OS/磁盘原子写单位通常 4KB（ext4），一次刷脏页可能写一半断电——页部分写（torn page）。redo 是"在完好页上应用变更"的物理日志，页本身已损坏时重放 redo 毫无意义（页校验和不过，页号都可能错），所以必须先把页修回完好状态。double write 流程：刷脏页前先顺序写到系统表空间的 doublewrite 区（8.0.20+ 独立为 #innodb_dblwr 目录的连续块）并 fsync，再把页写到真实位置；崩溃后用 doublewrite 里的完好副本覆盖坏页，再走 redo 前滚。代价是写放大一倍，但 doublewrite 区是连续顺序写，SSD 实测开销通常低于 10%。
+\`\`\`sql
+-- 观测批刷效率：pages_written / writes 越大越高效
+SHOW GLOBAL STATUS LIKE 'Innodb_dblwr%';
+-- 默认 ON；仅在原子写文件系统（ZFS/btrfs）或硬件原子写盘上才考虑关
+\`\`\`
+实际案例：某 IDC 市电闪断，一台历史配置未开 double write 的从库起来报 37 个页 checksum 失败，只能备份+binlog 重做，RTO 6 小时；同机房开启的实例全部自愈。该司随后把 innodb_doublewrite=ON 写入数据库基线，并配 innodb_page_cleaners=8 并行刷脏削峰。
+踩坑：1）关 double write 的前提是文件系统支持 16K 原子写（ZFS recordsize 对齐）或带掉电保护的企业盘，普通 SSD 别关；2）innodb_flush_method=O_DIRECT 只绕过 OS cache，不解决 torn page；3）线上出现 checksum mismatch 先查内存/磁盘/RAID 卡硬件，再想数据逻辑；4）8.0.20 起 doublewrite 文件从 ibdata1 挪出，升级后注意监控新目录磁盘水位。`,
+    keyPoints: ["torn page 源于页大于原子写单位", "先写双写区再写真实位置", "坏页用副本修复再走 redo"],
+    followUps: ["为什么 double write 的顺序写代价远小于随机写？", "File Trailer 的校验和如何参与坏页检测？"],
+    favorited: false,
+  },
+  {
+    id: "be-429",
+    nodeId: "be-storage-engine",
+    question: "LSM-Tree 与 B+ 树的读写放大有何差异？Leveled 与 Tiered compaction 怎么选？",
+    bigTech: true,
+    answer: `核心原理：B+ 树原地更新——一次写入要定位页+改页+可能页分裂，写放大（WA）通常 10-30 倍，但读路径短（树高 3-4 层，命中缓存后点查约 1 次 IO），读放大低。LSM-Tree 追加写——写先进 WAL+MemTable（跳表，RocksDB 默认 64MB），冻结成 Immutable 后 flush 成 L0 SSTable，再逐层 compaction。LSM 的 WA 来自 compaction 重复搬运：Leveled（每层容量 10 倍递增，同层 key 不重叠）WA 约 20-40、空间放大约 10%、读放大低（每层二分定位一个 SST）；Tiered（同尺寸攒 N 个再合并）WA 低至 4-10，但空间放大高（合并需近 1 倍冗余）且每层多个 run 要逐个查、读放大高。读路径：MemTable→Immutable→L0（逐文件查）→L1..Ln，Bloom filter（10 bits/key 误判约 1%）把不存在 key 的 IO 砍掉，block cache 兜底热数据。
+\`\`\`text
+选型速查：
+写多读少（日志/事件/监控）→ Tiered + 压缩，容忍空间放大
+读多写少（元数据/特征）  → Leveled + 大 block cache + Bloom
+写入突发                  → Tiered 容忍 L0 堆积；稳定写入 → Leveled
+\`\`\`
+实际案例：某监控平台从 MySQL 迁 RocksDB（Leveled+按时间分区），写入从 8 万行/s 提到 45 万点/s，Snappy 压缩后磁盘降 60%；但一次大范围删除触发全层 compaction 风暴，IO 打满 20 分钟，后改 L0 用 Tiered + rate_limiter 限速 20MB/s 才平滑。
+踩坑：1）L0 堆积到 soft/hard pending barrier 会触发 write stall 直接拒写，写入方要感知背压；2）大 value（>1MB）用 BlobDB 键值分离，否则 compaction 写放大爆炸；3）删除是插 tombstone，大量删除后 scan 变慢，要等 compaction 回收；4）LSM 范围读弱是相对的——prefix extractor+分区可把范围查限定在少数 SST。`,
+    keyPoints: ["B+ 原地更新 WA 低读快", "LSM 追加写 WA 来自 compaction", "Leveled 读优/Tiered 写优", "Bloom filter 砍掉空查 IO"],
+    followUps: ["RocksDB 的 write stall 如何监控与规避？", "为什么 LSM 的删除比插入还贵？"],
+    favorited: false,
+  },
+  {
+    id: "be-430",
+    nodeId: "be-storage-engine",
+    question: "InnoDB 崩溃恢复（crash recovery）的完整流程是怎样的？大事务回滚为什么那么慢？",
+    bigTech: true,
+    answer: `核心原理：恢复分两阶段，全自动无需人工。阶段一 redo 前滚（roll forward）：从最近 checkpoint 的 LSN 起扫描 redo（8.0 多线程并行重放），把所有页修改重放——不管事务当时是否提交，先把库恢复到宕机瞬间的物理状态；double write 先修 torn page，change buffer 也按 redo 重建。阶段二 undo 回滚（roll back）：扫描出 active/prepare 状态事务——普通未提交事务用 undo 逐条逻辑逆操作回滚（8.0 后台并行回滚，实例很快可对外服务）；prepare 事务查 binlog 决定提交或回滚（内部 XA 规则）。恢复耗时≈checkpoint_age 决定的 redo 量+未提交大事务的 undo 量；大事务回滚慢是因为 undo 是逐条逻辑逆操作且要重新加锁校验，不可并行化到行级之外。
+\`\`\`sql
+-- 找长事务：trx_rows_modified 越大，kill 后回滚越久
+SELECT trx_id, trx_state,
+       TIME_TO_SEC(TIMEDIFF(NOW(), trx_started)) AS age_s,
+       trx_rows_modified
+FROM information_schema.innodb_trx ORDER BY trx_started;
+-- 防御：安全更新模式+单语句执行时长上限（SELECT）
+SET SESSION sql_safe_updates = ON;
+SET SESSION max_execution_time = 30000;
+\`\`\`
+实际案例：某 SaaS 公司一次误执行无 WHERE 的 UPDATE 波及 8 亿行，跑 3 小时后被 kill，回滚又花 5 小时业务半瘫。复盘立规：SQL 上线走审核平台（explain+影响行数评估）、大变更拆批（每批 5000 行+间隔）、DBA 侧对超长事务自动告警。另一次机房断电恢复仅 90 秒——平时 checkpoint_age 水位控制得好。
+踩坑：1）kill 大事务连接不能止血，回滚照旧甚至更久；2）恢复窗口只能靠 checkpoint 策略和 redo 容量控制，没有"加速开关"；3）别在高峰跑 online DDL 与大事务叠加，回滚+重建双杀；4）8.0 并行回滚默认开，老版本升级后直接受益。`,
+    keyPoints: ["redo 前滚到宕机瞬间", "undo 回滚未提交事务", "prepare 事务由 binlog 仲裁", "大事务回滚是逻辑逆操作"],
+    followUps: ["checkpoint_age 如何换算恢复时间？", "为什么 undo 回滚不能像 redo 那样并行重放？"],
+    favorited: false,
+  },
+  {
+    id: "be-431",
+    nodeId: "be-storage-engine",
+    question: "RocksDB 生产调优的核心抓手有哪些？memtable/block cache/Bloom filter/compaction 如何配置？",
+    answer: `核心原理：调优围绕读写放大三角。1）memtable（默认跳表，write_buffer_size 64MB × max_write_buffer_number 2）：缓冲越大 compaction 越少，但宕机恢复要重放的 WAL 越长，写突发场景给到 4×128MB；2）block cache（默认仅 8MB，必调）：data block+index/filter 是否常驻决定读延迟，生产给物理内存 1/3，且 cache_index_and_filter_blocks=true 防索引过滤器被逐出；3）Bloom filter（10 bits/key，partitioned）：点查不存在的 key 免 IO；4）compaction：Leveled 为主，L0 文件数到 20（soft）/36（hard）触发 write stall；max_background_jobs 给足 CPU/4，rate_limiter 限制 compaction IO 防尖峰。
+\`\`\`cpp
+Options o;
+o.write_buffer_size = 128 << 20; o.max_write_buffer_number = 4;
+BlockBasedTableOptions t;
+t.block_cache = NewLRUCache(16ull << 30);          // 16GB
+t.cache_index_and_filter_blocks = true;
+t.filter_policy.reset(NewBloomFilterPolicy(10));
+o.table_factory.reset(NewBlockBasedTableFactory(t));
+o.max_background_jobs = 8;
+o.rate_limiter.reset(NewGenericRateLimiter(64 << 20)); // compaction 限速 64MB/s
+\`\`\`
+实际案例：某推荐平台用 RocksDB 存用户画像（2TB，读 30 万 QPS/写 5 万 QPS），默认配置 P99 抖动到 400ms，排查是 L0 周期性 stall+block cache 未配。治理：write buffer 4×128MB、block cache 16GB（index/filter 常驻）、prefix_extractor 按 user_id 前缀分区使点查只扫一个 SST、compaction 限速 64MB/s，P99 稳定 8ms，compaction 期间 P999 从 2s 降到 60ms。
+踩坑：1）默认 8MB block cache 是第一大坑；2）核心监控：l0_file_count、pending_compaction_bytes、write stall 时长；3）大量删除后磁盘不立刻回收（tombstone 要等 compaction），预留空间水位；4）多实例混部时 compaction 限速要错峰，避免 IO 撞车。`,
+    keyPoints: ["block cache 默认 8MB 必调", "index/filter 常驻缓存", "L0 堆积触发 write stall", "rate_limiter 削 compaction 尖峰"],
+    followUps: ["prefix_extractor 如何影响点查与范围查？", "WAL 与 memtable 大小如何影响恢复时间？"],
+    favorited: false,
+  },
+  // ========== be-mq-advanced：消息队列进阶（Kafka ISR/重平衡/KRaft/Pulsar）（be-432 ~ be-440） ==========
+  {
+    id: "be-432",
+    nodeId: "be-mq-advanced",
+    question: "Kafka 的 ISR 机制如何工作？HW/LEO 语义？unclean.leader.election 为何是可用性与一致性的开关？",
+    bigTech: true,
+    answer: `核心原理：每个分区的副本分 leader 与 follower，follower 主动向 leader 发 FetchRequest 拉取复制。HW（High Watermark）= ISR 集合中所有副本都已复制的最小 LEO（Log End Offset），消费者只能读 HW 之前的数据（即"已提交"）。ISR 伸缩判定：follower 在 replica.lag.time.max.ms（默认 30s，0.9 起替代旧的按消息条数判定）内未追上 leader 就被踢出 ISR，追上后重新加入。acks=all 时 producer 等 ISR 全部确认，配 min.insync.replicas=2 保证至少 2 个副本存活才允许写入。unclean.leader.election.enable=true 允许非 ISR 副本当 leader——保可用性但丢数据（HW 之后未同步数据被截断）；false 则分区不可用直到 ISR 成员恢复。
+\`\`\`properties
+# 金融级可靠性三件套（broker/topic 级）
+acks=all
+min.insync.replicas=2
+unclean.leader.election.enable=false
+replica.lag.time.max.ms=30000
+\`\`\`
+实际案例：某支付流水 topic 因 min.insync.replicas=1 且 unclean=true，一次 broker 宕机叠加磁盘故障，非 ISR 副本当选 leader，丢失 40 秒已 ack 数据，对账差 2000 笔，靠上游业务对账文件重推才平账。整改三件套+UnderReplicatedPartitions>0 即告警，两年未再丢消息。另一案例：某日志集群 follower 因 Full GC 超 30s 被反复踢出 ISR、告警轰炸，lag 阈值调到 60s+G1 调优后稳定。
+踩坑：1）acks=all 但 min.insync.replicas=1 等于没保障（ISR 只剩 leader 也算成功）；2）ISR 频繁伸缩打爆 controller，要查 GC/网络/磁盘 IO 根因；3）follower 重启会把日志截断到 HW，"已拉未提交"数据会被丢弃，这是设计行为；4）跨机房 MirrorMaker 复制场景 lag 判定要放宽，避免 ISR 抖动。`,
+    keyPoints: ["HW=ISR 最小 LEO", "lag.time.max.ms 判定伸缩", "acks=all 需配 min.insync.replicas", "unclean 选举保可用丢一致"],
+    followUps: ["为什么消费者不能读 HW 之后的数据？", "ISR 频繁抖动应该如何排查？"],
+    favorited: false,
+  },
+  {
+    id: "be-433",
+    nodeId: "be-mq-advanced",
+    question: "Kafka 消费组重平衡为何曾是顽疾？cooperative-sticky 与 KIP-848 新协议如何根治 stop-the-world？",
+    bigTech: true,
+    answer: `核心原理：旧协议（eager/classic）两轮 barrier：成员加入/退出/订阅变更 → GroupCoordinator 通知全组 revoke 所有分区（消费全停，stop-the-world）→ 客户端 group leader 计算分配方案 → SyncGroup 下发。成员与分区越多 STW 越久（百成员+千分区可达分钟级），滚动发布会连环触发。2.3 起 cooperative-sticky（KIP-429）改增量式：只 revoke 需要迁移的分区，其余照常消费，两轮收敛换不停机。2025-03 发布的 Kafka 4.0 把 KIP-848 转为 GA：分配计算从客户端 group leader 挪到 broker 端（server-side assignor），客户端只需周期性 heartbeat 上报状态，收到增量 assignment 直接应用——重平衡从"全员同步 barrier"变成"异步增量下发"，客户端不再参与复杂协商。
+\`\`\`properties
+# 3.x：开启合作式分配（消费不停机）
+partition.assignment.strategy=org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+# 4.0：启用新消费组协议（服务端分配，服务端默认开启）
+group.protocol=consumer
+\`\`\`
+实际案例：某出行平台订单事件组 200 消费者×2000 分区，K8s 滚动发布一次触发 6 轮 STW 重平衡，积压 4000 万条；切 cooperative-sticky 后发布期间消费不停；2025 年升级 Kafka 4.0 启用 KIP-848 后，单次 rebalance 收敛从 45s 降到 3s 内，延迟毛刺基本消失。
+踩坑：1）rebalance 期间 offset 提交失败抛 CommitFailedException，消费逻辑必须幂等（重复消费必然发生）；2）session.timeout.ms 太短误判死亡引发频繁 rebalance，太长故障发现慢，10-45s 按 SLA 权衡；3）max.poll.interval.ms 内必须再次 poll，处理慢要主动 pause 或拆批；4）静态成员（group.instance.id+K8s StatefulSet 稳定身份）可让重启不触发 rebalance。`,
+    keyPoints: ["eager 全员 revoke 全停", "cooperative 只迁移易手分区", "KIP-848 分配上收到 broker", "幂等消费是重平衡前提"],
+    followUps: ["静态成员如何避免重启触发 rebalance？", "CommitFailedException 应该如何处理？"],
+    favorited: false,
+  },
+  {
+    id: "be-434",
+    nodeId: "be-mq-advanced",
+    question: "KRaft 架构如何取代 ZooKeeper？controller quorum 与 __cluster_metadata 如何工作？3.x 集群如何迁移到 4.0？",
+    bigTech: true,
+    answer: `核心原理：ZK 模式下元数据（分区分配、ISR、配置）存 ZooKeeper，controller 由 ZK 协助选出，痛点：controller 切换要全量加载元数据（20 万分区级集群要数分钟）、两套系统运维成本翻倍、ZK 会话超时易脑裂。KRaft（KIP-500）把元数据变成内部日志主题 __cluster_metadata（单分区 Raft 日志），由 controller quorum（3 或 5 节点，Raft 多数派）复制与选举；broker 作为 observer 从 active controller 增量拉取元数据，切主秒级完成。版本时间线：3.3 KRaft 生产可用，3.9 是最后支持 ZK 的版本线，2025-03 发布的 Kafka 4.0 彻底移除 ZooKeeper 代码，KRaft 成为唯一模式（broker/controller 需 Java 17）。迁移不能跨步：先升 3.9 → 用迁移工具把 ZK 元数据搬到 KRaft quorum → 滚动切换验证 → 再升 4.0。
+\`\`\`properties
+# KRaft 混合模式（小规模三节点）
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@n1:9093,2@n2:9093,3@n3:9093
+listeners=BROKER://:9092,CONTROLLER://:9093
+\`\`\`
+实际案例：某内容平台 30 万分区集群，ZK 模式 controller 故障切换要 4-6 分钟，迁 KRaft 后切主小于 10s，分区承载上限从 20 万提到 200 万，同时下线 5 节点 ZK 集群与配套监控，运维人力减半。
+踩坑：1）controller 多数派必须存活（3 节点最多挂 1），跨机房部署要考虑 quorum 放置；2）首次启动要 kafka-storage.sh format 生成 cluster.id，写错或重复 format 直接元数据错乱；3）3.9+ 支持动态增删 controller voter，老版本要滚动重启；4）__cluster_metadata 是单 Raft 组，元数据写吞吐有上限，topic 数别失控。`,
+    keyPoints: ["元数据变为内部 Raft 日志", "controller quorum 多数派选举", "4.0 彻底移除 ZK", "迁移须先 3.9 再 4.0"],
+    followUps: ["KRaft 下 controller 故障切换为何能从分钟级降到秒级？", "为什么 __cluster_metadata 不做多分区？"],
+    favorited: false,
+  },
+  {
+    id: "be-435",
+    nodeId: "be-mq-advanced",
+    question: "Kafka 日志存储结构：segment 切分、稀疏索引、时间索引如何设计？log compaction 解决什么问题？",
+    answer: `核心原理：分区物理上是一组 log segment（默认 1GB 切一段，log.segment.bytes），每段三个文件：.log（消息数据，只追加）、.index（offset 稀疏索引）、.timeindex（时间戳→offset 索引）。稀疏索引每 4KB（log.index.interval.bytes）消息记一条 offset→文件物理位置映射：查 offset 先二分 index 定位到 4KB 区间，再小范围顺序扫——索引内存占用与查找速度的平衡。读路径 sendfile 零拷贝从 page cache 直发网卡。log compaction：对 keyed 消息每个 key 至少保留最新值，cleaner 线程把旧 segment 重写为新段（offset 不变，丢弃被覆盖的老值），适用 changelog/配置同步/状态快照；与按时间/大小删除整段的 retention 是两种 cleanup.policy。
+\`\`\`properties
+log.segment.bytes=1073741824
+log.index.interval.bytes=4096
+cleanup.policy=compact
+min.cleanable.dirty.ratio=0.5   # 脏数据过半才触发清理
+segment.ms=604800000            # 7 天强制滚段，保证可被清理
+\`\`\`
+实际案例：某用户画像同步 topic 用 compaction 承载 8 亿用户最新资料，新消费者从 offset 0 拉取只需读 compacted 后的"每 key 最新值"，体积降 92%，冷启动回放从 6 小时缩到 20 分钟。时间索引让"重放昨天 14 点的数据"用 offsetsForTimes 精确定位，免全量扫描。
+踩坑：1）compact 主题 key 为 null 的消息清理时直接丢弃；2）dirty.ratio 太低 cleaner 空转烧 IO，太高磁盘膨胀；3）cleanup.policy=compact,delete 组合下删除整段与 compaction 并存，tombstone 要 delete.retention.ms 后才移除；4）segment 太小索引与句柄开销大，太大单段恢复慢，1-4GB 是甜区。`,
+    keyPoints: ["segment 三件套 log/index/timeindex", "4KB 间隔稀疏索引+二分", "compaction 每 key 留最新值", "cleanup.policy 按场景选"],
+    followUps: ["offsetsForTimes 如何借助 timeindex 定位？", "compaction 期间 offset 会重排吗？"],
+    favorited: false,
+  },
+  {
+    id: "be-436",
+    nodeId: "be-mq-advanced",
+    question: "Kafka 消费者分区分配策略 range/round-robin/sticky/cooperative-sticky 有何差异？如何选？",
+    answer: `核心原理：分配发生在 rebalance 时。range（默认）：按 topic 逐个把分区连续段分给成员，成员数不整除时前面的成员多分一个，多 topic 订阅时倾斜逐 topic 叠加；round-robin：全部 topic 的分区混排轮询，均衡但打破 topic 局部性；sticky（KIP-54）：目标函数=均衡+尽量保留上次分配（迁移量最小）；cooperative-sticky（2.4+）：sticky 的合作式版本，rebalance 只 revoke 需要易手的分区，消费不停。选型：单 topic+整除 → range 够用；多 topic+均衡敏感 → round-robin/sticky；滚动发布频繁 → cooperative-sticky。Kafka 4.0 的 KIP-848 新协议把分配上收 broker（server-side assignor），客户端不再需要选策略。
+\`\`\`java
+// 3.x 显式指定合作式分配
+props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG,
+    CooperativeStickyAssignor.class.getName());
+// 4.0 启用新协议，分配由 broker 计算
+props.put("group.protocol", "consumer");
+\`\`\`
+实际案例：某风控平台一个消费组订 12 个 topic 共 480 分区、20 实例，range 策略下部分 topic 倾斜 30%，热点实例 CPU 打满；切 round-robin 均衡了但发布时全量迁移引发积压；最终 cooperative-sticky——发布期间只迁移待易手分区（小于 8%），积压消除，稳态倾斜小于 2%。
+踩坑：1）同组成员的分配策略集合必须兼容（协商取交集），灰度升级要先全组支持 cooperative 再切换；2）round-robin 破坏实例与分区的亲和性，依赖本地缓存预热的服务慎用；3）分配不均也可能是生产侧 partition key 倾斜，别只盯消费侧；4）手工 assign() 与 subscribe() 互斥——assign 没有 rebalance 也就没有自动容灾。`,
+    keyPoints: ["range 逐 topic 连续段易倾斜", "round-robin 均衡破局部性", "sticky 保上次分配", "cooperative 增量迁移不停机"],
+    followUps: ["生产端 key 倾斜如何识别与治理？", "assign() 手工分配适合什么场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-437",
+    nodeId: "be-mq-advanced",
+    question: "延迟消息如何实现？RocketMQ 定时消息、Kafka 时间轮与工程替代方案各有什么边界？",
+    answer: `核心原理：RocketMQ 支持 18 个固定延迟级别（5s/10s/30s/1m...2h），5.0 起支持任意时间戳定时消息：producer 先把消息投到内部 SCHEDULE_TOPIC_XXXX 对应级别队列，ScheduleMessageService 按级别到期把消息投回原 topic。Kafka 无原生延迟消息，但内部有层级时间轮（SystemTimer，tickMs×wheelSize 逐层降级，插入 O(1)）驱动 DelayedOperation（produce ack 超时、fetch 长轮询等待），可借鉴其设计。工程替代：1）延迟分级 topic（delay.5s/delay.1m...）+ 转发服务到期回投；2）DB 索引扫描（deliver_time<=now()，延迟长且量小适用）；3）Redis ZSET 按时间戳 score 轮询。选型：固定级别高吞吐用 RocketMQ，长延迟低频用 DB，需要取消能力用 ZSET 或 DB。
+\`\`\`java
+// RocketMQ 5.x：任意时间戳定时消息
+Message msg = new Message("order-close-topic", body);
+msg.setDeliverTimeMs(System.currentTimeMillis() + 30L * 60 * 1000); // 30 分钟未支付关单
+producer.send(msg);
+\`\`\`
+实际案例：某电商 30 分钟未支付自动关单，峰值 8 万单/分钟。方案演进：DB 轮询（扫表压垮主库）→ RabbitMQ TTL+DLX（队头阻塞：长延迟消息挡住短延迟）→ RocketMQ 定时消息：单集群承载 10 万条/s 定时投递，到期误差小于 2s，关单成功率 99.98%，残留失败走死信人工兜底。
+踩坑：1）定时消息量大时 RocketMQ 内部 SCHEDULE topic 也会积压，要监控投递延迟差值；2）自研时间轮别用 sleep 循环，tickMs 决定精度与空转开销；3）延迟消息消费失败后重试语义失效（走普通重试链路）；4）业务必须容忍秒级到期误差，强准时场景配定时任务对账兜底。`,
+    keyPoints: ["RocketMQ 内部 SCHEDULE topic 定时转投", "Kafka 层级时间轮 O(1) 插入", "TTL 队头阻塞陷阱", "按延迟量级选型"],
+    followUps: ["为什么 RabbitMQ TTL+DLX 不适合混合延迟级别？", "层级时间轮的降级（降级到下层）如何发生？"],
+    favorited: false,
+  },
+  {
+    id: "be-438",
+    nodeId: "be-mq-advanced",
+    question: "死信队列与非阻塞重试如何设计？RocketMQ %RETRY%/%DLQ% 与 Kafka 重试 topic 模式对比？",
+    bigTech: true,
+    answer: `核心原理：非阻塞重试解决"单条失败消息卡死整个 partition"：RocketMQ 消费失败自动把消息发去 %RETRY%consumerGroup 重试 topic，按梯度（10s/30s/1m/2m...2h，最多 16 次）重投，超限进 %DLQ% 死信 topic——重试期间主队列新消息照常消费。Kafka 无内置 DLQ，工程模式：消费失败把消息 publish 到 retry.5m 等梯度 topic（header 带 retry-count、首次失败时间、原 offset），专用消费者延迟后回投或直处理，超次数进 dlq topic。设计铁律：重试必须幂等；重试要带退避（指数+jitter）；DLQ 必须接告警+补偿入口，保留期覆盖排查窗口。
+\`\`\`java
+// Spring Kafka 2.7+ 声明式非阻塞重试
+@RetryableTopic(attempts = "4",
+    backoff = @Backoff(delay = 30_000, multiplier = 2),
+    dltTopicSuffix = ".DLQ")
+@KafkaListener(topics = "pay-callback")
+public void onMessage(PayEvent e) { biz(e); }
+
+@DltHandler
+public void onDlt(PayEvent e, @Header(KafkaHeaders.ORIGINAL_OFFSET) long offset) {
+    deadLetterStore.save(e, offset);   // 落库+告警，等补偿
+}
+\`\`\`
+实际案例：某出行平台支付回调消费，第三方支付通道偶发 5xx 导致连续失败：直接抛异常重消费把 partition 队头卡死，积压 40 分钟。改非阻塞重试（30s→2min→10min 梯度，3 次进 DLQ）后主流量零积压；DLQ 接通道恢复后的批量自动重放，月均 3000 条死信 98% 自动补偿成功。
+踩坑：1）固定间隔重试在下游故障期等于二次攻击，必须指数退避；2）DLQ 无人看管等于消息黑洞，告警+看板是标配；3）重试期间消息乱序，强顺序场景（账户流水）只能阻塞重试+人工介入；4）RocketMQ 死信默认保留 48h，审计要求的证据链要自行归档。`,
+    keyPoints: ["非阻塞重试保主队列流畅", "梯度退避+次数上限进 DLQ", "幂等是重试前提", "DLQ 要告警+补偿闭环"],
+    followUps: ["强顺序场景失败消息该怎么处理？", "DLQ 自动重放如何防止二次故障？"],
+    favorited: false,
+  },
+  {
+    id: "be-439",
+    nodeId: "be-mq-advanced",
+    question: "Pulsar 存算分离架构如何工作？BookKeeper 的副本语义与分层存储？与 Kafka 如何选型？",
+    answer: `核心原理：Kafka 的 broker 服务与存储一体（分区日志绑死 broker 磁盘），扩缩容要搬数据；Pulsar 拆分：broker 无状态（服务层，秒级扩缩、故障即漂移），存储层是 BookKeeper——消息切成 ledger（类似 segment），条带化写到多个 bookie，写够 AckQuorum 确认即返回；bookie 宕机由 AutoRecovery 后台对 ledger 做 re-replicate，broker 无感。副本语义三参数：Ensemble（一个 ledger 用几个 bookie）、WriteQuorum（每条 entry 写几份）、AckQuorum（几份确认算成功），E=3/WQ=3/AQ=2 是常见配置（写 3 确认 2，可容忍 1 挂）。分层存储：冷 ledger 自动 offload 到 S3/OSS，读取透明拉回，热数据留 bookie。多租户 namespace 隔离+四种订阅模式（Exclusive/Shared/Failover/Key_Shared），Shared 模式天然队列语义。
+\`\`\`properties
+bookkeeperEnsembleSize=3
+bookkeeperWriteQuorum=3
+bookkeeperAckQuorum=2
+managedLedgerOffloadDriver=aws-s3
+managedLedgerOffloadThresholdInBytes=53687091200   # 50GB 触发 offload
+\`\`\`
+实际案例：某券商行情推送原 Kafka 集群，扩容 20TB 分区搬迁要 3 天且全程抖动；迁 Pulsar 后 broker 扩容秒级完成（数据不动），bookie 扩容自动均衡，geo-replication 做跨机房双活，扩容窗口从 3 天压到 20 分钟；冷数据 offload 对象存储后存储成本降 70%。
+踩坑：1）组件多（broker+bookie+元数据存储），10 万 TPS 以下的小集群运维成本高于 Kafka；2）bookie 的 journal 盘与 ledger 盘要分离，journal 写满直接拒写；3）读冷数据延迟突增，消费侧要有降级预期；4）生态与客户端成熟度仍逊 Kafka，按团队基因与规模选型。`,
+    keyPoints: ["broker 无状态+bookie 存数据", "E/WQ/AQ 三参数副本语义", "ledger offload 分层存储", "Shared 订阅=队列语义"],
+    followUps: ["Pulsar 扩容为什么不需要搬数据？", "Key_Shared 订阅如何保证 key 内有序？"],
+    favorited: false,
+  },
+  {
+    id: "be-440",
+    nodeId: "be-mq-advanced",
+    question: "Kafka 集群如何做容量规划？分区数估算、磁盘治理与优先副本选举的实战要点？",
+    answer: `核心原理：分区数估算公式：max（目标写吞吐/单分区写能力 10-20MB/s，目标消费吞吐/单分区消费能力 1-5 万条/s，消费者最大实例数）×2 冗余——分区只能增不能减，按 2-3 年视角拍板。磁盘容量 = 日写入量 × retention 天数 × 副本因子 ÷（1-水位余量 20%）。治理四板斧：1）retention.ms/bytes 按业务窗口设（审计 180 天、事件流 3 天）；2）磁盘水位 70% 告警，75% 介入（临时缩短 retention+扩容）；3）优先副本选举：分区 leader 应在 preferred replica（副本列表首个）上，broker 重启后 leader 漂移造成负载倾斜，auto.leader.rebalance.enable=true 或手工执行归位；4）kafka-reassign-partitions.sh 迁移热点分区，--throttle 限速防打满内网。
+\`\`\`bash
+# 缩短保留期应急（3 天）
+kafka-configs.sh --alter --topic order-event --add-config retention.ms=259200000
+# leader 归位（均衡负载）
+kafka-leader-election.sh --bootstrap-server b:9092 --election-type preferred --all-topic-partitions
+\`\`\`
+实际案例：某物流轨迹集群 2KB 消息、峰值 40 万条/s：按消费端单分区 2 万条/s 估需 20 分区，拍 40 个（冗余+扩容余量），3 副本、retention 48h，磁盘窗口=40万×2KB×86400×2×3÷0.8≈5.2TB，按 3 台 8TB 盘规划。大促演练发现某 broker leader 占比 45%（重启漂移未归位），preferred election 后回到 33%±2%。
+踩坑：1）分区一次拍太大元数据膨胀、controller 压力上升；2）retention.bytes 按分区计，总上限=分区数×单分区上限×副本数，别只盯全局；3）磁盘写满 Kafka 直接 log.dir failure 宕机，水位红线要前置；4）reassign 搬迁忘记 throttle 会打爆内网影响生产读写。`,
+    keyPoints: ["分区数=三维度取 max×冗余", "磁盘=写入×保留×副本÷水位", "preferred election 治漂移", "reassign 必限速"],
+    followUps: ["分区过多对 controller 和客户端各有什么代价？", "磁盘水位告警后应急 SOP 怎么排？"],
+    favorited: false,
+  },
+  // ========== be-sharding：分库分表与分布式 ID（扩容迁移/跨片查询/Leaf）（be-441 ~ be-449） ==========
+  {
+    id: "be-441",
+    nodeId: "be-sharding",
+    question: "分片键设计的原则是什么？数据倾斜如何发现与治理？",
+    bigTech: true,
+    answer: `核心原理：分片键三原则：1）高基数——user_id 可以，性别/省份不行（分片数远超枚举值才有意义）；2）高频携带——80% 以上 SQL 带它，否则全片广播；3）写扩散可控——一个逻辑写不落过多分片。路由算法：hash 取模（均匀但扩容全量搬迁）、range（易热点但易扩容）、虚拟桶（逻辑 4096 桶映射物理分片，扩容只搬桶）。倾斜治理先识别：按分片监控行数/QPS/容量，超均值 2 倍即倾斜；成因多为大 V 用户、SaaS 大租户、range 时间热点。手段：热点白名单拆到独立高配分片（路由表优先于取模）、虚拟桶迁移、热点 key 加随机后缀打散（查询兼容 N 个 key）、二级路由表存配置中心动态下发。
+\`\`\`properties
+# ShardingSphere：16 库 × 16 表取模分片
+actual-data-nodes=ds0{0..15}.t_order_0{0..15}
+database-strategy.standard.sharding-column=user_id
+table-strategy.standard.sharding-column=order_id
+\`\`\`
+实际案例：某社交电商按 user_id mod 32 分片，头部主播单场 50 万订单把 1 个分片打到容量 60%（均值 12%）、CPU 95%。治理：主播 user_id 进路由表白名单切到独立高配套片，普通用户保持取模，热点片 CPU 降到 40%，大促不再单点爆。
+踩坑：1）分片键选定后几乎不可改（改=全量迁移），上线前用真实分布压测；2）mod 分片 32 扩 64 要迁 50% 数据，虚拟桶只需迁对应桶；3）倾斜监控要做分片维度，实例级监控看不出；4）别为"未来可能"提前 64 分片，分片数=3 年数据量测算+2 倍冗余。`,
+    keyPoints: ["高基数+高频携带+写可控", "虚拟桶扩容只搬桶", "热点白名单独立分片", "分片维度监控识别倾斜"],
+    followUps: ["分片键选错了如何无损切换？", "为什么 range 分片容易出时间热点？"],
+    favorited: false,
+  },
+  {
+    id: "be-442",
+    nodeId: "be-sharding",
+    question: "分库分表扩容迁移有哪些方案？停机迁移、双写迁移与平滑扩容如何选择？",
+    bigTech: true,
+    answer: `核心原理：三模式。停机迁移：低峰停写→导出→按新规则导入→校验→切流，简单可靠但停服窗口≈数据量/导出速度，1TB 级小时级停机多数业务不可接受，只适合内部系统与小数据量。双写迁移（不停机）：1）同步工具全量搬历史数据；2）应用双写新旧库（或 DTS 基于 binlog 增量同步，免改业务代码）；3）一致性校验（行数+分片级 CRC32+金额 SUM 指纹+业务抽检）；4）灰度切读 5%→100%，再停旧写、拆双写。平滑扩容（ShardingSphere-Scaling 类）：存量+增量一体化，自动 CRC 分段校验，切流仅秒级禁写，适合 hash 取片后的倍数扩容。关键难点：双写非原子（主写成功为准+异步补偿+对账兜底，绝不能反向以新库为准）、自增主键跨片冲突（先切分布式 ID）、迁移期 DDL 冻结防 binlog 位点漂移、路由规则新旧版本要可灰度回滚。
+\`\`\`text
+双写迁移时间线：
+T0 全量搬迁（历史数据，数小时）
+T1 开双写/binlog 增量同步（追平位点）
+T2 一致性校验（行数+CRC+业务抽检）
+T3 灰度切读 5%→50%→100%
+T4 停旧写→观察→下线旧库
+\`\`\`
+实际案例：某出行订单库 8 亿行拆 4 库 64 表：DTS 全量 14 小时+增量追 binlog，双写经 MQ 异步落新库（失败 3 次进死信人工），分片级 CRC32 校验差异率 0.0003% 逐条修复，灰度切流 2 周，全程业务零感知、零资损。
+踩坑：1）校验只比行数不够，字段抽样+SUM 指纹才可靠；2）切流先切读后切写，回滚预案反向执行；3）迁移期间改表结构会让增量同步丢数据，必须冻结 DDL；4）旧库至少观察一个账期再下线，防长尾回滚需求。`,
+    keyPoints: ["停机窗口=数据量/导出速度", "双写+对账兜底非原子", "CRC+SUM 指纹多层校验", "先切读后切写"],
+    followUps: ["双写期间新库写失败如何补偿？", "增量同步追不上 binlog 产生速度怎么办？"],
+    favorited: false,
+  },
+  {
+    id: "be-443",
+    nodeId: "be-sharding",
+    question: "跨分片查询如何避免全片广播？全局表、基因法与异构索引各自适用什么场景？",
+    bigTech: true,
+    answer: `核心原理：不带分片键的查询=全片广播+内存归并，1024 分片就是 1024 次 RT 叠加，必须设计避让。四件套：1）全局表（broadcast）：字典/类目/地区等小表每库一份，中间件同步更新，join 本地化，更新走广播写；2）基因法：把分片基因（user_id hash 的低位）注入其他维度主键——订单号嵌入用户分片位，按订单号查询反解出分片，消灭订单号维度广播，id 生成器要预留基因位；3）异构索引/冗余表：按第二维度（商户、手机号）再建一份精简数据或"维度→主键列表"索引表（写两份，读单分片）；4）搜索外置：多条件复杂检索走 ES 宽表（binlog→Canal→ES），DB 只承接分片键查询与主键回表。选型口诀：小表 join 用全局表、id 维度用基因法、第二维度读多写少用异构索引、多条件筛选一律 ES。
+\`\`\`sql
+-- 基因法订单号：64bit = 时间戳(41) + 分片基因(8) + 序列(15)
+-- 按订单号查：shard = (order_id >> 15) & 0xFF 直接路由
+-- 按用户查：user_id mod 256 路由（基因即该 mod 值）
+\`\`\`
+实际案例：某外卖平台订单 100 亿行，商户端"本店今日订单"最初 1024 分片全广播，RT 8s。改造：按 shop_id 分片的商户索引表（shop_id→order_id 列表）+ES 承接复杂筛选，商户查询 P99 从 8s 降到 45ms，DB 广播量降 99%。
+踩坑：1）异构索引靠 binlog 异步同步有秒级延迟，强一致读回主维度；2）基因位数决定分片上限（8 位=256 片），预留扩容位；3）ES 链路监控 lag，重建期间要有降级方案；4）全局表更新是广播写，行数控制在万级以下，大表别用。`,
+    keyPoints: ["广播=全片扫描必须避让", "基因法把分片位注入他键", "异构索引写双份读单份", "复杂检索交给 ES"],
+    followUps: ["基因法的基因位数如何规划？", "异构索引与本地消息表如何保最终一致？"],
+    favorited: false,
+  },
+  {
+    id: "be-444",
+    nodeId: "be-sharding",
+    question: "分库分表场景的全局唯一 ID 如何设计？雪花时钟回拨、Leaf 号段双 buffer、基因法 ID 各自怎么落地？",
+    bigTech: true,
+    answer: `核心原理：分片场景 ID 三要求：全局唯一、趋势递增（InnoDB 聚簇索引顺序写友好）、可携带分片基因。方案对比：1）雪花（41 位时间戳+10 位机器+12 位序列，单机每毫秒 4096 个）：死穴是时钟回拨——回拨即重复。应对：启动校验本地持久化的 lastTimestamp、小回拨等待大回拨拒绝；美团 Leaf-snowflake 用 ZooKeeper 持久 workerId+周期性上报时间，弱依赖本地时钟。2）Leaf-segment 号段：DB 表存 max_id，服务一次 UPDATE max_id+step 取走一段（如 1000）内存分发；双 buffer——当前段消耗 10% 即异步预拉下一段，DB 抖动/重启不阻塞发号。3）基因法 ID：雪花低位嵌分片位（user_id mod 1024），ID 自带路由信息。
+\`\`\`sql
+-- Leaf-segment 号段表
+CREATE TABLE leaf_alloc (
+  biz_tag VARCHAR(128) PRIMARY KEY,
+  max_id BIGINT NOT NULL,
+  step INT NOT NULL
+);
+UPDATE leaf_alloc SET max_id = max_id + step WHERE biz_tag = 'order';
+\`\`\`
+实际案例：某电商订单号从 DB 自增切 Leaf-segment：双 buffer 各 100 万号，DB 重启 30s 期间发号无感，峰值 6 万单/s 稳定。另一业务用裸雪花遇 NTP 校时回拨 800ms，发重 4000 个 ID 触发唯一键冲突告警，改 Leaf-snowflake（ZK 分配 workerId+启动时钟校验）后归零。
+踩坑：1）容器环境手工配 workerId 必撞车，交给 ZK/DB 分配；2）号段 step 别贪大——宕机浪费整段（订单号空洞无碍，发票号等连续场景不行）；3）跨机房在机器位里划机房段；4）趋势递增≠严格递增，做索引键够用，做业务排序依据不准。`,
+    keyPoints: ["雪花死穴是时钟回拨", "号段双 buffer 抗 DB 抖动", "基因法 ID 自带路由", "workerId 必须集中分配"],
+    followUps: ["Leaf-snowflake 如何用 ZK 解决时钟与 workerId 问题？", "号段空洞对哪些业务不可接受？"],
+    favorited: false,
+  },
+  {
+    id: "be-445",
+    nodeId: "be-sharding",
+    question: "分库分表下的分布式事务怎么做？XA、Seata AT 与柔性事务如何选型？",
+    bigTech: true,
+    answer: `核心原理：本地事务只能保单分片，跨片三方案：1）XA/2PC（ShardingSphere 整合 Atomikos/Narayana）：prepare 全部成功才 commit，强一致；代价是同步阻塞+长持锁，吞吐掉 60%+，proxy 模式缺全局死锁检测，prepare 后 TM 宕机会留悬挂事务。2）Seata AT：一阶段各分支本地提交并在 undo_log 表记前后镜像，二阶段成功只异步删 undo、失败按镜像回滚——无锁持有期短，性能损耗约 10-20%，脏写防护靠全局锁。3）BASE 柔性（本地消息表/RocketMQ 事务消息/Saga）：最终一致，吞吐无损，业务自写补偿。选型：跨片资金转移用 XA 或 Seata AT+对账；下单+积分等弱一致链路用 MQ 柔性。
+\`\`\`java
+// Seata AT：一个注解开启全局事务
+@GlobalTransactional(name = "create-order", rollbackFor = Exception.class)
+public void createOrder(OrderDTO dto) {
+    orderMapper.insert(dto);                                // 分片 A
+    accountClient.deduct(dto.getUid(), dto.getAmount());    // 分片 B
+    stockClient.deduct(dto.getSkuId(), 1);                  // 分片 C
+}
+\`\`\`
+实际案例：某支付平台跨分片转账先上 XA，大促压测 TPS 从 3000 掉到 700、锁冲突告警爆；改 Seata AT（undo_log 与业务表同分片）TPS 回到 2600，叠加天级对账（余额快照+流水核对）把不一致窗口压到秒级，全年零资损。
+踩坑：1）Seata AT 要求每库建 undo_log 表且走代理数据源，绕过即失效；2）全局锁下热点账户并发要专项压测；3）XA 悬挂事务靠 DBA 用 XA RECOVER 人工处置；4）柔性方案前提是所有分支可补偿，"扣款成功下单失败"这类硬场景别用柔性。`,
+    keyPoints: ["XA 强一致但吞吐腰斩", "Seata AT 镜像回滚无长锁", "柔性最终一致吞吐无损", "资金场景必配对账"],
+    followUps: ["Seata AT 如何防止全局脏写？", "TCC 与 AT 的接入成本差在哪？"],
+    favorited: false,
+  },
+  {
+    id: "be-446",
+    nodeId: "be-sharding",
+    question: "跨分片的 ORDER BY + LIMIT 深分页为什么危险？游标翻页与二次查询法如何解决？",
+    answer: `核心原理：跨片 LIMIT n,m 的坑：各分片不知道全局序，中间件只能在每个分片取排序后前 n+m 条，再在内存归并取第 n+1 到 n+m 条——m=10 万时每分片各拉 10 万行，页越深内存与网络越爆。解法：1）游标翻页（推荐）：产品上只给"下一页"，条件改为 WHERE sort_key < last_seen_key ORDER BY sort_key LIMIT n——各分片恒定只拉 n 条；2）二次查询法（精确跳页）：第一轮各分片查边界值算出全局第 m 条的位置，第二轮按值范围精确拉取，实现复杂，自研中间件才上；3）深分页需求（导出/运营筛查）引流到 ES 或离线数仓；4）业务限制最大页码（参考搜索引擎只给前 1000 条）。
+\`\`\`sql
+-- 游标式翻页：成本与页深无关
+SELECT * FROM t_order
+WHERE user_id = ?
+  AND (create_time, id) < ('2026-07-20 10:00:00', 88213301)  -- 上页末行
+ORDER BY create_time DESC, id DESC
+LIMIT 20;
+\`\`\`
+实际案例：某电商商家后台订单列表翻到第 5000 页，中间件每分片拉 10 万行归并直接把内存打爆、FGC 告警连环；改游标翻页+导出需求走离线数仓后，深分页查询清零，中间件内存占用降 70%，商家列表 P99 稳定 120ms。
+踩坑：1）排序键同值会丢/重数据，必须加唯一列做 tiebreaker（如 id）；2）游标翻页不支持跳页，产品设计要提前对齐；3）分片键内分页（用户查自己订单）成本恒定，尽量把查询引导到分片键维度；4）二次查询法在排序键稀疏时边界计算有误差，需按值二次校正。`,
+    keyPoints: ["深分页=每分片拉 n+m 行归并", "游标翻页成本恒定", "tiebreaker 防同值丢重", "深分页引流离线"],
+    followUps: ["为什么二次查询法能精确定位全局第 m 条？", "游标翻页如何兼容倒序与多列排序？"],
+    favorited: false,
+  },
+  {
+    id: "be-447",
+    nodeId: "be-sharding",
+    question: "分库分表后如何保证手机号/邮箱等字段的全局唯一？唯一索引表方案如何设计？",
+    answer: `核心原理：分片后数据库唯一索引只在分片内有效——手机号不是分片键就做不到全局唯一。四方案：1）全局唯一索引表：独立小库建 phone→user_id 唯一约束表，注册先插索引表（冲突即拒）再写业务分片；索引表自身可按 phone hash 再分片，片内唯一键仍生效。2）基因法：让唯一键本身参与分片（按 phone hash 路由），同 phone 必落同片，片内唯一=全局唯一——前提是分片键=该唯一键。3）Redis SETNX 预占：只做加速与降 DB 压力，缓存失效（过期/主从切换）不能当判据，DB 唯一键兜底。4）业务容忍+事后对账：昵称等非关键字段可用。交易型字段必须 1 或 2。
+\`\`\`sql
+-- 全局唯一索引表（独立库，按 phone_hash 分 4 片）
+CREATE TABLE uniq_phone (
+  phone_hash BIGINT NOT NULL,
+  phone CHAR(64) NOT NULL,
+  user_id BIGINT NOT NULL,
+  PRIMARY KEY (phone_hash, phone)
+);
+-- 注册：1) INSERT uniq_phone（Duplicate entry 即"已注册"） 2) INSERT 业务分片
+\`\`\`
+实际案例：某社交平台注册链路用唯一索引表承接手机号唯一性，峰值 3000 注册/s、4 分片承载；曾因某接口绕过索引表直写分片产生 17 个重复手机号，修脏数据花 2 天，随后把索引表插入封装进 ORM 拦截器从框架层杜绝绕过。
+踩坑：1）索引表与业务写入非原子——本地事务把"索引表+待确认记录"绑一起，异步补偿对账；2）索引表是小表高热点，加读写分离与缓存映射；3）手机号回收再注册要走解绑流程清索引，否则新用户被旧索引挡住；4）邮箱可换绑、手机号不可复用的策略差异要在索引表 TTL/状态字段里体现。`,
+    keyPoints: ["片内唯一≠全局唯一", "唯一索引表先插后写", "基因法让唯一键即分片键", "Redis 只加速不兜底"],
+    followUps: ["索引表与业务表写入如何做最终一致？", "换绑手机号的索引迁移流程怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "be-448",
+    nodeId: "be-sharding",
+    question: "单表多大才需要分表？从 B+ 树层数量化分析，分区表能否替代分表？",
+    bigTech: true,
+    answer: `核心原理：没有魔法数字，量化依据是 B+ 树层数：单页 16KB、行均 1KB、扇出约 1170 时，3 层树≈2200 万行、4 层≈250 亿行——3 层内非叶页可被 Buffer Pool 缓存，点查约 1 次 IO；超 3 层后缓存压力与页分裂成本上升。经验阈值：行均 1KB 时 2000-3000 万行或表文件 50-100GB 开始评估。但"大"不止行数：写入并发（页锁热点 3 万/s 就可能要拆）、DDL 成本（500GB online DDL 半天）、备份恢复窗口。先试替代方案：分区表（RANGE 按时间，DROP PARTITION 秒删历史，管理归挡一体，但索引仍单表、写入热点不分流）、冷热归档、TiDB/OceanBase 透明分布式。
+\`\`\`sql
+-- 量化估算行宽与体量
+SELECT table_rows, data_length, index_length,
+       ROUND(data_length/GREATEST(table_rows,1)) AS avg_row_bytes
+FROM information_schema.tables WHERE table_name='t_order';
+-- 分区表滚动删历史：秒级，替代 DELETE 几千万行
+ALTER TABLE t_order DROP PARTITION p202401;
+\`\`\`
+实际案例：某 SaaS 工单表 18 亿行/600GB，用月分区+12 个月滚动+1 年前归档冷库，在线表稳在 4 亿行/150GB，备份窗口从 9 小时降到 2 小时；另一写并发 3 万/s 的流水表 8000 万行就拆 16 片——触发条件是页级写热点而非行数。
+踩坑：1）迷信"500 万分表"会过度设计，先看行宽/并发/归档策略；2）分区表分区数控制在几百内，且分区键必须出现在所有唯一键中；3）分表后中间件、扩容、跨片查询的运维成本远超单库优化，能分区表解决就别分库；4）评估按 2 年增长率拍板，别按当前量。`,
+    keyPoints: ["3 层树≈2200 万行是分水岭", "大=行数+写并发+DDL 成本", "分区表先解决管理问题", "按增长率规划"],
+    followUps: ["分区表与分库分表能否叠加使用？", "为什么扇出约 1170 能推出 3 层 2200 万行？"],
+    favorited: false,
+  },
+  {
+    id: "be-449",
+    nodeId: "be-sharding",
+    question: "冷热数据分离与历史归档体系如何设计？归档期间查询路由与 NewSQL 替代方案怎么权衡？",
+    answer: `核心原理：数据温度分层：热（30 天，SSD+全索引）、温（1 年，SATA 或 ROW_FORMAT=COMPRESSED 压缩）、冷（归档库/数仓/对象存储 Parquet）。迁移链路：调度按时间分批扫描→双写校验→在线库分批 DELETE 或直接 DROP PARTITION→归档库可读。关键设计：归档键必须有时间索引；查询网关按时间路由（近 90 天打在线库、更早打归档库），避免"归档中查询"打爆在线库；预留回流通道（客服查 2 年前订单）。NewSQL 权衡：TiDB/OceanBase 存算分离+自动 rebalance，省掉分库分表中间件与归档体系，但引入 PD/zone 等新概念、DBA 学习曲线与双写迁移期成本——新建大系统或痛点到天花板的老系统重构才上。
+\`\`\`sql
+-- 温表压缩（CPU 换 IO，压缩率 50-70%）
+ALTER TABLE t_order_2025 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
+-- 归档删除分批限速，防大事务与 binlog 风暴
+DELETE FROM t_order WHERE create_time < '2025-01-01' ORDER BY id LIMIT 5000;
+\`\`\`
+实际案例：某出行订单 3 年 300 亿行：热库 90 天（3 亿行）、温库 1 年（压缩省 60%）、更早进 MaxCompute 存 Parquet；查询网关按时间路由，归档跑批夜间限速 2000 行/s，在线库 P99 无波动，整体存储成本降 55%。
+踩坑：1）DELETE 归档产生大量 binlog/undo，分批+sleep+低峰，能 DROP PARTITION 就别 DELETE；2）归档库也要备份与监控，归档≠删除；3）回流查询超预期就给归档库加只读副本；4）冷热分界线按查询分布数据定（99% 查询落在多少天内），别拍脑袋。`,
+    keyPoints: ["热温冷三层存储介质递减", "网关按时间路由查询", "DROP PARTITION 优于 DELETE", "NewSQL 省架构换学习成本"],
+    followUps: ["归档一致性如何校验？", "TiDB 的 region 自动分裂如何替代手工分片？"],
+    favorited: false,
+  },
+  {
+    id: "be-450",
+    nodeId: "be-consensus",
+    question: "Basic Paxos 的两阶段（Prepare/Accept）为什么能达成共识？活锁是怎么产生的，如何破解？",
+    bigTech: true,
+    answer: `核心原理：Paxos 目标是在异步网络+宕机模型下让多数派对唯一值达成一致。角色分 Proposer/Acceptor/Learner。阶段一 Prepare(n)：Proposer 选全局唯一递增编号 n（常见做法：轮次号拼接 serverId 防冲突）广播给多数派；Acceptor 承诺：不再接受编号 < n 的 Prepare 和 Accept，并返回自己已接受过的最大编号提案 (prevN, prevV)。阶段二 Accept(n, v)：若 Proposer 收齐多数派应答，选值规则——有 prevV 则选编号最大的 prevV（保证已被"选定"的值不被推翻），否则用自由值；Acceptor 未违背承诺则接受。安全性证明关键：任意多数派必有交集，新 Proposer 一定能"看到"已选定的值并继承它。活锁：两个 Proposer 编号互相碾压（P1 Prepare(1)→P2 Prepare(2) 抢占→P1 Prepare(3)…）永远走不到 Accept。破解：随机退避+选主（唯一 Leader 独占提案权，即 Multi-Paxos 思路）。
+\`\`\`text
+# 编号生成：高 32 位轮次 + 低 32 位 serverId
+n = (round << 32) | serverId
+# Acceptor 状态机伪码
+on Prepare(n): if n > promisedN { promisedN = n; reply(acceptedN, acceptedV) }
+on Accept(n,v):  if n >= promisedN { acceptedN=n; acceptedV=v; reply ok }
+\`\`\`
+实际案例：某配置中心自研类 Paxos 选主，上线初期两节点编号用本地时间戳生成，时钟抖动导致编号互相碾压，选主抖动 30 秒不收敛；改为"轮次号单调持久化+随机退避 50-150ms"后收敛到 1 秒内。
+踩坑：1）"多数派"是读写两集合有交集，3 节点容忍 1 挂、5 节点容忍 2 挂，偶数节点没有意义（4 节点仍只容忍 1 挂还多一份网络分区风险）；2）Prepare 阶段必须持久化 promisedN/acceptedN，否则重启后违背承诺丢数据；3）工程上没人裸用 Basic Paxos——每条日志两阶段两次多数派 RT，延迟不可接受。`,
+    keyPoints: ["两阶段+多数派交集保安全", "继承已选定值不可推翻", "活锁靠随机退避+选主破解", "编号必须全局唯一递增"],
+    followUps: ["为什么任意两个多数派一定有交集，这在证明里起什么作用？", "Prepare 阶段为什么必须落盘，不落盘会出什么事？"],
+    favorited: false,
+  },
+  {
+    id: "be-451",
+    nodeId: "be-consensus",
+    question: "Multi-Paxos 如何通过选主把两阶段优化成一阶段？新 Leader 上任时日志空洞怎么补？",
+    answer: `核心原理：Basic Paxos 每条日志都要 Prepare+Accept 两轮多数派。Multi-Paxos 的关键优化：先选出一个稳定 Leader，由它在 Prepare 阶段用编号 n 探测，若多数派应答里没有冲突的已接受值，则该 Leader 获得"一段任期"的提案权，之后所有日志直接走 Accept 阶段（一阶段一次 RT），直到有更高编号的 Prepare 抢占（即新 Leader 上任）。新 Leader 补洞流程：Prepare 阶段从多数派收集各节点 (acceptedN, acceptedV)，对每个日志位取最大编号的值重放 Accept，把多数派未确认的位置填满或填 no-op，之后才开放写——这等价于 Raft 里"Leader 提交前任 no-op 条目"的做法。工程结构：复制状态机（RSM）——共识层只保证日志序列一致，状态机按序 apply 到内存/KV 引擎，读写都从 Leader 的状态机走（或 follower read 加 ReadIndex）。
+\`\`\`text
+# Multi-Paxos 稳态写路径
+client → Leader: Accept(logIndex, n, value) → 多数派 ok → commit → apply → 响应
+# 新 Leader 补洞
+for idx in [firstUnchosen .. maxSeen]:
+    value = 多数派中该 idx 最大 acceptedN 的值 (无则 no-op)
+    Accept(idx, n, value) 到多数派
+\`\`\`
+实际案例：某分布式锁服务基于 Multi-Paxos 三副本，稳态写延迟从两阶段的 8ms 降到 4ms（同机房一次多数派 RT）；一次 Leader 宕机后新主补洞 1200 条日志，用批量 Accept pipeline 把恢复时间压在 900ms。
+踩坑：1）Leader 租约外仍可能有旧 Leader 在写（脑裂），靠编号递增+Acceptor 承诺保证旧主写不进多数派；2）补洞未完成就开放读会读到未提交中间态；3）"一阶段"优化只省 Prepare 的 RT，多数派落盘延迟省不掉，跨机房部署 RT 是硬下限。`,
+    keyPoints: ["稳定 Leader 免 Prepare 一阶段提交", "新主补洞=重放最大编号值", "共识保日志一致+状态机按序 apply", "脑裂靠编号承诺防护"],
+    followUps: ["Multi-Paxos 和 Raft 在日志连续性上的根本差异是什么？", "no-op 条目为什么能安全地填补空洞？"],
+    favorited: false,
+  },
+  {
+    id: "be-452",
+    nodeId: "be-consensus",
+    question: "Raft 的选主与日志复制如何保证安全？为什么规定「Leader 只提交当前任期的日志靠计数，前任日志靠间接提交」？",
+    bigTech: true,
+    answer: `核心原理：Raft 把共识拆成三个子问题。1）选主：Follower 在 election timeout（随机 150-300ms）内收不到心跳就转 Candidate 发起 RequestVote，拿到多数派票即任 Leader，term 单调递增。安全性靠选举限制：Candidate 的日志必须"至少和投票者一样新"（比较 (lastTerm, lastIndex)）才能拿到票——保证当选者包含所有已提交日志。2）日志复制：Leader 通过 AppendEntries 带 (prevLogIndex, prevLogTerm) 一致性检查，Follower 不匹配就拒绝，Leader 递减 nextIndex 重试直到找到分叉点，再用 Leader 日志覆盖 Follower 分叉后的部分（日志匹配特性：两节点某 (index, term) 相同，则前缀全同）。3）提交规则：Leader 只能对"当前任期"的日志用"复制到多数派"判定 commit；前任日志只能作为当前任期日志提交后的间接受益者。原因是 Raft 论文 Figure 8 的反例：旧任期日志即使复制到多数派，也可能被新 Leader 覆盖——它没有被"锁定"。
+\`\`\`text
+# 提交判定（Leader 侧）
+if log[N].term == currentTerm && matchIndex 计数 >= 多数派:
+    commitIndex = N   # 间接把 N 之前所有日志一起提交
+# 新 Leader 上任第一件事：追加一条当前任期 no-op，快速推进 commitIndex
+\`\`\`
+实际案例：某 KV 存储 Raft 实现漏了"当前任期"限制，压测中网络分区+连续切主后出现已"提交"值被回滚的线性一致性问题，对账发现 17 条已响应成功的写丢失；补上限制+no-op 后混沌工程注入 200 次切主无一丢失。
+踩坑：1）election timeout 必须随机化，固定值会导致选票瓜分反复重选；2）分区旧 Leader 仍在写，靠 term 检查让它步降为 Follower；3）心跳间隔远小于 election timeout（一般 1/10），否则正常抖动都会触发无谓选主。`,
+    keyPoints: ["选举限制保证当选者日志最全", "日志匹配特性前缀全同", "当前任期日志才可计数提交", "no-op 快速推进 commitIndex"],
+    followUps: ["Raft 论文 Figure 8 的具体反例场景是什么？", "PreVote 机制解决什么问题，为什么不直接调大超时？"],
+    favorited: false,
+  },
+  {
+    id: "be-453",
+    nodeId: "be-consensus",
+    question: "Raft 集群成员变更为什么不能单步切换？联合共识（Joint Consensus）两阶段怎么工作？",
+    bigTech: true,
+    answer: `核心原理：把 3 节点集群 {A,B,C} 一步换成 {C,D,E}，任何时刻不同服务器可能应用不同配置：A 还按老 3 节点算多数派（2 票），D 已按新配置算多数派（2 票）——两个多数派可以不相交（老多数派 {A,B}，新多数派 {D,E}），同一任期选出两个 Leader，脑裂。根因：老配置多数派集合与新配置多数派集合可能没有交集。联合共识（Raft 论文第 6 节）引入过渡配置 C(old,new)：阶段一，Leader 提交一条配置日志 Cold,new，此后选举与提交都要求"老配置多数派 AND 新配置多数派"双重通过——两个集合取交集必然非空，安全性保持；阶段二，Cold,new 提交后再提交 Cnew 日志，集群正式切到新配置。任何时刻落回中间态（Leader 宕机）都能安全续走：没提交 Cold,new 前按老配置，提交后按联合配置，不存在双多数派。简化变体：单节点变更（一次只加减一台，etcd 默认）数学上保证新老多数派必相交，可以不要联合共识，实现简单得多。
+\`\`\`text
+# 联合共识配置日志序列
+[A,B,C] → 提交 C[A,B,C]+[A,B,C,D,E] → 提交 C[A,B,C,D,E] → 完成
+# 联合配置下多数派判定
+commitOK = (老配置内复制数 > |老|/2) && (新配置内复制数 > |新|/2)
+\`\`\`
+实际案例：某 etcd 集群 3 扩 5 用一条命令同时加两台，触发联合共识路径中的实现 bug（旧版本边界），集群选主死锁 40 秒；改为一台一台加（单节点变更）后十次扩容全部平滑。
+踩坑：1）新成员要先以 learner/observer 身份追平日志再进投票组，否则它落后的日志会拖慢提交甚至被算进多数派导致不可用；2）变更期间 Leader 宕机恢复路径要测试覆盖；3）缩减节点时旧 Leader 若在被移除列表里，要在 Cnew 提交后主动退位。`,
+    keyPoints: ["单步切换新老多数派可不相交", "联合配置要求双重多数派", "单节点变更必相交可简化", "新成员先 learner 追平"],
+    followUps: ["为什么一次只变一台就能跳过联合共识？", "learner 转 voter 的时机怎么判断？"],
+    favorited: false,
+  },
+  {
+    id: "be-454",
+    nodeId: "be-consensus",
+    question: "Raft 工程化三件套：日志压缩 Snapshot、PreVote、线性一致读（ReadIndex/LeaseRead）各自解决什么问题？",
+    answer: `核心原理：1）Snapshot：日志无限增长拖垮重启恢复与磁盘，状态机定期把 [0, lastIncludedIndex] 的内存状态落盘成快照，之前的日志整体删除；落后太多的 Follower 不再逐条追日志，由 Leader 直接 InstallSnapshot 分块发送再增量追加。2）PreVote：分区节点回来后 term 很大（分区内反复自选举抬 term），会立刻触发一次无谓选主打断正常服务；PreVote 让 Candidate 先用"当前 term+1"做预投票，只有预投票赢了才真正抬 term 发 RequestVote——分区节点拿不到预投票多数派，无法扰动集群。3）线性一致读：直接读 Leader 状态机可能读到旧主（脑裂瞬间），ReadIndex——Leader 先和多数派确认一次心跳（自己仍是合法 Leader），然后等 apply 推进到应答时的 commitIndex 再读，不追加日志也能线性一致；LeaseRead 更激进——心跳自带多数派租约，租约期内（小于 election timeout 的保守值）Leader 直接本地读，零额外 RT，但依赖时钟偏移有界假设。
+\`\`\`go
+// ReadIndex 伪码（etcd 风格）
+func linearizableRead(req) {
+    index := raftNode.ReadIndex(ctx)  // 内部：heartbeat 确认多数派
+    <-appliedWait(index)            // 等状态机 apply 到 index
+    serve(store.Read(req))
+}
+\`\`\`
+实际案例：某服务注册中心 8 万 QPS 读全部走 ReadIndex，每次读一次多数派心跳 RT，P99 8ms；切 LeaseRead（租约 0.8×election timeout）后读 P99 降到 0.3ms，代价是时钟漂移>100ms 的理论窗口下可能读旧数据，业务可接受。
+踩坑：1）Snapshot 生成期间写放大，要与业务低峰对齐或用 copy-on-write；2）InstallSnapshot 大对象分块要限速，别把 Leader 出口带宽打满影响复制；3）LeaseRead 在虚拟机时钟被 NTP 大步校正的环境要禁用，退回 ReadIndex。`,
+    keyPoints: ["Snapshot 截断日志+追平落后者", "PreVote 防分区节点扰动选主", "ReadIndex 无日志线性一致读", "LeaseRead 零 RT 换时钟假设"],
+    followUps: ["ReadIndex 的心跳确认为什么等价于一次共识？", "snapshot 与业务事务并发时如何保证一致性视图？"],
+    favorited: false,
+  },
+  {
+    id: "be-455",
+    nodeId: "be-consensus",
+    question: "ZAB 协议与 Raft 有何本质区别？ZooKeeper 崩溃恢复时新 Leader 如何与 Follower 对齐数据？",
+    answer: `核心原理：ZAB（ZooKeeper Atomic Broadcast）为 ZK 的"全序广播+主备"场景设计，与 Raft 形似神不同。两种模式：崩溃恢复——Leader 挂了重新选主并对齐日志；消息广播——正常期 Leader 把写事务提案（zxid 全局唯一：高 32 位 epoch + 低 32 位计数）发给多数派 ACK 后 commit。与 Raft 的核心差异：1）恢复顺序相反——Raft 新 Leader 天生日志最全（选举限制），直接用自己的覆盖别人；ZAB 选"zxid 最大"的节点当 Leader，但新 Leader 上任后先同步再广播：把自己与各 Follower 的差异算出来，用 DIFF（全量差异）、TRUNC（回滚 Follower 多出的未提交提案）或 SNAP（全量快照）三种方式对齐，对齐完成前不对外服务。2）zxid 的 epoch 设计让"前任未提交的提案"可被显式识别丢弃（Follower 收到 TRUNC）。3）ZK 额外保证单一系统映像：客户端重连到新服务器也能看到自己之前的写（靠 lastZxid 比对与 session 机制）。
+\`\`\`text
+# 新 Leader 对齐决策树
+peerLastZxid < leaderMinCommitted  → SNAP 全量
+peer 有多余未提交提案            → TRUNC 回滚
+peer 缺部分已提交提案            → DIFF 逐条补发
+\`\`\`
+实际案例：某 Kafka 3.x 集群（ZK 模式）一次机房断网后 ZK 三节点脑裂恢复，新 Leader 用 TRUNC 让一台旧主回滚了 6 个未提交提案，controller 元数据无损收敛，全程 12 秒；对比团队自研类 Raft 组件同类故障要手工介入 20 分钟，坚定了"元数据服务直接用 ZK/etcd 而不是自研"的技术决策。
+踩坑：1）ZK 集群节点数取奇数，observer 只同步不投票，用于跨机房扩容读；2）zxid 低 32 位计数溢出会触发重新选主（大集群高频写要关注）；3）syncLimit×tickTime 配置太紧会导致正常 GC 停顿被误判为 Leader 死亡。`,
+    keyPoints: ["ZAB 先恢复对齐再广播", "zxid=epoch+计数识别前任提案", "DIFF/TRUNC/SNAP 三种对齐", "Raft 靠选举限制免对齐"],
+    followUps: ["ZK 的 session 与临时节点在 Leader 切换时如何保持语义？", "为什么 etcd 选 Raft 而 ZK 坚持 ZAB？"],
+    favorited: false,
+  },
+  {
+    id: "be-456",
+    nodeId: "be-consensus",
+    question: "EPaxos 无 Leader 共识的原理是什么？fast path 与 slow path 如何按冲突切换？",
+    answer: `核心原理：Paxos/Raft 系都有 Leader 瓶颈：所有写串行经过主节点，跨地域部署时客户端要忍受到 Leader 的 RT，Leader 宕机还有切换空窗。EPaxos（Egalitarian Paxos）让每个副本都能直接提案：提案带上两个元数据——deps（与该命令冲突的已见命令集合）和 seq（提议序号）。无冲突时走 fast path：客户端就近副本一次预接受（PreAccept），多数派且"fast quorum"（⌊3f/4⌋+1，5 节点时为 4）内所有副本的 deps 一致，直接提交，延迟 = 客户端到就近副本 RT + 一次地域内 RT。有冲突（并发写同一 key）时升级 slow path：再走一轮 Accept 把 deps 敲定，多一次 RT。提交时对所有冲突命令的 deps 建依赖图，求强连通分量（SCC）拓扑排序执行，保证所有副本执行顺序等价。无 Leader 带来的工程红利：就近写入、无单点、热点天然分散。
+\`\`\`text
+# fast quorum 大小（f 为容忍故障数）
+fast quorum = f + ceil((f+1)/2)   # 3 节点 f=1 → 3；5 节点 f=2 → 4
+# 执行顺序：deps 图 SCC 拓扑序，SCC 内按 seq 打破循环
+\`\`\`
+实际案例：某全球 KV 三地域部署，用 Raft 时非 Leader 地域写延迟 180ms（跨洋 RT）；换类 EPaxos 方案后同城 fast path 写到 12ms，订单号这类天然无冲突的 key 99% 走 fast path；但库存扣减热 key 冲突率 40%，slow path 反而比 Raft 慢，最终热 key 仍路由回单地域 Raft 组，混合架构落地。
+踩坑：1）fast quorum 比普通多数派大，地域内副本数不够时 fast path 成功率骤降；2）依赖图 SCC 计算是 CPU 热点，冲突多的时候执行线程容易堆积；3）实现复杂度远高于 Raft（状态机、依赖追踪、恢复路径），社区成熟实现稀缺，自研成本要算进去。`,
+    keyPoints: ["无 Leader 就近提案", "无冲突 fast path 一次 RT", "冲突升 slow path 敲定 deps", "依赖图拓扑序保证等价执行"],
+    followUps: ["fast quorum 为什么必须比多数派大？", "什么样的业务负载最适合 EPaxos？"],
+    favorited: false,
+  },
+  {
+    id: "be-457",
+    nodeId: "be-consensus",
+    question: "PBFT 拜占庭容错与 Raft 这类 CFT 协议的本质差异在哪？三阶段提交流程与 3f+1 节点数怎么来的？",
+    answer: `核心原理：CFT（Crash Fault Tolerance，Raft/Paxos）假设节点只会宕机或失联，不会说谎——n=2f+1 容忍 f 个故障。BFT（Byzantine FT）假设节点可以作恶：发矛盾消息、伪造应答，常见于跨机构联盟链。PBFT 三阶段：1）Pre-prepare：主节点给请求分配序号 n 并广播；2）Prepare：各副本广播"我收到并认可 (n, digest)"，收齐 2f 个匹配的 Prepare 进入 prepared 状态——这一步保证同一视图内不会有两个请求在同一序号 prepared（任意两个 2f+1 法定人数在 f 作恶下仍至少有一个诚实节点重合）；3）Commit：再广播一轮，收齐 2f 个 Commit 后执行——这一步保证视图切换后请求也不丢。节点数推导：n 个节点中 f 个作恶，正常投票需 n-f 票，且其中诚实票必须过半压过作恶票，即 n-f > 2f，得 n ≥ 3f+1：3 个作恶至少要 10 个节点。工程上还有视图切换（主作恶被换掉）、checkpoint 垃圾回收、MAC/签名验签开销。
+\`\`\`text
+# 安全性不等式
+n - f >= 2f + 1  →  n >= 3f + 1
+# 消息复杂度 O(n²)：Prepare/Commit 都是全网广播
+\`\`\`
+实际案例：某银行间联盟链清算网 7 机构 10 节点（容忍 3 作恶），PBFT 出块延迟 1.2s、TPS 3000，满足跨行清算吞吐；对比同机房 Raft 集群延迟仅 3ms——跨机构场景付的是信任成本而不是性能浪费。
+踩坑：1）O(n²) 消息量决定 PBFT 节点数实战上限 20-30，过百要用分层/分片或换 HotStuff 类流水线协议；2）主节点作恶检测（视图切换计时器）太敏感会频繁换主雪崩；3）身份与证书体系（准入、吊销）才是联盟链落地真正的大头，协议本身反而是成熟件。`,
+    keyPoints: ["BFT 容忍作恶节点 CFT 只容忍宕机", "n≥3f+1 保证诚实票压制作恶票", "三阶段锁序号+抗视图切换", "O(n²) 限制节点规模"],
+    followUps: ["HotStuff 如何把消息复杂度降到 O(n)？", "联盟链为什么不用 PoW 而用 PBFT 类协议？"],
+    favorited: false,
+  },
+  {
+    id: "be-458",
+    nodeId: "be-consensus",
+    question: "etcd、Consul、Nacos 的共识与一致性模型有何差异？注册中心/配置中心选型怎么拍板？",
+    bigTech: true,
+    answer: `核心原理：三者的存储底座都是"共识日志+KV"，但一致性取舍不同。etcd：Raft 强一致，写必须过半提交，读默认串行（linearizable，走 ReadIndex），也提供 serializable 读换性能；数据模型是纯 KV+revision+watch，靠 MVCC 多版本实现"从历史 revision 续 watch"。Consul：Raft 强一致 + Serf gossip 做成员管理与故障探测（AP 层）；读支持 consistent/stale 两档，stale 读允许任意节点响应（可能旧数据）换低延迟。Nacos 双模：AP 模式（Distro 协议——临时实例数据各节点分片负责+异步复制+读时合并，节点宕机不影响注册与发现）与 CP 模式（Raft，用于持久实例与配置）。选型判断：配置中心、分布式锁、leader election 这类"错了就出事故"的场景必须 CP（etcd/ZK/Nacos-CP）；服务发现"宁可拿到旧地址也别查不到"，AP 更抗抖动（Eureka/Nacos-AP/Consul stale）。
+\`\`\`yaml
+# Nacos 实例注册模式选择
+spring:
+  cloud:
+    nacos:
+      discovery:
+        ephemeral: true    # true=临时实例走 Distro(AP)，false=持久实例走 Raft(CP)
+\`\`\`
+实际案例：某微服务平台 4000 服务 6 万实例，从 Eureka 迁 Nacos：核心支付链路的配置与分布式锁走 Nacos-CP，业务实例发现走 AP；一次机房网络抖动 8 分钟，AP 侧注册发现零影响（旧 Eureka 时代要进自我保护、全线只读），CP 侧配置写入短暂排队但读正常。
+踩坑：1）把分布式锁建在 AP 存储上是原则性错误（锁可能双持）；2）Consul 的 stale 读 + 客户端缓存要自己处理"读到已下线实例"的快速失败与重试；3）etcd watch 断线要按返回的 revision 续传，不能简单重连最新状态，否则丢中间事件。`,
+    keyPoints: ["etcd 全 CP+MVCC watch", "Consul=Raft+gossip 分层", "Nacos 双模 Distro(AP)/Raft(CP)", "锁与配置必须 CP 发现可 AP"],
+    followUps: ["Distro 协议的分片负责与读合并具体怎么工作？", "为什么分布式锁不能用 AP 注册中心实现？"],
+    favorited: false,
+  },
+  {
+    id: "be-459",
+    nodeId: "be-stability",
+    question: "Sentinel 的 LeapArray 滑动窗口如何统计 QPS 与 RT？责任链 Slot 架构为什么比 AOP 切面更适合做流量治理？",
+    bigTech: true,
+    answer: `核心原理：Sentinel 的统计核心是 LeapArray——环形数组装 N 个 WindowWrap（桶），每个桶覆盖 windowLength/N 毫秒（默认 1 秒 2 桶，即 500ms 粒度）。请求进来按当前时间定位桶：时间戳对桶长取模定位下标，若桶的起始时间过期则 CAS 重置复用（避免分配新对象，无 GC 压力）；桶内用 LongAdder 分类计数（pass/block/exception/rt/minRt），LongAdder 分段 Cell 消除高并发 CAS 热点。请求结束回退时把 rt 计入。责任链 Slot：资源调用被包装成 Entry，依次过 NodeSelectorSlot（建调用树）→ ClusterBuilderSlot（汇聚簇点统计）→ LogSlot → StatisticSlot（核心统计）→ AuthoritySlot（黑白名单）→ SystemSlot（系统自适应保护）→ FlowSlot（流控）→ DegradeSlot（熔断）→ ParamFlowSlot（热点）。每个 Slot 只做一件事、依赖上游统计结果，规则热更新只换校验逻辑不动统计。对比 AOP 切面：切面是静态织入，规则粒度、动态增删、统计与决策分离都做不到——Slot 链本质是"统计管线+决策管线"的责任链模式。
+\`\`\`java
+// 手动埋点（框架集成外）
+Entry entry = SphU.entry("queryOrder");
+try {
+    return orderService.query(id);
+} catch (BlockException e) {
+    return fallback();      // 被限流/熔断走降级
+} finally {
+    if (entry != null) entry.exit();  // 回退统计 rt/complete
+}
+\`\`\`
+实际案例：某票务平台用 Sentinel 接管 200+ 接口限流，规则从 Nacos 推送秒级生效；压测中单机 8 万 QPS 下统计开销 CPU 仅增 3%，而此前 Hystrix 线程池模式同量级开销 12% 且有队列堆积毛刺。
+踩坑：1）exit 必须在 finally 且与 entry 配对，漏 exit 会漏计 rt 导致熔断判断失真；2）Context 默认单链路，异步场景要用 AsyncEntry 否则调用树断链；3）窗口粒度 500ms 决定统计精度，突刺流量在窗口边界可能双倍放行（所有滑动窗口通病），敏感接口用更小窗口或匀速排队。`,
+    keyPoints: ["LeapArray 环形数组+LongAdder 零 GC 统计", "窗口过期 CAS 复用桶", "Slot 链统计与决策分离", "exit 必须 finally 配对"],
+    followUps: ["LongAdder 为什么在高并发下优于 AtomicLong？", "窗口边界的突刺双倍放行怎么缓解？"],
+    favorited: false,
+  },
+  {
+    id: "be-460",
+    nodeId: "be-stability",
+    question: "熔断器的状态机（CLOSED/OPEN/HALF_OPEN）如何流转？慢调用比例、异常比例、异常数三种策略的适用场景是什么？",
+    bigTech: true,
+    answer: `核心原理：熔断器是"失败加速器"——下游已经病了，继续打流量等于帮它死透，还拖垮自己线程池。状态机：CLOSED 正常放行并统计；统计窗口内触发条件满足→OPEN，所有请求直接走 fallback（快速失败），进入冷却期（如 30s）；冷却结束→HALF_OPEN，放少量探测请求（如 5 个），全部成功→CLOSED，任一失败→重新 OPEN 并延长冷却（常见指数退避）。三种策略：1）慢调用比例（RT > 阈值的比例 > 50% 且请求数达标）——抓"下游变慢"这种死前信号，比异常更早，适合依赖方有连接池耗尽、GC 停顿风险的场景；2）异常比例——通用兜底，适合 RPC/HTTP 调用；3）异常数（窗口内异常总数）——适合低流量接口（比例策略在低流量下噪声太大，1 个请求失败就是 100%）。关键参数 minRequestAmount：流量太小时不熔断，防噪声。与限流的分工：限流保护自己不被打爆，熔断保护自己不被下游拖死。
+\`\`\`java
+// Resilience4j 配置示例
+CircuitBreakerConfig.custom()
+    .slidingWindowType(COUNT_BASED).slidingWindowSize(50)
+    .slowCallDurationThreshold(Duration.ofMillis(500))
+    .slowCallRateThreshold(50)          // 慢调用比例 50%
+    .failureRateThreshold(60)
+    .minimumNumberOfCalls(20)           // 窗口内不足 20 个不熔断
+    .waitDurationInOpenState(Duration.ofSeconds(30))
+    .permittedNumberOfCallsInHalfOpenState(5)
+    .build();
+\`\`\`
+实际案例：某支付网关对接的银行通道偶发响应从 50ms 劣化到 3s，异常率只有 5% 但慢调用比例冲到 70%；慢调用熔断 30 秒内切走流量到备用通道，主链路 P99 从 3.2s 回到 80ms，避免了网关线程池被慢调用占满的全站故障。
+踩坑：1）fallback 里再做 RPC 调用是找死（降级链路也可能挂），fallback 应走本地缓存/默认值；2）探测期放行太多请求会把刚恢复的下游再次打挂；3）超时时间必须先于熔断阈值设置——超时 3s 而慢调用阈值 500ms，慢调用统计永远抓不到（请求 3s 后才返回，记为异常而非慢调用）。`,
+    keyPoints: ["OPEN 期快速失败给下游喘息", "HALF_OPEN 小流量探测", "慢调用比异常更早发现劣化", "低流量接口用异常数策略"],
+    followUps: ["熔断与超时的参数配合顺序是什么？", "fallback 设计有哪些反模式？"],
+    favorited: false,
+  },
+  {
+    id: "be-461",
+    nodeId: "be-stability",
+    question: "线程池隔离与信号量隔离的取舍是什么？线程池大小、队列长度如何用 Little's Law 落地计算？",
+    answer: `核心原理：舱壁隔离把"不同下游依赖"的资源池分开，一个依赖挂了只占自己的池，不拖垮全局。两种实现：1）线程池隔离——每个依赖一个独立线程池+有界队列，调用线程把任务提交过去，依赖超时/挂死只耗尽它自己的池；代价是线程上下文切换与内存（每池线程栈 512KB-1MB），适合 RPC/DB 等慢且不可控的调用。2）信号量隔离——只在调用线程上扣许可，无线程切换开销，但依赖挂死会占着调用线程不放，只适合纯内存/极快本地调用（缓存读、序列化）。线程池参数用 Little's Law：L = λ×W（池中线程数 = 目标 QPS × 单次调用耗时秒数），再乘安全系数。例：某依赖 P99 耗时 50ms、峰值 400 QPS → 核心 400×0.05=20，配 24；队列长度按"可接受排队延迟"定：队列 20 意味着最坏多等 20×50ms=1s，超出就拒绝走降级。禁止用无界队列——它把"快速失败"变成"内存里慢慢 OOM"。
+\`\`\`java
+// 手工舱壁：按依赖分池
+ExecutorService poolA = new ThreadPoolExecutor(
+    24, 24, 60L, SECONDS,
+    new ArrayBlockingQueue<>(20),          // 有界
+    new ThreadPoolExecutor.AbortPolicy()); // 满即拒，快速失败
+\`\`\`
+实际案例：某商品详情页聚合 12 个下游，混部时推荐服务 GC 停顿 10 秒，Web 容器 200 线程全被占满导致核心库存接口也 503；改线程池隔离后推荐独占 30 线程池，它挂死只影响推荐模块展示降级，核心链路 P99 稳定在 45ms。
+踩坑：1）池子太多 JVM 线程数爆炸（一个微服务几十个依赖各 20 线程=上千线程），合并低流量依赖共池；2）超时时间要配在线程池拒绝之前（超时 2s、队列排满等 3s 才执行完毫无意义）；3）信号量隔离用于缓存访问时，缓存卡顿（如 Redis 大 key 慢查询）会直接占满 Web 线程——别对网络 IO 用信号量。`,
+    keyPoints: ["线程池隔离给慢依赖", "信号量只给纯内存快调用", "Little's Law 算池大小", "队列必须有界+满即拒"],
+    followUps: ["如何动态调整线程池参数应对流量变化？", "为什么 Netty/异步 IO 模型下舱壁思路不同？"],
+    favorited: false,
+  },
+  {
+    id: "be-462",
+    nodeId: "be-stability",
+    question: "超时与重试怎么配才不引发重试风暴？指数退避、抖动、重试预算分别解决什么？",
+    bigTech: true,
+    answer: `核心原理：重试风暴模型：服务 A 调 B 超时 1s 重试 3 次，B 调 C 同样 3 次——C 感受到的流量是 9 倍；链路每多一层重试次数相乘，下游已经过载时被重试流量彻底打死。治理三件套：1）超时分层收敛——链路每一跳超时必须严格小于上游（网关 3s > A 2.5s > B 2s > C 1.5s），保证上层等不到下层无谓的长尾；超时值按下游 P99.9 设，不是拍脑袋。2）指数退避+抖动——第一次失败后等 100ms，第二次 200ms、400ms，上限封顶；加 ±30% 随机抖动防止大量客户端同步重试形成"重试脉冲"。3）重试预算（retry budget）：客户端滑动窗口内重试请求占比超过 10-20% 就不再重试，直接失败——把重试总量摁死在下游可承受范围。配合幂等：只有幂等接口或带幂等键的写接口才允许重试，否则宁可失败。
+\`\`\`java
+// gRPC 重试策略配置（带预算与退避）
+"retryPolicy": {
+  "maxAttempts": 3,
+  "initialBackoff": "0.1s", "maxBackoff": "1s",
+  "backoffMultiplier": 2.0,
+  "retryableStatusCodes": ["UNAVAILABLE", "DEADLINE_EXCEEDED"]
+}
+// Envoy: retry_budget: { budget_percent: 20, min_retry_concurrency: 3 }
+\`\`\`
+实际案例：某出行平台晚高峰派单服务超时从 200ms 涨到 2s，上游无预算的 3 次重试把 8000 QPS 放大成 2.4 万，数据库连接池 30 秒耗尽全线 502；上线"单层重试+预算 15%+全链路超时收敛"后同类故障重试放大控制在 1.3 倍内，下游自愈。
+踩坑：1）连接异常（connect refused）可安全重试，读写超时（read timeout）重试有重复执行风险；2）退避不加抖动=全网同步重试脉冲；3）消息消费重试与 RPC 重试是两套体系，MQ 重试进死信前要有告警，别无限重投。`,
+    keyPoints: ["重试次数沿链路相乘放大", "超时逐跳收敛", "退避+抖动打散重试脉冲", "重试预算摁死总量"],
+    followUps: ["写接口如何做幂等键来安全重试？", "hedged request 与重试的区别是什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-463",
+    nodeId: "be-stability",
+    question: "固定阈值限流为什么在突发流量下失效？BBR 自适应限流与系统自适应保护的原理是什么？",
+    answer: `核心原理：固定 QPS 阈值（如 5000）的两个死穴：机器异构（8 核与 32 核同一阈值）、流量形状变化（大促峰值是日常 50 倍，阈值按峰值配平时浪费、按平时配峰值打爆）。自适应思路来自 TCP BBR：不盯丢包，盯"瓶颈带宽与最小 RT"——应用到限流就是持续测量"系统还能扛"的信号：CPU 利用率、load、入口 QPS 与 RT 的乘积（Little's Law 并发度）、线程池排队深度。快手/淘宝系自适应限流（如 Sentinel SystemSlot、brpc 自适应）：当 load > 阈值（如 CPU 核数×0.8）且当前并发 > 估算容量（minRt 时的 QPS×minRt）才限流——轻载时放流量，过载才出手；PID 控制器按 CPU 与目标值偏差动态调整通过率，P 项响应快、I 项消稳态误差、D 项抑震荡（工程上常只用 PI）。本质是把"拍脑袋的静态阈值"换成"以系统实时饱和度为反馈的控制回路"。
+\`\`\`java
+// Sentinel 系统规则：load+并发双条件触发
+SystemRule rule = new SystemRule();
+rule.setHighestSystemLoad(6.4);        // 8 核×0.8
+rule.setAvgRt(20);                     // 期望 RT 上限
+rule.setQps(20000);                    // 兜底硬顶
+rule.setHighestCpuUsage(0.85);
+SystemRuleManager.loadRules(List.of(rule));
+\`\`\`
+实际案例：某内容社区图文服务机型混杂（8 核到 56 核），固定阈值时代每周因新机扩容忘记调阈值打爆一次；切系统自适应（load 0.75×核数+BBR 并发估算）后，扩缩容零人工干预，大促 40 倍峰值下各机型都顶在自己真实容量的 90% 水位运行，资源利用率整体提升 35%。
+踩坑：1）load 指标对 IO 密集型服务失真（IO wait 不算 CPU busy），这类服务改用线程池排队深度/RT 做反馈；2）自适应是保命不是扩容信号，持续限流要联动 HPA；3）minRt 统计被一次长 GC 污染后容量估算会偏低，要对 RT 样本做分位数过滤。`,
+    keyPoints: ["固定阈值难适配异构与突发", "BBR 思路测瓶颈容量而非丢包", "load+并发双条件触发", "PID/PI 控制回路调通过率"],
+    followUps: ["为什么 IO 密集型服务不能用 load 做反馈？", "自适应限流与 HPA 扩缩容如何联动不打架？"],
+    favorited: false,
+  },
+  {
+    id: "be-464",
+    nodeId: "be-stability",
+    question: "热点参数限流如何实现？对比令牌桶、漏桶、滑动窗口三种限流算法的工程取舍。",
+    answer: `核心原理：接口级限流防不住"单用户狂刷"——总 QPS 没超，但某个 userId/商品 id 占了 80% 流量。热点参数限流（Sentinel ParamFlowSlot）：对指定参数值做独立计数与限流。实现要点：1）参数值经 ParameterMetric 用 LRU 结构（ConcurrentLinkedHashMap 或 Caffeine）缓存——天然 LRU 驱逐保证只统计"近期活跃"的热点值，防内存被海量长尾值打爆；2）每个热点值配独立的令牌桶/滑动窗口；3）支持例外项（给 VIP 用户单独大配额）与参数类型（int/string 前 N 个位置参数）。三种基础算法取舍：令牌桶（Guava RateLimiter）允许攒令牌应对突发，匀速消费平滑，是最通用选择；漏桶强制匀速出水，适合保护"下游只能匀速处理"的场景（如消息推送通道），但对正常突发不友好；滑动窗口计数最直观、实现最简，窗口边界双倍突刺是硬伤。工程选型：网关入口用令牌桶留突发弹性，调用第三方支付通道用漏桶控匀速，内部粗粒度接口用滑动窗口省内存。
+\`\`\`java
+// Sentinel 热点参数限流：第 0 个参数（userId）每秒 5 次，VIP 例外 100 次
+ParamFlowRule rule = new ParamFlowRule("getUserInfo")
+    .setParamIdx(0).setCount(5);
+ParamFlowItem vip = new ParamFlowItem("vip_9527").setCount(100);
+rule.setParamFlowItemList(List.of(vip));
+ParamFlowRuleManager.loadRules(List.of(rule));
+\`\`\`
+实际案例：某电商秒杀详情页被黄牛单账号 3 万次/秒刷接口，接口级限流没触发（多账号分散），加热点参数限流（商品 id 维度 2000/s+账号维度 5/s）后，黄牛流量被压在入口，正常用户抢单成功率从 40% 回到 92%。
+踩坑：1）参数是对象时要指定属性路径，默认 toString 可能不稳定导致统计错乱；2）LRU 容量（默认 4000）要按热点基数评估，热点数超容量会频繁重建桶；3）热点值配额别和业务配额混算——热点限流是兜底，业务配额单独走租户体系。`,
+    keyPoints: ["热点参数独立桶+LRU 防内存爆", "令牌桶留突发弹性", "漏桶匀速保护下游", "滑动窗口边界突刺"],
+    followUps: ["集群版热点限流怎么解决单机配额不均？", "令牌桶的预热（warmup）模式原理是什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-465",
+    nodeId: "be-stability",
+    question: "降级预案体系如何设计？降级矩阵、开关化管理、自动降级触发各自怎么落地？",
+    answer: `核心原理：降级是"断臂求生"——资源不够时主动砍掉非核心功能保主链路。体系建设三层：1）降级矩阵——把系统功能按 P0（核心交易：下单/支付）、P1（重要体验：库存展示）、P2（可降级：推荐/评论/积分）、P3（可关闭：营销弹窗/数据上报）分级，预案文档写清每级的降级动作（返回缓存/默认值/直接 404）、影响面、恢复条件，大促前全员过一遍。2）开关化管理——降级必须是配置中心动态开关（如 Nacos/Apollo 推送），秒级生效，绝不允许改代码发版降级；开关粒度到功能级+租户级，支持灰度（先降 10% 流量观察）。3）自动降级——基于监控指标触发：RT P99 超阈值、错误率、线程池饱和度联动降级 SDK 自动打开对应开关，同时告警人工确认（自动只敢降级不敢自动恢复，恢复要人工）。典型动作：推荐流降级为运营配置榜单、实时库存降级为缓存库存+下单时强校验、非核心写降级为本地消息表异步补。
+\`\`\`java
+// 降级开关统一入口（配置中心驱动）
+public ProductDetail getDetail(long id) {
+    if (degradeSwitches.isOpen("recommend")) {
+        detail.setRecommend(staticTopList());   // 运营兜底榜单
+    } else {
+        detail.setRecommend(recommendService.query(id));
+    }
+    return detail;
+}
+\`\`\`
+实际案例：某电商 618 大促按矩阵执行降级：峰值 21:00 开启 P2 全量降级（推荐换榜单、评论折叠）、P3 关闭，释放 30% 容量给交易链路；22:30 峰值过后按预案逐项恢复，全程无人工操作失误——对比上一年手写 if-else 降级忘恢复推荐位挂了 3 天空白。
+踩坑：1）降级路径必须常态演练（混沌工程月度注入），"一年用一次的代码"大概率是坏的；2）自动降级阈值保守一点，宁可误降不可不降，误降代价是体验、不降代价是故障；3）降级动作要进产品验收清单——"返回默认值"对 C 端用户是空白页，产品要认。`,
+    keyPoints: ["功能按 P0-P3 分级进矩阵", "开关化秒级生效禁发版降级", "自动降级只敢降不敢自动恢复", "降级路径常态演练"],
+    followUps: ["降级与熔断如何协同，边界在哪？", "有损服务的用户体验设计有哪些套路？"],
+    favorited: false,
+  },
+  {
+    id: "be-466",
+    nodeId: "be-stability",
+    question: "全链路压测与容量评估怎么做？混沌工程在稳定性体系里的位置是什么？",
+    answer: `核心原理：容量评估闭环：全链路压测→找到短板→扩容/优化→再压。线上全链路压测三大技术件：1）流量染色——压测请求带影子标（header），全链路透传，RPC/消息/缓存/DB 每一跳识别影子流量；2）数据隔离——影子库影子表（同实例不同 schema，避免独立环境成本），影子 topic、影子缓存前缀，保证压测数据不污染线上对账；3）挡板——第三方（支付渠道、短信）不能真打，Mock 挡板返回。压测模型按真实流量配比（读写比、接口比例从线上日志回放统计）逐级加压，记录"RT 拐点"即系统容量水位，日常流量控制在容量 50-60% 水位下运行。混沌工程（ChaosBlade/Chaos Mesh）是稳定性的"疫苗"：常态注入故障（杀 Pod、延迟、丢包、CPU 打满、磁盘写满），验证熔断/降级/预案真的有效——没演练过的预案等于没有预案。成熟度路径： staging 环境注入→生产小流量灰度注入→红蓝对抗。
+\`\`\`java
+// 影子流量透传与路由（简化）
+if ("stress".equals(RpcContext.getAttachment("tag"))) {
+    ShadowContext.mark();
+    dataSource = shadowDataSource;    // 影子库
+    topic = topic + "_shadow";        // 影子 topic
+}
+\`\`\`
+实际案例：某出行平台双 11 前 4 轮全链路压测：第一轮 3 万 QPS 时 Redis 大 key 热点打满网卡、第二轮 MQ 消费堆积、第三轮 DB 慢查询，逐轮治理后第四轮 12 万 QPS（日常 6 倍）全线 P99<100ms；混沌工程月度注入"推荐服务宕机"，第三次演练时发现降级开关因配置中心格式变更失效，修复后真正故障时降级一次成功。
+踩坑：1）影子表和真实表 DDL 要同步（CI 校验），否则压测时 schema 漂移压测失真；2）压测流量出口要封死（防打到真实第三方），挡板清单进 checklist；3）混沌注入要有"爆炸半径"控制与一键终止，别把演练做成真故障。`,
+    keyPoints: ["流量染色全链路透传", "影子库表隔离数据", "RT 拐点定容量水位", "混沌工程验证预案有效性"],
+    followUps: ["影子库方案与独立压测环境的成本对比？", "混沌工程的稳态假设怎么定义？"],
+    favorited: false,
+  },
+  {
+    id: "be-467",
+    nodeId: "be-stability",
+    question: "分布式限流如何用 Redis+Lua 实现？单机限流与网关限流、集群限流的精度与性能怎么权衡？",
+    answer: `核心原理：单机限流（Guava RateLimiter/Sentinel 本地）只管本机——10 台机器各配 100 QPS，实际集群上限 1000 且受负载均衡均匀度影响。全局限流必须集中计数，标准实现是 Redis+Lua 原子化"取窗口+累加+判断"：滑动窗口用 ZSET（score 为时间戳，每次清窗口外成员、统计窗口内基数、写入本次），或令牌桶用 HASH 存 token 数与上次补充时间、惰性补充。全部逻辑塞 Lua 脚本保证原子性（EVAL 单线程执行），否则"读-改-写"三步在并发下超限。性能：每次请求一次 Redis RT（0.3-1ms），QPS 高时成瓶颈与单点。工程权衡三档：1）精度优先——全量打 Redis（支付、写接口）；2）性能优先——本地估算+周期同步（本地令牌桶配 集群配额/N，周期向 Redis 上报校准，允许秒级误差）；3）网关层限流（Envoy/APISIX）在入口全局限流，业务层只做兜底——主流组合。Redis 挂了怎么办：fail-open（放行，限流是保险丝不是业务）+本地限流兜底。
+\`\`\`lua
+-- 滑动窗口限流 Lua（key=资源, limit, windowMs）
+redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, now - windowMs)
+local cnt = redis.call('ZCARD', KEYS[1])
+if cnt < tonumber(ARGV[1]) then
+  redis.call('ZADD', KEYS[1], now, now .. '-' .. math.random())
+  redis.call('PEXPIRE', KEYS[1], windowMs)
+  return 1
+end
+return 0
+\`\`\`
+实际案例：某开放平台 API 配额（企业租户 1 万 QPS）用 Redis ZSET 滑动窗口，QPS 高时 Redis CPU 冲到 85%；改"本地桶预分配 10% 配额+100ms 周期归还/申领"后 Redis 压力降 92%，突发精度损失控制在 5% 内，租户侧无感知。
+踩坑：1）ZSET 成员用唯一值（时间戳+随机数），同毫秒冲突会少计；2）Redis 集群模式 key 要 hash tag 保同 slot，Lua 多 key 跨 slot 直接报错；3）fail-close（Redis 挂全拒）会把限流组件变成新单点，生产事故里这种案例比比皆是。`,
+    keyPoints: ["Redis+Lua 原子化集中计数", "ZSET 滑窗/HASH 令牌桶", "本地估算+周期同步换性能", "fail-open+本地兜底防单点"],
+    followUps: ["Sentinel 集群流控的 token server 方案与 Redis 方案差异？", "限流被击穿后的兜底行为怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "be-468",
+    nodeId: "be-api-security",
+    question: "OAuth2 授权码模式为什么绕一圈发 code 再换 token？四种模式的适用边界是什么？",
+    bigTech: true,
+    answer: `核心原理：授权码模式两次跳转的设计精髓是"前后端通道分离"：浏览器重定向（前端通道）只携带一次性 code——它经 URL 传递，可能出现在浏览器历史、Referer、服务器 access log 里，泄露面大；真正的 token 换取发生在客户端后端（后端通道）：client_id+client_secret+code POST 到 token 端点，响应直接回后端，token 从不进浏览器/URL。code 一次性+短时效（60s）+绑定 client 与 redirect_uri，即使被截获，攻击者没有 client_secret 也换不到 token。四种模式边界：1）授权码（+PKCE）——有后端的 Web/移动 App 唯一推荐；2）隐式（token 直接回前端）——已被 OAuth2.1 废除；3）密码模式——仅限第一方高信任客户端过渡用，OAuth2.1 亦移除；4）客户端凭证（client_credentials）——服务间无用户场景，直接用 secret 换 token。
+\`\`\`text
+# 授权码换取 token（后端通道，token 不过浏览器）
+POST /oauth/token
+  grant_type=authorization_code
+  &code=SplxlOBeZQQYbYS6WxSbIA
+  &redirect_uri=https://app.example.com/callback
+  &client_id=s6BhdRkqt3
+  &client_secret=7Fjfp0ZBr1KtDRbnfVdmIw
+\`\`\`
+实际案例：某 SaaS 早期用隐式模式，token 出现在 URL fragment，一次第三方统计 SDK 上报全量 URL 导致 2 万用户 token 外泄，被迫全量吊销并迁移授权码+PKCE；改造后安全扫描同类问题清零。
+踩坑：1）redirect_uri 必须精确匹配注册值（前缀匹配可被构造开放重定向钓鱼）；2）state 参数防 CSRF——回调校验 state 与下发时一致，否则攻击者可用自己的 code 绑定受害者会话；3）token 存 HttpOnly Cookie 或内存，localStorage 里的 token 一次 XSS 全丢。`,
+    keyPoints: ["code 走前端通道 token 走后端通道", "code 一次性短时效绑定 client", "state 防 CSRF 回调攻击", "隐式/密码模式已被淘汰"],
+    followUps: ["开放重定向漏洞与 redirect_uri 校验的关系？", "OAuth2.1 相对 2.0 砍掉了什么，为什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-469",
+    nodeId: "be-api-security",
+    question: "PKCE 解决移动端/SPA 的什么问题？code_verifier 与 code_challenge 的交换流程如何防 code 拦截？",
+    bigTech: true,
+    answer: `核心原理：移动 App 与 SPA 是"公共客户端"——没有安全地方存 client_secret（反编译/JS 可见），授权码模式的后端通道保护失效，code 被恶意 App 通过自定义 scheme 劫持（同设备注册相同 redirect scheme）就能换 token。PKCE（RFC 7636）用动态密钥对替代静态 secret：客户端每次授权前生成随机 code_verifier（43-128 字符），授权请求带 code_challenge = BASE64URL(SHA256(code_verifier)) 与方法 S256；授权服务器把 challenge 与下发的 code 绑定。换 token 时提交原始 code_verifier，服务端重算 SHA256 与 challenge 比对——拦截者拿到 code 但没有 verifier（它只在客户端内存和最终换 token 的 HTTPS 请求体里出现，不经重定向），换 token 失败。本质：把"证明你是发起者"从共享秘密变成一次性密钥持有证明。OAuth2.1 已把 PKCE 列为所有授权码流程的强制项。
+\`\`\`text
+# 授权请求
+GET /authorize?response_type=code&client_id=app
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256
+# 换取 token
+POST /token  grant_type=authorization_code&code=xxx
+  &code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+\`\`\`
+实际案例：某出行 App 未上 PKCE 时被黑产注册相同 URL scheme 拦截 code，批量盗号约车；接入 PKCE（S256）+ App Links/Universal Links 校验后，同类盗刷归零。
+踩坑：1）method 必须 S256，plain 模式在网络被监听时等于明文；2）verifier 用密码学随机数生成器，Math.random/UUID 低熵可爆破；3）服务端必须校验 challenge 绑定，只"支持 PKCE"不强制校验等于没做。`,
+    keyPoints: ["公共客户端无 secret 可藏", "verifier 不经重定向拦截者拿不到", "challenge 绑定 code 服务端重算校验", "S256 强制 plain 禁用"],
+    followUps: ["为什么 PKCE 也能防御 CSRF 类 code 注入攻击？", "SPA 拿到 token 后的存储与刷新策略怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "be-470",
+    nodeId: "be-api-security",
+    question: "OIDC 与 OAuth2 的分工是什么？ID Token 与 Access Token 为什么不能混用？",
+    answer: `核心原理：OAuth2 只解决"授权"（authorization）：Access Token 是给资源服务器看的"访问凭证"，代表第三方应用可以访问用户哪些资源，客户端不需要也不应该解析它（可以是透明串或 JWT）。OIDC（OpenID Connect）在 OAuth2 之上补"认证"（authentication）：新增 ID Token——一个签名的 JWT，claims 含 iss（签发方）、sub（用户唯一标识）、aud（客户端 id）、exp、iat、nonce，给客户端证明"这个用户是谁、在哪登录的"。混用风险：拿 ID Token 去调资源 API——它的 aud 是客户端不是资源服务器，资源方校验 aud 直接拒绝（设计上就防混用）；拿 Access Token 当登录凭证——它不含用户身份语义（可能只有 scope），且刷新/吊销生命周期与登录态无关。正确姿势：客户端验 ID Token 的签名+iss+aud+exp+nonce 建本地会话；调 API 用 Access Token，资源服务器用 introspection 或验签+scope 鉴权。
+\`\`\`json
+// ID Token payload（客户端验签后取 sub 建会话）
+{
+  "iss": "https://idp.example.com",
+  "sub": "248289761001",
+  "aud": "s6BhdRkqt3",
+  "nonce": "n-0S6_WzA2Mj",
+  "exp": 1785087600, "iat": 1785084000
+}
+\`\`\`
+实际案例：某中台统一登录早期把 Access Token（含全部门 scope）塞给前端当"身份令牌"，前端解析 scope 控制菜单——一次权限收敛只改了资源侧 scope，结果十几个前端菜单错乱；重构为"ID Token 出身份+独立 RBAC 接口出权限"后解耦。
+踩坑：1）nonce 必须回放校验，防 ID Token 被截获重放登录；2）at_hash 校验把 Access Token 与 ID Token 绑定，防 token 替换攻击；3）"社交登录拿到的 Access Token 里有 openid"是平台私有扩展（微信/飞书），不是 OIDC 标准，跨平台抽象层别依赖。`,
+    keyPoints: ["OAuth2 授权 OIDC 补认证", "ID Token 给客户端证明身份", "Access Token 给资源服务器控权限", "aud 不同防混用"],
+    followUps: ["前后端分离架构下 ID Token 与本地 session 怎么映射？", "token introspection 与本地验签怎么选？"],
+    favorited: false,
+  },
+  {
+    id: "be-471",
+    nodeId: "be-api-security",
+    question: "JWT 的三大经典攻击（alg=none、算法混淆 RS256→HS256、弱密钥爆破）原理与防御是什么？",
+    bigTech: true,
+    answer: `核心原理：1）alg=none：JWT 规范留了"不签名"选项，早期库（旧版 jjwt、node-jsonwebtoken 4.x）默认信任 header 声明的算法——攻击者把 header 改成 {alg:"none"}、删掉签名段，服务端直接放行。防御：服务端显式白名单算法，禁用 none。2）算法混淆（RS256→HS256）：系统用 RSA 非对称——私钥签、公钥验；攻击者把 header 改成 HS256（对称 HMAC），拿服务端暴露的公钥当 HMAC 密钥伪造签名，库若按 header 动态选算法就会验签通过。防御：验签时钉死算法（verify(token, key, algorithms:["RS256"])），算法与密钥类型绑定校验。3）弱密钥爆破：HS256 密钥用"secret123"这类弱口令，hashcat 离线爆破秒出。防御：HS256 密钥 ≥256bit 高熵随机，密钥进 KMS/配置中心不硬编码。工程基线：用维护中的库、升最新版；payload 不敏感（JWT 只签名不加密，base64 解码即明文）；exp 必带。
+\`\`\`java
+// jjwt 安全验签：钉死算法，拒绝 header 动态选择
+Jws<Claims> jws = Jwts.parser()
+    .verifyWith(publicKey)              // RSA 公钥
+    .requireIssuer("https://idp.example.com")
+    .build()
+    .parseSignedClaims(token);          // 库内强制算法与密钥类型匹配
+\`\`\`
+实际案例：某金融中台网关验签用 java-jwt 按 header 动态选算法，红队用公钥当 HMAC 密钥伪造管理员 token 拿到全量用户导出权限；修复为钉死 RS256+算法密钥类型绑定，并把公钥下发改 JWK Set 端点轮换。
+踩坑：1）kid 注入——header 的 kid 被拼接进文件路径/SQL 读取密钥，要对 kid 做白名单映射；2）exp 之外还要限制 iat 签发时间窗口，防"先签一个永久有效的再放行"；3）JWT 体积大（全量 claims 每次请求带上），别把用户权限全塞进去，查库换缓存更稳。`,
+    keyPoints: ["alg=none 必须服务端禁用", "算法与密钥类型绑定防混淆", "HS256 密钥高熵≥256bit", "kid 走白名单映射"],
+    followUps: ["JWK Set 轮换时 kid 如何平滑过渡？", "PASETO 相比 JWT 修掉了哪些设计缺陷？"],
+    favorited: false,
+  },
+  {
+    id: "be-472",
+    nodeId: "be-api-security",
+    question: "JWT 无状态带来的撤销难题怎么解？黑名单、短时效+Refresh Token、双 token 各自代价是什么？",
+    bigTech: true,
+    answer: `核心原理：JWT 自包含验签不用查库——这是性能优点，也是撤销死穴：签发出去的 token 在 exp 到期前天然有效，用户改密码/被禁用/权限变更都拦不住。四种解法按代价排：1）短时效+Refresh Token：Access Token 只活 5-15 分钟，过期用 Refresh Token（可撤销、存库）换新——攻击窗口缩到分钟级，权限变更最长一个周期生效；Refresh Token 做旋转（每次用即发新的+旧的一次性作废），泄露可检测（旧 token 重现=被盗，整族吊销）。2）黑名单：把吊销的 jti 存 Redis 到原 exp，验签时多查一次——每请求一次缓存读，牺牲了部分无状态性但换即时生效，适合"踢人下线"刚需。3）版本号/安全戳：用户表存 tokenVersion，签发进 claims，改密码/权限变更时 version+1，验签比对（缓存用户 version）——一次缓存读覆盖"全设备登出"。4）纯白名单（token 全存库）——等于回到 session，丧失 JWT 意义，只用于极高安全场景。选型经验：普通业务 1+3 组合足够，金融级加 2。
+\`\`\`text
+# Refresh Token 旋转检测重放
+if refresh_token 已使用(redis 有标记):
+    revoke 该用户整族 token   # 判定为盗用
+else:
+    标记旧 token 已用 → 签发新 (access, refresh) 对
+\`\`\`
+实际案例：某内容平台创作者后台用 2 小时长效 token，账号被盗后客服冻结账号仍被持续发稿 2 小时；改"AT 10 分钟+RT 旋转+冻结即吊销 RT 并加黑名单"，冻结生效时间从 2 小时缩到 10 分钟内，RT 重放检测上线首月抓到 17 起真实 token 泄露。
+踩坑：1）黑名单 key 要随原 exp 过期自动清，否则 Redis 无限膨胀；2）多端登录的 RT 要按设备分族，一处泄露别误杀全部设备；3）时钟偏移容忍（clock skew 30-60s）必须在所有验签方统一配置。`,
+    keyPoints: ["短 AT 压缩攻击窗口", "RT 旋转+重放检测", "tokenVersion 支撑全端登出", "黑名单换即时生效"],
+    followUps: ["Refresh Token 被盗后的重放检测为什么能反推盗用？", "分布式环境下 tokenVersion 缓存一致性怎么保证？"],
+    favorited: false,
+  },
+  {
+    id: "be-473",
+    nodeId: "be-api-security",
+    question: "开放平台 AK/SK + HMAC 签名体系如何设计？签名串的构造有哪些必须覆盖的要素？",
+    answer: `核心原理：AK/SK（AccessKey/SecretKey）模式服务"服务器对服务器"无用户态调用：SK 永远不上网络，双方各自对"请求要素"算 HMAC-SHA256 比对——SK 拥有证明 + 请求完整性保护一体。签名串设计必须覆盖：1）HTTP 方法与路径（防 POST 改 GET 绕过校验）；2）全部业务参数（排序后拼接，防参数篡改）；3）body 摘要（大 body 算 SHA256 后参与签名）；4）timestamp（防重放窗口，±5 分钟）；5）nonce（一次性随机串，服务端缓存去重）；6）AK 标识与签名版本（算法可平滑升级）。服务侧流程：按 AK 取 SK→同样规则重算签名→比对（用恒定时间比较防时序攻击）→校验 timestamp 窗口→nonce 查重。SK 存储：服务端加密存（KMS 信封加密），支持一键轮换（新旧并行灰度）。典型参照 AWS SigV4：canonical request → string to sign → signing key 派生（按日期/区域/服务逐层 HMAC，SK 不直接签名，缩小泄露半径）。
+\`\`\`text
+# 规范化待签串（关键：要素全、顺序定、编码统一）
+StringToSign =
+  HTTP-Method + "\n" + CanonicalURI + "\n" +
+  CanonicalQueryString(参数按 key 排序 urlencode) + "\n" +
+  SHA256Hex(body) + "\n" + timestamp + "\n" + nonce
+signature = HMAC-SHA256(SK, StringToSign)
+\`\`\`
+实际案例：某云存储开放平台早期签名串漏了 query 参数，被中间代理篡改 prefix 参数批量列举他人目录；按 SigV4 全要素签名改造+SK 派生密钥后，通过外部安全审计，全年签名类攻击拦截 1400 万次无一穿透。
+踩坑：1）参数编码必须统一（空值、数组、嵌套 JSON 的序列化规则写进文档），商户接入 90% 的验签失败死在编码不一致；2）GET 请求的签名串别含 body 摘要之外的私有假设，代理可能重组 URL；3）SK 泄露应急通道（一键吊销+轮换）必须事先备好，泄露事件按小时计响应。`,
+    keyPoints: ["SK 不上网双方各算比对", "签名串覆盖方法/参数/body/时间/nonce", "恒定时间比较防时序攻击", "派生密钥缩小泄露半径"],
+    followUps: ["AWS SigV4 的逐层密钥派生为什么更安全？", "商户验签失败率高怎么做联调工具？"],
+    favorited: false,
+  },
+  {
+    id: "be-474",
+    nodeId: "be-api-security",
+    question: "重放攻击的防御体系：timestamp+nonce+一次性令牌的组合怎么设计才严密？",
+    answer: `核心原理：重放攻击=截获合法请求原样再发。防御三件套要组合使用才有闭环：1）timestamp——请求带时间戳，服务端校验与本地时钟偏差（±5 分钟），超窗直接拒；单独用不够：窗口内的重放照样成立。2）nonce——每次请求带唯一随机串，服务端在窗口期内缓存 nonce（Redis SETNX+过期=窗口时长），重复出现即重放；单独用不够：没有 timestamp 的话 nonce 缓存要永久保存，存储爆炸。两者组合才闭环：timestamp 把缓存窗口压到 5 分钟，nonce 在窗口内判重。3）强场景升级一次性令牌（one-time token）：支付/转账类接口，先调"申请令牌"接口拿一次性 ticket（绑定金额+收款方+TTL 30s），真实请求必须带 ticket 且服务端核销（原子 GETDEL）——连窗口内重放都杜绝。分布式注意：多实例 nonce 必须集中存（Redis 集群），本地内存缓存在负载均衡下形同虚设；客户端时钟不准时给服务端时间同步端点（响应头带 server time，客户端算偏移）。
+\`\`\`java
+// 防重放过滤器核心逻辑
+long skew = Math.abs(serverNow - reqTimestamp);
+if (skew > 5 * 60_000) throw new ReplayException("timestamp 超窗");
+Boolean firstSeen = redis.setIfAbsent(
+    "nonce:" + appId + ":" + nonce, "1", 5, TimeUnit.MINUTES);
+if (Boolean.FALSE.equals(firstSeen)) throw new ReplayException("nonce 重放");
+\`\`\`
+实际案例：某支付回调接口只验签名没防重放，黑产抓包重复推送"支付成功"回调，商户系统重复发货 3000 单；补 timestamp+nonce 后重放拦截率 100%，后续核心资金接口全量升级一次性 ticket 核销。
+踩坑：1）nonce 缓存 key 要带 appId/用户维度，全局一个池子高并发下 SETNX 成热点；2）MQ 消费、定时任务重试是"合法重发"，防重放只对入口 API，内部重试走幂等键体系别混淆；3）签名里必须包含 timestamp 与 nonce，否则攻击者改时间戳后签名依然有效，防线白搭。`,
+    keyPoints: ["timestamp 压缩 nonce 缓存窗口", "nonce 集中存储多实例共享", "资金接口升级一次性 ticket 核销", "timestamp/nonce 必须进签名串"],
+    followUps: ["幂等键与防重放的职责边界怎么划？", "客户端时钟偏移过大时的体验怎么兜底？"],
+    favorited: false,
+  },
+  {
+    id: "be-475",
+    nodeId: "be-api-security",
+    question: "水平越权（IDOR）与垂直越权的根因是什么？资源属主校验如何在架构层统一落地？",
+    bigTech: true,
+    answer: `核心原理：越权=鉴权只验证了"你是谁"没验证"你能不能碰这个资源"。水平越权（IDOR）：用 A 的 token 访问 /orders/{id} 里的 B 的订单——接口拿 id 直接查库返回，没校验资源属主；垂直越权：普通用户调 /admin/users 管理接口——没校验角色。根因共性：鉴权逻辑散落在每个接口里靠开发者自觉，漏一个就是一个洞。架构层统一落地三招：1）资源属主校验收口——数据访问层强制"租户/属主条件注入"：所有查询自动拼 WHERE owner_id = currentUser（MyBatis 拦截器/ORM scope 实现），开发者想漏都难；对外暴露的 id 用不可枚举值（UUID 或加密 id），把"猜 id"成本拉高（注意：不可枚举是缓解不是防护，校验仍必须做）。2）权限模型集中——RBAC（角色-权限点）或 ABAC（属性策略），网关/拦截器按注解 @RequirePermission("order:export") 统一校验垂直权限。3）清单化测试——越权用例进 CI：每个资源接口自动生成"换用户访问应 403"的测试。
+\`\`\`java
+// 数据层强制属主条件（MyBatis 拦截器思路）
+@Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {...}))
+public class OwnerGuardInterceptor implements Interceptor {
+    // 解析 SQL，对标记了 @OwnerScoped 的表自动追加
+    // AND owner_id = #{currentUserId}，无此条件拒绝执行
+}
+\`\`\`
+实际案例：某 SaaS 客服系统"工单详情"接口被报水平越权——遍历工单 id 可拖全量企业工单；治理时不是单点修补，而是在数据层上 OwnerGuard 拦截器+对外 id 全量改 UUID，三个月内同类漏洞清零，安全团队把该模式推广到全业务线。
+踩坑：1）"先查出来再在代码里 if 判断属主"有 TOCTOU 风险且易漏，条件要下推到 SQL；2）批量接口（ids[]=1&ids[]=2）同样要逐个校验属主，别把批量当例外；3）管理后台的"代客操作"要单独审计通道（impersonate 日志+二次审批），别复用普通鉴权。`,
+    keyPoints: ["水平越权缺属主校验", "垂直越权缺角色校验", "属主条件下推到 SQL 层", "不可枚举 id 只是缓解"],
+    followUps: ["RBAC 与 ABAC 在多租户 SaaS 下怎么选？", "TOCTOU 在越权场景的具体攻击路径是什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-476",
+    nodeId: "be-api-security",
+    question: "SSO 单点登录的会话共享方案有哪些？服务间 mTLS 认证的证书体系怎么运转？",
+    answer: `核心原理：SSO 三条路线：1）共享 Cookie 域——子系统同主域（*.example.com），session 存 Redis 集中共享，Cookie 种到主域；简单但跨域/跨主域失效。2）CAS/OIDC 中心认证——跳转 IdP 登录拿 ticket/ID Token，各子系统回 IdP 验证建本地会话；跨域标准做法，登出要联动（front-channel/back-channel logout 通知各系统清会话，这是实现最易翻车的点）。3）网关统一认证——入口网关验 token 注入身份头，内网服务只认网关头（网络层保证头不可伪造），新业务零认证代码。mTLS 服务间认证：双向 TLS——客户端也出示证书，双方互验。运转体系：私有 CA（或 SPIFFE/SPIRE 的工作负载身份 SVID）签发短时效证书（小时级）→ 服务启动/周期自动轮换（sidecar 代理如 Envoy 代持证书，业务无感）→ 握手时互验证书链+SAN 里的服务身份（spiffe://ns/payment/sa/api）→ 授权策略按身份放行（payment 只允许 order 调用）。零信任核心：身份从"网络位置（IP）"变成"密码学证明的工作负载身份"。
+\`\`\`yaml
+# Istio mTLS 严格模式+授权策略
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata: { name: default, namespace: payment }
+spec: { mtls: { mode: STRICT } }     # 拒绝明文流量
+---
+kind: AuthorizationPolicy
+spec:
+  rules:
+  - from:
+    - source: { principals: ["cluster.local/ns/order/sa/api"] }
+\`\`\`
+实际案例：某金融平台 300 微服务上 Istio mTLS：数据库拖库之外内网横向移动被彻底封堵——攻击者拿下某边缘服务 Pod 后无对应身份证书，调支付服务直接被拒；改造中最大工作量是 200 个服务分批从 PERMISSIVE 切 STRICT 的流量观察。
+踩坑：1）SSO 登出联动必须测试"关掉 IdP 会话后各子系统几秒内失效"，超长本地会话等于没登出；2）mTLS 切 STRICT 前用 PERMISSIVE+遥测摸清明文调用方，一刀切必出故障；3）证书轮换窗口内新旧并存校验，时间同步（NTP）是全体系地基。`,
+    keyPoints: ["OIDC 回跳验证建本地会话", "登出联动最易翻车", "mTLS=工作负载密码学身份", "PERMISSIVE 灰度再 STRICT"],
+    followUps: ["SPIFFE 相比传统私有 CA 解决了什么身份语义问题？", "网关注入身份头如何防内网伪造？"],
+    favorited: false,
+  },
+  {
+    id: "be-477",
+    nodeId: "be-k8s",
+    question: "K8s 控制面各组件职责是什么？声明式 API 与控制器模式（Reconcile Loop）为什么是 K8s 的设计灵魂？",
+    bigTech: true,
+    answer: `核心原理：控制面五件套：1）kube-apiserver——唯一入口，认证/鉴权/准入控制/REST 网关，所有组件只跟它通信，不直连彼此；2）etcd——唯一状态存储，所有资源对象的唯一事实源（apiserver 无状态，可水平扩）；3）kube-scheduler——watch 未绑定 Pod，按过滤+打分选节点写回 binding；4）kube-controller-manager——一堆控制器的集合（Deployment/Node/Job/EndpointSlice 等）；5）cloud-controller-manager——对接云厂商 LB/磁盘/节点生命周期。设计灵魂是控制器模式：用户只提交"期望状态"（Deployment 要 3 副本），控制器跑无限 Reconcile 循环——watch 到实际状态（2 个 Running）与期望不一致就驱动变更（再建 1 个），收敛到期望为止。这就是"声明式"：你描述终点，系统负责路径，且对故障天然自愈（Pod 挂了 reconcile 再拉一个）。level-triggered（按当前全量状态调和）而非 edge-triggered（按事件逐条响应），丢事件也不影响最终一致。
+\`\`\`go
+// 控制器 Reconcile 伪码
+for {
+    desired := getDesiredState()   // 用户提交的 spec
+    actual := getActualState()     // 从 lister 读当前状态
+    if diff := diffStates(desired, actual); diff != nil {
+        actuate(diff)              // 驱动实际状态向期望收敛
+    }
+}
+\`\`\`
+实际案例：某团队给内部平台写 CRD+Operator 管理中间件实例：用户提交 RedisCluster CR，Operator 自动完成 StatefulSet/Config/备份策略/监控接入；一次节点宕机，Operator 的 reconcile 自动在新节点重建并挂回数据卷，对比之前人肉运维手册 40 分钟缩短到 3 分钟。
+踩坑：1）controller 里别做长事务——reconcile 要幂等可重入，中途失败重跑不能产生副作用；2）status 与 spec 分离，status 只能由控制器写，用户改 status 无意义；3）etcd 是性能天花板——大集群 object 数量与 watch 连接数决定控制面容量，别拿 ConfigMap 当数据库用。`,
+    keyPoints: ["apiserver 唯一入口 etcd 唯一存储", "声明期望状态控制器负责路径", "level-triggered 丢事件仍收敛", "reconcile 必须幂等可重入"],
+    followUps: ["为什么 K8s 选择 level-triggered 而不是 edge-triggered？", "etcd 的容量瓶颈在生产上怎么治理？"],
+    favorited: false,
+  },
+  {
+    id: "be-478",
+    nodeId: "be-k8s",
+    question: "Pod 调度器的过滤与打分流程是什么？亲和/反亲和与污点容忍分别解决什么部署诉求？",
+    answer: `核心原理：kube-scheduler 两阶段：1）Filter（过滤）——硬约束筛掉不合格节点：资源够吗（requests 维度）、端口冲突吗、nodeSelector/污点匹配吗、卷冲突吗；2）Score（打分）——软约束排序：默认策略 LeastRequested（资源越空闲分越高，打散）与 BalancedAllocation（CPU/内存使用比例均衡）等加权汇总，选最高分绑定。三组部署语义工具：1）nodeAffinity——"我想去哪"：按节点标签选（ssd=true 的节点），required 硬/ preferred 软；2）podAffinity/AntiAffinity——"我想跟谁（不跟谁）在一起"：反亲和把同一应用的 Pod 打散到不同节点/可用区（topologyKey: zone），保高可用；3）taint/toleration——"节点拒绝谁"：节点打污点（dedicated=gpu:NoSchedule），只有带对应 toleration 的 Pod 能调度上来，做节点专用化（GPU 池、中间件池、驱逐驱逐 NotReady 节点自动打污点）。反亲和是"Pod 视角拉远"，污点是"节点视角拒绝"，两者配合：专用池用污点挡住杂 Pod，池内应用用反亲和打散。
+\`\`\`yaml
+# 高可用部署三件套：反亲和打散+专用池容忍
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - topologyKey: kubernetes.io/hostname   # 绝不同机
+      labelSelector: { matchLabels: { app: payment } }
+tolerations:
+- { key: dedicated, operator: Equal, value: payment, effect: NoSchedule }
+\`\`\`
+实际案例：某支付服务 6 副本未配反亲和，一次节点故障时 4 个副本恰好在同一节点，服务直接瘫痪；加 required 反亲和+topologySpreadConstraints 后，混沌演练单节点/单可用区故障服务容量最低保持 66%。
+踩坑：1）required 反亲和在大促扩容时可能"无节点可去"导致 Pending——高峰期用 preferred+topologySpread 的 skew 控制更稳；2）亲和规则参与调度打分有性能开销，大集群避免每 Pod 都配复杂 podAffinity；3）toleration 别随手加 toleration: Exists 全容忍，等于放弃节点隔离。`,
+    keyPoints: ["Filter 硬约束 Score 软打分", "反亲和打散保高可用", "污点做节点专用化", "required 规则防扩容 Pending"],
+    followUps: ["topologySpreadConstraints 与 podAntiAffinity 怎么选？", "调度器性能在大集群（5000 节点）如何优化？"],
+    favorited: false,
+  },
+  {
+    id: "be-479",
+    nodeId: "be-k8s",
+    question: "Service 的四种类型与 kube-proxy 的 iptables/IPVS 模式差异是什么？大规模集群为什么必须 IPVS？",
+    answer: `核心原理：Service 给一组 Pod 稳定访问入口（Pod IP 会变，Service 虚拟 IP 不变）。四种类型递进：ClusterIP（集群内虚拟 IP，默认）→ NodePort（每节点开端口转发，30000-32767）→ LoadBalancer（对接云厂商 LB 再进 NodePort）→ ExternalName（DNS CNAME 别名）。kube-proxy 是 Service 数据面的实现者：watch EndpointSlice 变化把"VIP→Pod IP 列表"的转发规则写到节点上。iptables 模式：规则链式匹配——O(n)，5000 Service 时规则数万条，一次更新全量重写（秒级），且只支持随机转发；IPVS 模式：哈希表查找 O(1)，增量增删，支持 rr/lc/sh（会话保持）等调度算法。大集群切换 IPVS 的收益：规则同步从秒级到毫秒级、转发不再随 Service 数量劣化。配合 CoreDNS（headless service 返回全量 Pod IP 给客户端自己做负载，gRPC 场景标配——gRPC 长连接复用让 L4 负载均衡失效）。
+\`\`\`yaml
+# headless service：DNS 直接返回 Pod IP 列表（gRPC/有状态场景）
+apiVersion: v1
+kind: Service
+metadata: { name: grpc-svc }
+spec:
+  clusterIP: None
+  selector: { app: grpc-server }
+\`\`\`
+实际案例：某微服务平台 8000 Service 的集群 iptables 模式下新 Service 生效要 2-4 秒，EndpointSlice 高频变化时节点 CPU 被 iptables 重写打满；切 IPVS 后生效延迟降到 50ms 内，节点 CPU 降 18%。gRPC 服务另走 headless+客户端侧负载（xDS），解决长连接流量倾斜。
+踩坑：1）IPVS 模式的 sessionAffinity 超时清理要关注，长会话场景可能粘连；2）NodePort 流量有 SNAT（源 IP 丢失）与二次转发问题，externalTrafficPolicy: Local 保源 IP 但放弃跨节点均衡；3）headless service 的 DNS 缓存与客户端重连策略要配对，否则 Pod 重建后客户端还连旧 IP。`,
+    keyPoints: ["ClusterIP→NodePort→LB 递进", "iptables O(n) 全量重写", "IPVS O(1) 增量同步", "gRPC 用 headless 客户端负载"],
+    followUps: ["externalTrafficPolicy: Local 的收益与代价？", "Gateway API 出现后 kube-proxy 会被替代吗？"],
+    favorited: false,
+  },
+  {
+    id: "be-480",
+    nodeId: "be-k8s",
+    question: "Ingress NGINX 已于 2026 年 3 月退役，Gateway API 凭什么接棒？存量 Ingress 怎么迁移？",
+    bigTech: true,
+    answer: `核心原理：Ingress NGINX 退役时间线：2025-11 官方宣布，2026-03 维护正式终止——仓库归档只读，不再有 bugfix 与安全补丁（存量部署可继续跑但暴露在零日风险下，官方与 KubeCon 2026 明确警告合规红线）。退役根因：1）维护者长期只有 1-2 人业余维护；2）annotation 拼凑配置（snippet 注解可注入任意 NGINX 指令）从灵活变成不可维护的安全债；3）NGINX 架构硬伤：reload 导致长连接（gRPC/WebSocket）抖动、HTTP/2 多路复用下 RPC 负载不均。Gateway API 接棒的设计升级：角色分离的资源模型——GatewayClass（基础设施方定义实现）→ Gateway（运维绑定端口/证书）→ HTTPRoute/TCPRoute（开发者定义路由规则），跨命名空间引用要显式 ReferenceGrant 授权，原生 RBAC 友好；能力标准化：流量切分（weight 灰度）、header 匹配、rewrite、超时重试全进 spec 不再靠注解。迁移路径：官方 ingress2gateway 工具 2026-03 发布 1.0，支持 30+ 常用 NGINX 注解自动翻译并告警不可翻译项；过渡期可用 Traefik（90%+ 注解兼容运行时转换）或 Higress 这类双栈网关平滑切流。
+\`\`\`yaml
+# Gateway API 灰度发布：90% 稳定版 + 10% 金丝雀
+kind: HTTPRoute
+spec:
+  parentRefs: [{ name: prod-gateway }]
+  rules:
+  - backendRefs:
+    - { name: web-stable, port: 80, weight: 90 }
+    - { name: web-canary, port: 80, weight: 10 }
+\`\`\`
+实际案例：某出行平台 2000+ Ingress 规则迁移：ingress2gateway 自动翻译 82%，剩余 snippet/正则类人工处理；用 Traefik 双栈并行跑 6 周按域名灰度切流，全程零故障，退役大限前完成清退。
+踩坑：1）snippet 类注解没有等价物，必须改造为扩展 CRD 或滤掉——越早清理技术债迁移越顺；2）Gateway API 的实现差异（Envoy/NGINX Fabric/云厂商）在高级特性上仍不对齐，选型要按特性矩阵；3）证书管理同步迁移（cert-manager 对 Gateway 的 listener 注解支持）。`,
+    keyPoints: ["2026-03 维护终止仓库只读", "snippet 注解=安全债主因", "Gateway API 角色分离+能力标准化", "ingress2gateway 1.0 自动翻译"],
+    followUps: ["ReferenceGrant 如何防止跨命名空间盗用路由？", "为什么 NGINX reload 对 gRPC 长连接是硬伤？"],
+    favorited: false,
+  },
+  {
+    id: "be-481",
+    nodeId: "be-k8s",
+    question: "HPA、VPA、Karpenter 节点伸缩三层弹性如何配合？基于自定义指标的 HPA 怎么落地？",
+    answer: `核心原理：弹性三层各管一段：1）HPA（横向）——按指标增减 Pod 副本数：CPU/内存是资源指标，QPS/消息堆积长度等自定义指标走 prometheus-adapter 或 KEDA（把 Prometheus 查询结果转成 metrics API 供 HPA 消费）；行为控制 behavior 字段防抖动（scaleDown stabilizationWindowSeconds: 300 缩容冷静期，扩容立即、缩容渐进）。2）VPA（纵向）——分析历史用量推荐/自动调整 requests：Off（只推荐）/Initial（重建时注入）/Auto（原地或重建调整）；HPA 与 VPA 同按 CPU 会打架（VPA 调大 requests→利用率下降→HPA 缩容→VPA 又调大），组合时 HPA 用自定义指标、VPA 管 requests 推荐。3）集群伸缩——Karpenter（AWS 主推，2024 GA 后已成事实标准，Cluster Autoscaler 的现代替代）：watch Pending Pod 直接计算需要什么样的节点（按污点/亲和/资源聚合选机型），秒级开节点；优势是按 Pod 需求"买刚好的机器"而不是预先维护节点组，配合 Spot 实例降本 60-70%。
+\`\`\`yaml
+# KEDA 按 Kafka 消费堆积扩缩消费者
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+spec:
+  scaleTargetRef: { name: order-consumer }
+  minReplicaCount: 2
+  maxReplicaCount: 50
+  triggers:
+  - type: kafka
+    metadata:
+      topic: order-event
+      lagThreshold: "1000"      # 每副本扛 1000 条堆积
+\`\`\`
+实际案例：某内容平台晚高峰流量 8 倍日间：HPA 按入口 QPS 扩 Pod（60s 内）、Karpenter 按 Pending 聚合开 Spot 节点（90s 就绪），夜间缩容回收；对比 Cluster Autoscaler 固定节点组时代，月度算力成本降 42%，高峰 Pending 时间从 4 分钟缩到 2 分钟内。
+踩坑：1）HPA 指标要有 warmup——Pod 刚启动 CPU 冲高别算数（startupProbe 就绪前排除）；2）缩容太激进遇上请求尖峰会反复"缩了又扩"（flapping），缩容窗口保守设；3）Karpenter 与 PDB 联动：节点回收尊重 PodDisruptionBudget，有状态服务要配 do-not-disrupt 注解。`,
+    keyPoints: ["HPA 管副本 VPA 管 requests", "同按 CPU 指标会打架", "KEDA 把业务指标接进 HPA", "Karpenter 按需求即时开节点"],
+    followUps: ["VPA 的推荐算法怎么用历史数据算 requests？", "Spot 实例被回收时的优雅处理链路？"],
+    favorited: false,
+  },
+  {
+    id: "be-482",
+    nodeId: "be-k8s",
+    question: "StatefulSet 与 Deployment 的本质差异是什么？有状态应用上 K8s 的存储与运维要点有哪些？",
+    answer: `核心原理：Deployment 的 Pod 是可互换的牛（cattle），StatefulSet 是有名字的宠物（pet）：稳定网络标识（pod-0/pod-1，名字不随重建变化，headless service 提供 pod-0.svc 的 DNS）、稳定存储（volumeClaimTemplates 给每个 Pod 独立 PVC，重建后挂回原卷）、有序部署与缩容（0→N 升序建、N→0 降序删，前一个 Ready 才动下一个——这是分布式存储选主/数据均衡的前提）。存储要点：StorageClass 定义供给方（云盘/本地盘/Ceph），PVC 是应用对存储的声明；本地盘（Local PV）性能最好但绑死节点（节点挂=数据要靠应用层副本恢复），云盘可随 Pod 漂移（跨可用区不行——盘和 Pod 必须同区，拓扑感知调度 topology.kubernetes.io/zone 配合）。有状态应用上 K8s 的真正难点不在起起来，而在 Day2：扩缩容后的数据均衡、备份恢复、升级时的滚动策略（partition 字段灰度）、故障演练。
+\`\`\`yaml
+# StatefulSet 核心三要素
+spec:
+  serviceName: redis-cluster          # headless service 提供稳定 DNS
+  podManagementPolicy: OrderedReady   # 有序；Parallel 适合无主从依赖的
+  volumeClaimTemplates:
+  - metadata: { name: data }
+    spec:
+      storageClassName: cloud-ssd
+      resources: { requests: { storage: 100Gi } }
+\`\`\`
+实际案例：某团队把 Kafka 搬上 K8s（Strimzi Operator）：每 broker 独立 PVC 云盘+反亲和跨可用区；一次可用区断电，K8s 在同区节点重建失败（云盘跨区不可挂），但 ISR 副本机制让分区秒级切 leader，业务无感——证明"存储层冗余靠应用，K8s 管调度"的分层正确。
+踩坑：1）删 StatefulSet 不删 PVC（设计如此防误删数据），缩容后残留 PVC 要手工清；2）云盘挂载有 attach 时间（10-60s），故障转移比本地盘慢，RTO 敏感业务要算进去；3）有状态应用尽量用成熟 Operator（Strimzi/CrunchyData/CloudNativePG），手写 YAML 运维有状态集群是给自己挖坑。`,
+    keyPoints: ["稳定名字+稳定存储+有序扩缩", "PVC 随 Pod 重建挂回", "云盘不可跨可用区漂移", "有状态优先用成熟 Operator"],
+    followUps: ["本地盘与云盘在有状态场景的 RTO/RPO 对比？", "为什么 Kafka 这类系统不依赖 K8s 存储冗余？"],
+    favorited: false,
+  },
+  {
+    id: "be-483",
+    nodeId: "be-k8s",
+    question: "三种探针（liveness/readiness/startup）的分工与优雅下线的完整链路是什么？滚动更新为何仍会丢请求？",
+    bigTech: true,
+    answer: `核心原理：探针分工：startupProbe——"起来没"，成功前禁用其他探针，给慢启动应用（JVM 预热 60s+）充足时间，避免 liveness 误杀；readiness——"能接流量没"，失败时从 EndpointSlice 摘除（不杀 Pod），用于优雅摘流；liveness——"还活着没"，失败就重启容器，只应检测死锁级故障（别把下游依赖挂当 liveness 失败——下游挂你也挂，重启无用还连环重启）。优雅下线完整链路：Pod 被删→进 Terminating→同时做两件事：1）从 EndpointSlice 摘除（kube-proxy 更新转发规则，异步！有传播延迟）；2）执行 preStop 钩子（sleep 5-15s 等摘流生效）→ SIGTERM→应用停止接受新连接、处理完存量请求→terminationGracePeriodSeconds（默认 30s）到点 SIGKILL。滚动更新丢请求的经典根因：摘流是异步的——Pod 已收 SIGTERM 开始拒绝连接，但 kube-proxy 规则还没更新，新请求仍被转发进来被拒。解法就是 preStop sleep 覆盖摘流传播时间。
+\`\`\`yaml
+lifecycle:
+  preStop:
+    exec: { command: ["sh", "-c", "sleep 10"] }  # 等摘流传播
+readinessProbe: { httpGet: { path: /ready }, periodSeconds: 2 }
+terminationGracePeriodSeconds: 60
+\`\`\`
+实际案例：某交易服务每次发版丢 0.1-0.3% 请求（502 尖峰），排查链路是"SIGTERM 先于摘流生效"：加 preStop sleep 8s（实测摘流 P99 传播 6s）+应用侧 connection  draining，发版 502 归零。
+踩坑：1）preStop sleep 与优雅时间要配套——grace 30s 里 sleep 10s，应用只剩 20s 处理存量，长请求业务要把 grace 调到 60-120s；2）负载均衡入口（Ingress/云 LB）还有一层健康检查摘流延迟，网关层的 drain 时间也要算；3）liveness 用 TCP/HTTP 简单探测，业务深检查放 readiness，反了会误杀。`,
+    keyPoints: ["startup 防慢启动误杀", "readiness 摘流 liveness 只测死锁", "摘流异步 preStop sleep 补窗口", "grace 时间覆盖存量请求"],
+    followUps: ["Gateway/Envoy 层的连接 draining 与 Pod 层如何协同？", "PDB 在滚动更新与节点维护时各起什么作用？"],
+    favorited: false,
+  },
+  {
+    id: "be-484",
+    nodeId: "be-k8s",
+    question: "CrashLoopBackOff 的系统化排障方法论是什么？从 kubectl 到根因的排查链路怎么走？",
+    answer: `核心原理：排障链路按"控制面→节点→容器→应用"四层收敛：1）kubectl get pod 看状态与重启次数→describe pod 看 Events（调度失败/拉镜像失败/探针失败/OOMKilled 全在这里）；2）Exit Code 判因：137=SIGKILL（绝大多数是 OOMKilled，看 container lastState.terminated.reason+节点 dmesg 的 oom_kill 日志）、143=SIGTERM（被人删/驱逐）、1=应用自身退出；3）kubectl logs --previous 拿上一个容器的临终日志（应用报错堆栈基本在这）；4）拉镜像失败看 imagePullPolicy/secret；5）Pending 看调度事件（资源不足/污点/亲和/PVC 未绑）。高频根因清单：配置错（ConfigMap 挂错路径/环境变量拼错）、依赖未就绪（DB/Redis 没起，应用启动即崩——该用 initContainer 等依赖）、内存 limit 太小（JVM 堆没按容器感知配，JDK 8u191 前不认 cgroup limit 按宿主机内存算堆）、探针配太狠（启动 10s 就 liveness 探测）。ephemeral debug container（kubectl debug）在 distroless 无 shell 镜像里救场必备。
+\`\`\`bash
+# 排障四板斧
+kubectl describe pod web-xxx          # Events + lastState + exitCode
+kubectl logs web-xxx --previous       # 崩溃前日志
+kubectl get events --sort-by=.lastTimestamp | grep web
+kubectl debug -it web-xxx --image=busybox --target=app   # 临时注入调试容器
+\`\`\`
+实际案例：某服务上线后 CrashLoop 循环 40 分钟：describe 显示 OOMKilled exit 137，limit 512Mi 但 JVM 未配 -Xmx（JDK 11 默认 MaxRAMPercentage=25% 应无碍），深查是 native 内存（Netty 直接内存）无上限泄漏；加 -XX:MaxDirectMemorySize 并同步调 limit，稳定。
+踩坑：1）--previous 只保留上一个实例日志，连续崩溃要配日志采集（EFK）留全量；2）restartPolicy 与 backoff 机制（最长 5 分钟）会掩盖"快速失败"的根因，排查时可直接把镜像入口改成 sleep 进容器手动复现；3）OOMKilled 的 limit 判定含 page cache 记账细节，memory 用量看 container_memory_working_set_bytes 而非 usage。`,
+    keyPoints: ["describe 看 Events 定层", "137=OOM 143=被终止", "logs --previous 拿临终日志", "JDK 容器内存感知与直接内存"],
+    followUps: ["为什么 memory working set 比 usage 更接近 OOM 判定？", "ephemeral container 与共享进程命名空间怎么配合？"],
+    favorited: false,
+  },
+  {
+    id: "be-485",
+    nodeId: "be-k8s",
+    question: "requests 与 limits 的语义差异是什么？QoS 三级分类如何影响驱逐与 OOM 优先级？",
+    answer: `核心原理：requests 是"调度保证"——调度器按它选节点（节点可分配资源-已分配 requests ≥ Pod requests 才接收），也是 cgroup 的资源下限保障；limits 是"使用上限"——CPU 超限被 throttle（限流，不杀进程，表现为 RT 毛刺），内存超限直接 OOMKill（不可压缩资源，超即杀）。QoS 三级：Guaranteed（每容器 requests=limits 且都设）——最后被杀；Burstable（设了但不相等）——中间；BestEffort（啥都没设）——节点资源紧张时第一批被驱逐/OOM。节点压力驱逐（eviction）按 QoS+实际用量超 requests 的幅度排序杀 Pod；cgroup OOM 打分（oom_score_adj）也是 Guaranteed 最低。生产基线：核心服务 Guaranteed（requests=limits，CPU 不设 limit 避免 throttle 毛刺、内存必须 limit 防泄漏扩散——这是主流折中），普通服务 Burstable 且 requests 按 P95 实际用量+30% 设，BestEffort 只允许批处理。LimitRange 兜底默认值、ResourceQuota 管命名空间总量。
+\`\`\`yaml
+# 核心服务推荐配法：CPU 不限防 throttle，内存双等防扩散
+resources:
+  requests: { cpu: "1", memory: 2Gi }
+  limits:   { memory: 2Gi }        # 故意不设 cpu limit
+\`\`\`
+实际案例：某网关服务 P99 周期性飙到 800ms，排查是 CPU limit 2 核在高并发被 throttle（cfs_quota 周期性耗尽，stat 里 nr_throttled 飙升）；去掉 CPU limit（保留 requests 保调度保障）后 P99 回到 40ms，代价是节点超卖风险改由 requests 准确性与监控兜底。
+踩坑：1）requests 拍脑袋设太大=集群资源利用率常年 15%（Karpenter/CA 也救不了"已分配但没用"），要接 VPA 推荐持续校正；2）CPU throttle 监控看 container_cpu_cfs_throttled_seconds_total，别只看利用率；3）JVM 容器内存 limit 要留堆外余量（直接内存+线程栈+元空间常占 30%），Xmx=limit 必 OOM。`,
+    keyPoints: ["requests 调度保障 limits 使用上限", "CPU 超限 throttle 内存超限 OOM", "Guaranteed 最后被杀", "核心服务 CPU 不限内存双等"],
+    followUps: ["CPU limit 的 CFS quota 机制为什么会造成延迟毛刺？", "VPA 推荐值与 HPA 指标在长期运行中如何收敛？"],
     favorited: false,
   },
 ];
