@@ -13377,6 +13377,731 @@ JOIN 嵌套结果  1         关联少、数据量可控（笛卡尔积爆炸风
     followUps: ["一对多 collection 映射怎么去重？", "GraphQL 的 DataLoader 怎么批量解决 N+1？"],
     favorited: false,
   },
+  // ===== 安全与认证：Web 安全（be-257 ~ be-263）=====
+  {
+    id: "be-257",
+    nodeId: "be-security",
+    question: "SQL 注入的原理是什么？预编译为什么能防注入？MyBatis 里还有哪些注入死角？",
+    bigTech: true,
+    answer: `结论：SQL 注入的本质是「数据和指令没有边界」——用户输入被拼进 SQL 字符串后，改变了 SQL 的语法结构。预编译（PreparedStatement）能防注入，是因为它把 SQL 模板先发给 DB 编译成执行计划，参数只作为「纯数据」传输，永远不会被当成 SQL 语法解析。
+
+\`\`\`java
+// 注入原理：字符串拼接
+String sql = "SELECT * FROM user WHERE name = '" + name + "'";
+// name = ' OR '1'='1  →  WHERE name = '' OR '1'='1' → 全表拖库
+// name = '; DROP TABLE user;--  → 删表（需 DB 允许多语句）
+
+// 预编译：模板和参数分离
+PreparedStatement ps = conn.prepareStatement("SELECT * FROM user WHERE name = ?");
+ps.setString(1, name);  // 参数在协议层单独传输，带类型标记
+// DB 收到 ' OR '1'='1 也只把它当成一个 8 字符的字符串字面值
+\`\`\`
+
+\`\`\`text
+预编译的两道防线：
+1. 语法树已固定：执行计划在参数到达前已生成，参数改不了树结构
+2. 协议层分离：MySQL 的 COM_STMT_PREPARE + COM_STMT_EXECUTE 是两条命令，
+   参数走二进制编码，不经过 SQL 词法分析器
+\`\`\`
+
+MyBatis 的注入死角（预编译不是银弹）：
+\`\`\`xml
+<!-- 1. \${} 纯文本替换 = 拼接，高危 -->
+ORDER BY \${orderField}   <!-- orderField=name; DROP TABLE user;-- 直接注入 -->
+
+<!-- 2. LIKE 拼接 % 用 concat 才是安全的 -->
+WHERE name LIKE CONCAT('%', #{kw}, '%')   <!-- ✅ -->
+WHERE name LIKE '%\${kw}%'                <!-- ❌ 注入 -->
+
+<!-- 3. IN 用 foreach 展开成 #{} 才安全 -->
+id IN <foreach collection="ids" open="(" separator="," close=")">#{id}</foreach>  <!-- ✅ -->
+id IN (\${ids})                           <!-- ❌ 注入 -->
+\`\`\`
+
+死角清单（order by / 表名 / 列名不能预编译）：动态排序字段必须白名单校验（\`Set.of("id","name","create_time")\` 查表），分表场景表名后缀必须 \`\\d+\` 正则校验，DB 账号最小权限（应用账号禁 DROP/GRANT），开启 MySQL 的 sql_safe_updates。
+
+案例：2018 某快递公司 API 按运单号查询接口用 \${} 拼接，被黑产注入拖走 3 亿条用户数据（姓名+电话+地址），暗网售卖；修复成本远超一次安全评审。Hibernate/JPA 也不是免疫——JPQL 拼接字符串照样注入，nativeQuery + 拼接是重灾区。
+
+踩坑：以为用了 ORM 就安全（Hibernate 的 HQL 拼接照样注入）；以为存储过程安全（存储过程内部 EXECUTE 拼接字符串一样中招）；WAF 能挡但挡不住编码绕过（宽字节 %df' 吃掉转义反斜杠）；预编译在 LIKE 通配符场景要转义 % 和 _ 本身，否则用户输入 % 实现「全模糊扫描」慢查询攻击。`,
+    keyPoints: ["预编译=语法树先固定+参数协议分离", "\\${}/order by/表名是注入死角，必须白名单", "DB 账号最小权限兜底"],
+    followUps: ["宽字节注入 %df 怎么绕过 addslashes？", "MySQL 的 sql_mode 和 safe_updates 怎么配？"],
+    favorited: false,
+  },
+  {
+    id: "be-258",
+    nodeId: "be-security",
+    question: "XSS 三种类型（存储/反射/DOM）的区别和防御？CSP 是什么？HttpOnly Cookie 防得住 XSS 吗？",
+    bigTech: true,
+    answer: `结论：XSS = 攻击者的 JavaScript 在受害者的浏览器里以「本站身份」执行。三型的区别在于「恶意代码的存储位置」：存储型存在服务端 DB（危害最大，所有访客中招）、反射型存在 URL 参数里（需要诱骗点击）、DOM 型不经过服务端，纯前端 JS 读写 DOM 时注入。
+
+\`\`\`text
+三型对比：
+类型    恶意代码位置        触发方式                典型案例
+存储型  服务端数据库        任何用户访问该页面      评论区留言 <script> 偷 Cookie
+反射型  URL 参数           诱骗点击钓鱼链接        ?q=<script> 搜索结果页原样回显
+DOM 型  前端 JS 的输入源    修改 location.hash 等   document.write(location.hash)
+\`\`\`
+
+\`\`\`java
+// 防御三板斧：
+// 1. 输出编码（核心！按上下文分别编码）
+//    HTML 上下文：& < > " ' → 实体
+//    JS 上下文：\\uXXXX 转义
+//    URL 上下文：URLEncoder
+//    CSS 上下文：禁止用户输入进 style
+<div th:text="\${user.nickname}"></div>   <!-- Thymeleaf text 自动转义 ✅ -->
+<div th:utext="\${user.nickname}"></div>  <!-- utext 不转义 = 自杀 ❌ -->
+
+// 2. CSP（Content-Security-Policy）：白名单脚本来源，内联脚本一刀切
+res.setHeader("Content-Security-Policy",
+  "default-src 'self'; script-src 'self' https://cdn.example.com; " +
+  "object-src 'none'; base-uri 'self'; report-uri /csp-report");
+// 即使注入成功，<script>alert(1)</script> 内联脚本被浏览器直接拒绝执行
+
+// 3. HttpOnly Cookie：document.cookie 读不到 → 偷不走 Session
+//    注意：HttpOnly 不防 XSS 本身！攻击者可以直接以你的身份发请求
+//    （XSS 里 fetch('/api/transfer') 照样带着你的 Cookie 走）
+\`\`\`
+
+富文本场景（评论支持加粗/图片）不能全转义——用白名单过滤库：Java 用 OWASP Java HTML Sanitizer / jsoup.clean(Safelist.relaxed())，前端用 DOMPurify。黑名单（过滤 script 标签）必被绕过：\`<scrscriptipt>\`、\`<img onerror=alert(1)>\`、\`<svg onload=alert(1)>\`。
+
+案例：新浪微博 2011 XSS 蠕虫——存储型 XSS + 短链接扩散，用户点链接自动发微博+关注，1 小时感染 3 万+用户；MySpace Samy 蠕虫 20 小时感染 100 万用户，作者被判缓刑+禁触网。现代前端框架默认转义插值，XSS 减少但没绝迹——React 的 dangerouslySetInnerHTML、Vue 的 v-html 是仅剩的高危口子。
+
+踩坑：innerHTML = data 是 DOM XSS 温床（用 textContent）；JSON 里嵌 HTML 字符串双重编码陷阱（服务端转一次前端再转一次反而引入 &amp; 注入）；富文本过滤后存入 DB 时做转义，污染原始数据且换展示端就漏（要存原文、输出时转义/过滤）；认为 SPA 没有 XSS（DOM 型在 SPA 里更猖獗）；CSP 配了 report-only 忘了切换成 enforce 模式=裸奔。`,
+    keyPoints: ["三型区别=恶意代码存储位置", "输出编码按上下文+CSP 白名单", "HttpOnly 防偷 Cookie 不防冒名发请求"],
+    followUps: ["富文本为什么用白名单不用黑名单过滤？", "Trusted Types API 怎么根治 DOM XSS？"],
+    favorited: false,
+  },
+  {
+    id: "be-259",
+    nodeId: "be-security",
+    question: "CSRF 攻击原理？为什么 SameSite Cookie 能防？JWT 放 localStorage 后还有 CSRF 吗？",
+    bigTech: true,
+    answer: `结论：CSRF = 借用浏览器的「自动带 Cookie」特性，让受害者在已登录状态下无感知地向目标站发出伪造请求。防御三件套：SameSite Cookie（治本，浏览器级）、CSRF Token（经典，服务端校验随机值）、校验 Origin/Referer（辅助）。
+
+\`\`\`text
+攻击链（你登录了 bank.com，访问了 evil.com）：
+1. evil.com 页面里 <img src="https://bank.com/transfer?to=hacker&amt=10000">
+2. 浏览器发请求时自动带上 bank.com 的 Cookie（不管请求从哪发起）
+3. bank.com 看到合法 Session → 执行转账
+关键：攻击者拿不到 Cookie 内容，只是「借用」浏览器自动携带的行为
+\`\`\`
+
+\`\`\`text
+SameSite 三个取值：
+Strict  任何跨站请求都不带 Cookie（从外部链接点进来也不带→用户体验差）
+Lax     跨站 GET 导航带，POST/img/iframe 不带（Chrome 80+ 默认值）
+None    都带（必须配合 Secure，用于跨域 SSO 场景）
+SameSite=Lax 后 <img>/<form POST> 跨站请求不再携带 Cookie → CSRF 基本断绝
+\`\`\`
+
+\`\`\`java
+// CSRF Token 方案（SameSite 不可用的老浏览器兜底）：
+// 1. 服务端生成随机 Token 绑定 Session，下发到表单隐藏域
+// 2. 提交时校验：Token 对不上就拒绝
+// 攻击者在 evil.com 无法读取 bank.com 页面内容（同源策略）→ 拿不到 Token
+// Spring Security 默认开启 CsrfFilter，GET 放行、POST/PUT/DELETE 必校验
+
+// 校验 Origin/Referer（辅助层，防子域 XSS 后绕过 SameSite）：
+String origin = request.getHeader("Origin");
+if (origin != null && !TRUSTED_ORIGINS.contains(origin)) return 403;
+\`\`\`
+
+JWT 放 localStorage 后：没有 Cookie 就没有 CSRF——浏览器不会自动带 localStorage 里的东西，请求头是 JS 手动加的 Authorization: Bearer。但代价是 XSS 一来全完蛋：localStorage 里的 JWT 被 document 任意 JS 读走，攻击者直接拿到「凭证本体」，比借 Cookie 更惨（可导出、可离线重放到过期）。所以：
+- Cookie(HttpOnly+SameSite) 模式：怕 CSRF（已防）不怕偷凭证
+- localStorage 模式：不怕 CSRF 怕 XSS 偷凭证
+两害相权，大厂主站多选 Cookie 模式，CSRF 防线成熟；纯内部系统/APP 内嵌可用 Bearer。
+
+案例：Gmail 2007 CSRF——攻击页面发请求修改受害者邮箱过滤器，把含特定关键词的邮件转发给攻击者，用于盗取域名注册确认邮件抢域名；ING Direct、YouTube 都中过 CSRF。抖音早期的「关注/点赞」接口曾因未校验 CSRF Token 被刷量平台利用。
+
+踩坑：把 CSRF Token 放在 Cookie 里再让 JS 读出来放 Header（Double Submit）——子域 XSS 可重写 Cookie 攻破，要配合加密绑定 Session；只校验 Referer 不校验 Origin，攻击者用 data: URL 或 meta referrer=no-referrer 让 Referer 为空，空校验默认放行=白给（空必须拒绝）；GET 接口做了写操作（CSRF Token 一般只验非 GET）——幂等规范也是安全规范；跨域 CORS 配 Access-Control-Allow-Origin: * + Allow-Credentials: true（浏览器会拦，但反射 Origin 的动态配置常见失误）。`,
+    keyPoints: ["CSRF 借用浏览器自动带 Cookie", "SameSite=Lax 治本+Token 兜底", "localStorage 免 CSRF 但 XSS 可偷凭证本体"],
+    followUps: ["Double Submit Cookie 怎么被子域 XSS 攻破？", "扫码登录场景 CSRF 怎么防（QR 码钓鱼）？"],
+    favorited: false,
+  },
+  {
+    id: "be-260",
+    nodeId: "be-security",
+    question: "SSRF 是什么？为什么比 XSS/CSRF 更危险？怎么防御（含绕过手法）？",
+    bigTech: true,
+    answer: `结论：SSRF = 攻击者诱导「服务端」代替他发起请求。危险之处在于：服务端在内网，能访问攻击者从公网够不到的资源——云元数据接口、内网管理后台、K8s API、Redis 未授权端口。一次 SSRF 可能直接打穿整个内网，这是「权限升级」漏洞，XSS/CSRF 只是客户端漏洞。
+
+\`\`\`text
+攻击链（头像 URL 抓取功能为例）：
+POST /avatar/fetch  { "url": "http://attacker.com/a.jpg" }   ← 正常用法
+POST /avatar/fetch  { "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/" }
+  → 云服务器元数据接口！返回临时 AK/SK → 控制整个云账号（阿里云/AWS 同套路）
+POST /avatar/fetch  { "url": "http://10.0.0.5:8080/actuator/env" }
+  → 内网 Spring Boot Actuator 泄露全部环境变量（含 DB 密码）
+POST /avatar/fetch  { "url": "gopher://10.0.0.6:6379/_*1%0d%0a$4%0d%0aEVAL..." }
+  → gopher 协议打内网未授权 Redis → 写 SSH 公钥
+\`\`\`
+
+\`\`\`java
+// 防御四层（缺一不可）：
+// 1. 协议白名单：只允许 http/https
+URI uri = new URI(url);
+if (!Set.of("http", "https").contains(uri.getScheme())) return 400;
+
+// 2. 域名/IP 黑白名单 + DNS 解析后校验（防 DNS Rebinding！）
+InetAddress addr = InetAddress.getByName(uri.getHost());
+if (addr.isLoopbackAddress() || addr.isSiteLocalAddress()
+    || addr.isAnyLocalAddress() || isCloudMetadata(addr)) return 400;
+// 关键：用解析后的 IP 发请求，不要让 HttpClient 自己再解析一次（TOCTOU 竞态）
+
+// 3. 禁 302 跳转跟随（跳转到内网地址绕过校验）
+HttpClient client = HttpClient.newBuilder()
+    .followRedirects(HttpClient.Redirect.NEVER).build();
+
+// 4. 出口隔离：抓图服务放独立 VPC，安全组只放行 80/443 出向，
+//    元数据接口走 IMDSv2（必须 PUT 拿 token 才能查）
+\`\`\`
+
+\`\`\`text
+常见绕过手法（审计自查清单）：
+短网址        t.cn/xxx 302 到内网                    → 禁跳转
+进制混淆      http://2130706433/ = 127.0.0.1         → 解析后统一校验
+DNS Rebinding 第一次解析返回公网 IP 过校验，TTL=0
+              第二次解析返回 10.x → 用解析出的 IP 直连
+@ 符号        http://evil.com@127.0.0.1/             → URI.getHost 正确处理
+IPv6          http://[::1]/、http://[::ffff:127.0.0.1]/
+0.0.0.0       Linux 下等于 127.0.0.1
+\`\`\`
+
+案例：Capital One 2019 数据泄露——SSRF 打 AWS 元数据接口拿到 IAM 临时凭证，拖走 S3 里 1 亿条用户信用记录，罚款 8000 万美元；特斯拉 2018 K8s 控制台未授权 + SSRF 被植入挖矿程序。国内：某大厂图片代理服务 SSRF 扫内网，Redis 未授权写 crontab 批量沦陷。
+
+踩坑：只校验字符串包含 "127.0.0.1"（进制/IPv6/@ 全绕过）；校验后 HttpClient 自动跟随 302 跳到内网；DNS 校验和请求发起之间有时间差（TOCTOU），攻击者控制 DNS 服务器返回短 TTL 记录；只防了 http 协议，gopher/file/dict/ftp 没堵（Java 默认不支援 gopher 是万幸，但 PHP curl 全家桶）；微服务内部 feign 调用信任 URL 参数，SSRF 从入口服务穿透到内部服务。`,
+    keyPoints: ["服务端代发请求=内网权限升级", "云元数据 169.254.169.254 是重灾区", "DNS 解析后校验+禁 302+协议白名单"],
+    followUps: ["IMDSv2 相比 v1 怎么缓解 SSRF？", "gopher 协议打 Redis 的完整利用链？"],
+    favorited: false,
+  },
+  {
+    id: "be-261",
+    nodeId: "be-security",
+    question: "对称加密、非对称加密、哈希、HMAC、国密分别解决什么问题？密码该用什么存？",
+    bigTech: true,
+    answer: `结论：四类原语解决四类问题——对称加密（AES/SM4）解决「大量数据的保密传输/存储」，快但有密钥分发问题；非对称（RSA/ECC/SM2）解决「密钥交换+身份认证（签名）」，慢只适合小数据；哈希（SHA-256/SM3）解决「完整性校验」，不可逆；HMAC = 哈希+密钥解决「消息认证」（防篡改+防伪造）。密码存储必须用「带盐的慢哈希」：BCrypt/Argon2，禁用 MD5/SHA-1/裸 SHA-256。
+
+\`\`\`text
+选型决策树：
+要保密+量大        → AES-GCM（自带完整性，淘汰 CBC）      例：DB 敏感列加密
+要保密+双方无信道   → 混合加密：RSA 加密 AES 密钥+AES 加密数据  例：HTTPS/TLS
+要证明「是我发的」  → 私钥签名 RSA/ECDSA/SM2               例：JWT RS256、代码签名
+要证明「没改过」    → HMAC-SHA256（双方有共享密钥时）       例：API 签名、Webhook 验签
+要存密码           → BCrypt(≥10)/Argon2id（盐+慢+内存硬）   例：用户表 password 列
+要指纹/去重        → SHA-256                               例：文件秒传、ETag
+国密合规           → SM2(非对称)+SM3(哈希)+SM4(对称)        例：政务/金融等保
+\`\`\`
+
+\`\`\`java
+// 密码存储正确姿势（Spring Security）
+PasswordEncoder encoder = new BCryptPasswordEncoder(12);  // cost=12，约 250ms/次
+String stored = encoder.encode(rawPassword);  // $2a$12$盐22字符+哈希31字符，盐自动生成
+boolean ok = encoder.matches(rawPassword, stored);
+// 为什么慢哈希：GPU 撞 MD5 每秒千亿次，撞 BCrypt(12) 每秒几百次——
+// 拖库后暴力破解从「分钟级」变「世纪级」
+
+// 敏感数据列加密（手机号/身份证）：AES-GCM
+Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+// GCM 自带认证标签，密文被篡改解密直接抛异常（CBC 会解出乱码不报错）
+
+// API 签名（Webhook 验签）：HMAC-SHA256
+Mac mac = Mac.getInstance("HmacSHA256");
+mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+String sig = Hex.encodeHexString(mac.doFinal((timestamp + "." + body).getBytes()));
+// 时间戳防重放（服务端校验 ±5min），body 进签名防篡改
+\`\`\`
+
+案例：CSDN 2011 拖库 600 万明文密码泄露——直接推动了全行业密码哈希化；LinkedIn 2012 用无盐 SHA-1 存密码，1.17 亿账号被撞库，2016 年暗网二次售卖。正面案例：微信支付回调用 HMAC-SHA256 验签 + 商户私钥签请求，双向认证；iCloud 端到端加密用 ECC 密钥包裹 AES 数据密钥。
+
+踩坑：MD5(password) 等于明文（彩虹表秒查）；SHA-256(password) 也等于明文（GPU 暴力破解太快）——「哈希」不等于「密码哈希」；盐全局固定一份（拖库后盐失去意义，必须每密码独立盐）；自己发明加密算法（密码学第一诫：Don't roll your own crypto）；AES 用 ECB 模式（相同明文块密文相同，企鹅图梗）；RSA 直接加密大文件（性能爆炸且 PKCS#1 v1.5 有 Bleichenbacher 攻击，混合加密才是正道）；密钥硬编码在代码里进 git（要用 KMS/Vault/环境变量+加密 session）。`,
+    keyPoints: ["AES 保密/RSA 交换密钥/签名认证/HMAC 消息认证", "密码=BCrypt/Argon2 慢哈希+独立盐", "AES-GCM 淘汰 CBC，禁 ECB"],
+    followUps: ["JWT 的 HS256 和 RS256 选型与安全差异？", "前向保密（PFS）是什么，TLS 1.3 怎么实现？"],
+    favorited: false,
+  },
+  {
+    id: "be-262",
+    nodeId: "be-security",
+    question: "开放 API 怎么设计防重放和防篡改？（签名机制完整设计）",
+    bigTech: false,
+    answer: `结论：开放 API 的安全基线 = HTTPS（传输层）+ 请求签名（防篡改）+ 时间戳+nonce（防重放）+ AppKey/AppSecret 密钥体系（身份）。核心思想：把「请求的全部关键要素」用共享密钥算出签名，服务端重算比对——任何一字节被改签名即失效。
+
+\`\`\`text
+完整签名流程（以微信支付 V3/阿里云 API 为蓝本）：
+
+1. 客户端构造待签名串（ Canonical Request ）：
+   HTTP方法 + "\\n" + URL路径 + "\\n" + 查询参数(排序后) + "\\n" +
+   请求体SHA256 + "\\n" + 时间戳 + "\\n" + nonce
+
+2. 计算签名：
+   signature = HMAC-SHA256(AppSecret, canonicalString)
+   （更高级：RSA 私钥签名，服务端公钥验——平台方不存商户私钥）
+
+3. 请求头携带：
+   Authorization: appid=xxx, timestamp=1700000000, nonce=a1b2c3, signature=xxx
+
+4. 服务端校验五道关卡：
+   ① AppKey 存在且未禁用
+   ② timestamp 与服务器时间差 < 300s（防重放窗口）
+   ③ nonce 在 Redis 中不存在 → SETEX nonce 300 1（窗口期内一次性）
+   ④ 按相同规则重算签名比对（常量时间比较防时序攻击）
+   ⑤ 权限范围校验（该 AppKey 是否允许调此接口）
+\`\`\`
+
+\`\`\`java
+// 服务端验签骨架（Spring 拦截器）
+public boolean preHandle(HttpServletRequest req, ...) {
+    String ts = req.getHeader("X-Timestamp");
+    if (Math.abs(System.currentTimeMillis()/1000 - Long.parseLong(ts)) > 300)
+        throw new SecurityException("timestamp expired");
+
+    String nonce = req.getHeader("X-Nonce");
+    if (!redis.setIfAbsent("nonce:" + appKey + ":" + nonce, "1", 300, SECONDS))
+        throw new SecurityException("replay detected");
+
+    String body = getCachedBody(req);  // 注意 body 流只能读一次，要缓存
+    String canonical = buildCanonical(req, body);  // 参数 TreeMap 排序拼接
+    String expect = hmacSha256(secretService.get(appKey), canonical);
+    if (!MessageDigest.isEqual(expect.getBytes(), got.getBytes()))
+        throw new SecurityException("bad signature");  // isEqual 防时序侧信道
+    return true;
+}
+\`\`\`
+
+案例：微信支付 V2 → V3 的演进——V2 用 MD5 签名（已破），V3 全面切 SHA256-RSA + 平台证书 + 回调也要验签；AWS Signature V4 把签名粒度做到「区域+服务+日期」派生密钥，主 Secret 从不上网线。反面案例：某开放平台早期只签名 body 不签名查询参数，攻击者改 ?amount= 参数金额被放大 100 倍。
+
+踩坑：签名串没包含查询参数/body（只签时间戳=没签）；参数排序规则双方不一致（URL 编码先后、大小写、数组表示法——要有明确的 canonical 规范文档）；时间戳窗口开太大（>10min 重放风险）或太小（时钟漂移误杀，客户端 NTP 校准+返回服务端时间纠正）；nonce 存储单机内存（分布式下重放打其他节点）必须 Redis 集中存储；GET 请求不验签（GET 也能改数据就完蛋）；日志打印 AppSecret/签名原文（脱敏！）；验签失败返回「签名错误，应为 xxx」把正确签名泄露给攻击者。`,
+    keyPoints: ["签名覆盖方法+路径+参数+body+时间戳+nonce", "timestamp 窗口+nonce 一次性防重放", "常量时间比较防时序攻击"],
+    followUps: ["mTLS 双向证书认证 vs 签名机制选型？", "AWS SigV4 的派生密钥设计好在哪？"],
+    favorited: false,
+  },
+  {
+    id: "be-263",
+    nodeId: "be-security",
+    question: "越权漏洞（IDOR）是什么？水平越权和垂直越权怎么防？",
+    bigTech: true,
+    answer: `结论：越权 = 「认证了但没授权」——你知道我是谁，但你没检查我能不能干这件事。水平越权：同角色用户 A 操作了用户 B 的数据（改订单 ID 看别人订单）；垂直越权：普通用户调了管理员接口（改 URL 进 /admin 删用户）。OWASP API Top 1，因为自动化扫描难发现，纯靠人工编码纪律。
+
+\`\`\`text
+攻击示例（都是真实高频事故）：
+GET /api/orders/10086        → 改成 /api/orders/10087 看到别人订单（水平）
+POST /api/user/profile       body {"userId": 9527, "phone": "138..."} 改别人手机（水平）
+GET /api/admin/users         普通用户直接调（垂直，接口只在前端隐藏了按钮）
+PUT /api/orders/123/cancel   取消别人订单（水平）
+\`\`\`
+
+\`\`\`java
+// ❌ 错误：信任客户端传的 ID
+@GetMapping("/orders/{id}")
+public Order getOrder(@PathVariable Long id) {
+    return orderService.findById(id);  // 谁的订单都返回！
+}
+
+// ✅ 正确：数据归属校验——查询条件强制带 owner
+@GetMapping("/orders/{id}")
+public Order getOrder(@PathVariable Long id, @AuthenticationPrincipal User me) {
+    Order o = orderService.findById(id);
+    if (o == null || !o.getUserId().equals(me.getId()))
+        throw new NotFoundException();  // 返回 404 而非 403，不暴露订单存在性
+    return o;
+}
+
+// ✅ 更好：SQL 层就把 owner 条件焊死（防漏写校验）
+@Select("SELECT * FROM orders WHERE id = #{id} AND user_id = #{meId}")
+Order findByIdAndOwner(@Param("id") Long id, @Param("meId") Long meId);
+
+// ✅ 垂直越权：方法级权限注解（Spring Security）
+@PreAuthorize("hasRole('ADMIN')")
+@DeleteMapping("/admin/users/{id}")
+public void deleteUser(...) { }
+\`\`\`
+
+\`\`\`text
+防御体系（纵深）：
+1. 不可猜测 ID：订单号用雪花 ID/UUID 而非自增（防遍历，但不能替代校验！）
+2. 统一鉴权切面：Controller 禁止裸查，数据访问层强制 owner 条件
+3. 方法级权限：@PreAuthorize 垂直越权防线
+4. 间接引用映射：/api/orders/me/3 → 服务端映射成真实 ID（第三方系统常用）
+5. 测试：每个接口写「用 B 的 token 访问 A 的资源必须 404/403」的用例
+\`\`\`
+
+案例：Facebook 2019 著名 IDOR——改通讯录 ID 可查看任意用户私密照片，影响 680 万用户；某票务平台改订单 ID 看别人身份证号和行程，被白帽子提交后上热搜；Parler 2021 自增 ID + 无鉴权，被脚本按序爬走全站 70TB 视频（包括删除标记的）。
+
+踩坑：只在 Controller 校验、Service 被内部调用时绕过（校验要下沉到数据访问层）；前端隐藏按钮当权限控制（垂直越权经典错误）；「管理员也走这套校验」时留了 if (isAdmin) skip 后门；列表接口校验了但详情/导出/打印接口漏了（同一资源的所有入口都要查）；微服务间内网调用信任 userId 头，网关被绕过后全穿（内网也要验签+归属校验下沉）；用 UUID 就觉得安全——UUID 防遍历不防「合法用户拿到别人 UUID 后访问」（比如分享链接泄露）。`,
+    keyPoints: ["查询条件强制带 owner，404 不暴露存在性", "校验下沉数据访问层", "UUID 防遍历不防越权"],
+    followUps: ["ABAC（属性级权限）怎么表达「只能看自己部门的数据」？", "分享链接的权限时效怎么设计？"],
+    favorited: false,
+  },
+  // ===== 安全与认证：认证授权（be-264 ~ be-270）=====
+  {
+    id: "be-264",
+    nodeId: "be-auth",
+    question: "Session-Cookie 和 JWT 的本质区别？分布式场景怎么选？",
+    bigTech: true,
+    answer: `结论：Session-Cookie 是「有状态凭证」——服务端存一份会话数据（Redis/内存），Cookie 里只放一把钥匙（sessionId）；JWT 是「无状态凭证」——用户信息自包含在 Token 里，服务端不存任何东西，靠签名防伪。本质差异：状态存哪。
+
+\`\`\`text
+对比表：
+维度          Session-Cookie              JWT
+状态          服务端存（Redis）           无状态，自包含
+吊销          删 Redis 立即生效           天然不可吊销（要等过期）
+体积          Cookie 几十字节            几百字节~几 KB（每次请求都带）
+跨域          Cookie 跨域受限             Header 携带天然跨域
+续期          滑动过期自动续              要么重签要么 Refresh Token
+多设备踢人    容易（删其他 session）      难（要额外维护黑名单）
+泄露面        XSS 偷不到(HttpOnly)        放 localStorage 可被 JS 读走
+\`\`\`
+
+\`\`\`text
+JWT 结构三段式（xxxxx.yyyyy.zzzzz）：
+Header   {"alg":"RS256","typ":"JWT"}                    Base64Url
+Payload  {"sub":"9527","role":"admin","exp":1700003600} Base64Url（不加密！）
+Signature 私钥签名(Header.Payload)                       防篡改
+关键认知：JWT 是签名不是加密，Payload 谁都能解码——别放密码/身份证！
+\`\`\`
+
+\`\`\`java
+// JWT 生成与校验（jjwt 示例）
+String jwt = Jwts.builder()
+    .subject(userId)
+    .claim("role", role)
+    .issuedAt(new Date())
+    .expiration(new Date(System.currentTimeMillis() + 30 * 60_000)) // 短！
+    .signWith(rsaPrivateKey, Jwts.SIG.RS256)   // 非对称：签发方私钥，校验方公钥
+    .compact();
+
+Jws<Claims> parsed = Jwts.parser()
+    .verifyWith(rsaPublicKey)
+    .build().parseSignedClaims(jwt);
+// 校验项：签名 + exp + iss/aud，缺一不可
+\`\`\`
+
+选型决策：
+- 单体/中小团队/强管控（要随时踢人、设备管理）→ Session+Redis 简单可靠
+- 微服务网关统一鉴权/跨域 SPA+APP 双端/第三方接入 → JWT（网关验签后内网传 userId 头）
+- 大厂主流：网关层 JWT（短 15-30min）+ Refresh Token（长 7-30 天，HttpOnly Cookie，可吊销）双 Token 组合——兼得「无状态验签性能」和「可吊销安全」
+
+案例：微信/支付宝的 access_token 体系本质是服务端可控的 Session（7200s，集中签发集中校验）；AWS/GCP 的 STS 临时凭证是 JWT 思路（自包含+短过期）；Auth0/Firebase Auth 标准双 Token：ID Token(JWT) + Refresh Token。
+
+踩坑：JWT 放敏感信息（Base64 解码即见）；alg=none 漏洞——早期库接受 alg:none 伪造 Token（必须服务端强制指定算法白名单）；HS256 和 RS256 混淆攻击——用公钥当 HMAC 密钥伪造签名（库要锁死算法）；Token 太长撑爆 Cookie（4KB 限制）放不进 Cookie 只好 localStorage；忘记校验 exp/iat；用 JWT 当「永不过期 API Key」发出去收不回；登出后客户端删 Token 但服务端没黑名单，Token 在过期前依然有效（要短过期+Refresh 轮换+关键操作二次验证）。`,
+    keyPoints: ["Session 有状态可吊销/JWT 无状态不可吊销", "JWT 是签名非加密，Payload 公开", "大厂=短 JWT+可吊销 Refresh Token"],
+    followUps: ["JWT 黑名单方案怎么做到高性能（Bloom Filter）？", "Refresh Token 轮换检测到重用怎么办？"],
+    favorited: false,
+  },
+  {
+    id: "be-265",
+    nodeId: "be-auth",
+    question: "为什么需要 Refresh Token？双 Token 机制和轮换检测怎么设计？",
+    bigTech: true,
+    answer: `结论：单 Token 有个死结——过期时间短则用户频繁掉线，长则泄露后攻击窗口大。双 Token 解法：Access Token 短寿命（15-30 分钟）无感使用，Refresh Token 长寿命（7-30 天）只用于换新。攻击者偷到 Access 只能用半小时；偷到 Refresh 但「轮换检测」会在他换新的瞬间暴露并全族吊销。
+
+\`\`\`text
+双 Token 时序：
+登录 → 颁发 AT(30min) + RT(30d，HttpOnly Cookie，仅存 /auth/refresh 路径)
+请求 → Authorization: Bearer AT
+AT 过期 → 前端静默调 /auth/refresh（带 RT Cookie）
+     → 服务端校验 RT（Redis 白名单）→ 颁发新 AT + 新 RT（旧 RT 作废=轮换）
+RT 也过期 → 重新登录
+\`\`\`
+
+\`\`\`text
+Refresh Token 轮换 + 重用检测（RFC 6819 推荐，Auth0/Google 同款）：
+1. 每次刷新：旧 RT 立即标记为「已使用」，颁发新 RT
+2. 若收到「已使用」的 RT → 判定为令牌被盗（重放）
+   → 吊销该用户整族 RT（攻击者和受害者一起下线，受害者重新登录后安全）
+3. Redis 结构：
+   rt:{userId}:{rtId} = { status: valid/used, familyId, exp }
+   family:{familyId} 被标记 compromised 时整族拒绝
+\`\`\`
+
+\`\`\`java
+// 刷新接口核心逻辑（伪代码）
+public TokenPair refresh(String oldRt) {
+    RefreshToken stored = redis.get("rt:" + hash(oldRt));
+    if (stored == null) throw new Unauthorized("unknown rt");
+    if (stored.status == USED) {
+        // 重用检测：RT 被偷了！整族吊销
+        redis.set("family:" + stored.familyId, "compromised", stored.familyTtl);
+        securityAudit.alert("rt-reuse", stored.userId);
+        throw new Unauthorized("rt reused, family revoked");
+    }
+    if (redis.exists("family:" + stored.familyId + "=compromised"))
+        throw new Unauthorized("family compromised");
+
+    stored.status = USED;  // 原子操作：SETNX/Lua 防并发双刷新
+    redis.save(stored);
+    return issuePair(stored.userId, stored.familyId);  // 新 AT + 新 RT
+}
+\`\`\`
+
+工程细节：
+- RT 存 HttpOnly + Secure + SameSite + Path=/auth/refresh 四重限制的 Cookie（XSS 读不到、CSRF 打不到、只有刷新接口收得到）
+- RT 本体只给哈希存 Redis（泄露 DB 也不能用）
+- AT 用 JWT（无状态验签快），RT 用不透明随机串（必须服务端校验，天然可吊销）
+- 多端登录：每端独立 family（设备 A 掉线不影响设备 B）
+
+案例：Google OAuth2——access_token 1h + refresh_token 长期，refresh 时轮换且检测重用；GitHub 2021 起 OAuth Token 全面支持过期+轮换；某电商未做轮换检测，RT 泄露后攻击者持续半年换 AT 盗刷，加检测后第二次重用即触发全族吊销+风控报警。
+
+踩坑：RT 也做成 JWT 且服务端不存（无法吊销=退化成单长 Token）；刷新接口不验 RT 有效性只看签名（泄露的 RT 永久可用）；旧 RT 不作废（新旧并存，泄露面翻倍）；重用检测误杀正常并发（前端两个请求同时 401 同时刷新——要用分布式锁单飞 + 短期缓存新 AT 返回给后到请求）；RT 无限续期等于永不过期（要设 absolute expiry，如 90 天后必须重登）。`,
+    keyPoints: ["短 AT 无感+长 RT 换新，攻击窗口最小化", "轮换+重用检测=RT 泄露即暴露", "RT 存哈希+HttpOnly Cookie+family 隔离"],
+    followUps: ["单点登出（全端下线）在双 Token 下怎么实现？", "OAuth2 的 PKCE 解决什么场景的 RT 泄露？"],
+    favorited: false,
+  },
+  {
+    id: "be-266",
+    nodeId: "be-auth",
+    question: "OAuth2 四种授权模式？授权码模式为什么要 code 换 token 两步走？",
+    bigTech: true,
+    answer: `结论：OAuth2 解决的是「让第三方应用有限访问你的资源，又不把密码给它」。四种模式：授权码（Authorization Code，标准首选）、简化（Implicit，已废弃）、密码（Resource Owner Password，仅限第一方）、客户端凭证（Client Credentials，服务间调用）。授权码模式两步走的精髓：code 走浏览器（可被看到），token 走服务器直连（不可见）——token 永远不经过浏览器历史/日志/Referer。
+
+\`\`\`text
+授权码模式全流程（你用微信登录知乎）：
+1. 知乎跳微信授权页：
+   https://wx.qq.com/oauth?response_type=code&client_id=zhihu&
+   redirect_uri=https://zhihu.com/callback&state=xyz&scope=userinfo
+2. 用户扫码同意 → 微信回调：
+   https://zhihu.com/callback?code=AUTH_CODE&state=xyz
+   （code 暴露在浏览器地址栏/历史记录，所以必须短寿命+一次性）
+3. 知乎后端用 code + client_secret 直连微信换 token：   ← 关键第二步！
+   POST wx.qq.com/token { code, client_id, client_secret }
+   这步是服务器到服务器，不经过浏览器 → token 不泄露
+4. 拿到 access_token → 拉取用户 OpenID/昵称 → 建立自己的会话
+\`\`\`
+
+\`\`\`text
+为什么必须两步（一步直接发 token 会怎样）：
+- Implicit 模式就是这么干的（token 直接放 URL fragment）
+- 问题：token 可能通过 Referer 头泄露给页面里的第三方资源；
+  浏览器历史/代理日志留存 token；无法校验 client 身份（没有 secret 环节）
+- OAuth2.1 已正式删除 Implicit，SPA 用「授权码+PKCE」
+\`\`\`
+
+\`\`\`text
+四种模式速查：
+授权码+PKCE   有后端的 Web / SPA / 移动 App（唯一推荐给第三方）
+密码模式      自家 App（官方客户端），用户信得过你拿密码（京东 App 登录京东）
+客户端凭证    没有「用户」的机器间调用：client_id+secret 换 token（微服务调开放平台）
+设备码        电视/命令行无浏览器设备（RFC 8628，扩展模式）
+\`\`\`
+
+\`\`\`java
+// PKCE（防 code 被截获，移动/SPA 必配）：
+// 1. 客户端生成 verifier（随机串）并算出 challenge
+String verifier = randomUrlSafe(64);
+String challenge = base64url(sha256(verifier));
+// 2. 授权请求带 challenge；回调后换 token 时带 verifier
+// 3. 授权服务器校验 sha256(verifier) == challenge
+// 效果：即使恶意 App 截获了回调 code，没有 verifier 也换不出 token
+\`\`\`
+
+案例：GitHub OAuth App 登录（gitkraken 等工具全走授权码）；微信开放平台/企业微信扫码登录；Google 登录的 gsi 客户端。安全事件：早期多款 App 用 Implicit 且 redirect_uri 校验不严（*.evil-cdn.com 也算匹配主域），token 被钓鱼页收割——redirect_uri 必须精确匹配，不能通配。
+
+踩坑：state 参数不校验 → CSRF 攻击者把自己的 code 塞给受害者浏览器完成「账号绑定劫持」（受害者的知乎被绑到攻击者微信上）；redirect_uri 用前缀/通配匹配被 open redirect 绕过；code 不限制一次性使用（重放换 token）；access_token 放 URL 里传（日志泄露）；把 OAuth2 当认证协议用——OAuth2 是授权协议，「拿到 token」不等于「验证身份」，身份层要用 OIDC（ID Token JWT 带 iss/sub/aud 校验）；aud 不校验 → 给 A 应用签的 token 拿去访问 B 应用（Confused Deputy）。`,
+    keyPoints: ["code 走浏览器 token 走服务器，token 不落地浏览器", "Implicit 已废，SPA 用授权码+PKCE", "state 防 CSRF，redirect_uri 精确匹配"],
+    followUps: ["OIDC 的 ID Token 和 access_token 职责区别？", "OAuth2 的 token 怎么设计撤销（RFC 7009）？"],
+    favorited: false,
+  },
+  {
+    id: "be-267",
+    nodeId: "be-auth",
+    question: "SSO 单点登录怎么实现？CAS 流程和 Cookie 域共享、JWT 方案各有什么坑？",
+    bigTech: true,
+    answer: `结论：SSO 的核心是「认证状态集中管理，业务系统信任认证中心的票据」。三种主流落地：CAS（票据回跳+后端验票，企业级老标准）、Cookie 域共享（*.corp.com 同域系产品最简单）、OIDC/SAML（跨组织标准，现代首选）。选型看一点：业务系统是否在同一个父域下。
+
+\`\`\`text
+CAS 全流程（用户访问 app1.corp.com 未登录）：
+1. app1 发现无会话 → 302 跳 CAS Server：
+   sso.corp.com/cas/login?service=https://app1.corp.com/cas/callback
+2. CAS 无全局会话 → 显示登录页 → 用户输密码
+3. CAS 建立全局会话（TGT Cookie，域=sso.corp.com）
+   → 302 回跳 service 地址 + 一次性票据 ST：
+   app1.corp.com/cas/callback?ticket=ST-1-abc
+4. app1 后端拿 ST 直连 CAS 验票（/p3/serviceValidate）   ← 类 code 换 token
+   → 返回 XML：用户名+属性 → app1 建立自己的局部会话
+5. 用户再访问 app2.corp.com → 跳 CAS → TGT Cookie 还在
+   → 直接发新 ST 回跳 → app2 验票建会话（全程无感）
+\`\`\`
+
+\`\`\`text
+三方案对比：
+方案            适用                    坑
+CAS             跨域企业集团应用         ST 一次性+短 TTL；验票走后端；
+                                       单点登出要 CAS 广播通知各 app 清会话
+Cookie 域共享   同父域 *.corp.com        跨不了域（taobao/tmall 就不行）；
+                sessionId Cookie        CSRF 面变大；Cookie 体积膨胀
+                Domain=.corp.com
+OIDC(JWT)      跨组织/SaaS/移动         公钥轮换（jwks 端点）；时钟偏移；
+               ID Token + 标准 claims   token 体积大；登出要 RP-Initiated Logout
+\`\`\`
+
+\`\`\`java
+// 单点登出（SLO）是 SSO 最难的部分：
+// 用户在 app1 点退出 → 清 app1 会话 → 跳 CAS /logout 清 TGT
+// → CAS 给所有登过的 app 发 back-channel 注销通知
+// → 各 app 收到通知清掉对应局部会话
+// 现实妥协：很多系统只清本地+清 TGT，其他 app 的局部会话等自然过期
+// （局部会话设短一点，如 30min，降低窗口）
+\`\`\`
+
+案例：Google 全家桶（accounts.google.com 是 CAS 角色，Gmail/YouTube/Drive 各有局部会话）；阿里统一登录（login.taobao.com，淘宝天猫飞猪互通，跨域用 token 传递+域名列表信任）；企业微信/钉钉应用市场的 OAuth2 授权即 SSO；大学统一身份认证 90% 跑 Apereo CAS。
+
+踩坑：CAS 的 service 参数不校验白名单 → 票据发给任意域名（钓鱼站拿 ST 换身份）；验票用前端 JS 直连（暴露 serviceValidate 响应篡改面，必须后端验）；局部会话和全局会话生命周期不分（CAS 登出了 app 还能用——登出通知必须实现或局部会话要短）；Cookie 域共享方案把 sessionId 放 .corp.com 父域，任一子域 XSS 全集团沦陷（收窄 path/域 + 子域安全基线）；跨域场景用 iframe 嵌登录页（第三方 Cookie 被浏览器拦截后失效）；SAML 断言不验证签名/Recipient/InResponseTo → 重放和伪造（XML 签名验证是著名雷区，XXE+签名包裹攻击）。`,
+    keyPoints: ["CAS=TGT 全局会话+ST 一次性票据+后端验票", "同域用 Cookie 共享，跨组织用 OIDC/SAML", "单点登出要广播通知，局部会话宜短"],
+    followUps: ["OIDC 的 RP-Initiated Logout 流程？", "SAML 签名包裹攻击（XSW）怎么防？"],
+    favorited: false,
+  },
+  {
+    id: "be-268",
+    nodeId: "be-auth",
+    question: "RBAC 权限模型怎么设计？RBAC vs ABAC？数据级权限怎么做？",
+    bigTech: true,
+    answer: `结论：RBAC = 「用户→角色→权限」三层解耦——权限不直接绑人，绑到角色上，人通过担任角色获得权限。这是后台系统的事实标准（95% 场景够用）。当权限判断需要「看上下文」（自己的数据/本部门/工作时间），就要升级 ABAC（属性基访问控制）或在 RBAC 上外挂数据权限规则。
+
+\`\`\`text
+RBAC 经典五表（SQL 建模）：
+user(id, name, dept_id)
+role(id, code, name)              -- admin / ops / finance
+permission(id, code, resource, action)  -- order:read / order:refund
+user_role(user_id, role_id)       -- 多对多
+role_permission(role_id, permission_id) -- 多对多
+
+演进方向：
+- 角色继承（role.parent_id）：高级客服 ⊇ 客服，减少权限重复配置
+- 用户组（group）：部门整体授角色，新人入职自动继承
+- 权限码规范：resource:action[:scope]，如 order:refund:own
+\`\`\`
+
+\`\`\`java
+// 接口级鉴权（垂直）：注解 + AOP
+@PreAuthorize("hasAuthority('order:refund')")
+@PostMapping("/orders/{id}/refund")
+public void refund(@PathVariable Long id) { }
+
+// 数据级权限（水平）——三种实现：
+// 1. SQL 改写拦截器（MyBatis 插件）：按用户数据范围注入 WHERE
+//    数据范围枚举：ALL / DEPT / DEPT_AND_SUB / SELF / CUSTOM
+String inject = switch (scope) {
+    case "SELF" -> " AND creator_id = " + me.getId();
+    case "DEPT_AND_SUB" -> " AND dept_id IN (" + subDeptIds(me) + ")";
+    default -> "";
+};
+// 2. 查询对象层：Repository 方法强制带 owner/dept 参数（编译期防漏）
+// 3. 行级安全（数据库原生）：PostgreSQL RLS、MySQL 8 无（要靠视图/中间件）
+\`\`\`
+
+\`\`\`text
+RBAC vs ABAC：
+维度      RBAC                        ABAC
+判断依据  你是谁（角色）               你是谁+资源属性+环境条件
+表达力    静态授权                     「本部门+金额<5万+工作时间」动态规则
+复杂度    低（配置即可）               高（规则引擎 XACML/OPA Rego）
+性能      角色权限可缓存               每次求值，需策略缓存
+适用      后台管理/ERP/CRM            云 IAM/零信任/金融风控
+现实方案  RBAC 为主体+数据范围外挂     AWS IAM（RBAC+Condition 混合=ABAC 化）
+\`\`\`
+
+案例：AWS IAM 是 ABAC 巅峰——policy 里 Condition 可写 \`"StringEquals": {"aws:PrincipalTag/team": "\${aws:ResourceTag/team}"}\` 实现「同 team 才能操作」；金蝶/用友 ERP 的 RBAC + 数据权限（按组织/仓库/客户维度过滤）；蚂蚁金服的 SOFA 权限体系把「功能权限+数据权限+字段权限」三层分离（敏感字段单独授权）。
+
+踩坑：权限只校验菜单可见性（前端隐藏按钮≠安全，接口必须独立鉴权）；超管权限硬编码 if (userId == 1)；角色爆炸——给每个人单独建角色（退化成 ACL，角色数>50 就该引入用户组/继承）；权限码用中文或模糊语义（「查看订单」和「订单查询」混用，必须 resource:action 规范）；数据权限在 Controller 层手写（漏一个接口就越权，必须用 MyBatis 拦截器统一注入）；权限变更不生效（缓存了用户权限集，改角色后没失效——版本号或短 TTL）；删除权限时没检查「正在被哪些角色引用」。`,
+    keyPoints: ["用户-角色-权限三层解耦+五表建模", "数据权限用 SQL 拦截器统一注入 WHERE", "复杂条件上 ABAC，AWS IAM 是范本"],
+    followUps: ["OPA（Open Policy Agent）在微服务里怎么做统一鉴权？", "字段级权限（手机号脱敏分级）怎么落地？"],
+    favorited: false,
+  },
+  {
+    id: "be-269",
+    nodeId: "be-auth",
+    question: "扫码登录的完整流程和状态机？二维码会不会被截胡？",
+    bigTech: false,
+    answer: `结论：扫码登录 = 「已认证设备（手机）替未认证设备（PC）做身份背书」。核心是一张临时二维码作为「会话凭证」在三个端（PC 浏览器、手机 App、服务端）间流转状态机：待扫码→已扫码→已确认→已失效。安全性靠：二维码短寿命 + 一次性 + 确认动作在手机端完成。
+
+\`\`\`text
+完整时序（以微信网页版为蓝本）：
+1. PC 请求生成二维码 → 服务端生成 qrId（UUID，120s 过期）+ 状态 PENDING
+   → Redis: qr:{qrId} = { status: PENDING } EX 120
+2. PC 展示二维码（内容= qrId 或带 qrId 的 URL）
+   PC 开始轮询（或长轮询/WebSocket）：GET /qr/status?qrId=xxx
+3. 手机 App 扫码 → 已登录的 App 带着自己的 token 调：
+   POST /qr/scan { qrId } → 状态变 SCANNED（PC 页面显示「已扫描，请在手机确认」）
+   → 此时还没登录！手机上弹出「确认登录网页版？」
+4. 手机点确认 → POST /qr/confirm { qrId }（带 App token）
+   → 服务端校验：qrId 状态=SCANNED + 扫描人与确认人一致
+   → 状态变 CONFIRMED，绑定 userId，生成 PC 会话凭证 ticket
+5. PC 轮询到 CONFIRMED → 用 qrId+ticket 换正式 Session/JWT → 登录成功
+6. 二维码 120s 无操作 → EXPIRED；确认过一次 → 立即作废（一次性）
+\`\`\`
+
+\`\`\`text
+状态机（防止非法跃迁是安全关键）：
+PENDING --scan--> SCANNED --confirm--> CONFIRMED --exchange--> CONSUMED
+   |                 |
+   +--120s--> EXPIRED +--cancel--> CANCELLED（手机点取消）
+\`\`\`
+
+\`\`\`text
+截胡攻击与防御：
+攻击1  钓鱼二维码：攻击者拿到自己的 qrId 做成「登录领红包」海报
+        受害者扫码确认 → 攻击者的 PC 登录了受害者账号！
+防御    手机确认页大字展示「登录地点/设备/IP」让用户判断；
+        扫码后显示的是「确认登录」而非静默登录（确认动作即授权）
+攻击2  二维码被旁人扫：地铁里别人扫了你的屏幕
+防御    qrId 一次性+短寿命；确认在手机端（攻击者扫了不确认=无效）
+攻击3  中间人改轮询响应
+防御    全链路 HTTPS；ticket 与 qrId 绑定且一次性
+\`\`\`
+
+案例：微信网页版/桌面客户端登录（行业标杆，确认页显示地点+设备型号）；钉钉/飞书扫码登录管理后台；任天堂 Switch 扫码绑定账号。真实攻击：2019 年黑产在网吧张贴「扫码领网费」二维码，实为攻击者 PC 的登录二维码，扫码者确认后 Steam/微信被盗——确认页信息展示和用户教育是最后防线。
+
+踩坑：qrId 用自增/可猜测 ID（攻击者批量轮询别人的二维码状态）；PC 轮询拿到 CONFIRMED 后直接信任 qrId 当凭证（必须换一次性 ticket 再换正式凭证，且 qrId 换完即焚）；没有 SCANNED 中间态（扫了=登录，钓鱼更容易）；二维码长期有效（打印张贴后被无限利用）；确认接口不校验扫描人和确认人是同一登录态（App 换账号确认漏洞）；轮询无频率限制被刷（用长轮询 30s+限流）；手机端确认页不显示登录位置信息（用户无法识别异地登录）。`,
+    keyPoints: ["已认证设备替未认证设备背书", "四态状态机+一次性+短寿命", "手机确认页展示设备/IP 防钓鱼"],
+    followUps: ["WebSocket 替代轮询时连接怎么鉴权？", "FIDO2/Passkey 会取代扫码登录吗？"],
+    favorited: false,
+  },
+  {
+    id: "be-270",
+    nodeId: "be-auth",
+    question: "「记住我」和「踢人下线」「全平台登出」分别怎么实现？（会话管理实战）",
+    bigTech: false,
+    answer: `结论：三个需求本质都是「会话生命周期的精细化管理」。记住我 = 双 Cookie 长效令牌（持久化+可轮换）；踢人下线 = 服务端会话索引（userId→sessionIds 反查删除）；全平台登出 = 吊销该用户全部会话+令牌版本号失效 JWT。
+
+\`\`\`java
+// 1. 记住我（Spring Security Remember-Me 持久化方案）
+// 登录时：生成 series + token 二元组存 DB，Cookie 存 "series:token" 14 天
+// 回来时：按 series 查库 → token 比对（哈希存储）
+//        → 通过则发新 token（轮换，旧 token 作废）+ 建立会话
+// 重用检测：series 对但 token 不对 → 被盗！删除该用户全部 remember-me 令牌
+// 敏感操作（改密/支付）：remember-me 登录的用户强制重新输密码
+//   Spring Security: isRememberMe() 时要求 fullyAuthenticated()
+\`\`\`
+
+\`\`\`text
+2. 踢人下线（单设备登录/强制下线）
+数据结构：
+  session:{sid}        = { userId, device, createdAt }   会话本体
+  user_sessions:{uid}  = Set<sid>                         反查索引
+单设备登录：登录时删除 user_sessions 里所有旧 sid（旧端下次请求 401）
+管理端踢人：按 uid 查索引 → 批量 DEL → 实时生效
+JWT 场景：维护 user 级 token_version，踢人时 version+1，
+         验签时比对 payload.tv != 当前 version → 拒绝
+         （JWT 黑名单太重的折中：全踢用版本号，单踢用短黑名单）
+\`\`\`
+
+\`\`\`text
+3. 全平台登出（改密码后/发现被盗）
+- Session 体系：删 user_sessions:{uid} 全量 sid（O(n) 但有索引所以快）
+- JWT 双 Token：吊销全部 Refresh Token family + token_version+1
+  → AT 在剩余寿命（<30min）内仍可用——要立刻生效就得网关查 version 缓存
+- Remember-Me：删该用户全部 series
+- OAuth：撤销第三方授权 token（RFC 7009）
+配套：给用户「登录设备列表」页（展示 device/IP/最后活跃，可逐台踢）
+\`\`\`
+
+案例：微信「登录设备管理」可删除历史设备（删后该设备需重新验证）；Google 账号安全页的「您的设备」支持远程退出任意设备；GitHub 改密码后自动吊销全部会话和所有 OAuth token（除了显式保留的 SSH key）；Netflix 2017 上线「Sign out of all devices」应对账号共享黑产，背后是全局会话索引+令牌吊销。
+
+踩坑：踢人只删 session 不删 remember-me 令牌（被踢端靠记住我自动登录回来）；Session 存内存（重启全掉线+多实例不一致，必须 Redis 集中存储）；JWT 踢人靠等过期（事故响应要求分钟级，version 机制是底线）；改密码后旧 Refresh Token 没吊销（被盗的手机还能换新 AT）；设备列表只存 UA 字符串（相同型号手机分不清，要存 device fingerprint + 登录时标记）；并发登录竞态——两端同时登录互相把对方挤掉形成「踢人乒乓」（登录加用户级分布式锁）；登出接口 CSRF 可打（强制 POST+Token，不然攻击者让受害者被动下线配合钓鱼）。`,
+    keyPoints: ["记住我=series+token 轮换+重用检测", "踢人=userId 会话索引反查删除", "JWT 全踢用 token_version，秒级生效"],
+    followUps: ["改密码后如何让进行中的 WebSocket 连接也断开？", "设备指纹的常用因子和隐私合规边界？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
