@@ -5,6 +5,10 @@
 //   1. renderBlock 必须返回 SVG 元素，不能包裹 HTML <div>（SVG <g> 不允许包含 div）
 //   2. 数据必须按日期升序排序（ActivityCalendar fillHoles 依赖 activities[0]/[last])
 //   3. fallback 数据应填充整个时间范围（避免只渲染单个 12px 格子）
+//
+// 2026-07-26 性能优化后拆分：Heatmap.tsx (数据加载轻量外壳) + HeatmapContent.tsx
+// (持有 react-activity-calendar 重库 + renderBlock)。守护测试改为扫描两个文件
+// 合并内容，既保留拆分带来的首屏体积优化，又保留对 renderBlock 实现的守护。
 
 import { describe, it, expect } from "vitest";
 
@@ -62,18 +66,29 @@ describe("Heatmap 修复守护", () => {
   });
 
   it("Heatmap.tsx 不应在 renderBlock 中使用 div 包裹", async () => {
-    // 静态扫描：Heatmap.tsx 的 renderBlock 不应返回 <div> 元素
+    // 静态扫描：Heatmap 的 renderBlock 不应返回 <div> 元素
     // 这是 2026-07-26 修复的核心：SVG <g> 不能包含 <div>，会导致整个 SVG 渲染失败
+    //
+    // 2026-07-26 性能优化后 renderBlock 移到 HeatmapContent.tsx，
+    // 扫描 Heatmap.tsx + HeatmapContent.tsx 合并内容（单一事实源 = 两文件组合）
     const fs = await import("fs");
     const path = await import("path");
-    const fileContent = fs.readFileSync(
+    const heatmapFile = fs.readFileSync(
       path.join(process.cwd(), "components/Heatmap.tsx"),
       "utf-8",
     );
+    const heatmapContentFile = fs.readFileSync(
+      path.join(process.cwd(), "components/HeatmapContent.tsx"),
+      "utf-8",
+    );
+    const fileContent = heatmapFile + "\n" + heatmapContentFile;
 
     // 提取 renderBlock 的代码块（从 "renderBlock={" 到对应的 "}"）
     const renderBlockStart = fileContent.indexOf("renderBlock={");
-    expect(renderBlockStart, "Heatmap.tsx 应该有 renderBlock prop").toBeGreaterThan(-1);
+    expect(
+      renderBlockStart,
+      "Heatmap.tsx 或 HeatmapContent.tsx 应该有 renderBlock prop",
+    ).toBeGreaterThan(-1);
 
     // 提取从 renderBlock 开始的代码段（取 1000 字符足够）
     const renderBlockSection = fileContent.slice(renderBlockStart, renderBlockStart + 1000);
