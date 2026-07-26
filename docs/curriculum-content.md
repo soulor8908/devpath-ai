@@ -27,8 +27,11 @@ content/
 1. 在 `sources/registry.yaml` 登记其来源（≥2 条，至少 1 条 T0/T1）
 2. 在 `graph/nodes/` 新建 `<id>.yaml`，字段见 `lib/curriculum/schema.ts`
 3. 必填的教学字段：`frontendBridge`（前端迁移映射）、`concepts`、`gotchas`、`interview`（含追问）、`masteryCheck`
-4. 跑 `npm run content:validate` 通过
-5. `npm run content:compile` 生成 `public/data/curriculum-graph.json`
+4. **内容质量**：题目角度分布、答案四段式、量化案例等强制要求见
+   [content-generation-standard.md](file:///workspace/docs/content-generation-standard.md)
+   （AI 生成与人工编写同规）
+5. 跑 `npm run content:validate` 通过
+6. `npm run content:compile` 生成 `public/data/curriculum-graph.json`
 
 ## 校验规则（CI 门禁，npm test 自动执行）
 

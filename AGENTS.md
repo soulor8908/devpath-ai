@@ -397,10 +397,26 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 | emoji 当功能图标 | 代码评审打回（暂无测试守护） |
 | absolute 浮层覆盖画布内容（见 2.11） | 代码评审打回（暂无测试守护，需自查窄屏 + 浮层重叠） |
 | 跳转不带场景参数（见 2.12） | 代码评审打回（暂无测试守护，需自查交互闭环） |
+| AI 生成内容删除/削弱质量宪章约束（见第 9 节） | `content-generation-standard.test.ts` 失败 → CI red |
+| AI 生成内容含占位符 / 裸答案 / 孤儿题（见第 9 节） | `preset-content-quality.test.ts` 失败 → CI red |
+| 改 prompt 不 bump version（见第 9 节） | `prompts.test.ts` 指纹快照失败 → CI red |
 
 ---
 
-## 9. 更新本文件
+## 9. AI 内容生成规范（知识点 / 题目 / 答案）
+
+**强制规范全文**：[docs/content-generation-standard.md](file:///workspace/docs/content-generation-standard.md)。
+所有 AI 生成知识库内容（运行时生成 + 策展轨道批量生产 + 任何未来入口）必须遵守。核心：
+
+1. **答案四段式宪章**：结论与原理（含量化细节）→ 实战案例（第一人称 + 至少 2 个具体数字 + 踩坑修复过程）→ 举一反三（场景推广/工程经验映射）→ 扣分点对照（背题 vs 真做过）。禁止名词罗列、教科书定义堆砌、无数字空洞案例、无前提经验值。
+2. **题目四角度**：概念辨析 / 原理深挖 / 实战设计 / 踩坑对比；题面具体有场景，禁止泛泛题。
+3. **知识点正确性/完整性**：事实可被一手来源佐证；经验值标注适用条件；高频考点不得遗漏；依赖闭环。
+4. **运行时注入点**：`lib/ai/prompts.ts` 的 `ANSWER_QUALITY_CHARTER` / `QUESTION_ANGLE_RULES` 常量注入 4 个生成 prompt（`knowledge_decompose` / `question_generate` / `question_stem_generate` / `answer_generate`）。修改 prompt 必须 bump version（指纹快照强制）。
+5. **守护测试**：[__tests__/content-generation-standard.test.ts](file:///workspace/__tests__/content-generation-standard.test.ts) 守护约束在位；[__tests__/preset-content-quality.test.ts](file:///workspace/__tests__/preset-content-quality.test.ts) 守护产物质量。
+
+---
+
+## 10. 更新本文件
 
 本文件是活文档。新增设计规则、组件、令牌时，**必须**同步更新本文件和 [docs/ui-design-system.md](file:///workspace/docs/ui-design-system.md)。
 
