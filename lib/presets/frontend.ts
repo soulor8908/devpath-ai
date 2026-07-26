@@ -524,20 +524,20 @@ const FRONTEND_QUESTIONS: Question[] = [
     nodeId: "fe-html-semantics",
     question: "ARIA 的 role 和 aria-* 属性如何使用？什么时候该用，什么时候不该用？",
     bigTech: false,
-    answer: `ARIA（Accessible Rich Internet Applications）用于给自定义组件补充语义。核心原则：能用原生语义标签就别加 ARIA——button 天然有 role="button"，不需要再声明。
+    answer: `ARIA（Accessible Rich Internet Applications，WAI-ARIA 规范）用于给自定义组件补充语义，浏览器解析后把 role、状态和属性映射进无障碍树（Accessibility Tree），读屏软件读的是这棵树而非 DOM。规范第一原则：能用原生语义标签就别加 ARIA——button 天然有 role=button、键盘聚焦和 Enter/Space 触发，再加 ARIA 是重复甚至冲突，社区共识是「No ARIA is better than bad ARIA」。
 
-在字节内部设计系统组件库里，自定义下拉菜单必须声明 ARIA 才能让键盘和读屏可用：
+自定义组件必须手工补齐三件套：角色、状态、键盘交互。以设计系统的下拉菜单为例：
 
-\`\`\`html
-<div role="listbox" aria-label="选择城市" tabindex="0">
+<div role="listbox" aria-label="选择城市" tabindex="0" aria-activedescendant="opt-1">
   <div role="option" aria-selected="true" id="opt-1">北京</div>
   <div role="option" aria-selected="false" id="opt-2">上海</div>
 </div>
-\`\`\`
 
-踩坑：aria-hidden="true" 会让整个子树对辅助技术不可见，别用在可聚焦元素上；aria-live="polite" 用于动态通知（如点赞数变化），assertive 会打断用户，慎用。`,
-    keyPoints: ["原生标签优先，ARIA 补充语义", "role 定义组件类型", "aria-selected/expanded/disabled 反映状态"],
-    followUps: ["aria-live 的 polite 和 assertive 区别？", "tabindex 的 0 和 -1 如何配合键盘导航？"],
+还要配套方向键移动 aria-activedescendant、Enter 选中、Esc 关闭，缺一样读屏用户就不可用。
+
+踩坑：aria-hidden="true" 让整个子树对辅助技术不可见，绝不能用在可聚焦元素上（焦点能进却读不到，属 WCAG 违规）；aria-live="polite" 用于动态通知，assertive 会打断当前朗读，仅用于报错等紧急场景；role 一旦声明就覆盖原生语义，给 button 加 role=link 会丢掉按钮行为。DevTools 的 Accessibility 面板可查看无障碍树验证效果。`,
+    keyPoints: ["原生语义优先，ARIA 只补缺不重复","浏览器把 ARIA 映射进无障碍树，读屏读树不读 DOM","自定义组件要补齐 role + 状态属性 + 键盘交互三件套","aria-hidden 不能用于可聚焦元素"],
+    followUps: ["aria-live 的 polite 和 assertive 在使用场景上怎么选？","tabindex 的 0 和 -1 如何配合做组件内键盘导航（roving tabindex）？"],
     favorited: false,
   },
   {
@@ -576,20 +576,20 @@ export const metadata = {
     nodeId: "fe-html-semantics",
     question: "img 标签的 alt 属性什么时候必须写，什么时候应该留空？",
     bigTech: false,
-    answer: `alt 是图片的文本替代。规则：信息图必须有 alt 描述内容；纯装饰图 alt 留空（alt=""）让读屏跳过；背景图用 CSS 而非 img。
+    answer: `alt 是图片的文本替代（alternative text），WCAG 1.1.1 非文本内容条款的硬性要求。机制上读屏遇到 img 时分三种情况：有 alt 读 alt；alt=""（空字符串）直接跳过该图；完全没有 alt 属性时，多数读屏会把文件名读出来——「divider 横线 png」，体验最差。所以「留空」和「不写」语义完全不同，装饰图必须显式留空而不是省略属性。
 
-\`\`\`html
-<!-- 信息图：必须描述 -->
+判断流程：图片传达信息吗？传达→alt 概括信息与结论；纯装饰→alt=""；功能图（按钮里的图标）→alt 描述功能而非外观；复杂图表→alt 给简短结论，再用 figcaption 或 aria-describedby 给长描述。
+
+<!-- 信息图：描述内容与结论 -->
 <img src="chart.png" alt="2024 年 Q3 销售额环比增长 23%" />
-<!-- 装饰图：alt 留空，读屏会忽略 -->
+<!-- 装饰图：读屏直接忽略 -->
 <img src="divider.png" alt="" />
-<!-- 含文字的图：alt 写出图中文字 -->
-<img src="logo.png" alt="美团" />
-\`\`\`
+<!-- 图标按钮：描述功能 -->
+<button><img src="search.svg" alt="搜索" /></button>
 
-踩坑：alt 写"图片"这种废话比不写还糟；复杂图表 alt 描述不下时，用 figcaption 长描述 + alt 简短概括；loading="lazy" 别用在首屏 LCP 图片上，会拖慢 LCP。`,
-    keyPoints: ["信息图 alt 必须描述内容", "装饰图 alt=\"\" 让读屏跳过", "loading=lazy 慎用于 LCP 图"],
-    followUps: ["picture 标签的 source 如何做响应式图片？", "如何用 srcset 做高清屏适配？"],
+真实场景：电商商品图的 alt 同时服务 SEO 和无障碍，写「iPhone 15 Pro 钛金属原色正面图」而不是「图片1」。踩坑：alt 写「图片」「icon」这类废话比不写还糟；loading="lazy" 别用在首屏 LCP 图上，会延迟加载拖慢 LCP 指标；alt 不是 title，鼠标悬浮提示该用 title 或自定义 tooltip，两者职责别混。`,
+    keyPoints: ["alt=\"\" 与不写 alt 语义不同：跳过 vs 读文件名","信息图写结论、装饰图留空、功能图写功能","alt 同时服务无障碍与 SEO","lazy 加载避开首屏 LCP 图"],
+    followUps: ["picture 标签的 source 如何做响应式与格式降级？","复杂图表（如数据大屏）如何用 aria-describedby 提供长描述？"],
     favorited: false,
   },
   {
@@ -621,18 +621,18 @@ export const metadata = {
     nodeId: "fe-html-semantics",
     question: "HTML heading 层级有什么规范？为什么不能跳级？",
     bigTech: false,
-    answer: `heading（h1-h6）表达文档大纲，必须按层级递进不跳级。屏幕阅读器用户靠 heading 导航，跳级（h1→h3）会让大纲断裂，用户找不到内容。
+    answer: `heading（h1-h6）表达文档大纲层级，必须递进不跳级。机制上浏览器把 heading 序列解析成大纲树，屏幕阅读器用户按 h 键在 heading 间跳转、按数字键跳到指定层级——这是视障用户浏览长页面最高效的方式；跳级（h1 之后直接 h3）会让大纲断裂，用户以为漏了中间章节。
 
-\`\`\`html
 <h1>页面主标题</h1>
   <h2>章节 A</h2>
     <h3>子节</h3>  <!-- h2 之后用 h3，不跳级 -->
   <h2>章节 B</h2>
-\`\`\`
 
-踩坑：一个页面只能有一个 h1（主标题）；用 CSS 改字号不等于改层级，h2 样式小不代表语义降级；不要用 heading 凑视觉效果，纯样式用 div+CSS。axe 工具能扫出 heading 顺序问题。`,
-    keyPoints: ["h1 每页一个", "层级递进不跳级", "heading 表语义非样式"],
-    followUps: ["如何用 aria-headinglevel 修正跳级？", "section 嵌套如何影响 heading 大纲？"],
+规范要点：一个页面通常只用一个 h1 表达主标题。HTML5 曾设计「section 嵌套自动重置大纲」的算法，允许每个 section 从 h1 重新开始，但浏览器从未真正实现，W3C 已明确不推荐依赖，所以别指望「section 里随便用 h1」。用 CSS 改字号不改语义：视觉上的「小标题」语义是 h2 就写 h2 再调样式；纯装饰文字不要滥用 heading 凑视觉效果。
+
+真实场景：内容型站点（文档、资讯）的 heading 大纲同时影响 SEO——搜索引擎用 heading 结构理解内容权重，乱用 h 标签做样式会稀释主题相关性。工具验证：axe DevTools、WAVE 能扫出跳级问题，headingsMap 插件可视化大纲树。组件库场景可用 role="heading" + aria-level="2" 在 DOM 结构受限时修正层级。`,
+    keyPoints: ["heading 构成大纲树，读屏靠它导航","层级递进不跳级，每页一个 h1","HTML5 大纲重置算法浏览器未实现，别依赖","heading 表语义不表样式，同时影响 SEO"],
+    followUps: ["组件层级由外部决定时，如何用 aria-level 动态修正 heading 层级？","HTML5 的 section/article 嵌套对大纲算法实际产生了什么影响？"],
     favorited: false,
   },
   {
@@ -741,17 +741,15 @@ export const metadata = {
     nodeId: "fe-css-layout",
     question: "position 各值的定位参照系是什么？sticky 在什么场景失效？",
     bigTech: false,
-    answer: `static 默认流；relative 相对自身原位置；absolute 相对最近非 static 祖先；fixed 相对视口（除非祖先有 transform/filter）；sticky 相对最近滚动祖先。
+    answer: `position 各值的本质是「包含块（containing block）」不同：static 默认文档流；relative 相对自身原位置偏移且不脱离流，原占位保留；absolute 脱离流，相对最近的非 static 祖先，没有则相对初始包含块；fixed 相对视口；sticky 是 relative 与 fixed 的混合，阈值内相对定位、越过阈值后相对最近滚动祖先固定。
 
-\`\`\`css
-.header { position: sticky; top: 0; z-index: 10; } /* 滚动时吸顶 */
-/* sticky 失效场景：父元素 overflow:hidden 或高度不够 */
-.parent { overflow: hidden; } /* 子 sticky 失效！改 overflow: visible */
-\`\`\`
+.header { position: sticky; top: 0; z-index: 10; }
 
-踩坑：sticky 失效最常见原因是任一祖先 overflow 非 visible（auto/hidden/scroll 都算）；fixed 在祖先有 transform/filter/perspective 时会以该祖先为参照系而非视口，这是大坑。美团商品详情页 sticky 吸顶失效，排查半天是上层有个 overflow:hidden 的容器。`,
-    keyPoints: ["absolute 找最近非 static 祖先", "fixed 受 transform 影响", "sticky 受祖先 overflow 影响"],
-    followUps: ["transform 如何影响 fixed 后代？", "sticky 和 fixed 的滚动性能差异？"],
+sticky 失效三大原因：任一祖先 overflow 为 hidden/auto/scroll（规范要求 sticky 相对最近有滚动机制的祖先，overflow 非 visible 会切断参照链）；父元素高度不够（sticky 只能在父容器范围内滑动，父高度等于自身高度时无可滑空间）；旧浏览器对表格、flex 子项的 sticky 支持有 bug。
+
+踩坑：fixed 的「相对视口」有例外——祖先有 transform/filter/perspective/backdrop-filter 时，fixed 以该祖先为包含块，弹层被裁剪或错位，这是 CSS Transforms 规范明确规定的，也是 UI 库里 Modal/Tooltip 要用 Portal 挂载到 body 的根本原因。美团商品详情页 sticky 吸顶失效，排查半天就是上层容器有个 overflow:hidden。调试技巧：Chrome DevTools 选中 sticky 元素会提示失效原因，或逐层祖先查 overflow 与 transform。`,
+    keyPoints: ["各值区别在包含块：absolute 找最近非 static 祖先","sticky 失效首查祖先 overflow 和父容器高度","transform/filter 会让 fixed 脱离视口参照","弹层用 Portal 挂 body 规避包含块陷阱"],
+    followUps: ["transform 为什么会让 fixed 后代改变参照系？规范怎么规定的？","sticky 和 JS 监听 scroll 实现吸顶，性能和体验差异在哪？"],
     favorited: false,
   },
   {
@@ -782,19 +780,19 @@ html { font-size: 16px; }
     nodeId: "fe-css-layout",
     question: "CSS 多列布局（columns）和 Grid 多列有什么区别？瀑布流怎么实现？",
     bigTech: false,
-    answer: `columns 是报纸式分栏（内容自上而下填充再换栏），Grid 是结构化行列。瀑布流推荐用 CSS columns 或 JS 计算列。
+    answer: `columns 是报纸式分栏：内容自上而下填满一栏再换下一栏，属于 CSS Multi-column 规范，本意为长文排版设计；Grid 是二维结构化布局，行列都由开发者显式控制。瀑布流（各列高度不一、卡片高度自适应）两者都能凑合但各有硬伤。
 
-\`\`\`css
-/* 方案一：CSS columns 实现瀑布流（简单但顺序是列优先） */
+/* 方案一：CSS columns，最简单但阅读顺序是列优先 */
 .masonry { column-count: 3; column-gap: 16px; }
 .masonry .item { break-inside: avoid; margin-bottom: 16px; }
-/* 方案二：Grid + dense 填充（顺序行优先） */
+/* 方案二：Grid 模拟，顺序行优先但行高被最高卡片撑开 */
 .masonry { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; }
-\`\`\`
 
-踩坑：columns 瀑布流的阅读顺序是列优先（第一列从上到下再到第二列），不符合用户从左到右的预期；动态高度内容用 columns 会有重排抖动，电商场景（小红书瀑布流）通常用 JS 计算最小高度列插入。`,
-    keyPoints: ["columns 列优先 / Grid 行优先", "break-inside:avoid 防止分栏断裂", "瀑布流动态高度用 JS"],
-    followUps: ["break-inside 防止内容被分栏截断？", "Grid 的 dense 模式有什么副作用？"],
+踩坑：columns 瀑布流阅读顺序是列优先（第一列从上到下再到第二列），用户预期是从左到右按时间或相关度排序，电商场景不可接受；动态增删内容时 columns 整体重排抖动明显。Grid 的 dense 模式虽能自动填空，但卡片高度不同时行高被最高者撑开，视觉上根本不是瀑布流。规范层面 CSS Grid Level 3 正在制定 masonry 值（grid-template-rows: masonry），Firefox 有过实验实现，离生产可用尚远。
+
+所以小红书、Pinterest 的线上方案都是 JS 计算：维护各列高度数组，新卡片插入当前最矮列，配合 ResizeObserver 处理图片加载后的高度变化；万级卡片还要结合 IntersectionObserver 做虚拟滚动回收。`,
+    keyPoints: ["columns 列优先 / Grid 行优先，阅读顺序是关键差异","break-inside: avoid 防止卡片被分栏截断","CSS masonry 规范未落地，生产用 JS 算最矮列","动态高度场景配合 ResizeObserver 修正"],
+    followUps: ["JS 瀑布流在图片未加载完高度未知时如何处理？","Grid 的 grid-auto-flow: dense 有什么副作用？"],
     favorited: false,
   },
   {
@@ -802,19 +800,19 @@ html { font-size: 16px; }
     nodeId: "fe-css-layout",
     question: "盒模型 content-box 和 border-box 有什么区别？全局如何设置？",
     bigTech: false,
-    answer: `content-box（默认）：width 只含 content，加 padding/border 会撑大元素；border-box：width 含 content+padding+border，设置 padding 不影响总宽。
+    answer: `content-box（W3C 默认）：width 只含 content，padding 和 border 向外撑大盒子，width:100px 加 padding:20px 实际占 140px；border-box：width 含 content+padding+border，padding 向内挤压内容区，总宽不变。border-box 更符合人类直觉（「这个卡片就是 300px 宽」），也是早年 IE 怪异模式的行为，CSS3 用 box-sizing 把它扶正为可选项。
 
-\`\`\`css
-/* 全局重置：所有元素用 border-box，布局更可预测 */
-*, *::before, *::after { box-sizing: border-box; }
-/* 继承给伪元素和子组件 */
+/* 全局重置的标准写法：inherit 保证可局部覆盖 */
 html { box-sizing: border-box; }
 *, *::before, *::after { box-sizing: inherit; }
-\`\`\`
+/* 第三方旧组件局部切回 */
+.legacy { box-sizing: content-box; }
 
-踩坑：第三方组件库可能假设 content-box，全局 border-box 会导致其布局错位，需用 :where() 降低优先级或局部重置；margin 不计入 width 但会影响外部占位，margin 负值能实现满屏溢出效果。`,
-    keyPoints: ["border-box 含 padding+border", "全局重置用 border-box", "margin 不计入 width"],
-    followUps: ["margin 折叠发生在什么场景？", "box-sizing 如何继承给组件？"],
+为什么用 inherit 而不是直接 *{box-sizing:border-box}：通配符写死后，假设 content-box 的第三方组件无法通过单点覆盖恢复；inherit 方案下给组件根节点声明 content-box，其后代全部跟随。
+
+踩坑：margin 永远不计入 width，且垂直方向相邻 margin 会发生折叠（取较大者，属于 BFC 规则），新手常因此算错总高度；content-box 下 width:100% 加 padding 会溢出父容器，是横向滚动条 bug 的常见来源；调试时先用 Chrome DevTools 盒模型图确认目标元素的 box-sizing 再算尺寸，别凭感觉。`,
+    keyPoints: ["border-box 的 width 含 padding+border，布局可预测","全局重置用 inherit 写法，保留局部覆盖能力","margin 不计入 width 且垂直方向会折叠","width:100%+padding 在 content-box 下溢出"],
+    followUps: ["margin 折叠在什么场景发生？如何用 BFC 阻止？","为什么组件库内部通常自己声明 box-sizing 而不依赖全局？"],
     favorited: false,
   },
   {
@@ -856,20 +854,16 @@ tr:hover ~ tr, tbody:has(tr:hover) tr:not(:hover) { opacity: 0.5; }
     nodeId: "fe-css-effects",
     question: "CSS 动画如何优化性能？will-change 什么时候用？",
     bigTech: true,
-    answer: `动画性能核心：只动 transform 和 opacity（合成层属性），避免触发 layout 和 paint。will-change 提前告知浏览器将变化的属性，让其创建合成层预准备。
+    answer: `动画性能核心：浏览器每帧预算 16ms（60fps），渲染管线为 Style→Layout→Paint→Composite。改 width/left 等几何属性触发 Layout，主线程逐帧重排且牵连后代；改 background 触发 Paint；只有 transform 和 opacity 能在 Composite 阶段由合成器线程（GPU）直接处理，完全绕开主线程——主线程被 JS 长任务占住时动画依然流畅。
 
-在腾讯视频播放器进度条拖拽优化中，把 left 改成 transform 后，低端机帧率从 30fps 升到 58fps：
+will-change 是提前声明「这个属性将要动画」，浏览器据此提前把元素提升为独立合成层，避免动画首帧才建层导致的闪烁。腾讯视频播放器进度条拖拽优化中，left 改 transform 后低端机帧率从 30fps 升到 58fps。
 
-\`\`\`css
-/* 差：left 触发 layout，每帧重排 */
-.bad { transition: left 0.3s; left: 0; }
-/* 好：transform 只触发 composite */
-.good { transition: transform 0.3s; transform: translateX(0); will-change: transform; }
-\`\`\`
+.bad { transition: left 0.3s; left: 0; }           /* 每帧重排 */
+.good { transition: transform 0.3s; transform: translateX(0); }
 
-踩坑：will-change 不能滥用，每个都会占内存，长期挂会导致内存爆炸，应在动画开始前加、结束后移除；动画结束记得 will-change: auto 释放。`,
-    keyPoints: ["只动 transform/opacity 避免重排", "will-change 预创建合成层", "用完即移除释放内存"],
-    followUps: ["合成层（Composite Layer）是什么？", "如何用 DevTools Performance 分析动画掉帧？"],
+踩坑：will-change 是「预告」不是「增强」，每个合成层都占显存，列表项全员 will-change 会层爆炸；正确姿势是动画即将开始时（pointerdown、hover）动态加，animationend/transitionend 后移除或设 will-change: auto。验证手段：DevTools Performance 录帧看紫色 Layout 和绿色 Paint 条是否消失，Rendering 面板开 FPS meter 和 Layer borders 看层数量。`,
+    keyPoints: ["只动 transform/opacity，走合成器线程绕开主线程","will-change 提前建合成层，防首帧闪烁","用完即移除，滥用导致层爆炸占显存","Performance 面板验证 Layout/Paint 是否消失"],
+    followUps: ["合成层（Composite Layer）创建的触发条件有哪些？","如何用 DevTools Performance 定位一次动画掉帧的根因？"],
     favorited: false,
   },
   {
@@ -877,18 +871,18 @@ tr:hover ~ tr, tbody:has(tr:hover) tr:not(:hover) { opacity: 0.5; }
     nodeId: "fe-css-effects",
     question: "transform 和直接改 left/top 性能差异在哪？",
     bigTech: false,
-    answer: `改 left/top 触发 Layout（重排）→ Paint（重绘）→ Composite 全流程；transform 跳过 Layout 和 Paint，直接在合成阶段由 GPU 处理。
+    answer: `改 left/top 触发 Layout→Paint→Composite 全流程：浏览器重新计算元素几何位置（连带影响兄弟和后代）、重新绘制像素、再合成；transform 是合成层属性，跳过 Layout 和 Paint，合成器线程拿已有纹理做矩阵变换即可，GPU 一次矩阵乘法搞定，且不占用主线程。
 
-\`\`\`js
-// 差：每次改 left 触发重排，60fps 下每帧只有 16ms
-el.style.left = x + "px";
-// 好：transform 走合成层，GPU 加速
-el.style.transform = \`translateX(\${x}px)\`;
-\`\`\`
+// 差：每帧走主线程重排，JS 繁忙时动画卡顿
+el.style.left = x + 'px';
+// 好：合成器线程处理，主线程被长任务占住依然流畅
+el.style.transform = 'translateX(' + x + 'px)';
 
-浏览器渲染管线：Style → Layout → Paint → Composite。重排最贵（影响所有后代），重绘次之（只影响自身像素），合成最便宜（GPU 直接叠加图层）。translateZ(0) 或 will-change 能强制元素独立成层。踩坑：transform 会创建包含块，内部 fixed 定位以 transform 元素为参照。`,
-    keyPoints: ["left 触发重排，transform 只合成", "渲染管线 Style/Layout/Paint/Composite", "合成层 GPU 处理"],
-    followUps: ["什么操作会触发重排？", "translateZ(0) 强制合成层有什么副作用？"],
+浏览器渲染管线：Style（算样式）→ Layout（算几何）→ Paint（绘像素）→ Composite（GPU 叠加图层）。成本排序：重排最贵（几何变化沿树传播），重绘次之，合成最便宜。让 transform 动画真正走合成层的前提是元素已独立成层——will-change: transform 或 translateZ(0) 提前提升，否则首帧才建层会闪一下。
+
+踩坑：transform 会创建新的包含块和层叠上下文，后代 fixed 定位以它为参照而非视口，下拉菜单错位常源于此；left 动画即使开了「GPU 加速」也照样重排，加速只作用于合成阶段。真实案例：飞书文档侧边栏滑入动画从 left 改 translateX 后，长文档场景下输入卡顿与动画掉帧同时消失——主线程不再被逐帧重排占用。`,
+    keyPoints: ["left 触发重排重绘，transform 只走合成阶段","渲染管线 Style→Layout→Paint→Composite 成本递减","transform 走 GPU 合成器线程，不阻塞主线程","transform 会建包含块，影响后代 fixed 定位"],
+    followUps: ["哪些操作会同步触发强制重排（如 offsetWidth）？","translateZ(0) 强制成层有什么副作用？"],
     favorited: false,
   },
   {
@@ -922,21 +916,20 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "CSS filter 滤镜性能如何？毛玻璃效果怎么实现最优？",
     bigTech: false,
-    answer: `filter（blur/grayscale/drop-shadow 等）会触发 Paint，性能开销大，尤其 blur 在大区域上。毛玻璃推荐 backdrop-filter，但兼容性需注意。
+    answer: `filter（blur/grayscale/drop-shadow）是像素级后处理：浏览器对每个像素及其邻域采样计算，高斯模糊的采样量随半径平方级增长，且元素每帧变化都要重算，开销集中在 Paint 阶段。毛玻璃效果推荐 backdrop-filter——只模糊元素背后的内容，元素自身文字保持锐利，浏览器还能针对合成阶段优化。
 
-\`\`\`css
-/* backdrop-filter：毛玻璃，只模糊背景 */
 .glass {
   backdrop-filter: blur(12px);
-  background: rgba(255,255,255,0.3);
+  -webkit-backdrop-filter: blur(12px);   /* Safari 必须加前缀 */
+  background: rgba(255, 255, 255, 0.3);  /* 必须半透明，否则模糊被盖住 */
 }
-/* filter:blur 模糊整个元素含内容，性能更差 */
-.blur { filter: blur(12px); }
-\`\`\`
+.blur { filter: blur(12px); }  /* 整个元素含内容一起糊，文字也糊 */
 
-踩坑：backdrop-filter 在 Safari 需 -webkit- 前缀；blur 半径越大 GPU 开销越大，超过 20px 在低端机明显卡顿；模糊区域内若有滚动内容会持续重绘，应给模糊层固定高度并 overflow:hidden。`,
-    keyPoints: ["filter 触发 Paint 性能差", "backdrop-filter 只模糊背景", "blur 半径影响性能"],
-    followUps: ["drop-shadow 和 box-shadow 的区别？", "如何降级处理不支持 backdrop-filter 的浏览器？"],
+踩坑：background 必须半透明，不透明背景会把模糊效果完全遮住；blur 半径超过 20px 在低端机明显卡顿，设计稿给 40px 时要协商或用静态模糊图替代；模糊层覆盖区域若有滚动或动画内容，每帧都要重采样，应限制模糊区域尺寸并 overflow:hidden 裁剪。
+
+降级方案：用 @supports (backdrop-filter: blur(1px)) 做渐进增强，不支持的浏览器提高背景不透明度（rgba 从 0.3 提到 0.85）保证可读性；低版本 iOS 微信 webview 曾不支持，头部导航用「半透明纯色+细分割线」视觉近似。iOS 控制中心、飞书移动端弹层都是 backdrop-filter 的典型应用。`,
+    keyPoints: ["filter 模糊整元素含内容，backdrop-filter 只糊背景","blur 采样量随半径平方增长，控制半径","半透明背景是毛玻璃生效前提","@supports 渐进增强做降级"],
+    followUps: ["drop-shadow 和 box-shadow 的区别和各自适用场景？","backdrop-filter 为什么会让后代 fixed 定位失效？"],
     favorited: false,
   },
   {
@@ -944,25 +937,23 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "如何实现单行/多行文本截断省略号？",
     bigTech: false,
-    answer: `单行用 text-overflow:ellipsis + white-space:nowrap + overflow:hidden 三件套；多行用 -webkit-line-clamp。
+    answer: `单行省略三件套各司其职：white-space:nowrap 禁止换行让文本在一行内溢出，overflow:hidden 裁掉溢出部分，text-overflow:ellipsis 在裁剪处渲染省略号——缺 nowrap 文本会换行不溢出，缺 overflow 溢出可见，缺 ellipsis 只剩生硬截断。多行用 -webkit-line-clamp，本质是旧版 flexbox（-webkit-box）的私有属性组合，因生态依赖太深已被 CSS Overflow 4 收编为标准（line-clamp），现代浏览器全支持。
 
-\`\`\`css
-/* 单行省略 */
 .ellipsis-1 {
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-/* 多行省略（webkit 内核，兼容性已较好） */
 .ellipsis-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-\`\`\`
 
-踩坑：单行省略的三件套缺一不可；多行省略的 display 必须是 -webkit-box，改 flex 会失效；中文无空格不会自动换行导致省略失效，需加 word-break:break-all。`,
-    keyPoints: ["单行三件套", "-webkit-line-clamp 多行", "word-break 处理中文换行"],
-    followUps: ["-webkit-line-clamp 的兼容性如何？", "如何用 JS 计算精确截断位置？"],
+踩坑：多行省略的 display 必须是 -webkit-box，外层套 flex 容器可以，但这一行改成 flex 立即失效；中文、URL、连续英文数字没有自然断点不会换行，导致省略失效，需补 overflow-wrap:anywhere 或 word-break:break-all；行内混入大字号元素导致行高不一致时会露出半行。
+
+精确控制场景（「…展开」按钮紧跟文字末尾）纯 CSS 做不到，需 JS 二分查找截断位置：逐字删减文本直到 scrollHeight 不大于 clientHeight，饿了么商品卡的「更多」按钮就是这么实现的，记得监听容器宽度变化重新计算。`,
+    keyPoints: ["单行三件套缺一不可：nowrap+hidden+ellipsis","line-clamp 已从 webkit 私有收编为标准","中文无断点需 overflow-wrap/word-break","文字内嵌按钮的精确截断用 JS 二分"],
+    followUps: ["-webkit-line-clamp 与标准 line-clamp 的兼容性现状？","JS 截断方案如何避免频繁重排带来的性能问题？"],
     favorited: false,
   },
   {
@@ -970,18 +961,18 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "什么是 GPU 合成层？如何强制元素独立成层？",
     bigTech: false,
-    answer: `合成层是浏览器为提升渲染性能创建的独立图层，由 GPU 直接合成，修改 transform/opacity 不影响其他层。强制成层：transform:translateZ(0)、will-change、opacity<1、filter。
+    answer: `合成层（Composite Layer）是浏览器把部分元素提升为独立图层的优化机制：每层独立绘制成纹理，最终由合成器线程交给 GPU 叠加输出。层与层互不影响——改某层的 transform/opacity 只需 GPU 重新合成，不用重排重绘，这是动画流畅的底层基础。
 
-\`\`\`css
-/* 强制独立成层，动画走 GPU */
+提升为合成层的常见条件：transform: translateZ(0) 或任何 3D 变换、will-change 指定合成属性、opacity 动画、filter、video/canvas 元素、某些场景下的 fixed 定位。
+
 .animated { transform: translateZ(0); will-change: transform; }
-/* 层爆炸：太多合成层耗内存，反而卡 */
-*\ { transform: translateZ(0); } /* 千万别全局加 */
-\`\`\`
+* { transform: translateZ(0); }  /* 层爆炸：千万别全局加 */
 
-踩坑：合成层过多（层爆炸）会耗尽 GPU 内存，每个层都占显存，几百个反而卡；will-change 应局部、临时使用；Chrome DevTools Layers 面板可查看层数量和合成原因。`,
-    keyPoints: ["合成层 GPU 直接处理", "translateZ(0)/will-change 强制成层", "层爆炸耗内存"],
-    followUps: ["如何用 Layers 面板调试合成层？", "层叠上下文和合成层的关系？"],
+踩坑：合成层不是免费的——每层占一份显存（宽×高×4 字节的 RGBA 纹理），低端机显存有限，几百个层直接触发 GPU 纹理回收，帧率雪崩，这就是「层爆炸」；层提升还会改变渲染效果，独立层元素不再参与原层叠上下文的混合，偶现色差或白边；translateZ(0) 会同时创建包含块，影响后代 fixed 定位。
+
+工程实践：只对真正需要动画的元素临时提升，动画结束移除 will-change；长列表项别每项建层，给动画容器建。排查工具：Chrome DevTools 的 Layers 面板 3D 展示层树，标注每层的提升原因（Compositing Reasons）和内存占用；Rendering 面板开 Layer borders，绿框即合成层，一眼识别层爆炸。`,
+    keyPoints: ["合成层独立成纹理，GPU 合成绕开重排重绘","translateZ(0)/will-change 可强制提升","每层占显存，层爆炸反噬性能","Layers 面板查看提升原因和内存占用"],
+    followUps: ["层叠上下文（stacking context）和合成层是什么关系？","为什么 will-change: transform 比 translateZ(0) 更推荐？"],
     favorited: false,
   },
   {
@@ -989,24 +980,24 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "如何用 CSS 实现骨架屏（Skeleton）加载效果？",
     bigTech: false,
-    answer: `骨架屏用渐变背景 + animation 实现 shimmer 闪光效果，比 loading 转圈体验更好。美团外卖列表加载用此方案，感知等待时间降低 30%。
+    answer: `骨架屏是在数据返回前用灰色块占位还原页面结构，配合 shimmer 扫光动画传递「正在加载」的信号。相比 loading 转圈，骨架屏让用户预知内容结构、感知等待更短——美团外卖列表页实测感知等待降低约 30%。注意它优化的是感知性能而非真实性能，真实加载时长没变。
 
-\`\`\`css
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.5s infinite linear;
   border-radius: 4px;
 }
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-\`\`\`
 
-踩坑：骨架屏尺寸要和真实内容一致，否则闪现跳动；背景动画用 background-position 比 transform 差（触发 Paint），高要求场景用伪元素 + transform 移动遮罩层。`,
-    keyPoints: ["渐变 + shimmer 动画", "尺寸匹配真实内容防跳动", "transform 遮罩性能更优"],
-    followUps: ["骨架屏如何配合数据预取？", "如何避免骨架屏到内容的闪烁？"],
+原理：背景尺寸拉宽到 200%，动画移动 background-position，高光带就扫过元素。
+
+踩坑：骨架尺寸必须和真实内容一致（行数、宽高、间距），否则数据到达瞬间布局跳动，CLS 指标变差；background-position 动画走 Paint，性能敏感场景改用伪元素做渐变遮罩加 transform: translateX 移动，走合成层；深色模式要给骨架单独配色；图片占位可用 LQIP 或 BlurHash 字符串解码出模糊预览，比纯灰块体验好。工程化：组件库（antd、Arco）都有 Skeleton 组件，列表场景按真实 item 结构拼骨架；配合路由级数据预取缩短骨架展示时长，两者组合体感最佳。`,
+    keyPoints: ["骨架屏优化感知性能，预知结构降低焦虑","渐变 200% 宽 + background-position 动画实现扫光","尺寸匹配真实内容防 CLS 跳动","高性能场景用 transform 遮罩替代背景动画"],
+    followUps: ["骨架屏与数据预取、流式渲染（SSR streaming）如何配合？","如何避免骨架屏到真实内容切换时的闪烁？"],
     favorited: false,
   },
 
@@ -1016,19 +1007,18 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-architecture",
     question: "BEM 命名规范是什么？有什么优缺点？",
     bigTech: false,
-    answer: `BEM = Block（块）__Element（元素）--Modifier（修饰符）。块是独立组件，元素是块的子部分，修饰符是状态变体。
+    answer: `BEM 是 Yandex 提出的 CSS 命名方法论：Block 独立组件（card）、Element 块的组成部分用双下划线（card__title）、Modifier 状态或变体用双连字符（card--featured、card__title--large）。类名全程扁平、不依赖嵌套，靠命名表达结构。
 
-\`\`\`css
-/* Block: card / Element: card__title / Modifier: card--featured */
 .card { }
 .card__title { }
 .card__title--large { }
 .card--featured { border-color: gold; }
-\`\`\`
 
-优点：命名即结构、避免冲突、可读性强。缺点：类名冗长、嵌套深时名字爆炸。在饿了么组件库中，BEM 配合 Sass 嵌套减少手写长度。踩坑：Element 不能脱离 Block 单独使用（card__title 不能用在非 card 内）；Modifier 是块/元素的状态，不是新块。`,
-    keyPoints: ["Block__Element--Modifier 三段式", "避免命名冲突", "命名即结构可读性强"],
-    followUps: ["BEM 如何处理深层嵌套？", "BEM 和 CSS Modules 如何结合？"],
+优点：命名即文档，看类名知道元素归属和状态；全部单类选择器优先级一致，避免优先级战争；无全局污染，多人协作不冲突；纯约定零构建成本。缺点：类名冗长，嵌套两层后名字爆炸；对「孙元素」不友好——card__body__title 是反模式，正确做法是拆新块或扁平化为 card__title。
+
+规则细节：Element 不能脱离 Block 单独使用，也不能跨块复用；Modifier 描述状态（--active/--disabled），不是新块；一个标签可挂「块+修饰符」或两个块（mix 模式复用结构）。饿了么组件库（Element UI 早期）全量 BEM，配合 Sass 的父选择器嵌套（&__title、&--featured）自动生成类名，手写量减半。对比 CSS Modules：BEM 靠人守规矩，Modules 靠工具兜底，老项目无构建链时 BEM 是唯一可行的隔离方案。`,
+    keyPoints: ["Block__Element--Modifier 三段式，命名即结构","单类选择器优先级一致，无优先级战争","Element 不脱离 Block，孙元素拆新块","Sass 父选择器缓解类名冗长"],
+    followUps: ["BEM 的 mix（一个标签挂两个块）解决什么问题？","BEM 和 CSS Modules 在大型团队里如何取舍或结合？"],
     favorited: false,
   },
   {
@@ -1036,20 +1026,20 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-architecture",
     question: "CSS Modules 如何实现样式隔离？和 BEM 有什么区别？",
     bigTech: false,
-    answer: `CSS Modules 在构建时给类名加 hash 后缀（如 .title → .title_x8y2k），天然隔离。BEM 靠人工命名规范，Modules 靠工具保证。
+    answer: `CSS Modules 在构建阶段（webpack css-loader / Vite 内置）把每个类名编译成全局唯一的 hash 名，同时导出类名映射对象，样式作用域天然限定在模块内。BEM 靠人工命名规范避免冲突，CSS Modules 靠工具从机制上消灭冲突。
 
-\`\`\`tsx
 // Button.module.css
 .btn { color: blue; }
 // Button.tsx
-import s from "./Button.module.css";
+import s from './Button.module.css';
 <button className={s.btn}>点击</button>
-// 编译后 class="_btn_x8y2k_1"，全局唯一
-\`\`\`
+// 编译产物：class="_btn_x8y2k_1"，类名带路径 hash
 
-踩坑：CSS Modules 默认局部，:global(.xxx) 才能全局；动态 class 拼接要用类库（clsx）；和 Tailwind 混用时，@apply 在 module 里能引用全局 Tailwind 类。`,
-    keyPoints: ["构建时加 hash 隔离", "默认局部 :global 全局", "配合 clsx 拼接动态 class"],
-    followUps: [":global 和 :local 的区别？", "CSS Modules 如何引用全局变量？"],
+机制细节：hash 通常基于「文件相对路径+类名」生成，同名类在不同文件互不干扰；开发环境可配 localIdentName 为 [name]__[local]--[hash:base64:5] 保留可读性，生产用纯 hash 压体积。默认所有类局部，:global(.ant-btn) 声明全局类用于覆盖三方库；composes: base; 能组合复用其他类（支持跨文件），是 Modules 版的「继承」。
+
+踩坑：动态拼接类名（'btn-' + type）取不到映射，要用 clsx/classnames 组合完整类名；jest 快照里 hash 类名易变，配 identity-obj-proxy 映射回原类名；和 Tailwind 混用时 module 文件里 @apply 可引用全局工具类。真实场景：React 中后台项目里 CSS Modules 是零运行时方案的默认选择，对比 CSS-in-JS 无运行时开销、SSR 无需特殊处理。`,
+    keyPoints: ["构建期 hash 类名，机制级隔离","默认局部，:global 穿透，composes 复用","动态类名用 clsx 组合，别字符串拼接","对比 CSS-in-JS 零运行时、SSR 友好"],
+    followUps: ["composes 和 Sass 的 @extend 有什么本质区别？","CSS Modules 如何做主题切换？"],
     favorited: false,
   },
   {
@@ -1057,20 +1047,15 @@ import s from "./Button.module.css";
     nodeId: "fe-css-architecture",
     question: "Tailwind CSS 的优缺点是什么？什么项目适合用？",
     bigTech: true,
-    answer: `Tailwind 是原子化 CSS，类名即样式（p-4 = padding:1rem）。优点：不用起类名、样式即所见、Tree Shaking 后包体小、设计令牌统一。缺点：HTML 类名长、学习成本、需配 Prettier 插件排序。
+    answer: `Tailwind 是原子化 CSS 框架：每个类对应一条样式声明（p-4 即 padding:1rem），样式直接写在 HTML 上。优点：不用发明类名终结命名内耗；样式即所见，改动不用跳 CSS 文件；设计令牌内置（间距阶梯、色板），产出天然统一；JIT 按需生成用到的类，生产包通常 10KB 上下。缺点：类名串长影响可读性；动态拼接有坑；团队需要学习期。
 
-\`\`\`tsx
-// 字节飞书后台用 Tailwind，开发效率提升 40%
-<button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors">
-  提交
-</button>
-// 抽组件复用，避免类名重复
-const btn = "px-4 py-2 rounded-lg transition-colors";
-\`\`\`
+<button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors">提交</button>
 
-踩坑：长类名用 @apply 抽公共类或抽组件；JIT 模式按需生成，动态 class（\`p-\${n}\`）不会被识别，需用 safelist 或完整类名；Tailwind 适合中后台和设计系统统一的项目，强定制设计稿反而不灵活。`,
-    keyPoints: ["原子化类名即样式", "JIT 按需生成包体小", "动态 class 需 safelist"],
-    followUps: ["@apply 的使用场景和限制？", "Tailwind 如何自定义设计令牌？"],
+机制：JIT（Just-In-Time）扫描源码中的类名按需生成 CSS，所以运行时才拼出来的类（'p-' + n）扫描不到、样式丢失——必须写完整类名或用 safelist 配置白名单。
+
+踩坑：长类名别滥用 @apply 抽取（违背原子化初衷、优先级易乱），正确做法是抽 React 组件把类名封装进去；响应式和暗色用前缀（md:flex、dark:bg-gray-800），断点默认 mobile-first。适用场景：中后台、设计系统统一的产品、快速迭代项目——字节多个内部平台全面 Tailwind 后，样式评审不再争论命名；不适用：设计稿高度定制（大量一次性视觉效果）、需要对外提供可覆盖样式的 SDK 组件库——原子类把样式钉死在 HTML 上，使用者无法主题化。v4 基于 CSS 变量和 @theme 配置，自定义令牌比 v3 的 JS 配置更直观。`,
+    keyPoints: ["原子化类名即样式，设计令牌内置统一产出","JIT 扫描源码按需生成，动态拼接类名会丢","复用靠抽组件而非 @apply","适合中后台，不适合需外部主题化的 SDK"],
+    followUps: ["Tailwind v4 的 @theme 与 v3 的 JS 配置有什么架构差异？","safelist 应该配什么？有没有更优雅的动态样式方案？"],
     favorited: false,
   },
   {
@@ -1127,19 +1112,19 @@ const toggle = () => {
     nodeId: "fe-css-architecture",
     question: "什么是设计令牌（Design Tokens）？如何在前端落地？",
     bigTech: false,
-    answer: `设计令牌是设计系统的最小单位（颜色/间距/字号/圆角），以变量形式统一设计稿与代码。落地：JSON 定义 → 转 CSS 变量/JS 对象/Tailwind 配置。
+    answer: `设计令牌是设计系统的最小决策单元——颜色、字号、间距、圆角、阴影的具名值，是设计与代码的单一事实源。改一处全端生效，主题切换只是换一组值。落地链路：JSON 定义 → 工具转换 → CSS 变量 / JS 对象 / Tailwind 配置 / 移动端资源。
 
-\`\`\`json
-{ "color": { "primary": { "500": "#0070f3" } }, "spacing": { "4": "1rem" } }
-\`\`\`
-\`\`\`css
-:root { --color-primary-500: #0070f3; --spacing-4: 1rem; }
-.btn { background: var(--color-primary-500); padding: var(--spacing-4); }
-\`\`\`
+// tokens.json
+{ "color": { "brand": { "500": "#0070f3" }, "text": { "primary": "{color.gray.900}" } } }
+// 编译产物
+:root { --color-brand-500: #0070f3; --color-text-primary: #111827; }
+.btn { background: var(--color-brand-500); }
 
-踩坑：令牌要分层（global 语义令牌 → component 组件令牌），直接用原始色值后期改主题灾难；Style Dictionary 等工具能从一份 JSON 生成多平台令牌（Web/iOS/Android）。`,
-    keyPoints: ["令牌是设计系统最小单位", "JSON 单一来源生成多平台", "分层：global → component"],
-    followUps: ["Style Dictionary 如何生成多平台令牌？", "令牌版本化如何管理？"],
+关键是分层：primitive 原始令牌（gray 色阶）→ semantic 语义令牌（text-primary 引用 gray-900）→ component 组件令牌（button-bg 引用 brand-500）。组件只消费语义层，暗色主题只需重映射语义层引用，业务代码零改动——直接在组件里写 gray-900 的项目，做暗色模式就是全局替换灾难。
+
+工程实践：Style Dictionary 从一份 JSON 生成 Web/iOS/Android 多端产物；Figma Variables 经 Tokens Studio 插件同步到仓库，设计改稿自动提 PR；CSS 变量支持运行时切主题（html[data-theme=dark] 覆盖变量），Sass 变量编译期固化做不到。踩坑：令牌粒度过细（每个组件都建专属令牌）会失控，语义层覆盖 80% 场景即可；令牌变更要版本管理和 review，改一个色值影响面是全站。`,
+    keyPoints: ["令牌是设计与代码的单一事实源","三层架构：primitive→semantic→component","组件只消费语义层，主题切换零业务改动","Style Dictionary 一份 JSON 生成多端"],
+    followUps: ["CSS 变量令牌和 Sass 变量在主题能力上的本质差异？","设计在 Figma 改色后，如何自动化同步到代码令牌？"],
     favorited: false,
   },
   {
@@ -1147,20 +1132,20 @@ const toggle = () => {
     nodeId: "fe-css-architecture",
     question: "如何解决第三方组件库样式被覆盖/无法覆盖的问题？",
     bigTech: false,
-    answer: `覆盖三方库样式：提高选择器优先级（:where() 降权 / 多层类名 / !important 慎用）、CSS Modules 用 :global、Tailwind 用重要修饰符。
+    answer: `覆盖三方库样式的手段按推荐顺序：库自带的 theme/token 配置（首选）→ 库暴露的 CSS 自定义属性 → 提高选择器优先级 → :global 穿透 → !important（最后手段）。优先级机制：id(100) > 类/属性/伪类(10) > 元素(1)，同优先级后者胜；:where() 包裹的选择器优先级为 0，是降权神器。
 
-\`\`\`css
-/* 方案一：提高优先级，多层类名 */
-.parent .ant-btn { color: red; }
-/* 方案二：:global 穿透 CSS Modules */
+/* 方案一：多层类名堆优先级 */
+.parent .ant-btn.ant-btn { color: red; }
+/* 方案二：CSS Modules 下 :global 穿透 */
 :global(.ant-btn) { color: red; }
-/* 方案三：Tailwind !important 修饰符 */
-<button className="!text-red-500 !important:bg-blue-500">
-\`\`\`
+/* 方案三：@layer 分层，layer 外样式天然胜过 layer 内 */
+@layer components, overrides;
 
-踩坑：antd 等库用 CSS-in-JS 计算优先级较高，简单选择器盖不住；优先级战争会导致维护噩梦，优先用库提供的 theme/token 配置而非硬覆盖；Shadow DOM 隔离的组件（如微前端）外部样式完全进不去，需用 CSS 自定义属性穿透。`,
-    keyPoints: ["提高优先级覆盖", ":global 穿透 Modules", "优先用库的 theme 配置"],
-    followUps: [":where() 如何降低优先级？", "Shadow DOM 内如何注入样式？"],
+踩坑：antd v5 等 CSS-in-JS 方案运行时生成 hash 类且优先级不低，单类选择器盖不住，官方的 ConfigProvider theme token 配置才是正道；优先级战争（你加类我加 id）会把代码拖进维护地狱，CSS @layer 能从机制上终结战争；Shadow DOM 隔离的组件（微前端严格沙箱、Web Components）外部样式完全进不去，只能靠库暴露的 CSS 自定义属性或 ::part() 穿透。
+
+真实场景：飞书开放平台组件供三方接入，主题定制全部走 CSS 变量暴露，不接受优先级覆盖——覆盖是债务，配置才是契约。紧急 hotfix 才用 !important，且必须加注释说明原因和清理期限。`,
+    keyPoints: ["优先用库的 theme/token 配置，覆盖是最后手段",":where() 优先级为 0，@layer 可终结优先级战争","Shadow DOM 只能 CSS 变量或 ::part() 穿透","!important 仅限 hotfix 并注释清理期限"],
+    followUps: ["@layer 的层叠规则和优先级如何计算？","Web Components 的 ::part() 如何暴露内部样式能力？"],
     favorited: false,
   },
 
@@ -1191,19 +1176,19 @@ Array.isArray([]); // true（数组专用）
     nodeId: "fe-js-types",
     question: "JS 类型转换规则是什么？== 的隐式转换有哪些坑？",
     bigTech: true,
-    answer: `隐式转换规则：相等比较时，null==undefined 只互相相等；数字和字符串比较，字符串转数字；布尔参与比较先转数字（true→1）；对象转原始值调 valueOf 再 toString。
+    answer: `== 的转换规则由 ECMAScript 规范的抽象相等比较算法定义：类型相同直接比；null 与 undefined 互相相等且不等于其他任何值；数字与字符串比较，字符串走 ToNumber；布尔参与比较先 ToNumber（true→1、false→0）；对象与原始值比较，对象走 ToPrimitive——先调 valueOf 再调 toString（Date 顺序相反）。
 
-\`\`\`js
 [] == false;    // true：[]→""→0，false→0
 [] == ![];      // true：![]→false→0，[]→""→0
-null == 0;      // false：null 只和 undefined 相等
+null == 0;      // false：null 只与 undefined 相等
 "0" == 0;       // true：字符串转数字
-NaN == NaN;     // false：NaN 不等于任何值
-\`\`\`
+NaN == NaN;     // false：NaN 不等于包括自己在内的任何值
 
-踩坑：团队规范一律用 ===，但判断 null/undefined 可用 obj == null 简写（只匹配这两个）；{} == {} 永远 false（引用不同）；+ 号既是数学加也是字符串拼接，{} + [] 结果因解析器而异。阿里规约强制 ===，code review 卡 ==。`,
-    keyPoints: ["null/undefined 只互等", "对象转原始 valueOf→toString", "一律用 ==="],
-    followUps: ["+[] 和 +{} 分别是什么？", "Symbol 转 string 为什么要显式 String()？"],
+经典面试题 [] == ![] 拆解：! 优先级高于 ==，先算 ![] 得 false，再比较 [] 与 false，双方最终都转成 0。
+
+踩坑：团队规范一律 ===（阿里、腾讯前端规约强制，code review 卡 ==），唯一例外是 obj == null 同时匹配 null 和 undefined，比双判断简洁，ESLint 配 eqeqeq 的 null: ignore 放行；{} == {} 永远 false（引用比较看地址）；对象参与数学运算同样走 ToPrimitive——[]+[] 得空字符串、[]+{} 得 [object Object]；判断 NaN 用 Number.isNaN，全局 isNaN 会先转数字导致 isNaN('abc') 误判 true。`,
+    keyPoints: ["null/undefined 只互等，不等于其他任何值","对象 ToPrimitive：valueOf 再 toString，Date 相反","布尔先转数字，字符串对数字转数字","一律 ===，唯一例外 obj == null"],
+    followUps: ["如何自定义对象的隐式转换行为（Symbol.toPrimitive）？","isNaN 和 Number.isNaN 的区别及判断 NaN 的正确姿势？"],
     favorited: false,
   },
   {
@@ -1211,21 +1196,18 @@ NaN == NaN;     // false：NaN 不等于任何值
     nodeId: "fe-js-types",
     question: "原始类型和引用类型在赋值/传参时有什么区别？",
     bigTech: false,
-    answer: `原始类型按值传递（复制值），引用类型按引用地址传递（共享同一对象）。函数参数都是按值传递，但引用类型的"值"是指针。
+    answer: `内存模型：原始类型（string/number/boolean/null/undefined/symbol/bigint）值存在栈上，赋值复制值本身，两个变量互不影响；引用类型（对象/数组/函数）栈上存的是堆内存地址，赋值复制的是地址，两个变量指向同一对象，改一个另一个跟着变。函数传参统一「按值传递」——传的是地址的副本：函数内给形参重新赋新对象不影响外部，但通过形参改对象属性会影响外部。
 
-\`\`\`js
-// 原始类型：互不影响
-let a = 1; let b = a; b = 2; // a 仍是 1
-// 引用类型：共享对象
-let obj1 = { n: 1 }; let obj2 = obj1; obj2.n = 2; // obj1.n 也是 2
-// 函数内改形参引用不影响外部
-function fn(o) { o = { n: 99 }; } // 重新赋值形参，外部 obj 不变
-let obj = { n: 1 }; fn(obj); // obj.n 仍是 1
-\`\`\`
+let a = 1; let b = a; b = 2;             // a 仍是 1
+let o1 = { n: 1 }; let o2 = o1; o2.n = 2; // o1.n 也是 2
+function fn(o) { o = { n: 99 }; }         // 重新赋值：外部不变
+function fn2(o) { o.n = 99; }             // 改属性：外部跟着变
 
-踩坑：深拷贝用 structuredClone（现代）或 JSON.parse(JSON.stringify())（无函数/循环引用）；浅拷贝用 {...obj} 或 Object.assign；React 状态必须不可变更新，直接改 state 对象不会触发渲染。`,
-    keyPoints: ["原始值传递 / 引用地址传递", "函数内重赋值不影响外部", "深拷贝 structuredClone"],
-    followUps: ["structuredClone 和 JSON 深拷贝的区别？", "如何实现一个完整深拷贝？"],
+React 场景是重灾区：setState 用 Object.is 浅比较，直接改 state（state.list.push(x) 再 setState(state)）引用没变不触发渲染，必须不可变更新——展开运算符、immer、map/filter 返回新数组。
+
+踩坑：深拷贝首选 structuredClone（原生、支持循环引用/Date/Map，但不支持函数和 DOM 节点）；JSON.parse(JSON.stringify()) 丢 undefined/函数/Symbol，Date 变字符串，循环引用直接抛错，只能用于纯数据；浅拷贝 {...obj} 只拷一层，嵌套对象依然共享——「我以为深拷贝了」是线上数据串扰 bug 的高频根源；const 声明引用类型只锁地址不锁内容，属性照样可改，真正冻结用 Object.freeze（也只是浅冻结）。`,
+    keyPoints: ["原始值复制值，引用复制地址（共享对象）","传参是地址副本：重赋值不影响外部，改属性影响","React 状态必须不可变更新，浅比较决定是否渲染","深拷贝 structuredClone，JSON 方案丢类型"],
+    followUps: ["structuredClone 支持哪些类型？哪些会抛 DataCloneError？","手写深拷贝如何处理循环引用、Date、Map、原型链？"],
     favorited: false,
   },
   {
@@ -1233,23 +1215,21 @@ let obj = { n: 1 }; fn(obj); // obj.n 仍是 1
     nodeId: "fe-js-types",
     question: "Symbol 有什么用？为什么用它做对象 key 不会被遍历到？",
     bigTech: false,
-    answer: `Symbol 是唯一且不可变原始值，主要做对象私有属性 key 和内置行为协议（Symbol.iterator/toStringTag）。Symbol key 不被 for...in/Object.keys 遍历，实现"半私有"。
+    answer: `Symbol 是 ES2015 引入的原始类型，每次调用 Symbol() 引擎内部都会生成全局唯一标识，description 仅是调试标签，不参与唯一性比较。规范规定对象属性 key 只能是 String 或 Symbol 两类，而 for...in、Object.keys、Object.getOwnPropertyNames 只枚举字符串 key，Symbol key 必须用 Object.getOwnPropertySymbols 或 Reflect.ownKeys 才能取到——这就是「半私有」的本质：不是访问控制，而是默认枚举路径不可见，拿到引用的人依然能读写。
 
-\`\`\`js
-// 私有属性：外部遍历不到
-const id = Symbol("id");
-const user = { name: "Tom", [id]: 123 };
-Object.keys(user);       // ["name"]
-Object.getOwnPropertySymbols(user); // [Symbol(id)] 才能拿到
-// 内置协议：自定义可迭代
-class Range {
-  *[Symbol.iterator]() { yield 1; yield 2; }
-}
-\`\`\`
+代码示例：
+  const id = Symbol("id");
+  const user = { name: "Tom", [id]: 123 };
+  Object.keys(user);       // ["name"]
+  Reflect.ownKeys(user);   // ["name", Symbol(id)]
+  class Range {
+    *[Symbol.iterator]() { yield 1; yield 2; }
+  }
+  [...new Range()];        // [1, 2]：内置协议定制行为
 
-踩坑：Symbol.for("x") 会注册全局（可跨文件共享），Symbol("x") 每次新建唯一；Symbol 不能 new（不是构造器）；JSON.stringify 会忽略 Symbol key，序列化后丢失。`,
-    keyPoints: ["Symbol 唯一不可变做私有 key", "不被 for...in/Object.keys 遍历", "Symbol.for 全局共享"],
-    followUps: ["Symbol.iterator 如何让对象可迭代？", "Symbol 和私有字段 #field 的区别？"],
+真实场景：给第三方对象打标记防命名冲突，React 用 Symbol.for("react.element") 标识元素类型，事件总线用 Symbol 当事件名避免撞车。坑点：Symbol.for("x") 写入全局注册表可跨 realm（iframe）共享，Symbol("x") 每次唯一；Symbol 不能 new（规范显式抛 TypeError，防止包装对象破坏唯一性）；JSON.stringify 会忽略 Symbol key 和 Symbol 值，序列化后丢失；description 相同不代表相等，Symbol("a") !== Symbol("a")。`,
+    keyPoints: ["Symbol 唯一不可变，description 仅调试不参与相等","不被 for...in/Object.keys 枚举，需 Reflect.ownKeys","Symbol.iterator 等内置协议定制对象行为","Symbol.for 全局注册表跨 realm 共享"],
+    followUps: ["Symbol.iterator 如何让对象可迭代？","Symbol 和 class 私有字段 #field 的本质区别？"],
     favorited: false,
   },
   {
@@ -1278,20 +1258,19 @@ JSON.parse('{"id": 9007199254740993}').id; // 9007199254740992 丢失！
     nodeId: "fe-js-types",
     question: "JS 的包装类型是什么？'abc'.length 为什么能访问到？",
     bigTech: false,
-    answer: `原始类型没有方法，但 JS 在访问属性时临时创建包装对象（String/Number/Boolean），用完即销毁。所以 "abc".length 能取到值但不能赋值。
+    answer: `原始值本身没有属性和方法，但 ECMAScript 规范在属性访问求值时定义了隐式装箱：对原始值取属性，引擎会临时创建对应包装对象（String/Number/Boolean），在其原型链上查找属性，表达式求值结束立即销毁该临时对象。所以 "abc".length 取到的是临时 String 对象的 length；而 "abc".x = 1 是往临时对象上写，对象随即被回收，下次再访问又是一个全新临时对象，自然读不到。这解释了「能读方法、不能存属性」的经典现象。
 
-\`\`\`js
-"abc".length;   // 3：临时 new String("abc").length，用完销毁
-"abc".x = 1;    // 临时对象赋值，立即销毁
-"abc".x;        // undefined：又新建了一个，没有 x
-// 对比显式包装（不推荐）
-const s = new String("abc"); // s 是对象，typeof "object"
-s === "abc";    // false（对象 vs 原始）
-\`\`\`
+代码示例：
+  "abc".length;         // 3：临时 new String("abc").length
+  "abc".x = 1;
+  "abc".x;              // undefined：换了新临时对象
+  const s = new String("abc");
+  typeof s;              // "object"，s === "abc" 为 false
+  String(5);             // "5"：转型函数（推荐用法）
 
-踩坑：new String/Number/Boolean 创建的是对象，=== 比较原始值会 false；用 typeof 区分：typeof "x" 是 "string"，typeof new String() 是 "object"；Symbol/BigInt 不能用 new，本身就是原始值。`,
-    keyPoints: ["访问属性时临时创建包装对象", "用完即销毁不能存属性", "new String 是对象非原始"],
-    followUps: ["new String 和 String() 的区别？", "为什么不能用 new Symbol？"],
+真实场景：面试常结合装箱考 === 与 typeof；工程上要警惕 new Boolean(false) 是对象、在 if 里恒真导致的线上 bug，所以 ESLint 的 no-new-wrappers 规则默认禁用显式包装。坑点：typeof 判断在包装对象上失效，需 instanceof 或 Object.prototype.toString；Symbol/BigInt 规范禁止 new，保证原始值身份；valueOf/toString 在对象参与运算时按 ToPrimitive 顺序触发，1 + new Number(1) 得 2 就是这个机制。`,
+    keyPoints: ["访问属性时引擎临时装箱，用完即销毁","临时对象不能存属性，每次访问都是新对象","new String/Boolean 是对象，=== 与 typeof 均失真","Symbol/BigInt 禁止 new，本身是原始值"],
+    followUps: ["new String(\"a\") 和 String(\"a\") 的区别？","对象参与运算时 ToPrimitive 的转换顺序？"],
     favorited: false,
   },
   {
@@ -1299,20 +1278,18 @@ s === "abc";    // false（对象 vs 原始）
     nodeId: "fe-js-types",
     question: "如何准确判断 NaN？为什么 isNaN 不靠谱？",
     bigTech: false,
-    answer: `NaN 是"非数字"的数字值（typeof NaN === "number"），特点是 NaN≠NaN。全局 isNaN 会先强制转换参数再判断，导致 isNaN("abc") 也 true。用 Number.isNaN 严格判断。
+    answer: `NaN 是 IEEE 754 规定的特殊浮点值，表示未定义或不可表示的运算结果（0/0、Infinity - Infinity），typeof NaN === "number"，且规范规定 NaN 与任何值比较都为 false，包括自身——这是为了忠实表达「无效结果不等于任何已知值」的数学语义。全局 isNaN 的历史包袱在于先对参数做 ToNumber 强制转换再判断，任何转成 NaN 的值都被误判，isNaN("abc")、isNaN(undefined) 都是 true。ES6 的 Number.isNaN 不做转换，仅当值类型为 number 且等于 NaN 才返回 true，是语义正确的版本。
 
-\`\`\`js
-isNaN("abc");      // true：先转 Number("abc")=NaN，再判
-isNaN("123");      // false：Number("123")=123 不是 NaN
-Number.isNaN("abc"); // false：不转换，"abc"不是 NaN 类型
-Number.isNaN(NaN);   // true：严格判断
-// 最简判断：利用 NaN≠NaN
-const isNaNSafe = v => v !== v;
-\`\`\`
+代码示例：
+  isNaN("abc");           // true：Number("abc") 得 NaN，误判
+  isNaN("123");           // false：能转成 123
+  Number.isNaN("abc");    // false：不转换，类型不符
+  Number.isNaN(NaN);      // true：严格判断
+  const isNaNSafe = v => v !== v;   // 利用 NaN 唯一不等于自身
 
-踩坑：NaN 是唯一不等于自身的值，v !== v 是最快的 NaN 判断；NaN 参与运算结果都是 NaN（NaN+1=NaN）；数组的 indexOf 找不到 NaN（用 includes 能找到，因为用零值相等算法）。`,
-    keyPoints: ["Number.isNaN 严格不转换", "全局 isNaN 会强制转换", "v!==v 判 NaN 最快"],
-    followUps: ["为什么 NaN 不等于自身？", "Array.includes 为什么能找到 NaN？"],
+真实场景：表单数值校验、接口数据清洗时必须先 Number.isFinite 过滤再使用；polyfill 时代 v !== v 是标准技巧，速度也最快。坑点：NaN 参与算术运算结果恒为 NaN 且静默传播，一个 NaN 污染整条计算链；[NaN].indexOf(NaN) 为 -1，因为 indexOf 用严格相等，而 includes 用 SameValueZero 算法能找到 NaN；Object.is(NaN, NaN) 为 true，遵循 SameValue 语义，与 === 形成三种相等算法的对照。`,
+    keyPoints: ["NaN 是 number 类型，唯一不等于自身的值","全局 isNaN 先强制转换，误报非数字字符串","Number.isNaN 不转换严格判断，或 v !== v","indexOf 找不到 NaN，includes 用 SameValueZero 能找到"],
+    followUps: ["为什么 IEEE 754 规定 NaN 不等于自身？","===、SameValueZero、SameValue 三种相等算法差异？"],
     favorited: false,
   },
 
@@ -1374,23 +1351,20 @@ const frozen = Object.freeze({ n: 1 }); frozen.n = 2; // 静默失败
     nodeId: "fe-js-scope",
     question: "词法作用域和动态作用域有什么区别？JS 是哪种？",
     bigTech: false,
-    answer: `词法作用域（静态作用域）：函数的作用域在定义时确定（看代码书写位置）；动态作用域：在调用时确定（看调用栈）。JS 是词法作用域，this 是动态的（类似动态作用域但不是）。
+    answer: `词法作用域（静态作用域）：函数能访问哪些变量由它「写在哪儿」决定，引擎在编译阶段就根据代码嵌套结构建立作用域链；动态作用域则由「在哪儿调用」决定，沿调用栈向上查找，典型代表是 Bash 和早期 Lisp。JS 采用词法作用域，证据就是函数定义位置决定自由变量的绑定，闭包正是词法作用域的直接产物——内部函数持有定义处环境记录的引用。
 
-\`\`\`js
-// 词法作用域：foo 定义在全局，访问的 a 是全局的
-let a = 1;
-function foo() { console.log(a); }
-function bar() { let a = 2; foo(); }
-bar(); // 1（词法：foo 定义处 a=1，非调用处 a=2）
-// this 是动态的：取决于调用方式
-const obj = { n: 1, get() { return this.n; } };
-obj.get();           // 1（this=obj）
-const fn = obj.get; fn(); // undefined（this=window）
-\`\`\`
+代码示例：
+  let a = 1;
+  function foo() { console.log(a); }
+  function bar() { let a = 2; foo(); }
+  bar();               // 1：foo 定义在全局，与调用处无关
+  const obj = { n: 1, get() { return this.n; } };
+  const fn = obj.get;
+  fn();                // undefined：this 按调用方式动态绑定
 
-踩坑：闭包捕获的是变量引用而非值，循环中用 let 自动绑定每轮副本；eval/with 能动态改作用域（严格模式禁用）；箭头函数没有自己的 this，继承外层词法 this。`,
-    keyPoints: ["词法作用域定义时确定", "this 动态绑定类似但不等同", "闭包捕获变量引用"],
-    followUps: ["with 语句为什么被严格模式禁用？", "箭头函数的 this 如何确定？"],
+真实场景：React Hooks 依赖词法作用域捕获当次渲染的 props 和 state，「过期闭包」问题根源在此；ESM 的文件级隔离也基于词法作用域。坑点：this 是动态绑定的特例（看调用点不看定义点），但它不是真正的动态作用域，只是默认/隐式/显式/new 四条规则决定的运行时绑定；闭包捕获的是变量引用而非快照值，var 循环注册事件拿到的是同一个 i，let 每轮迭代创建新环境记录副本；eval/with 能在运行时注入作用域，破坏引擎编译期优化，严格模式直接禁用。`,
+    keyPoints: ["词法作用域由定义位置决定，编译期确定","JS 是词法作用域，闭包是其直接产物","this 动态绑定看调用点，但非真正动态作用域","闭包捕获引用非快照，let 每轮生成新副本"],
+    followUps: ["with 语句为什么被严格模式禁用？","箭头函数的 this 绑定规则与普通函数有何不同？"],
     favorited: false,
   },
   {
@@ -1454,29 +1428,23 @@ for (var i = 0; i < 3; i++) { (i => setTimeout(() => console.log(i)))(i); }
     nodeId: "fe-js-scope",
     question: "模块模式（Module Pattern）如何用闭包实现私有化？",
     bigTech: false,
-    answer: `模块模式用 IIFE + 闭包封装私有变量和方法，只暴露公共接口。ES6 前是主要的私有化方案，现已被 class 私有字段 # 和 ESM 取代，但理解原理重要。
+    answer: `模块模式利用 IIFE 立即执行创建独立函数作用域，内部变量被返回的公共方法以闭包形式引用，从而在外层函数执行完毕后依然存活，实现「私有状态 + 受控接口」。本质是闭包延长了局部变量的生命周期：返回对象的方法持有词法环境引用，垃圾回收无法释放私有变量。ES6 前这是事实标准的封装方案（jQuery 插件、早期模块化都基于此），如今多被 class 私有字段 # 和 ESM 文件作用域取代，但面试必考其原理。
 
-\`\`\`js
-// 经典模块模式
-const Counter = (function() {
-  let count = 0; // 私有
-  const inc = () => ++count; // 私有
-  return { // 公共
-    increment: inc,
-    get: () => count,
-  };
-})();
-Counter.increment(); Counter.get(); // 1
-// 现代：class 私有字段
-class Counter {
-  #count = 0; // 真私有
-  increment() { return ++this.#count; }
-}
-\`\`\`
+代码示例：
+  const Counter = (function () {
+    let count = 0;                        // 私有变量
+    const inc = () => ++count;            // 私有函数
+    return { increment: inc, get: () => count };  // 公共接口
+  })();
+  Counter.increment(); Counter.get();     // 1，count 外部摸不到
+  class C {
+    #count = 0;                           // 引擎级硬私有
+    inc() { return ++this.#count; }
+  }
 
-踩坑：模块模式的私有变量无法被实例化（单例）；class 私有字段 #x 是真私有（外部和子类都不可访问），相较闭包无运行时开销；单例模块适合全局配置/store。`,
-    keyPoints: ["IIFE+闭包封装私有", "暴露公共接口", "现代用 # 私有字段"],
-    followUps: ["class 私有字段 # 和闭包私有的区别？", "揭示模块模式（Revealing Module）是什么？"],
+真实场景：全局配置中心、单例 store、SDK 内部状态常用此模式防外部篡改；揭示模块模式（Revealing Module）在 return 时把私有函数统一映射为公共名，声明与暴露分离可读性更好。坑点：IIFE 产物是单例无法 new 多实例，需要工厂函数返回闭包对象；# 私有字段是硬私有（子类、外部、序列化全不可见）且无原型查找开销，闭包私有则依赖封装约定；闭包长期引用大对象要警惕内存泄漏，用完应置 null 断开引用。`,
+    keyPoints: ["IIFE + 闭包让私有变量在函数返回后存活","只暴露公共接口，实现封装与信息隐藏","揭示模块模式统一在 return 映射公共名","现代替代：class # 私有字段 + ESM 文件作用域"],
+    followUps: ["class # 私有字段和闭包私有在机制上的区别？","如何用工厂模式让模块模式支持多实例？"],
     favorited: false,
   },
   {
@@ -1956,22 +1924,20 @@ if (user.role === "admin") {
     nodeId: "js-modules",
     question: "Tree Shaking 的原理是什么？为什么 CommonJS 不能 Tree Shaking？",
     bigTech: true,
-    answer: `Tree Shaking 基于 ESM 静态结构，编译时分析导入导出，剔除未使用的代码。CJS 是运行时动态 require，无法静态分析，所以不能 Tree Shaking。
+    answer: `Tree Shaking 依赖 ESM 的静态结构：import/export 必须在模块顶层声明，绑定关系编译期即可确定，打包器（Webpack/Rollup/esbuild）从入口出发构建模块依赖图，标记「被引用」的导出，未标记的代码连同只被死代码引用的部分在压缩阶段（Terser）被丢弃。CommonJS 的 require 是普通函数调用，参数可以是变量、可以写在任何位置，module.exports 还能动态赋值，绑定关系只有运行时才能确定，静态分析无解，故天然无法摇树。
 
-\`\`\`js
-// math.js (ESM)
-export function add(a, b) { return a + b; }   // 被使用，保留
-export function sub(a, b) { return a - b; }   // 未使用，剔除
-// main.js
-import { add } from "./math"; // sub 被摇掉
-// 副作用：模块顶层有副作用，需 package.json 标记
-// package.json
-{ "sideEffects": false } // 告诉打包器无副作用可安全摇
-\`\`\`
+代码示例：
+  // math.js
+  export function add(a, b) { return a + b; }   // 被引用，保留
+  export function sub(a, b) { return a - b; }   // 未被引用，剔除
+  // main.js
+  import { add } from "./math";
+  // package.json
+  { "sideEffects": false }
 
-踩坑：有副作用的模块（顶层修改全局/原型）不能被摇，需在 package.json sideEffects 数组排除；生产模式才摇（dev 不摇便于调试）；函数需纯（无副作用）才安全摇，class 方法默认保留。`,
-    keyPoints: ["ESM 静态结构可分析", "CJS 运行时动态不可摇", "sideEffects 标记副作用"],
-    followUps: ["sideEffects 如何配置？", "为什么 class 方法默认不摇？"],
+真实场景：按需加载 lodash 必须用 lodash-es 或 babel-plugin-import，直接 import { cloneDeep } from "lodash"（CJS 版）摇不动，包体积凭空多几十 KB。坑点：有副作用的模块（顶层改全局、注册 polyfill、纯 import CSS）会被误摇，需 sideEffects 数组显式保留；只有生产模式才摇（dev 保留便于调试）；Webpack 还需 usedExports 与 minimize 联动才生效；class 实例方法默认保留（静态分析无法确定哪些方法被调用），导出纯函数更利于摇树。`,
+    keyPoints: ["ESM 顶层静态声明，编译期可确定绑定图","CJS require 是运行时函数调用，无法静态分析","sideEffects 标记保护副作用模块免误摇","生产模式 + 压缩器协同才真正剔除死代码"],
+    followUps: ["sideEffects 字段如何精确配置？","为什么 class 方法默认不会被摇掉？"],
     favorited: false,
   },
   {
@@ -2745,19 +2711,17 @@ function Bad({ initial }) {
     nodeId: "react-core",
     question: "React 的 key 有什么作用？为什么不能用 index 做 key？",
     bigTech: true,
-    answer: `key 是 diff 时识别列表项身份的标识。key 不变 React 复用 DOM（保留状态），key 变则卸载重建。用 index 做 key 在增删时导致状态错乱和性能下降。
+    answer: `key 是 React Reconciliation 阶段识别同层兄弟节点身份的唯一线索：diff 时先比 type 再比 key，key 相同则复用 Fiber 节点和对应 DOM，仅更新 props；key 不同则卸载旧子树、挂载新子树，内部 state 全部丢弃。用 index 做 key 的致命问题是列表增删后索引整体漂移，React 按错位的 key 复用了不属于自己的 DOM 和 state，造成状态串台；同时大量节点 key 变化触发不必要的卸载重建，性能随之劣化。
 
-\`\`\`jsx
-// 差：index 做 key，删除第一项后所有项 key 错位，状态串了
-{items.map((item, i) => <Item key={i} data={item} />)}
-// 删除 items[0] 后，原 items[1] 变 key=0，复用了 items[0] 的 DOM 和 state
-// 好：用稳定唯一 id
-{items.map(item => <Item key={item.id} data={item} />)}
-\`\`\`
+代码示例：
+  {items.map((item, i) => <Item key={i} data={item} />)}     // 差
+  {items.map(item => <Item key={item.id} data={item} />)}    // 好
+  // 删除 items[0] 后 key=0 的 Fiber 被复用给原 items[1]，
+  // 其内部 input 值、展开状态全部错乱
 
-字节直播间礼物列表曾用 index 做 key，删除首个礼物后动画串到下一个，改成 id 后修复。踩坑：key 只需兄弟间唯一不需全局唯一；key 变化会触发卸载挂载（input 失焦）；静态不变列表用 index 影响小但仍不推荐。`,
-    keyPoints: ["key 识别列表项身份", "index 做 key 增删导致状态错乱", "用稳定唯一 id"],
-    followUps: ["key 变化会触发什么生命周期？", "静态列表能用 index 做 key 吗？"],
+真实案例：字节直播间礼物列表曾用 index 做 key，删除首个礼物后进场动画串到下一个礼物，换 id 后修复；表单列表删除中间行导致未受控 input 内容错位也是经典线上事故。坑点：key 只需兄弟间唯一，不要求全局唯一；key 变化等价于组件替换，会完整走卸载-挂载（input 失焦、动画重置），可借此做「切换用户重置表单」技巧 key={userId}；纯静态且永不变序的列表用 index 不出 bug，但仍是坏习惯；key 不会传入子组件 props，需要 key 值得另传属性。`,
+    keyPoints: ["key 是 diff 时同层节点身份标识，决定复用或重建","index 做 key 增删后索引漂移，状态串台","用稳定唯一业务 id，key 变化等于组件替换","key 只在兄弟间唯一，且不传给子组件"],
+    followUps: ["key 变化会触发哪些生命周期和副作用清理？","静态永不变化的列表用 index 做 key 有风险吗？"],
     favorited: false,
   },
   {
@@ -2794,19 +2758,16 @@ useEffect(() => {
     nodeId: "react-core",
     question: "React 的 Reconciliation（协调）算法是怎样的？",
     bigTech: false,
-    answer: `Reconciliation 是 diff 算法，对比新旧虚拟 DOM 树决定最小更新。核心假设：同层比较、type 变则销毁重建、key 标识同层项身份。O(n) 复杂度。
+    answer: `Reconciliation 是 React 对比新旧两棵 Fiber 树求最小更新的 diff 算法。理论最优的树 diff 是 O(n³)，React 用三条启发式假设降到 O(n)：一、只同层比较，跨层移动直接视为删除加新建；二、type 不同判定为不同子树，整棵销毁重建（含 DOM 与 state）；三、同层兄弟靠 key 匹配身份，key 相同复用节点仅更新 props。Fiber 架构把递归 diff 改写成可中断的链表遍历，渲染可分片让出主线程，高优先级更新可插队。
 
-\`\`\`jsx
-// type 不同：销毁旧树建新树（连同 state）
-<div>{cond ? <A /> : <B />}</div> // 切换时 A 卸载 B 挂载，state 不保留
-// type 相同 key 相同：复用，更新 props
-{items.map(i => <Item key={i.id} v={i.v} />)}
-// 跨层移动：React 不跨层 diff，会重建
-\`\`\`
+代码示例：
+  <div>{cond ? <A /> : <B />}</div>   // type 不同：A 卸载 B 挂载，state 不保留
+  {items.map(i => <Item key={i.id} v={i.v} />)}   // key 稳定：只更新 v
+  // <A/> 从 div1 挪到 div2：React 不识别为移动，销毁后重建
 
-踩坑：条件渲染切换不同 type 组件会丢 state（需同 type 或提升 state）；列表顺序变化用 key 让 React 复用而非重建；diff 只同层比较，跨层移动会重建（性能差）。Fiber 后可中断分片渲染。`,
-    keyPoints: ["同层比较 O(n)", "type 变销毁重建", "key 标识身份复用"],
-    followUps: ["为什么 React 不做跨层 diff？", "Fiber 如何让 diff 可中断？"],
+真实场景：登录/注册表单切换时 state 互串，就是 type 相同位置相同被复用所致，加 key 或包不同 type 可解决；长列表重排序配合稳定 key 才能把 DOM 移动降到最少。坑点：别指望 React 保留跨层移动的 state，需手动提升 state 或引入状态管理；数组 reverse 后 key 不变则全量复用仅移动 DOM，key 用 index 则全量重写内容；三条假设是启发式，极端场景（大量跨层移动）会退化为全量重建，这也是长列表要用虚拟滚动的根本原因。`,
+    keyPoints: ["三条启发式假设把 diff 从 O(n³) 降到 O(n)","同层比较，type 变则整棵销毁重建","key 匹配身份复用节点，跨层移动不识别","Fiber 让 diff 可中断分片，支持优先级插队"],
+    followUps: ["为什么 React 放弃跨层 diff 这个场景？","Fiber 架构如何让渲染过程可中断？"],
     favorited: false,
   },
   {
@@ -3459,21 +3420,18 @@ useEffect(() => { sync(value); }, []); // 并发下可能延迟执行读到错�
     nodeId: "react-concurrent",
     question: "React 的 lane 优先级模型是什么？",
     bigTech: false,
-    answer: `lane 是 32 位二进制表示的优先级，不同位段代表不同优先级等级。多个更新可同时调度，高优先级可打断低优先级。比旧的 expirationTime 模型更细粒度（支持并行多优先级）。
+    answer: `lane 是 React 18 并发架构的优先级模型：用 31 位二进制掩码表示优先级轨道，每个 bit 位段对应一类更新（同步、输入连续、默认、过渡、空闲等）。一次更新被分配一个或多个 lane，调度器按 lane 优先级决定渲染顺序；渲染中途来了更高 lane 的更新，当前渲染被打断丢弃，高优渲染完成后低优再重做。相比旧的 expirationTime 模型（单时间戳只能表达一种优先级，多更新互相覆盖且无法批量分组），lane 用位掩码可同时表达多个并存优先级、批量合并与纠缠（entanglement），这是 useTransition、Suspense 流式渲染的调度地基。
 
-\`\`\`js
-// lane 模型（简化）
-const SyncLane = 0b0001;        // 同步最高（如 onClick）
-const InputLane = 0b0010;       // 输入
-const TransitionLane = 0b0100;  // 过渡（useTransition）
-const IdleLane = 0b1000;        // 空闲最低
-// 多 lane 可并存：0b0110 表示 Input + Transition
-// 调度时按优先级处理，高优先级打断低优先级重做
-\`\`\`
+代码示例（简化位段）：
+  const SyncLane = 0b0001;        // onClick 等同步最高
+  const InputLane = 0b0010;       // 输入连续事件
+  const TransitionLane = 0b0100;  // useTransition 标记
+  const IdleLane = 0b1000;        // 空闲最低
+  // lanes = 0b0110 表示 Input 与 Transition 同批调度
 
-踩坑：lane 让并发更新成为可能（同一组件可有多个未完成更新）；过渡更新被打断后丢弃中间结果重做；业务代码不直接操作 lane，通过 useTransition 等 API 间接控制。`,
-    keyPoints: ["lane 32 位优先级", "多优先级并行调度", "高优先级打断低优先级"],
-    followUps: ["lane 和 expirationTime 区别？", "Offscreen lane 是什么？"],
+真实场景：搜索框输入（InputLane 高优）与结果列表更新（TransitionLane 低优）分离，输入永远跟手不卡；Tab 切换包 startTransition 标记低优，点击立即响应。坑点：业务代码不直接操作 lane，只能通过 useTransition、useDeferredValue 间接影响；被打断的过渡更新中间结果被丢弃重做，所以并发渲染必须无副作用；同一组件可同时存在多个不同 lane 的未完成更新。`,
+    keyPoints: ["lane 用 31 位掩码表示优先级轨道，可组合并存","高优先级 lane 打断低优渲染，丢弃重做","比 expirationTime 细粒度，支持批量与纠缠","业务经 useTransition 间接影响，不直接操作 lane"],
+    followUps: ["lane 模型相比 expirationTime 解决了什么具体问题？","Offscreen lane 在 Suspense 中扮演什么角色？"],
     favorited: false,
   },
   {
@@ -3631,20 +3589,16 @@ const useStore = defineStore("user", () => {
     nodeId: "vue-core",
     question: "computed 和 watch/watchEffect 的区别？",
     bigTech: false,
-    answer: `computed 计算属性（有缓存、依赖不变不重算、返回值）；watch 侦听某值变化执行副作用（无返回值、可异步）；watchEffect 自动收集依赖立即执行。
+    answer: `三者定位不同：computed 是声明式派生值，内部用响应式依赖收集 + 脏标记实现缓存——依赖没变直接返回缓存值，依赖变了下次取值才重算，必须纯且有返回值；watch 是显式侦听某个响应式源，变化时执行副作用回调，能拿到新旧值，适合异步请求、本地存储同步等命令式逻辑；watchEffect 立即执行一次并自动收集回调里用到的所有依赖，依赖变化就重跑，适合「用到谁就依赖谁」的同步副作用。
 
-\`\`\`js
-// computed：有缓存，依赖不变返回缓存值
-const fullName = computed(() => \`\${first.value} \${last.value}\`);
-// watch：显式侦听，变化才执行，可拿新旧值
-watch(count, (newVal, oldVal) => { saveToServer(newVal); }, { immediate: true });
-// watchEffect：自动收集依赖，立即执行一次
-watchEffect(() => { document.title = count.value; }); // 自动追踪 count
-\`\`\`
+代码示例：
+  const fullName = computed(() => first.value + " " + last.value);
+  watch(count, (n, o) => { saveToServer(n); }, { immediate: true });
+  watchEffect(() => { document.title = String(count.value); });
 
-踩坑：computed 必须纯函数（无副作用），副作用用 watch；computed 缓存基于依赖变化（依赖是响应式才缓存）；watch 监听对象需 deep:true 或用 getter 函数返回属性。`,
-    keyPoints: ["computed 缓存纯计算", "watch 副作用拿新旧值", "watchEffect 自动依赖立即执行"],
-    followUps: ["computed 缓存如何失效？", "watch 的 deep 和 immediate 区别？"],
+真实场景：表单联动计算总价用 computed（多次渲染不重复算）；搜索防抖请求用 watch（拿新值发请求、对比旧值取消过期请求）；调试埋点打印状态用 watchEffect 最省事。坑点：computed 里写副作用（发请求、改 DOM）是大忌，缓存语义会让时序错乱；watch 监听 reactive 对象默认深层遍历，监听 ref 包裹的对象需 deep: true，监听嵌套属性推荐 getter 写法 () => obj.a.b；watchEffect 清理副作用用 onCleanup 参数（如取消上一次请求）；computed 依赖必须是响应式数据，普通变量变化不触发重算。`,
+    keyPoints: ["computed 缓存纯派生，依赖不变不重算","watch 显式侦听拿新旧值，承载副作用","watchEffect 自动收集依赖且立即执行","computed 禁副作用，watch 嵌套属性用 getter"],
+    followUps: ["computed 的缓存依赖什么机制失效？","watch 的 deep、immediate、flush 选项各控制什么？"],
     favorited: false,
   },
   {
@@ -3652,20 +3606,25 @@ watchEffect(() => { document.title = count.value; }); // 自动追踪 count
     nodeId: "vue-core",
     question: "Vue 的生命周期有哪些？Composition API 怎么写？",
     bigTech: false,
-    answer: `挂载：onBeforeMount→onMounted。更新：onBeforeUpdate→onUpdated。卸载：onBeforeUnmount→onUnmounted。调试：onErrorCaptured。
+    answer: `Vue3 生命周期围绕组件实例三阶段：挂载前 onBeforeMount（VDOM 就绪、真实 DOM 未插入）→ 挂载后 onMounted（DOM 就绪，可操作节点、发请求）；更新前 onBeforeUpdate → 更新后 onUpdated（DOM 已按新状态渲染）；卸载前 onBeforeUnmount → 卸载后 onUnmounted（实例销毁，必须清理副作用）。另有 onErrorCaptured 捕获后代错误、onRenderTracked/onRenderTriggered 调试响应式追踪，keep-alive 场景用 onActivated/onDeactivated 替代挂载卸载。
 
-\`\`\`js
-import { onMounted, onUnmounted, onUpdated } from "vue";
-setup() {
-  onMounted(() => { console.log("挂载"); startTimer(); });
-  onUpdated(() => { console.log("更新"); });
-  onUnmounted(() => { clearInterval(timer); }); // 清理
-}
-\`\`\`
+代码示例：
+  import { onMounted, onUnmounted, onUpdated } from "vue";
+  setup() {
+    onMounted(() => {
+      fetchList();
+      window.addEventListener("resize", onResize);
+    });
+    onUpdated(() => { console.log("DOM 已更新"); });
+    onUnmounted(() => {
+      clearInterval(timer);
+      window.removeEventListener("resize", onResize);
+    });
+  }
 
-踩坑：onMounted 中 DOM 才就绪可操作；onUpdated 内别改 state（可能死循环）；onUnmounted 必须清理副作用（定时器/事件/订阅）；keep-alive 用 onActivated/onDeactivated。`,
-    keyPoints: ["挂载/更新/卸载三阶段", "onMounted DOM 就绪", "onUnmounted 清理副作用"],
-    followUps: ["keep-alive 的生命周期？", "onUpdated 内改 state 会死循环吗？"],
+真实场景：ECharts 实例在 onMounted 初始化（此时容器才有尺寸）、onUnmounted 调 dispose，漏掉 dispose 是常见内存泄漏源；轮询定时器同理。Options API 的 created/mounted 等钩子在 Composition API 里全部以 onXxx 形式注册。坑点：onUpdated 内修改响应式状态可能再次触发更新形成死循环，确需修改必须加终止条件；onMounted 不保证所有子组件挂载完，要等 nextTick；SSR 场景只有 onBeforeMount 之前的钩子在服务端执行，访问 window 必须放 onMounted。`,
+    keyPoints: ["挂载/更新/卸载三阶段对应 onXxx 钩子","onMounted 中 DOM 就绪，可初始化图表发请求","onUnmounted 必须清理定时器/事件/实例防泄漏","keep-alive 用 onActivated/onDeactivated 替代"],
+    followUps: ["keep-alive 组件的缓存与激活流程是什么？","onUpdated 内改 state 为什么会死循环，如何避免？"],
     favorited: false,
   },
   {
@@ -3673,18 +3632,17 @@ setup() {
     nodeId: "vue-core",
     question: "v-for 的 key 有什么作用？和 React key 区别？",
     bigTech: false,
-    answer: `Vue 的 key 用于 diff 时识别节点身份，key 不变复用（保留状态），key 变重建。和 React 类似，但 Vue 的 diff 是双端比较+最长递增子序列优化。
+    answer: `key 在 Vue 的 patch 过程中标识同层 vnode 身份：key 相同则判定为同一节点，复用 DOM 和组件实例只更新内容；key 不同则卸载重建。语义与 React 一致，但 diff 实现不同：Vue2 用双端比较（头头、尾尾、头尾、尾头四次比对），Vue3 在双端比较之后接最长递增子序列（LIS）算法，求出未乱序的最长节点子序列保持不动，只移动其余节点，把 DOM 移动次数压到理论最少。用 index 做 key 时列表增删导致索引漂移，组件复用错位，输入框内容、勾选状态就会串行。
 
-\`\`\`html
-<!-- 差：index 做 key，增删时状态错乱 -->
-<li v-for="(item, i) in list" :key="i">{{ item.name }}<input /></li>
-<!-- 好：稳定 id -->
-<li v-for="item in list" :key="item.id">{{ item.name }}<input /></li>
-\`\`\`
+代码示例：
+  <li v-for="(item, i) in list" :key="i">{{ item.name }}<input /></li>
+  <!-- 差：删除首项后所有 key 错位 -->
+  <li v-for="item in list" :key="item.id">{{ item.name }}<input /></li>
+  <!-- 好：稳定业务主键 -->
 
-踩坑：Vue3 的 diff 用最长递增子序列（LIS）减少 DOM 移动，比 Vue2 双端更优；key 必须稳定唯一（兄弟间）；用 index 做 key 输入框状态会串（和 React 一样）。`,
-    keyPoints: ["key 识别节点身份复用", "Vue3 LIS 优化 diff", "index 做 key 状态错乱"],
-    followUps: ["Vue3 LIS diff 比 Vue2 强在哪？", "key 和 ref 的区别？"],
+真实场景：表格勾选若干行后翻页选中态错乱、拖拽排序后输入框内容错位，九成是 index key 引起，换成业务主键 id 即修复。坑点：key 只需兄弟间唯一；不写 key 时 Vue 默认按位置就地复用（等效 index key）；Vue3 中 v-for 与 v-if 同节点时 v-if 优先级更高，key 应放在 template 包裹层或组件上；key 变化可主动强制组件重建，常用于「切换 tab 重置表单」；key 与 ref 不同，ref 拿实例引用，key 只做 diff 身份标识。`,
+    keyPoints: ["key 标识 vnode 身份，相同复用不同重建","Vue3 双端比较 + LIS 把 DOM 移动减到最少","index 做 key 增删后状态错乱，须用稳定 id","key 变化可强制重建组件，与 ref 职责不同"],
+    followUps: ["Vue3 的 LIS diff 具体比 Vue2 双端比较省了什么？","key 和 ref 在组件复用中的区别？"],
     favorited: false,
   },
   // ===== 18. vue-advanced Vue 进阶 =====
@@ -3723,25 +3681,22 @@ function useMouse() {
     nodeId: "vue-advanced",
     question: "Teleport 组件的作用和使用场景？",
     bigTech: false,
-    answer: `Teleport 把组件渲染到 DOM 树其他位置（如 body），脱离父级样式/层级约束。场景：弹窗/通知/全屏遮罩（避免被父级 overflow/transform/z-index 影响）。
+    answer: `Teleport 是 Vue3 内置组件，把子树的真实 DOM 渲染到组件层级之外的指定容器（to 选择器），而逻辑上仍属于原组件——props、emit、provide/inject、响应式全部照常工作。它解决的核心矛盾是：弹窗、Toast、全局 loading 这类 UI 在逻辑上属于某个深层业务组件，但若 DOM 就地渲染，会被祖先的 overflow:hidden、transform（创建新包含块使 position:fixed 失效）、z-index 层叠上下文截断或压盖。渲染到 body 下即可脱离这些约束。
 
-\`\`\`html
-<!-- 弹窗渲染到 body，不受父级 overflow:hidden 影响 -->
-<Teleport to="body">
-  <div class="modal" v-if="show">
-    <h2>标题</h2>
-    <slot />
-  </div>
-</Teleport>
-<!-- 多个传送目标 -->
-<Teleport :to="target" :disabled="!teleport">
-  <Tooltip />
-</Teleport>
-\`\`\`
+代码示例：
+  <Teleport to="body">
+    <div class="modal" v-if="show">
+      <h2>标题</h2>
+      <slot />
+    </div>
+  </Teleport>
+  <Teleport :to="target" :disabled="!needTeleport">
+    <Tooltip />
+  </Teleport>
 
-踩坑：Teleport 的内容仍是组件子树（props/emit 正常）；disabled 可关闭传送回原位；样式作用域（scoped）仍按原组件位置，需用 :deep 或全局样式。`,
-    keyPoints: ["Teleport 渲染到指定 DOM", "弹窗脱离父级约束", "仍是组件子树"],
-    followUps: ["Teleport 的 scoped 样式如何处理？", "Teleport 和 React Portal 区别？"],
+真实场景：卡片内的确认弹窗用 Teleport 挂到 body，避免被卡片 overflow 裁切；多个 Teleport 指向同一目标按挂载顺序追加，天然实现消息堆叠；disabled 属性可做「大屏传送到侧边栏、小屏就地展示」的响应式布局。坑点：scoped 样式仍按原组件作用域生成属性选择器，传送到 body 后可能失效，需 :deep() 或全局类；to 目标必须在挂载时已存在（可先渲染占位 div）；SSR 下 Teleport 默认只在客户端激活，配合 defer 属性；与 React Portal（createPortal 命令式 API）能力等价，只是声明式写法更贴合模板。`,
+    keyPoints: ["DOM 渲染到外部容器，逻辑仍是原组件子树","解决弹窗被 overflow/transform/z-index 截断","disabled 可关闭传送，多实例按序追加","scoped 样式需 :deep，目标容器须先存在"],
+    followUps: ["Teleport 后 scoped 样式失效如何处理？","Teleport 与 React Portal 的异同？"],
     favorited: false,
   },
   {
@@ -3781,20 +3736,16 @@ async function setup() {
     nodeId: "vue-advanced",
     question: "Vue3 的编译优化有哪些？为什么比 Vue2 快？",
     bigTech: false,
-    answer: `Vue3 编译优化：静态提升（静态节点提到 render 外）、补丁标记（动态节点标记只比动态部分）、块树（Block Tree 收集动态节点）、缓存事件处理器。
+    answer: `Vue3 编译器在 template 转 render 函数阶段做静态分析，产出带优化信息的代码：一、静态提升，把纯静态 vnode 和静态 props 提升到 render 函数外只创建一次，后续渲染直接复用引用；二、补丁标记（PatchFlag），给动态节点打数字标记（TEXT=1、CLASS=2、PROPS=8 等）并记录动态属性名，diff 时只看标记位做靶向更新，静态属性和静态子树整体跳过；三、Block Tree，根 Block 把后代所有动态节点收集成扁平数组，diff 从「全树递归」变成「只遍历动态列表」；四、事件缓存 cacheHandlers，内联事件函数缓存复用，避免子组件因函数引用变化而无效更新。
 
-\`\`\`js
-// 静态提升：静态节点只创建一次
-const _hoisted = createVNode("div", null, "静态");
-// 补丁标记：动态属性标记
-createVNode("div", { id: dynamicId }, text, 8 /* PROPS */, ["id"]);
-// diff 时只比较 id 这个动态属性，跳过静态
-// 块树：根节点收集所有动态子节点，diff 时直接遍历动态数组（非全树）
-\`\`\`
+代码示例：
+  const _hoisted = createVNode("div", null, "静态内容");  // 提升出 render
+  createVNode("div", { id: dynamicId }, text, 8, ["id"]);  // PROPS 标记
+  // diff 时只比较 id，其余静态部分跳过
 
-踩坑：手写 render 函数失去编译优化，能用模板优先；block 树在结构稳定时高效，频繁结构变化退化；Vue3 比 Vue2 快约 1.3-2 倍（编译+运行时双重优化）。`,
-    keyPoints: ["静态提升/补丁标记", "块树收集动态节点", "模板比手写 h 快"],
-    followUps: ["块树什么时候退化？", "Vue3 比 Vue2 快多少？"],
+真实场景：万行表单页面 Vue2 全树 diff 卡顿，Vue3 只比几十个动态节点，官方基准快 1.3-2 倍；v-memo 指令可手动标记跳过子树更新，适合超长列表行内优化。坑点：手写 h/render 函数拿不到编译优化，能用模板就别手写；v-if 分支间结构频繁变化会让 Block 失稳退化；动态组件 :is 和运行时拼接模板无法静态提升；优化信息由编译器生成，构建时开启 production 才完整生效。`,
+    keyPoints: ["静态提升 + 补丁标记 + Block Tree 三大编译优化","diff 只遍历动态节点列表，跳过静态子树","cacheHandlers 稳定事件引用，减少子组件重渲染","模板优先于手写 h，v-memo 手动跳过子树"],
+    followUps: ["Block Tree 在什么场景下会退化失效？","Vue3 相对 Vue2 的性能提升来自哪几个层面？"],
     favorited: false,
   },
   {
@@ -4394,22 +4345,19 @@ const editor = await import("./MonacoEditor");
     nodeId: "build-tools",
     question: "Source Map 的作用？生产环境如何安全使用？",
     bigTech: false,
-    answer: `Source Map 把打包后代码映射回源码，便于调试。生产环境为安全不公开（防暴露源码），用 hidden-source-map 生成但不在 bundle 引用，上传到错误监控（Sentry）。
+    answer: `Source Map 是压缩混淆产物与源码之间的映射文件（.map，基于 VLQ 编码记录行列映射关系），浏览器 DevTools 和错误监控平台据此把打包后的位置还原成源码文件与行号，调试体验等同直接调源码。生产环境的两难在于：不留 map 无法定位线上错误栈，公开 map 又等于开源全部源码。标准做法是 devtool 用 hidden-source-map（Webpack）或 sourcemap: "hidden"（Vite）——生成 map 文件但产物末尾不写 sourceMappingURL 注释，map 只上传到 Sentry 等私有监控平台，服务器不对外托管。
 
-\`\`\`js
-// 开发：eval-source-map 快速重建
-// 生产：hidden-source-map（生成不引用）+ 上传 Sentry
-// Vite
-build: { sourcemap: "hidden" } // 生成 .map 但注释不写
-// Webpack
-devtool: "hidden-source-map"
-// Sentry 上传 map 后即可在错误栈看到源码位置
-// 错误监控：window.onerror 上报 stack，Sentry 用 map 还原
-\`\`\`
+代码示例：
+  // Vite
+  build: { sourcemap: "hidden" }
+  // Webpack
+  devtool: "hidden-source-map"
+  // 构建后上传 Sentry 再删除本地 map
+  sentry-cli sourcemaps upload ./dist && rm -rf ./dist/**/*.map
 
-踩坑：生产 source map 泄露源码（竞争对手可还原）；eval-cheap-module-source-map 开发快但生产不可用；CSS source map 需单独配置；上传 Sentry 后删除服务器上的 map 文件。`,
-    keyPoints: ["map 映射打包码到源码", "生产用 hidden 不引用", "上传 Sentry 安全调试"],
-    followUps: ["source map 的格式是什么？", "eval-source-map 为什么快？"],
+真实场景：线上 window.onerror 捕获的压缩栈经 Sentry 用 map 还原为 src/utils/pay.ts:42 并关联 release，定位效率天差地别；部分公司用 nginx 鉴权让 map 仅内网可访问，兼顾排障与安全。坑点：eval-cheap-module-source-map 开发期重建快但含 eval 且映射粗糙，生产禁用；CSS sourcemap 需 css.devSourcemap 单独开启；noscript-sourcemap 只去注释不生成文件，别选错；上传 Sentry 后务必从 CDN 删除 map，否则等于没隐藏；Worker 文件的 map 路径常被 CSP 拦截需单独放行。`,
+    keyPoints: ["map 用 VLQ 编码记录产物到源码的行列映射","生产用 hidden 模式：生成但不引用，防源码泄露","map 上传 Sentry 私有平台，传完从服务器删除","开发用 eval 系求快，生产禁用 eval 类 sourcemap"],
+    followUps: ["source map 的 mappings 字段是如何编码的？","eval-source-map 为什么重建速度最快？"],
     favorited: false,
   },
   {
@@ -4546,23 +4494,22 @@ test("定时", () => {
     nodeId: "testing",
     question: "测试覆盖率有哪些指标？多少合适？",
     bigTech: false,
-    answer: `覆盖率指标：语句（Statements）、分支（Branches）、函数（Functions）、行（Lines）。80% 是常见目标，但 100% 不等于无 bug，关键路径和核心逻辑要高覆盖。
+    answer: `覆盖率四大指标：语句覆盖 Statements（每条语句是否执行过）、分支覆盖 Branches（if/else、三元、switch 每个分支是否都走到）、函数覆盖 Functions（每个函数是否被调用）、行覆盖 Lines（可执行行的覆盖比例）。分支覆盖通常最难达标也最接近「场景穷尽」。业界常见门槛 80%：Google 测试分级把 60% 划为可接受、75% 推荐、90% 优秀，但数字只是底线约束——支付、鉴权、资金计算等关键路径应接近 100%，纯 UI 展示和胶水代码可适当放低。
 
-\`\`\`js
-// vitest 覆盖率
-test: { coverage: {
-  provider: "v8",
-  reporter: ["text", "html", "lcov"],
-  thresholds: { statements: 80, branches: 75, functions: 80, lines: 80 },
-}}
-// 跑覆盖率
-vitest run --coverage
-// 指标：if/else 两个分支都测到才算分支覆盖
-\`\`\`
+代码示例（vitest 配置）：
+  test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      thresholds: { statements: 80, branches: 75,
+                    functions: 80, lines: 80 },
+    },
+  }
+  // 执行 vitest run --coverage，不达标 CI 直接失败
 
-踩坑：覆盖率 100% 不等于测了所有场景（只测了执行路径）；分支覆盖比行覆盖更严格（条件组合）；核心支付/鉴权逻辑追求高覆盖，UI 样式可低；CI 卡覆盖率防回退。`,
-    keyPoints: ["语句/分支/函数/行四指标", "80% 常见目标", "100% 不等于无 bug"],
-    followUps: ["分支覆盖和语句覆盖区别？", "覆盖率如何接入 CI？"],
+真实场景：CI 卡阈值防止「改一行代码覆盖率掉 5 个点」的回退；新增代码用 changed-files 类插件只考核 diff 覆盖率，老代码不背锅；Codecov 报告挂到 PR 上评审体验最好。坑点：100% 覆盖不等于无 bug——它只证明代码被执行过，不证明断言正确，缺断言时覆盖全绿照样漏 bug；分支覆盖要警惕条件组合爆炸，可上 mutation testing（Stryker）检验断言强度；不要为凑数写「调一下不断言」的僵尸测试，反而制造虚假安全感，评审时应把覆盖率当参考而非 KPI。`,
+    keyPoints: ["语句/分支/函数/行四指标，分支最难也最有价值","80% 是常见门槛，关键路径追求接近 100%","100% 覆盖只证明执行过，不证明断言正确","CI 卡阈值 + diff 覆盖率防回退，拒绝僵尸测试"],
+    followUps: ["分支覆盖和语句覆盖的差异体现在哪？","如何在 CI 中落地覆盖率门禁且不影响老代码？"],
     favorited: false,
   },
   {
@@ -4570,21 +4517,21 @@ vitest run --coverage
     nodeId: "testing",
     question: "视觉回归测试如何做？",
     bigTech: false,
-    answer: `视觉回归：截图对比，捕获 UI 意外变化。工具：Playwright screenshot、Percy、Chromatic。流程：基线截图→改动后对比→差异高亮人工确认。
+    answer: `视觉回归测试用「基线截图 + 像素对比」捕获 UI 的意外视觉变化：首次运行为页面或组件生成基准图，后续每次提交重新截图并做像素级 diff，差异超过阈值即失败，差异高亮图供人工确认——是有意变更（更新基线）还是回归 bug（修复代码）。工具链分两类：Playwright/Puppeteer 自带截图对比，零成本接入；Percy、Chromatic 等 SaaS 提供云端渲染、跨浏览器矩阵和评审工作流。
 
-\`\`\`js
-// Playwright 截图对比
-test("首页视觉", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveScreenshot("home.png", { maxDiffPixelRatio: 0.01 });
-});
-// 配置：首次生成基线，之后对比
-// 差异超阈值失败，更新基线需 --update-snapshots
-\`\`\`
+代码示例（Playwright）：
+  test("首页视觉", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveScreenshot("home.png", {
+      maxDiffPixelRatio: 0.01,
+      animations: "disabled",
+    });
+  });
+  // 首次运行生成基线；确认变更后 --update-snapshots 更新
 
-踩坑：截图受字体/动画/时间影响需禁用（disableAnimations）；跨平台渲染差异导致误报（统一 CI 环境）；响应式需多视口截图；动态内容（日期/随机）需 mock 固定。`,
-    keyPoints: ["截图对比捕获 UI 变化", "基线+对比+阈值", "禁用动画字体防误报"],
-    followUps: ["如何处理动态内容截图？", "Percy 和 Playwright 截图区别？"],
+真实场景：设计系统组件库每次发版跑全组件截图矩阵（主题 × 状态 × 尺寸），防止改 Button 波及 Modal；电商大促页改样式后对比确认没有误伤相邻模块。坑点：字体抗锯齿、GPU 渲染差异导致跨平台误报，必须在统一 CI 容器（如 Playwright 官方 Docker 镜像）里跑；动画、光标闪烁要禁用，动态内容（时间戳、随机头像、广告位）需 mock 或用 mask 遮挡对应区域；响应式页面要配多视口截图；阈值设 0 过于敏感全是误报，0.01-0.02 是常用平衡点；基线更新要走 Code Review 防止误更新掩盖真 bug。`,
+    keyPoints: ["基线截图 + 像素 diff + 阈值 + 人工确认四步","Playwright 零成本，Percy/Chromatic 上云端矩阵","统一 CI 环境、禁动画、mock 动态内容防误报","阈值 0.01-0.02 平衡灵敏度与噪声"],
+    followUps: ["截图中的动态内容（时间、随机数据）如何处理？","Percy 这类 SaaS 比本地截图对比强在哪？"],
     favorited: false,
   },
   {
@@ -4592,21 +4539,22 @@ test("首页视觉", async ({ page }) => {
     nodeId: "testing",
     question: "TDD（测试驱动开发）的流程是什么？优劣？",
     bigTech: false,
-    answer: `TDD 流程：Red（写失败测试）→ Green（最少代码让测试过）→ Refactor（重构保持绿）。优势：设计驱动、即时反馈、回归保护。劣势：初期慢、UI 难 TDD、需练习。
+    answer: `TDD 循环三步：Red——先写一个描述期望行为的测试，运行必红（证明测试本身有效）；Green——写最少的实现代码让测试变绿，允许实现丑陋；Refactor——在测试保护下重构优化，保持常绿。外圈配合「待测行为清单」驱动下一步开发。优势在于倒逼可测性设计（依赖注入、纯函数、小接口）、获得即时反馈与重构勇气、测试即文档；代价是初期进度慢 15-30%、对开发者设计能力要求高，且强依赖「需求可预先明确」这个前提。
 
-\`\`\`js
-// Red：先写测试（失败）
-test("格式化金额", () => {
-  expect(formatMoney(1234.5)).toBe("1,234.50");
-});
-// Green：最少实现
-function formatMoney(n) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
-// Refactor：优化（如抽正则常量）保持测试绿
-\`\`\`
+代码示例：
+  // Red：先写失败测试
+  test("格式化金额", () => {
+    expect(formatMoney(1234.5)).toBe("1,234.50");
+  });
+  // Green：最小实现让测试过
+  function formatMoney(n) {
+    return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  // Refactor：抽正则常量、补负数分支，测试保持绿
 
-踩坑：TDD 适合纯逻辑/算法（边界清晰），UI/探索性开发难 TDD；不要为测而测（覆盖无意义路径）；先写测试能倒逼设计可测（依赖注入/纯函数）。`,
-    keyPoints: ["Red→Green→Refactor", "设计驱动即时反馈", "适合纯逻辑不适合探索"],
-    followUps: ["TDD 和 BDD 区别？", "什么场景不适合 TDD？"],
+真实场景：金融计算、状态机、编译器这类边界清晰的纯逻辑模块 TDD 收益最大；前端的工具函数、store 的 reducer 也很适合。BDD 是它的外延，用 Given-When-Then 描述业务场景对接需求方。坑点：UI 布局、探索性原型、需求频繁变动的业务不适合先写测试，强行 TDD 只会反复重写测试；一个红-绿循环只解决一个小行为，不要一次写全；实现写完再补测试不是 TDD，那只是普通单测，丢掉了设计驱动这个核心价值；过度追求「所有代码都 TDD」会在不合适场景制造挫败感。`,
+    keyPoints: ["Red 失败 → Green 最小实现 → Refactor 保绿","测试先行倒逼可测性设计，测试即文档","适合边界清晰的纯逻辑，不适合 UI 与探索","写完实现再补测试不是 TDD，丢了设计驱动"],
+    followUps: ["TDD 与 BDD 的关注点有何不同？","哪些前端场景你会明确放弃 TDD？"],
     favorited: false,
   },
   // ===== 23. performance 性能优化 =====
@@ -4932,21 +4880,18 @@ location /api { proxy_pass https://api.com; }
     nodeId: "security",
     question: "Subresource Integrity（SRI）是什么？解决什么问题？",
     bigTech: true,
-    answer: `SRI 给外部资源（CDN JS/CSS）加 integrity 哈希，浏览器加载时校验哈希不匹配则拒绝执行，防 CDN 被篡改注入恶意代码。
+    answer: `SRI（Subresource Integrity）是浏览器安全特性：给 script/link 标签加 integrity 属性，内容为先对资源做哈希（sha256/384/512）再 base64 编码并带算法前缀。浏览器下载完资源后在执行前重算哈希，与 integrity 不符则拒绝执行并报错，从机制上保证「第三方 CDN 资源就是我发布时审计过的那份」。它防御的核心威胁是 CDN 被入侵或劫持后投毒——2018 年 Browsealoud 插件被篡改注入挖矿脚本、波及数千政府网站，正是 SRI 要解决的场景。
 
-\`\`\`html
-<!-- integrity 哈希：内容变则不执行 -->
-<script src="https://cdn.com/lib.js"
-  integrity="sha384-abc123..."
-  crossorigin="anonymous"></script>
-<!-- CSS 同理 -->
-<link rel="stylesheet" href="https://cdn.com/style.css"
-  integrity="sha384-xyz..." crossorigin="anonymous" />
-\`\`\`
+代码示例：
+  <script src="https://cdn.com/lib.js"
+    integrity="sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/ux..."
+    crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.com/style.css"
+    integrity="sha384-xyz..." crossorigin="anonymous" />
 
-踩坑：SRI 需 crossorigin 属性（跨源资源）；CDN 更新资源需同步更新 integrity（构建工具自动生成）；SRI 只防篡改不防可用性（哈希不匹配资源不加载，需 fallback）。`,
-    keyPoints: ["SRI 哈希校验防 CDN 篡改", "integrity + crossorigin", "CDN 更新需同步哈希"],
-    followUps: ["SRI 如何生成哈希？", "SRI 校验失败怎么办？"],
+真实场景：官网落地页引第三方统计 SDK、支付页引风控脚本必须加 SRI；构建期用 webpack-subresource-integrity 插件自动算哈希注入 HTML，或 openssl dgst -sha384 -binary 手工生成。坑点：跨源资源必须配 crossorigin 属性（否则 CORS 阻断连加载都失败），且 CDN 需返回 Access-Control-Allow-Origin；资源每次发版哈希都变，手工维护不现实，必须构建自动化；SRI 只保完整性不保可用性，校验失败资源直接不执行，关键库要备 onerror 降级加载本地副本；动态 insertBefore 插入的脚本不受 SRI 保护。`,
+    keyPoints: ["integrity 哈希校验，不符则拒绝执行","防 CDN 篡改投毒，典型如 Browsealoud 事件","跨源资源必须配 crossorigin + CORS 响应头","只保完整性不保可用性，需 onerror 降级"],
+    followUps: ["SRI 的哈希在构建流程中如何自动生成？","SRI 校验失败时如何做优雅降级？"],
     favorited: false,
   },
   {
