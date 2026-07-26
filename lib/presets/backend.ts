@@ -14102,6 +14102,816 @@ JWT 场景：维护 user 级 token_version，踢人时 version+1，
     followUps: ["改密码后如何让进行中的 WebSocket 连接也断开？", "设备指纹的常用因子和隐私合规边界？"],
     favorited: false,
   },
+  // ===== Java 框架：Netty 网络编程（be-271 ~ be-277）=====
+  {
+    id: "be-271",
+    nodeId: "be-netty",
+    question: "Netty 的线程模型（主从 Reactor）是什么？EventLoop 和 EventLoopGroup 怎么分工？",
+    bigTech: true,
+    answer: `结论：Netty = 主从 Reactor 多线程模型。BossGroup（1 个线程就够）只处理 OP_ACCEPT 接收连接，把 SocketChannel 注册给 WorkerGroup 的某个 EventLoop；WorkerGroup 的每个 EventLoop 是一个「单线程执行器」，绑死一个 Selector，负责其上所有 Channel 的 IO 读写+任务执行。一个 Channel 一生只绑定一个 EventLoop → 同一连接的 IO 事件天然串行，无锁。
+
+\`\`\`text
+主从 Reactor 结构：
+              ┌── BossGroup (NioEventLoopGroup, 1 线程)
+客户端连接 ──→ │   Selector 只监听 OP_ACCEPT
+              └── 接受后把 SocketChannel 按策略(round-robin)注册到 ↓
+              ┌── WorkerGroup (默认 CPU核数×2 线程)
+              │   EventLoop-1: Selector + taskQueue + Channel[1,4,7...]
+              │   EventLoop-2: Selector + taskQueue + Channel[2,5,8...]
+              └── 每个 EventLoop 单线程跑死循环：select → processSelectedKeys
+                  → runAllTasks(定时任务+用户提交的任务)
+\`\`\`
+
+\`\`\`java
+// 标准服务端骨架
+EventLoopGroup boss = new NioEventLoopGroup(1);        // 只接连接
+EventLoopGroup worker = new NioEventLoopGroup();       // 默认 核数*2
+new ServerBootstrap()
+    .group(boss, worker)
+    .channel(NioServerSocketChannel.class)
+    .childHandler(new ChannelInitializer<SocketChannel>() {
+        protected void initChannel(SocketChannel ch) {
+            ch.pipeline()
+              .addLast(new LengthFieldBasedFrameDecoder(65536, 0, 4))
+              .addLast(new BusinessHandler());   // 业务 Handler
+        }
+    })
+    .bind(8080).sync();
+
+// 关键认知：BusinessHandler 的 channelRead 跑在 EventLoop 线程上
+// 同一 Channel 的事件串行 → Handler 里操作连接级状态不用加锁
+// 但！不同 Channel 可能共享单例 Handler → 成员变量仍是共享的
+// （@ChannelHandler.Sharable 的 Handler 必须无状态）
+\`\`\`
+
+为什么 EventLoop 里不能阻塞：一个 EventLoop 管几千个 Channel，你在 channelRead 里 sleep 100ms 或同步查 DB，这几千个连接的 IO 事件全部延迟——整个 EventLoop 瘫痪。正确姿势：耗时业务（DB/RPC/文件）丢给独立的业务线程池（DefaultEventExecutorGroup 或自家池），IO 线程只编解码+分发。
+
+\`\`\`java
+// 耗时业务卸载到业务池（两种姿势）
+// 姿势1：addLast 时指定 executor，该 Handler 整体在业务池执行
+pipeline.addLast(bizGroup, new BlockingDbHandler());
+// 姿势2：Handler 内手动提交（更细粒度）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    bizPool.execute(() -> {
+        Result r = heavyQuery(msg);
+        ctx.writeAndFlush(r);  // writeAndFlush 线程安全，会被塞回 EventLoop 执行
+    });
+}
+\`\`\`
+
+案例：Dubbo 的 NettyServer 默认 1 boss + 默认 worker，业务派发到 AllChannelHandler 线程池；RocketMQ Broker 用 Netty 处理上万并发的消息收发，发送/拉取/心跳各用独立 EventExecutorGroup 隔离；gRPC-Java 服务端基于 Netty，HTTP/2 多路复用单连接。
+
+踩坑：channelRead 里直接调阻塞 JDBC → 全 EventLoop 卡顿，线上表现为「部分连接全部超时、其他连接正常」；Sharable Handler 里用 SimpleDateFormat 成员变量（线程不安全经典事故）；EventLoop 提交任务时忘了优雅停机导致任务丢失（shutdownGracefully 有 quietPeriod）；ChannelHandlerContext 引用被业务线程池长期持有导致内存泄漏（要 retain/release ByteBuf）；把 boss 线程数开很大（纯属浪费，accept 无竞争）。`,
+    keyPoints: ["Boss 接连接 Worker 跑 IO，Channel 一生绑定一个 EventLoop", "EventLoop 禁阻塞，耗时业务卸载业务池", "Sharable Handler 必须无状态"],
+    followUps: ["Netty 的 FastThreadLocal 相比 ThreadLocal 快在哪？", "EpollEventLoop 相比 NioEventLoop 多了什么（边缘触发）？"],
+    favorited: false,
+  },
+  {
+    id: "be-272",
+    nodeId: "be-netty",
+    question: "TCP 粘包拆包是什么？Netty 的四种拆包器怎么选？",
+    bigTech: true,
+    answer: `结论：TCP 是字节流协议，没有消息边界——你发 3 个包，对端可能 1 次收完（粘包）也可能 5 次收完（拆包），原因是 Nagle 算法合并小包、MSS 切分大包、接收缓冲区大小不确定。应用层必须自己定义「帧格式」并拆包。Netty 提供四个现成解码器覆盖所有场景。
+
+\`\`\`text
+粘包成因三连：
+1. Nagle：应用连续写 3 个小包 → 内核合并成一个 TCP 段发出（省包头开销）
+2. MSS 切分：一个 8KB 应用包 → 被切成 6 个 1460B 的段
+3. 接收缓冲：对端 recv 缓冲区只有 2KB 剩余 → 一次 read 只拿半包
+TCP 只保证「字节按序不丢不重」，不保证「一次 read = 一次 write」
+\`\`\`
+
+\`\`\`text
+四种拆包器选型：
+解码器                          帧格式                  适用
+FixedLengthFrameDecoder        定长 N 字节              雷达/工控定长协议
+DelimiterBasedFrameDecoder     分隔符结尾($_/\\r\\n)      文本协议/Redis RESP
+LineBasedFrameDecoder          换行符结尾               日志采集/telnet
+LengthFieldBasedFrameDecoder   长度字段+消息体(私有协议)  Dubbo/gRPC/IM 全部用它
+\`\`\`
+
+\`\`\`java
+// 私有协议标配：LengthFieldBasedFrameDecoder 五参数（面试要能默写）
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    10 * 1024 * 1024,  // maxFrameLength：帧最大长度，防爆内存（安全阀！）
+    0,                 // lengthFieldOffset：长度字段偏移
+    4,                 // lengthFieldLength：长度字段本身占 4 字节
+    0,                 // lengthAdjustment：长度字段到消息体之间的额外字节
+    4                  // initialBytesToStrip：解码后跳过的字节数（剥掉长度头）
+));
+// 帧结构：| 4B length | N B body |
+// 带魔数防串线：| 2B magic | 4B length | N B body |
+//   → offset=2, length=4, adjustment=0, strip=6
+
+// 长度字段不包含自身是铁律；包含时用 lengthAdjustment 修正
+// 例如 | 4B len(含自身) | body | → adjustment = -4
+\`\`\`
+
+半包处理是拆包器内部完成的：缓冲区不够一帧就等下一批字节（cumulation 累积），绝不把半包丢给业务 Handler——业务永远拿到完整帧。
+
+案例：Dubbo 协议 = 16B 定长头（魔数 0xdabb + 状态 + 请求 ID + 数据长度）+ body，用 LengthFieldBasedFrameDecoder（offset=12, length=4）；RocketMQ 私有协议 = 4B 总长度 + 4B 头长度 + 头 JSON + body；Redis RESP 协议用分隔符 \\r\\n；HTTP/1.1 本质也是「请求头 \\r\\n\\r\\n 分隔 + Content-Length 定体」的混合拆包。
+
+踩坑：不设 maxFrameLength → 攻击者伪造 length=Integer.MAX_VALUE 的头，Netty 按长度预分配/累积内存，OOM（这是真实的 DDoS 手法）；粘包问题在本地测试不复现（localhost 不经过 Nagle/MSS，小包必达），一上生产跨机房就随机截断——压测要过真实网络；解码器放错 Pipeline 位置（在业务 Handler 后面 = 白配）；Delimiter 场景消息体本身含分隔符未转义（Redis 用长度前缀解决这个问题，纯分隔符协议要转义）；拆包后 ByteBuf 没释放（SimpleChannelInboundHandler 自动释放，ChannelInboundHandlerAdapter 手动处理）。`,
+    keyPoints: ["TCP 无消息边界：Nagle+MSS+缓冲区三因", "私有协议=长度字段法，五参数要会配", "maxFrameLength 是防 OOM 攻击的安全阀"],
+    followUps: ["Netty 拆包器的 cumulation 缓冲区怎么避免内存拷贝（CompositeByteBuf）？", "HTTP/2 的帧格式相比 HTTP/1.1 拆包优势？"],
+    favorited: false,
+  },
+  {
+    id: "be-273",
+    nodeId: "be-netty",
+    question: "ByteBuf 的引用计数和内存泄漏怎么排查？池化内存（PooledByteBufAllocator）收益在哪？",
+    bigTech: true,
+    answer: `结论：ByteBuf 不走 JVM GC，而是引用计数（ReferenceCounted）——创建时 refCnt=1，retain() +1，release() -1，归 0 时内存归还池/堆外。忘了 release 就泄漏（堆外内存 GC 管不着）；release 后又访问就报错。池化（PooledByteBufAllocator，默认开启）复用内存块，避免频繁的 malloc/free 和堆外内存零初始化开销——高并发下分配性能差 10 倍以上。
+
+\`\`\`java
+// 引用计数生命周期（谁消费谁释放是铁律）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    ByteBuf buf = (ByteBuf) msg;
+    try {
+        byte[] data = new byte[buf.readableBytes()];
+        buf.readBytes(data);
+        process(data);
+    } finally {
+        ReferenceCountUtil.release(buf);  // 必须释放！
+    }
+}
+// 省心替代：继承 SimpleChannelInboundHandler，框架自动 release
+
+// 异步场景：消息要传给业务线程池 → 先 retain 续命
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    ByteBuf buf = (ByteBuf) msg;
+    buf.retain();  // refCnt 2，IO 线程 release 后还剩 1
+    bizPool.execute(() -> {
+        try { process(buf); } finally { buf.release(); }  // 业务线程还账
+    });
+}
+\`\`\`
+
+\`\`\`text
+堆外 vs 堆内 vs 池化：
+alloc().directBuffer()   堆外内存，零拷贝直达 Socket，但分配慢（malloc）
+alloc().heapBuffer()     堆内数组，分配快，但写 Socket 要拷贝到堆外
+PooledByteBufAllocator   池化复用（默认）：jemalloc 式内存池，
+                         线程本地缓存(ThreadLocal) → 大部分分配无锁
+堆外总容量上限：-XX:MaxDirectMemorySize（默认≈Xmx），超限抛 OutOfDirectMemoryError
+\`\`\`
+
+泄漏排查三板斧：
+\`\`\`java
+// 1. 开泄漏检测（开发环境 paranoid，生产采样）
+-Dio.netty.leakDetectionLevel=PARANOID  // 每个 buf 都检测（慢）
+-Dio.netty.leakDetectionLevel=SIMPLE    // 1% 采样（生产可用）
+// 泄漏时日志打 LEAK: ByteBuf.release() was not called...附分配栈
+
+// 2. 监控指标：PooledByteBufAllocator.metric()
+long usedDirect = metric.usedDirectMemory();  // 持续上涨不回落=泄漏
+
+// 3. 物理排查：jstat 看不到堆外 → NMT(Native Memory Tracking)
+-XX:NativeMemoryTracking=summary  →  jcmd <pid> VM.native_memory
+\`\`\`
+
+案例：某 IM 网关消息转发 Handler 异常分支漏 release，堆外每天涨 2GB，FULL GC 无效（堆外不归 GC），一周后 OutOfDirectMemoryError——加 PARANOID 复现 10 分钟定位到异常分支；Cassandra/Elasticsearch 都用 Netty 传输层 + 池化；gRPC 的零拷贝优化用 CompositeByteBuf 合并 header+body 避免一次拷贝。
+
+踩坑：channelRead 里 try 中 return 提前跑了 finally 没写（必须 finally release）；ctx.writeAndFlush(buf) 后又 release(buf)——write 是异步的，release 后发送线程拿到的是已释放内存（框架写完会自己 release，调用方别再动）；异常处理器 exceptionCaught 里没 release 当前 msg；ByteBuf 转 byte[] 时直接 array()——direct buffer 没有底层数组，抛 UnsupportedOperationException（要判断 hasArray）；测试环境泄漏检测关着，泄漏代码带病上线。`,
+    keyPoints: ["refCnt 引用计数，谁消费谁 release", "异步传递先 retain 后还账", "Pooled 池化+SIMPLE 采样检测泄漏"],
+    followUps: ["Netty 零拷贝三板斧（Composite/Slice/FileRegion）？", "堆外内存被谁统计进容器 OOM（K8s 场景）？"],
+    favorited: false,
+  },
+  {
+    id: "be-274",
+    nodeId: "be-netty",
+    question: "长连接心跳机制怎么设计？Netty IdleStateHandler 和断线重连怎么做？",
+    bigTech: true,
+    answer: `结论：长连接会「假死」——NAT 表超时（家用路由 60-300s）、防火墙静默断链、对端宕机但 TCP 没收到 FIN（拔网线场景，TCP 本身要几小时才能探测到）。应用层心跳是唯一可靠手段：IdleStateHandler 检测读写空闲，超时触发事件，发心跳/断开。设计要点：心跳间隔 < 中间设备超时、带随机抖动防同步雪崩、失败重连要指数退避。
+
+\`\`\`java
+// 服务端心跳标配三件套
+pipeline.addLast(new IdleStateHandler(
+    60,   // readerIdleTime：60s 没读到数据（含心跳）→ 认为对端死了
+    0,    // writerIdleTime：服务端一般不设（靠客户端心跳）
+    0));  // allIdleTime
+pipeline.addLast(new ChannelInboundHandlerAdapter() {
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent e && e.state() == READER_IDLE) {
+            // 读超时=客户端 60s 没任何消息（含心跳包）→ 断开
+            ctx.close();  // 配合连接数指标告警，异常批量断开要熔断
+        }
+    }
+});
+
+// 客户端：写空闲就发心跳（应用层 PING 帧）
+pipeline.addLast(new IdleStateHandler(0, 20, 0, SECONDS)); // 20s 无写→触发
+public void userEventTriggered(ctx, evt) {
+    if (evt == WRITER_IDLE) ctx.writeAndFlush(PING);  // 保持 NAT 表活跃
+}
+\`\`\`
+
+\`\`\`text
+参数设计经验值：
+心跳间隔   20-30s（移动 4G NAT 超时最短约 270s，WiFi 路由约 60-300s，
+           取 1/3 安全边际；太短费电——微信心跳智能区间 4.5min~28min 自适应）
+读超时     = 心跳间隔 × 2~3（容忍丢包/延迟抖动，单次超时就断太敏感）
+双向心跳   IM/推送必须双向（服务端也要知道客户端活着）
+智能心跳   稳定网络下逐步拉长间隔，断网后缩短——微信/GCM 都这么干
+\`\`\`
+
+\`\`\`java
+// 断线重连（客户端）：指数退避 + 上限 + 随机抖动
+channel.closeFuture().addListener(f -> scheduleReconnect(1));
+
+void scheduleReconnect(int attempt) {
+    long delay = Math.min(1000L << attempt, 30_000)   // 2^n 秒，封顶 30s
+               + ThreadLocalRandom.current().nextLong(1000);  // 抖动防群起
+    eventLoop.schedule(() -> {
+        if (!shutdown) connect().addListener((ChannelFuture cf) -> {
+            if (!cf.isSuccess()) scheduleReconnect(Math.min(attempt + 1, 6));
+            else onReconnected();  // 重发订阅/补拉离线消息
+        });
+    }, delay, MILLISECONDS);
+}
+\`\`\`
+
+案例：微信移动端的智能心跳（按网络质量动态 4.5~28 分钟，省电量是核心竞争力）；阿里 ACCL 长连接网关——百万级设备每 30s 心跳，网关层 IdleStateHandler 读超时 90s 自动清理死连接；Dubbo 消费端与提供者之间 HeaderExchangeClient 60s 心跳保活；gRPC 的 HTTP/2 PING 帧 + keepalive 参数。
+
+踩坑：只在 TCP 层开 keepalive（默认 2 小时才探测，等于没有，必须应用层）；心跳包走业务线程池被阻塞任务排队（心跳要 IO 线程直发，最高优先级）；重连无退避——服务端重启瞬间几万客户端同时重连形成「重连风暴」直接把服务端打死（必须指数退避+抖动+限流）；心跳和断连事件没接监控，机房网络抖动导致的大规模掉线无人知晓；IdleStateHandler 的读超时在消息洪峰时误判——纯读业务（行情推送）客户端长时间只读不写，服务端应设 allIdle 而非 readIdle。`,
+    keyPoints: ["TCP 假死靠应用层心跳探测", "心跳 20-30s+读超时 2-3 倍+智能自适应", "重连指数退避+抖动防风暴"],
+    followUps: ["微信智能心跳的具体算法（网络类型×成功率）？", "QUIC 连接迁移对心跳设计的影响？"],
+    favorited: false,
+  },
+  {
+    id: "be-275",
+    nodeId: "be-netty",
+    question: "Pipeline 和 ChannelHandler 的责任链机制？入站出站事件怎么传播？",
+    bigTech: false,
+    answer: `结论：Pipeline = 双向链表串联的 Handler 责任链，每个 Channel 一条。入站事件（连接建立/读到数据/异常）从头传到尾，出站事件（write/flush/close）从尾传回头。编解码器、业务逻辑、日志、限流全拆成独立 Handler 挂链上——这是 Netty 可插拔架构的根基。
+
+\`\`\`text
+双向传播图：
+        入站方向（Inbound）：socket → head → Decoder → Decoder → BizHandler → tail
+        出站方向（Outbound）：BizHandler.write → Encoder → Encoder → head → socket
+
+handler 列表（典型 IM 网关）：
+[0] IdleStateHandler          入站：心跳超时检测
+[1] LengthFieldBasedDecoder   入站：拆包（ByteBuf→完整帧 ByteBuf）
+[2] MessageDecoder            入站：ByteBuf→业务 POJO
+[3] AuthHandler               入站：鉴权（失败直接 close，不往下传）
+[4] BizLogicHandler           入站：业务处理，write 响应 ← 出站从这里反向
+[5] MessageEncoder            出站：POJO→ByteBuf
+[6] MetricsHandler            双向：流量统计
+\`\`\`
+
+\`\`\`java
+// 传播控制（面试高频：事件怎么流动）
+public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    if (msg instanceof PingFrame) {
+        ctx.writeAndFlush(PONG);   // write 从当前 Handler 反向找出站链
+        return;                    // 不调 fireChannelRead → 入站传播到此为止
+    }
+    ctx.fireChannelRead(msg);      // 手动放行到下一个入站 Handler
+}
+// 关键区别：
+ctx.write()        → 从当前 Handler 往前找出站（常用，跳过后面无关出站 Handler）
+channel.write()    → 从 tail 开始走完整出站链（要过全部 Encoder 时用）
+ctx.fireChannelRead() 不调用 = 消息被「吃掉」（鉴权拦截、防刷丢弃都这么实现）
+\`\`\`
+
+\`\`\`text
+Handler 类型速查：
+ChannelInboundHandlerAdapter   入站事件处理（channelRead/Active/Exception）
+ChannelOutboundHandlerAdapter  出站事件处理（write/bind/close）
+ChannelDuplexHandler           双向
+MessageToByteEncoder<T>        出站编码：POJO→ByteBuf（自动 release 源消息）
+ByteToMessageDecoder           入站解码基类（拆包器都继承它）
+MessageToMessageDecoder        入站转码：帧→POJO
+SimpleChannelInboundHandler<T> 入站+自动类型匹配+自动 release（业务首选）
+\`\`\`
+
+案例：Dubbo 的 Pipeline = ExchangeCodec（编解码）→ HeaderExchangeHandler（请求响应配对）→ DecodeHandler → 业务派发；gRPC 服务端 = Http2FrameReader/Writer（HTTP/2 帧）→ 流控 → 业务方法调用；APISIX 网关在 OpenResty 的 cosocket 之上抽象了类似的 phase 链（rewrite/access/content/log）——思想同源。
+
+踩坑：Handler 顺序放错——Encoder 放在 BizHandler 前面导致出站事件不经过它（出站是反向传播！）；一个 Handler 既处理入站又处理出站但只继承了一边基类，另一边事件被默默吞掉；在 HeadHandler 之后 addLast 永远执行不到（tail 是终点）；异常没重写 exceptionCaught → 默认实现打日志+不关连接，半死连接堆积；ctx.pipeline() 在 handlerAdded 里就遍历（还没加完，要在 channelRegistered 后）；共享 Handler（@Sharable）里存了 ctx 引用——ctx 属于特定 Channel，多连接共享时串线（数据发到别人连接上，线上大事故）。`,
+    keyPoints: ["入站头→尾，出站尾→头，write 从当前 Handler 反向", "不调 fireChannelRead=吃掉消息", "Sharable Handler 禁存 Channel 状态"],
+    followUps: ["Netty 的 Handler 热插拔（运行时 modify pipeline）应用场景？", "HTTP/2 的 stream 与 Channel 的映射关系？"],
+    favorited: false,
+  },
+  {
+    id: "be-276",
+    nodeId: "be-netty",
+    question: "Netty 相比原生 NIO 的优势？为什么 Dubbo/gRPC/RocketMQ 都选它？",
+    bigTech: true,
+    answer: `结论：原生 NIO 是「正确的零件，错误的体验」——API 反人类（Selector/Channel/Buffer 三层裸操作）、epoll 空轮询 bug、要手写粘包/心跳/重连/内存管理。Netty 把 NIO 包装成事件驱动的组件化框架：线程模型现成、拆包器现成、内存池现成、SSL 现成，且在零拷贝、无锁化、池化上做了 JVM 级深度优化。选它的本质：用 20% 的复杂度获得 95% 的裸 NIO 性能。
+
+\`\`\`text
+原生 NIO 的坑（Netty 逐个填平）：
+原生 NIO 痛点                    Netty 方案
+Selector 空轮询 CPU 100% bug    select 计数，空轮询超阈值重建 Selector（epoll bug 规避）
+ByteBuffer flip() 心智负担       ByteBuf 读写双指针分离，无需 flip
+半包粘包手写状态机               LengthFieldBasedFrameDecoder 开箱即用
+连接/读写/异常事件分发手写        Pipeline 责任链自动派发
+ByteBuffer 频繁分配 GC 压力大    PooledByteBufAllocator 池化+堆外
+线程模型自己设计                 主从 Reactor 开箱即用
+SSL/TLS 握手状态机极复杂         SslHandler 一行 addLast
+\`\`\`
+
+\`\`\`text
+Netty 的性能三板斧（超越原生 NIO 的部分）：
+1. 零拷贝
+   - CompositeByteBuf：逻辑合并多个 buf 不拷贝
+   - FileRegion.transferTo：文件直发 socket（sendfile）
+   - slice/duplicate：共享底层数组不同视图
+2. 无锁化
+   - 串行无锁：Channel 绑定唯一 EventLoop，连接内操作无锁
+   - FastThreadLocal：比 JDK ThreadLocal 快（数组索引替代哈希）
+   - 线程本地内存池：分配无竞争
+3. 对象复用
+   - Recycler 对象池（轻量，避免滥用）
+   - ByteBuf 池化（jemalloc 分区管理）
+\`\`\`
+
+\`\`\`text
+选型案例（为什么基础设施都选 Netty）：
+Dubbo       RPC 需要私有协议+长连接+心跳+异步调用——Netty 全包
+gRPC-Java   HTTP/2 帧编解码+流控，Netty 有现成 HTTP/2 codec
+RocketMQ    Broker 高吞吐收发+多种协议头，主从 Reactor+业务线程池隔离
+ES          节点间 transport 层，9300 端口二进制协议
+Cassandra   CQL 协议服务端
+Spark       节点间 Shuffle 数据传输（netty-rpc 替代 akka）
+EMQX/MQTT   百万连接 IoT 网关（单机 C10M 优化标杆）
+\`\`\`
+
+反面与边界：Netty 不是银弹——普通 CRUD Web 服务用 Spring Boot/Tomcat 足够（Servlet 模型+连接池成熟，没必要自己玩字节）；Netty 做 HTTP 服务端性能不如 Envoy/Nginx（C 实现的极致优化）；团队无网络编程积累时 Netty 的「自由度」是事故温床（内存泄漏/线程阻塞防不胜防，严格 code review+泄漏检测是底线）。
+
+案例：阿里双 11 的 RPC 框架 HSF 基于 Netty，单机支撑 10 万+ QPS；蚂蚁 SOFARPC 在 Netty 上做了 Bolt 协议（连接复用+无序列化开销的 oneway）；腾讯开源的 tRPC 同样 Netty 底座；Apache Pulsar 的 broker 和 bookie 全 Netty，支撑 Yahoo 百万 topic。
+
+踩坑：把 Netty 当 Web 框架用写 CRUD（杀鸡用屠龙刀，维护成本反噬）；盲目上 EpollEventLoop 但 so 库没打进去（回退 NIO 还不知道）；4.0 → 4.1 迁移时 ByteBuf 默认从非池化变池化，老代码按非池化写的 release 逻辑双重释放；EventLoop 数开成 CPU×4（IO 线程不是越多越好，上下文切换反噬，默认×2 是甜点位）；在容器里不感知 MaxDirectMemorySize，K8s limit 把堆外+堆内算一起 OOMKilled。`,
+    keyPoints: ["填平 NIO 五坑：epoll bug/flip/粘包/分发/内存", "零拷贝+无锁串行+池化三板斧", "CRUD 服务别用 Netty，基础设施才需要"],
+    followUps: ["Netty 怎么规避 epoll 空轮询 bug（rebuildSelector）？", "Netty 5 为什么夭折（ForkJoinPool 模型反思）？"],
+    favorited: false,
+  },
+  {
+    id: "be-277",
+    nodeId: "be-netty",
+    question: "用 Netty 手写一个极简 RPC 框架：客户端怎么实现同步调用？（请求-响应配对）",
+    bigTech: false,
+    answer: `结论：RPC 的核心难点是「异步网络 IO 上做出同步调用体验」。标准解法：每个请求带全局唯一 requestId，客户端发送后把 Future 挂进「请求映射表」，IO 线程收到响应按 requestId 找到对应 Future 并 setResult 唤醒——这就是 Dubbo 的 DefaultFuture 模式。
+
+\`\`\`java
+// ============ 协议设计（4B 魔数+8B requestId+4B 长度+JSON body）============
+record RpcRequest(long requestId, String method, Object[] args) {}
+record RpcResponse(long requestId, Object result, String error) {}
+
+// ============ 客户端核心：请求-响应配对 ============
+public class RpcClient {
+    private final Map<Long, CompletableFuture<RpcResponse>> pending =
+        new ConcurrentHashMap<>();                    // 请求映射表
+    private final AtomicLong idGen = new AtomicLong();
+    private Channel channel;  // 单连接长连接（生产要连接池）
+
+    public Object call(String method, Object... args) throws Exception {
+        long id = idGen.incrementAndGet();
+        CompletableFuture<RpcResponse> future = new CompletableFuture<>();
+        pending.put(id, future);                      // 先挂号再发送（顺序不能反！）
+
+        channel.writeAndFlush(new RpcRequest(id, method, args))
+               .addListener(f -> {                    // 写失败要清理挂号
+                   if (!f.isSuccess()) {
+                       pending.remove(id);
+                       future.completeExceptionally(f.cause());
+                   }
+               });
+        return future.get(3, SECONDS).result();       // 同步等待，带超时！
+    }
+
+    // IO 线程收到响应：按 requestId 唤醒等待的业务线程
+    class ClientHandler extends SimpleChannelInboundHandler<RpcResponse> {
+        protected void channelRead0(ChannelHandlerContext ctx, RpcResponse resp) {
+            CompletableFuture<RpcResponse> f = pending.remove(resp.requestId());
+            if (f != null) f.complete(resp);   // complete 唤醒 future.get() 的线程
+        }
+    }
+}
+\`\`\`
+
+\`\`\`text
+关键点逐条（面试追问点）：
+1. 为什么先 put 再 write：响应可能比 writeAndFlush 返回更快到达
+   （同机房 RT 微秒级），反了会丢响应→调用方超时
+2. 为什么 CompletableFuture 不用 wait/notify：
+   支持超时/取消/链式，且 complete 只生效一次（重复响应安全）
+3. 超时清理：future.get 超时后 pending 里的条目还在 →
+   要么 catch 后 pending.remove(id)，要么定时扫描清理（防泄漏）
+4. 服务端怎么实现：IO 线程解码 → 业务线程池执行方法 →
+   用同一个 requestId 写回响应（异步写完，IO 线程不阻塞）
+5. oneway 调用：不带 requestId 的 fire-and-forget（日志上报类）
+\`\`\`
+
+进阶（Dubbo 真实实现对比）：
+- 连接池：单连接扛不住时按「连接数×请求并发」扩容，Dubbo 默认共享连接+多路复用
+- 序列化：JSON → Hessian2/Protobuf（体积减半，CPU 省 70%）
+- 调用模式：同步（本文）/ 异步 future / callback / oneway 四种
+- 服务发现：注册中心（ZK/Nacos）订阅提供者列表 + 负载均衡（随机/轮询/一致性哈希）
+- 容错：失败重试（幂等接口）/ Failover / Failfast / Forking 并行调用
+
+案例：Dubbo 的 DefaultFuture（2.7 前用 JDK 同步器，后改 CompletableFuture）；gRPC 的 ClientCalls.futureUnaryCall 同样 requestId 配对（HTTP/2 streamId 天然充当 requestId）；某厂手写 RPC 忘了超时清理 pending map，大促时 100 万超时请求堆积 → OOM。
+
+踩坑：requestId 用时间戳（并发冲突，必须原子序列或 UUID）；future.get() 不带超时（服务端宕机=调用线程永久挂起，线程池打满雪崩）；响应超时才到达，pending 已 remove，日志报「unknown requestId」是正常现象（别当 bug 修，打 debug 日志即可）；一个连接上并发发送没控制 inflight 上限（TCP 缓冲区写爆，应该信号量限流）；重试不幂等——超时重试导致重复下单（重试必须配幂等 key）。`,
+    keyPoints: ["requestId+Future 映射表=异步 IO 上的同步体验", "先挂号再发送，超时必须清理", "重试必须配幂等"],
+    followUps: ["HTTP/2 streamId 怎么天然解决多路复用配对？", "RPC 超时时间怎么科学设定（P99 基线+熔断联动）？"],
+    favorited: false,
+  },
+  // ===== 分布式：协调服务 ZK/etcd（be-278 ~ be-284）=====
+  {
+    id: "be-278",
+    nodeId: "be-zk-etcd",
+    question: "ZooKeeper 的 ZAB 协议是什么？崩溃恢复和消息广播两个阶段怎么工作？",
+    bigTech: true,
+    answer: `结论：ZAB（ZooKeeper Atomic Broadcast）是为 ZK 定制的「主备原子广播」协议，类 Raft 但更早。两阶段：消息广播阶段（Leader 把写请求转成 Proposal 两阶段提交给 Follower，过半 ACK 即提交）；崩溃恢复阶段（Leader 宕机→选新主→数据同步，保证已提交的不丢、未提交的丢弃）。设计目标：单一 Leader 串行化写，保证全局顺序一致。
+
+\`\`\`text
+阶段一：消息广播（正常态，类似 2PC 但过半即成功）
+1. 客户端写请求到任意节点 → 转发给 Leader
+2. Leader 生成 Proposal（带 zxid = <epoch, 递增计数>，全局单调）
+3. Leader 把 Proposal 发给所有 Follower（各 Follower 写入本地事务日志）
+4. Follower 落盘成功 → 回 ACK
+5. Leader 收到过半 ACK → 发 COMMIT → 各节点应用变更到内存树
+关键：过半即提交，不需要全部 ACK（这是 ZAB 比纯 2PC 快的原因）
+
+读请求：本地直接读（不保证最新！），要最新需 sync() 或走 Leader
+\`\`\`
+
+\`\`\`text
+阶段二：崩溃恢复（Leader 挂了）
+1. 发现期：Follower 心跳超时 → 进入 LOOKING 状态发起选举
+2. 选举：投票 (myid, zxid)——zxid 大的优先（数据最新），
+   相同则 myid 大优先；得票过半者成为 Leader
+3. 同步期：新 Leader 与各 Follower 做数据对齐
+   - Follower 有 Leader 没有的未提交 Proposal → 丢弃
+   - Follower 落后 → Leader 按差异 SNAP/DIFF/TRUNC 同步
+4. 恢复完成 → 回到广播模式
+
+zxid 设计精髓：高 32 位 epoch（每届 Leader 任期）+ 低 32 位计数
+→ 新 Leader epoch+1，天然屏蔽旧 Leader 的所有消息（脑裂保护）
+\`\`\`
+
+\`\`\`text
+ZAB vs Raft 对比（面试高频）：
+维度        ZAB                       Raft
+选举依据    zxid（数据新优先）         日志 lastIndex+term（同样数据新优先）
+日志复制    Proposal→ACK过半→COMMIT    AppendEntries→过半→commitIndex 推进
+读一致      本地读（可能旧）           本地读或 ReadIndex/LeaseRead
+应用        ZK                        etcd/Consul/TiKV
+本质        都是「单 Leader+过半派」，思想同源
+\`\`\`
+
+案例：Kafka（KRaft 之前）用 ZK 做 Controller 选举+Broker 元数据，Controller 挂了就靠 ZAB 重新选主；HBase 的 HMaster 选举+RegionServer 上下线感知全靠 ZK；HDFS NameNode HA 的 Active/Standby 切换由 ZKFC 基于 ZK 临时节点+Watcher 实现；Dubbo 经典部署用 ZK 做注册中心（provider 注册临时节点）。
+
+踩坑：以为 ZK 读是强一致的——默认本地读可能读到旧数据（要 sync 或读走 Leader）；Follower 太多写变慢（写要过半 ACK，7 节点比 3 节点写延迟高，一般 3/5 足矣）；ZAB 广播阶段的事务日志磁盘 fsync 是写延迟大头（ZK 写性能不如 etcd 的原因之一）；把 ZK 当消息队列/KV 大对象存储用（znode 默认上限 1MB，它是协调服务不是数据库）；客户端 session 超时设太短（GC 停顿 10s 被误判宕机，临时节点全掉，服务大规模重注册——SessionTimeout 一般 10-30s 且要监控 GC）。`,
+    keyPoints: ["广播=Proposal+过半ACK+COMMIT", "恢复=按 zxid 选主+数据对齐", "ZK 读默认非强一致，要 sync"],
+    followUps: ["ZAB 怎么处理「已 COMMIT 但没送达」的 Proposal（历史补发）？", "Observer 节点为什么不参与选举（扩容读不拖累写）？"],
+    favorited: false,
+  },
+  {
+    id: "be-279",
+    nodeId: "be-zk-etcd",
+    question: "用 ZooKeeper 实现分布式锁：临时顺序节点怎么避免羊群效应？和 Redis 锁对比？",
+    bigTech: true,
+    answer: `结论：ZK 分布式锁的标准实现 = 临时顺序节点 + Watch 前一个节点。抢锁：在锁目录下创建 EPHEMERAL_SEQUENTIAL 节点（如 lock-0000000042）；判断：自己是不是序号最小的——是则持锁，否则 Watch 前一个序号节点；前驱删除（持锁方释放或宕机会话过期）→ 自己被唤醒重试。羊群效应的避免关键：只 Watch 前驱一个节点，而不是 Watch 整个锁目录。
+
+\`\`\`text
+羊群效应（naive 实现的灾难）：
+1000 个线程抢锁，都 Watch /lock 目录的 children 变化
+→ 锁释放瞬间，目录一变，ZK 给 1000 个客户端发通知
+→ 1000 个请求同时打向 ZK + 1000 个客户端同时重判断
+→ 惊群（thundering herd），ZK 被打爆
+
+正确实现：每个等待者只 Watch 自己的前驱节点
+lock-0001 ← Watch by lock-0002
+lock-0002 ← Watch by lock-0003
+...
+锁释放=只有「下一个」收到通知，链式唤醒，O(1) 通知
+\`\`\`
+
+\`\`\`java
+// Curator InterProcessMutex 核心逻辑（简化版）
+public void acquire() {
+    String path = client.create()
+        .creatingParentsIfNeeded()
+        .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)  // 临时+顺序
+        .forPath("/locks/order-" );
+    while (true) {
+        List<String> children = client.getChildren().forPath("/locks");
+        sort(children);  // 按序号排序
+        if (isFirst(path, children)) return;         // 最小=持锁
+        String prev = findPrev(path, children);      // 找前驱
+        // 只 Watch 前驱（stat 订阅删除事件），阻塞等待
+        CountDownLatch latch = new CountDownLatch(1);
+        client.checkExists().usingWatcher(e -> latch.countDown())
+              .forPath(prev);
+        latch.await(sessionTimeout, MILLISECONDS);   // 前驱删除→醒
+    }
+}
+public void release() { client.delete().forPath(myPath); }
+// 宕机安全：会话过期 → ZK 自动删除临时节点 → 锁自动释放（不死锁！）
+// 可重入：同线程重入计数（Curator 已封装）
+\`\`\`
+
+\`\`\`text
+ZK 锁 vs Redis 锁（选型必考）：
+维度        ZK 锁                        Redis 锁（Redisson）
+可靠性      CP，过半持久化，绝不丢锁      AP，主从切换瞬间可能双持锁
+            （脑裂时少数派不可写）        （Redlock 有争议，Martin Kleppmann 批过）
+死锁        临时节点+会话过期自动释放      EXPIRE 兜底，但业务超长易误释放
+            （宕机即释放，无残留）
+公平性      顺序节点天然 FIFO 公平锁       非公平（谁抢到谁得），
+                                        公平锁要靠 Lua 排队
+性能        写要过半提交，~千级 QPS        内存操作，~万级 QPS
+watch 唤醒   事件驱动，无轮询              订阅 pub/sub 或轮询
+运维        ZK 集群                      Redis 集群（更普及）
+\`\`\`
+
+案例：Hadoop HDFS NameNode HA 的 Active 选举锁用 ZK（宁可不可用不可双主）；Kafka Controller 选举锁；美团 Leaf 的 segment 号段分配用 ZK 锁防重复分配；支付对账任务的多机互斥执行（防重复跑批）用 Curator 锁。反面：某厂用 Redis setnx 锁但过期时间 3s，大促 GC 停顿 5s 锁被误释放，两个实例同时扣库存超卖。
+
+踩坑：ZK 锁拿到后业务执行超过会话超时（长 GC/FullGC）→ 会话过期锁被释放，业务还在跑=双持锁！解法：锁内做「临界区前检查锁仍有效」+  fencing token（锁版本号，存储层拒绝旧版本写入）；把 Watch 注册在锁目录上（羊群）；Curator 连接抖动抛出后认为锁丢了，实际服务端会话还有 30s 才过期（重连后要重新校验持锁状态）；跨机房用 ZK 锁（RT 几十 ms，锁吞吐雪崩，跨机房场景用各自机房本地锁+全局幂等）。`,
+    keyPoints: ["临时顺序节点+Watch 前驱=无羊群公平锁", "宕机自动释放不死锁", "CP 可靠 vs Redis 高性能， fencing token 防双持"],
+    followUps: ["Redlock 为什么被 Martin Kleppmann 质疑（时钟与 GC 暂停）？", "fencing token 在存储层怎么校验（单调版本号）？"],
+    favorited: false,
+  },
+  {
+    id: "be-280",
+    nodeId: "be-zk-etcd",
+    question: "ZooKeeper 的 Watcher 机制原理？为什么说它是「一次性」的？注册中心怎么用它做服务发现？",
+    bigTech: true,
+    answer: `结论：Watcher = 客户端对某个 znode 注册的「一次性回调」——节点创建/删除/数据变更/子节点变化时，ZK 服务端推送事件给注册过的客户端。一次性的含义：触发一次后自动注销，想继续监听必须重新注册。这是刻意设计：避免服务端维护永久订阅关系的状态爆炸+简化故障语义。
+
+\`\`\`text
+Watcher 工作原理：
+1. 客户端调用 getData(path, watch=true) / exists() / getChildren()
+   → 请求里带 watch 标记，服务端在该 znode 的 WatchTable 登记
+2. 事件类型：
+   NodeCreated / NodeDeleted / NodeDataChanged / NodeChildrenChanged
+3. 变更发生 → 服务端把事件塞进该客户端连接的发送队列（异步，不保证
+   「变更发生」和「收到通知」之间没有新变更——这就是一次性+重新注册
+   要搭配 getData 重新拉取的原因）
+4. 客户端收到 WatchedEvent → 回调 process() → 业务重新 getData+重新注册
+
+关键语义：「通知你变了，但不告诉你变成什么样」——
+新值要客户端自己拉。这样服务端只存「谁注册了哪个 path」，
+不传数据，推送成本 O(1)。
+\`\`\`
+
+\`\`\`java
+// 经典「永久监听」模板：触发后重新注册（面试手写题）
+public void watchConfig(String path) {
+    zk.getData(path, event -> {
+        if (event.getType() == EventType.NodeDataChanged) {
+            reloadConfig();       // 先处理
+            watchConfig(path);    // 再重新注册（一次性！）
+        } else if (event.getType() == EventType.NodeDeleted) {
+            log.warn("config deleted");
+        }
+    }, null);
+}
+// 生产别手写——Curator 的 NodeCache/TreeCache 已封装好自动重注册
+// + 连接抖动重放 + 本地缓存
+\`\`\`
+
+\`\`\`text
+服务注册发现的完整闭环（Dubbo-on-ZK 模式）：
+1. Provider 启动：创建 /dubbo/com.XService/providers/10.0.0.1:20880
+   （临时节点！宕机会话过期自动摘除——这是选 ZK 做注册中心的核心原因）
+2. Consumer 启动：getChildren(/dubbo/com.XService/providers, watch=true)
+   拿到全量地址列表 + 注册子节点 Watcher
+3. Provider 上下线 → 子节点变化 → Consumer 收到 NodeChildrenChanged
+   → 重新 getChildren+重注册 → 刷新本地路由表 → 负载均衡剔除死节点
+4. Consumer 自己注册到 /consumers/ 下（供治理台查询调用关系）
+\`\`\`
+
+案例：Dubbo 默认注册中心就是 ZK（2.x 时代绝对主流）；Canal 的 HA——server 和 client 都用 ZK 临时节点选主+位置存储；ElasticJob 的分片协调——实例上下线触发 Resharding；Apollo 的早期版本用 ZK 做配置变更通知（后改自研长轮询，因为 ZK 推送在十万级客户端下压力太大）。
+
+踩坑：忘了重新注册导致「只收到第一次变更」（最经典 bug）；在 Watcher 回调里做重活（回调跑在客户端 ZK 线程上，阻塞会丢后续事件）；Watch 了不存在的节点用 getData（要用 exists 注册，NodeCreated 才能收到）；大量客户端 Watch 同一热点节点，变更瞬间推送风暴（配置中心场景要分片或用长轮询替代，Nacos/Apollo 都因此弃用 ZK 推送模型）；会话过期后重连，之前的 Watcher 全没了（Curator 自动重放注册，原生 API 要自己在 process(SyncConnected) 里重挂）；以为 Watcher 保证不丢——「两次变更间隔极短」时第一次触发后还没重注册，第二次变更就丢了（所以重拉数据时要用 stat 版本号比对，漏了靠定时全量对账兜底）。`,
+    keyPoints: ["一次性触发+重新注册+重新拉数据三件套", "变更通知不带数据，O(1) 推送", "临时节点+子节点 Watch=注册发现闭环"],
+    followUps: ["Curator TreeCache 和 NodeCache 的适用场景差异？", "Nacos 为什么放弃推送改长轮询（gRPC 前）？"],
+    favorited: false,
+  },
+  {
+    id: "be-281",
+    nodeId: "be-zk-etcd",
+    question: "etcd 的 Raft 协议怎么选主和复制日志？为什么 etcd 能替代 ZooKeeper 成为云原生标配？",
+    bigTech: true,
+    answer: `结论：Raft 把一致性问题拆成三个子问题：选主（Leader Election）、日志复制（Log Replication）、安全性（Safety）。任期（term）单调递增，选主要求候选人日志「至少和我一样新」，复制要求过半持久化才算提交。etcd 凭 Raft 的简单可靠 + watch 长连接 + MVCC + 租约，取代 ZK 成为 K8s 元数据底座。
+
+\`\`\`text
+Raft 选主流程：
+1. 节点初始都是 Follower；Follower 在 election timeout（150-300ms 随机）
+   内没收到 Leader 心跳 → 转 Candidate
+2. Candidate：term+1 → 投自己 → 广播 RequestVote{term, lastLogIndex,
+   lastLogTerm}
+3. 收到投票请求的节点：若 term 比我新 且 候选人日志不比我旧
+   （lastLogTerm 大，或同 term 比 lastLogIndex）→ 投票（一任期只投一票）
+4. 过半票 → 成为 Leader → 立即发心跳（AppendEntries 空日志）压制其他选举
+5. 随机超时防平票：超时时间随机化，分裂投票概率指数级降低
+\`\`\`
+
+\`\`\`text
+Raft 日志复制：
+1. Leader 收到写请求 → 追加到本地日志（uncommitted）
+2. 并行发 AppendEntries{prevLogIndex, prevLogTerm, entries[], leaderCommit}
+   给所有 Follower
+3. Follower 校验 prevLog 匹配（一致性检查=归纳法保证前缀一致）
+   → 匹配则追加/覆盖冲突 → 回 ACK；不匹配则拒绝（Leader 回退
+   nextIndex 重试，直到找到共同前缀）
+4. 过半 ACK → Leader 推进 commitIndex → 应用到状态机 → 响应客户端
+   → 下次心跳把 leaderCommit 带给 Follower，它们也提交
+关键安全属性：Leader 只会提交「本任期」的条目后旧条目才算真提交
+（防旧任期条目被新 Leader 覆盖的著名边界 case）
+\`\`\`
+
+\`\`\`text
+etcd 胜过 ZK 的工程点（云原生选型原因）：
+对比        ZooKeeper                  etcd
+协议        ZAB（实现复杂，文档少）      Raft（论文易懂，实现多）
+API         自定义 TCP 协议+Java 客户端  gRPC+HTTP/JSON，语言无关
+数据模型    znode 树+1MB 限制           KV+MVCC 多版本+范围查询
+watch       一次性触发                  长流式 watch（gRPC stream），
+                                        可带历史 revision 重放
+租约        会话绑定临时节点             Lease 独立对象，可绑多个 key，
+                                        TTL 续租语义清晰
+存储        内存树+事务日志              BoltDB b+树，读性能强，
+                                        默认 2GB（配额告警）/可调 8GB
+生态        Hadoop 系老古董              K8s/CoreDNS/Rook/Calico 全家标配
+\`\`\`
+
+案例：K8s 全部元数据（Pod/Service/ConfigMap）存 etcd，apiserver 是唯一入口，Controller 靠 etcd watch 驱动调和循环；CoreDNS 从 etcd 读服务发现记录；Rook/Ceph 用 etcd 存集群拓扑；TiKV 的 PD（Placement Driver）内嵌 etcd 存 Region 元数据。
+
+踩坑：etcd 默认配额 2GB，K8s 集群 ConfigMap/Secret 膨胀写满后整个集群只读（要配 quota-backend-bytes+定期 compact+defrag）；watch 从太老的 revision 开始收「required revision has been compacted」（客户端要处理压缩错误并从当前版本重来）；把大量临时数据（心跳指标）写 etcd——Raft 写放大+快照频繁，集群抖动（心跳用 Lease+批量 key，指标别进 etcd）；跨机房部署 etcd（Raft 写要过半，跨机房 RT 20ms=写延迟 20ms+，同城三可用区是上限，跨地域用各集群独立 etcd+上层同步）；defrag 没安排导致磁盘只涨不降（compact 只标记，物理回收靠 defrag，且 defrag 期间阻塞读——要滚动做）。`,
+    keyPoints: ["Raft=选主+复制+安全性，任期单调+日志最新优先", "过半提交+前缀一致归纳", "etcd=gRPC 流式 watch+MVCC+Lease，云原生标配"],
+    followUps: ["Raft 的 PreVote 机制解决什么问题（网络分区节点回来搅局）？", "K8s 的 resourceVersion 和 etcd revision 怎么映射（list-watch 一致性）？"],
+    favorited: false,
+  },
+  {
+    id: "be-282",
+    nodeId: "be-zk-etcd",
+    question: "为什么协调服务集群必须奇数节点部署？脑裂是什么，怎么防？",
+    bigTech: true,
+    answer: `结论：奇数节点是「过半派（quorum）」机制的数学结果——N 节点集群容忍 ⌊(N-1)/2⌋ 个故障。3 节点和 4 节点都只能容忍 1 个故障（都要 2/3 或 3/4 过半），但 4 节点多一台机器、多一个故障点、选举更难收敛——偶数节点是纯粹的浪费。脑裂 = 网络分区把集群切成两半，若两边都选出 Leader 同时写，数据分叉。防御核心：quorum 保证「任何两个多数派必有交集」，少数派永远选不出 Leader。
+
+\`\`\`text
+奇数节点的数学：
+节点数   quorum(过半)   可容忍故障   写入代价(需ACK数)
+2        2              0           2（一挂全完，不如单机）
+3        2              1           2  ← 甜点
+4        3              1           3（容忍度同3但代价+1，纯亏）
+5        3              2           3  ← 高可用甜点
+6        4              2           4（容忍度同5但代价+1，纯亏）
+7        3→4            3           4
+结论：永远 3 或 5（7 以上选举/心跳成本陡增，ZK 官方建议 ≤7）
+\`\`\`
+
+\`\`\`text
+脑裂攻防战：
+场景：5 节点机房网络分区 {A,B} | {C,D,E}
+- C,D,E 侧：3 票过半 → 选出新 Leader，继续服务 ✓
+- A,B 侧：最多 2 票，永远过不了半 → 选不出 Leader，拒绝写 ✓
+- 分区恢复：A,B 发现集群 term 已更新，自己 term 旧 → 退回 Follower
+  并同步新日志（旧 Leader 的未提交写入被丢弃）
+本质：quorum 交集=任何合法多数派都包含「上一个提交」的见证者，
+     少数派物理上不可能形成多数派 → 数学层面杜绝双主
+\`\`\`
+
+\`\`\`text
+两个多数派必有交集（证明一句话版）：
+集合 S 有 N 个元素，两个子集大小都 > N/2
+→ |P| + |Q| > N → |P ∩ Q| = |P| + |Q| - |P ∪ Q| > N - N = 0
+→ 交集非空 ∎ 这个交集中的节点记得上一个 term 的投票/提交，
+  新选举必须经它同意 → 历史不会分叉
+\`\`\`
+
+防脑裂的工程补充（quorum 之外的防线）：
+- fencing：旧 Leader 恢复联系前，存储/资源层拒绝它的写（HDFS NameNode HA 的 sshfence/电源隔离 STONITH）
+- lease/term 检查：客户端/下游组件记录见过的最大 term，旧 term 请求直接拒
+- 部署拓扑：3 节点跨 3 个可用区（任一 AZ 挂了还剩 2/3 可服务）；5 节点跨 3 AZ 按 2-2-1 分布
+- 双节点陷阱：2 节点集群一挂即瘫，且网络抖动时互相以为对方死了（quorum=2，谁都凑不齐）——宁可用 1 主 1 备手动切换也别跑 2 节点 quorum 集群
+
+案例：Galera Cluster（MySQL 多主）偶数节点脑裂的著名事故——必须配 garbd 仲裁节点凑奇数；Elasticsearch 7 之前 minimum_master_nodes 配错（2 节点集群配 1）导致脑裂双 master 数据分叉，7.0 后改为内置投票配置自动管理；Redis Sentinel 也要奇数（3 哨兵）+ quorum 配置防双主。ZK 官方文档明确：「2 台比 1 台更不可靠，因为 2 台的 quorum=2，任何一台挂集群就不可用」。
+
+踩坑：为了「多一台更保险」上 4/6 节点（纯负收益）；3 节点全放一个机房（机房断电=全军覆没，quorum 救不了物理团灭）；ZK 的 observer 误参与选举配置（Observer 不算 quorum 成员，配错会缩小容忍度）；以为 quorum 能防「双机房各 50%」的对等分区（3-3 分布跨双机房，断网后两边都凑不齐 4/6？不，3+3=6 节点 quorum=4，两边各 3 都瘫痪——跨双机房必须第三地仲裁或 2-2-1 三机房）；容器环境 IP 漂移导致成员列表失效（etcd 要 --initial-cluster-state 重配或 K8s Operator 管理）。`,
+    keyPoints: ["N 节点容忍 (N-1)/2 故障，偶数节点纯浪费", "两个多数派必有交集=脑裂数学免疫", "跨 3 AZ 部署，双机房对等分区是无解局"],
+    followUps: ["etcd 的 learner 成员为什么不算 quorum（同步中不投票）？", "FlexiQuorum/分层 quorum 在大规模集群怎么降低写延迟？"],
+    favorited: false,
+  },
+  {
+    id: "be-283",
+    nodeId: "be-zk-etcd",
+    question: "基于 etcd 实现服务注册发现：Lease 租约和 Watch 怎么配合？和 ZK 方案对比？",
+    bigTech: false,
+    answer: `结论：etcd 注册发现三件套：注册 = 申请 Lease（TTL 如 10s）+ Put 服务地址 key 绑定 Lease；保活 = 客户端定时 KeepAlive 续租（宕机停止续租→TTL 到期→key 自动删除=自动摘除）；发现 = Watch 服务前缀，增量收 PUT/DELETE 事件。Lease 替代了 ZK 的「会话+临时节点」，语义更解耦（一个 Lease 可绑多个 key，多个 key 也可共享会话生命周期）。
+
+\`\`\`go
+// Go 客户端完整实现（面试手写框架）
+// 1. 注册 + 保活
+lease, _ := cli.Grant(ctx, 10)  // 10s TTL
+cli.Put(ctx, "/svc/order/10.0.0.1:8080", '{"weight":100}',
+        clientv3.WithLease(lease.ID))
+kaCh, _ := cli.KeepAlive(ctx, lease.ID)   // 自动续租 goroutine
+go func() {
+    for range kaCh { /* 收到续租响应即续命成功 */ }
+    // KeepAlive 通道关闭=租约丢失（网络分区/etcd 集群切换）
+    // → 重新 Grant+Put（自愈）
+}()
+
+// 2. 发现 + 增量订阅
+resp, _ := cli.Get(ctx, "/svc/order/", clientv3.WithPrefix())
+addrs := parseAddrs(resp.Kvs)              // 全量快照
+watchCh := cli.Watch(ctx, "/svc/order/", clientv3.WithPrefix(),
+                      clientv3.WithRev(resp.Header.Revision+1))
+for wresp := range watchCh {
+    for _, ev := range wresp.Events {
+        switch ev.Type {
+        case clientv3.EventTypePut:    addrs.upsert(ev.Kv)
+        case clientv3.EventTypeDelete: addrs.remove(ev.Kv.Key)
+        }
+    }   // 增量合并到本地路由表 → 负载均衡器热更新
+}
+\`\`\`
+
+\`\`\`text
+etcd 方案 vs ZK 方案（关键差异）：
+维度        ZK 临时节点+Watcher          etcd Lease+Watch
+生命周期    绑定会话（TCP 连接级）        绑定 Lease（逻辑对象）
+            连接断=会话危=节点危          连接断但 Lease 还在（重建连接续租）
+触发方式    一次性，要重注册              流式持续推送，带 revision 可断点续传
+推送内容    只有事件类型，数据要重拉       事件带完整 KV（新值/旧值都能给）
+历史追溯    无                           MVCC：可从任意 revision 重放
+多 key 绑   一个会话多个临时节点          一个 Lease 绑任意多 key，
+定          （会话死全死）               （Lease 死全死，也可各自独立）
+\`\`\`
+
+\`\`\`text
+生产级细节：
+1. 租约 TTL 选择：10-15s（太短→etcd 压力大+网络抖动误摘除；
+   太长→故障发现慢，调用方打到死节点）
+2. 心跳成本优化：KeepAlive 默认续租间隔=TTL/3；万级实例时
+   KeepAlive 请求是 etcd 的主要负载（可多个 key 共享一个 Lease 摊薄）
+3. 摘掉≠立刻摘除：消费方本地还要有「被动摘除」（调用失败 N 次
+   临时拉黑）——注册中心摘除有秒级延迟，双保险
+4. 优雅下线：实例收到 SIGTERM → 主动 Delete key + 等 2× 推送延迟
+   再停服务（防「摘了但流量还在飞」）
+\`\`\`
+
+案例：K8s Endpoint 的本质就是「Pod 注册+kubelet 心跳保活+watch 下发」（存在 etcd）；CoreDNS 的 etcd 插件做 DNS 记录动态发现；Apache APISIX 用 etcd 存路由配置，watch 毫秒级热更新（对标 Kong 的 DB+轮询）；go-zero/dubbogo 的注册中心默认 etcd。
+
+踩坑：KeepAlive goroutine 泄漏（实例注销了 goroutine 还在跑，持续续租=僵尸注册）；Watch 通道断开没重连（网络抖动后永远收不到事件，要 withRequireLeader+断线重 watch 从 lastRevision+1 续传）；全量拉取和 Watch 建立之间有窗口期丢变更（必须先 Get 拿 revision 再 WithRev 开 Watch，顺序反了就丢）；服务元数据（权重/标签）变更用 Put 同 key——消费方分不清是「重注册」还是「元数据更新」，要做内容 diff 再决定是否刷新连接池；etcd 集群Leader切换瞬间 watch 收 ErrCompacted 没处理（要捕获后重新全量 Get）。`,
+    keyPoints: ["Lease 租约=TTL+KeepAlive 续租+到期自动删", "先 Get 快照(带 revision)再 Watch 增量，无缝衔接", "注册中心摘除有延迟，消费方要被动摘除双保险"],
+    followUps: ["Lease 的续租为什么默认 TTL/3 间隔（租约到期判定细节）？", "K8s informer 的 Reflector 怎么处理 watch 断连和 relist？"],
+    favorited: false,
+  },
+  {
+    id: "be-284",
+    nodeId: "be-zk-etcd",
+    question: "ZK/etcd 集群的性能瓶颈在哪？十万级客户端的配置中心为什么不用它们直连？",
+    bigTech: false,
+    answer: `结论：协调服务的瓶颈是「写要过半共识 + 事件推送扇出」。写路径：每次写 = Leader 磁盘 fsync + 网络广播 + 过半 ACK，延迟下限 = 磁盘+网络 RT，吞吐天花板千级~万级 TPS。推送路径：一个 key 变更要扇出给 N 个 watcher，十万客户端 watch 同一配置 = 一次变更 10 万次网络推送，服务端 CPU/带宽瞬间打满。所以超大规模配置中心（Apollo/Nacos）都改用「长轮询/推拉结合」架构，协调服务只存元数据小对象。
+
+\`\`\`text
+ZK/etcd 性能画像：
+指标          ZK 3.6            etcd 3.5        说明
+写 TPS        ~1-2万(批量)       ~1-2万          单 key 写：百级 TPS
+写延迟        本地 DC ~2-5ms     ~2-5ms          fsync+过半 RT
+读 TPS        ~10万+             ~10万+          本地读/串行读
+线性读延迟    =一次共识 RT        =一次共识 RT     强一致的代价
+watch 扇出    单连接串行推送       gRPC 流式多路   10 万 watcher 一次
+                                                变更=10 万次发送
+单 key 大小   1MB                 1.5MB 建议值    大对象=共识日志膨胀
+数据总量      内存树(GB 级)        默认 2GB 配额   都不是数据库！
+\`\`\`
+
+\`\`\`text
+为什么十万客户端配置中心不直连协调服务：
+1. 推送风暴：变更瞬间 10 万推送 → 出口带宽打满 → 正常读写也卡
+2. 连接成本：10 万长连接的心跳/会话维持，ZK 的 session 管理器 OOM
+3. 羊群踩踏：配置变更后 10 万客户端同时重拉全量 → 读流量尖峰
+4. 故障半径：协调服务抖动=十万客户端集体重连=更大抖动（恶性循环）
+
+正确架构（Apollo/Nacos 模式）：
+客户端 ──长轮询──→ 配置中心集群（无状态，可水平扩）
+                      ↓ 变更监听
+                   协调服务/MySQL（只存配置本体+版本号）
+- 长轮询：客户端发请求挂起 30-60s，有变更立即返回，无变更超时重发
+  → 推送变「拉取」，服务端从扇出者变应答者，压力解耦
+- 变更通知只推「哪个 key 变了」，客户端再拉数据（削峰+天然版本校验）
+- CDN/边缘缓存兜底只读配置
+\`\`\`
+
+案例：Nacos 1.x 用 HTTP 长轮询（29.5s 挂起），2.x 改 gRPC 双向流但仍是「变更通知+客户端拉取」两段式；Apollo 的 NotificationController 挂起 60s，支撑携程十万级实例；Disconf/Archaius 同理。对比事故：某厂直连 ZK 做配置中心，3 万客户端 watch 同一节点，一次批量配置变更推送把 ZK Leader CPU 打满 100%，选举超时连续换主，半小时雪崩。
+
+协调服务的「正确打开方式」（什么该放什么不该放）：
+✅ 该放：集群元数据（服务地址列表、分片分配、leader 身份）、分布式锁、选主、小配置（KB 级，低频变更）
+❌ 不该放：业务数据、大配置（MB 级）、高频变更数据（秒级心跳指标）、消息队列、十万级客户端的直连推送
+
+踩坑：把 etcd 当 KV 数据库存业务（配额写满集群只读，K8s 真实事故）；watch 数量不设限（etcd 的 --watch-progress-notify 和 max-watch 要规划）；ZK 的 jute.maxbuffer 调大存大对象（事务日志膨胀，恢复时间从秒变分钟）；协调服务和业务服务抢同一物理机 IO（fsync 被业务磁盘 IO 拖慢，共识超时换主——ZK/etcd 的磁盘必须独立 SSD）；跨城部署当「全局注册中心」（RT 30ms 写延迟不可接受，应该每地域一套+上层联邦）。`,
+    keyPoints: ["写瓶颈=fsync+过半共识，推送瓶颈=扇出", "十万客户端用长轮询+通知拉取两段式", "协调服务只存元数据，不是数据库不是消息队列"],
+    followUps: ["Nacos 2.x gRPC 推送相比长轮询省了什么（连接数/包大小）？", "K8s apiserver 的 watch cache 怎么缓冲 etcd 压力？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
