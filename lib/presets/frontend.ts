@@ -107,6 +107,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "DOM/BOM、Fetch 封装、Storage（localStorage/IndexedDB）、Web Worker、Observer 系列、postMessage。",
     mastery: 0,
   },
+  // ===== 浏览器与网络层（4 个节点） =====
+  {
+    id: "browser-rendering",
+    title: "浏览器渲染原理",
+    difficulty: 4,
+    prerequisites: ["js-api"],
+    frequency: "高",
+    bigTech: true,
+    summary: "渲染流水线（DOM/CSSOM/布局/分层/绘制/合成）、重排重绘、合成层加速、关键渲染路径、rAF 帧调度。",
+    mastery: 0,
+  },
+  {
+    id: "browser-engine",
+    title: "浏览器架构与 JS 引擎",
+    difficulty: 4,
+    prerequisites: ["browser-rendering", "fe-js-scope"],
+    frequency: "高",
+    bigTech: true,
+    summary: "多进程架构、V8 执行机制（JIT/隐藏类/内联缓存）、分代垃圾回收、内存泄漏排查、事件循环完整模型。",
+    mastery: 0,
+  },
   // ===== 进阶层（10 个节点） =====
   {
     id: "ts-types-basic",
@@ -6661,6 +6682,554 @@ app.get("/data", async (c) => {
 踩坑：next-on-pages 已停止维护，新项目用 OpenNext Cloudflare，对 Next 新特性（App Router、PPR 等）跟进更好，但部分功能（image optimization、部分缓存语义）仍有差异，上线前逐项验证；binding 差异（Vercel KV vs CF KV）API 略不同，需适配层抹平；两平台 Edge 限制不同（CPU 时间、内存），别写重逻辑。`,
     keyPoints: ["Hono 多 runtime 适配", "env 抽象 binding 差异", "OpenNext Cloudflare 替代已弃用的 next-on-pages"],
     followUps: ["Next.js 在 Cloudflare 功能差异？", "如何做自托管 fallback？"],
+    favorited: false,
+  },
+  // ===== 31. browser-rendering 浏览器渲染原理 =====
+  {
+    id: "fe-214",
+    nodeId: "browser-rendering",
+    question: "从输入 URL 到页面渲染完成，浏览器经历了哪些阶段？请尽量深入到进程和线程级别。",
+    bigTech: true,
+    answer: `这是一道考察知识广度的综合题，要分层讲：网络层 → 解析层 → 渲染层，并点明每层的性能优化抓手。
+
+1. 网络层：URL 解析 → DNS 查询（浏览器缓存 → 系统缓存 → hosts → 递归 DNS）→ TCP 三次握手（HTTPS 再加 TLS 握手，TLS1.3 只需 1-RTT）→ 发送 HTTP 请求 → 服务器响应。浏览器进程把响应交给渲染进程。
+2. 解析层：渲染进程的主线程把 HTML 字节流 → 字符 → Token → 节点 → DOM 树；并行预加载扫描器提前发现 link/img/script 发起请求；CSS 解析成 CSSOM（CSS 是渲染阻塞资源）。
+3. 渲染层：DOM + CSSOM 合成 Render 树 → Layout 布局（计算几何信息）→ Layer 分层 → Paint 绘制（生成绘制指令列表）→ 交给合成线程 Raster 光栅化（分块，GPU 加速）→ 合成显示。
+
+在蚂蚁财富首页优化项目里，按这个链路逐段打点：DNS+TCP 占 400ms（用 preconnect/dns-prefetch 预热降到 50ms）、HTML 下载 300ms（CDN 边缘缓存降到 80ms）、CSS 阻塞渲染 500ms（关键 CSS 内联 + 非关键 media 拆分）、JS 执行阻塞 800ms（defer + 代码分割），最终 FCP 从 3.2s 降到 1.1s。
+
+\`\`\`html
+<!-- 优化抓手示例 -->
+<link rel="dns-prefetch" href="//cdn.example.com" />
+<link rel="preconnect" href="https://api.example.com" crossorigin />
+<style>/* 关键 CSS 内联，首屏样式直接可用 */</style>
+<link rel="stylesheet" href="print.css" media="print" /> <!-- 非关键 CSS 不阻塞 -->
+<script src="app.js" defer></script> <!-- 不阻塞解析 -->
+\`\`\`
+
+踩坑：preconnect 超过 10 秒不用会被浏览器关闭，白做还多耗一次握手；dns-prefetch 是 preconnect 的降级（只做 DNS），两者要配对用；HTTP/2 下域名收敛比域名发散更重要，别再为"突破 6 连接限制"做多域名拆分了。`,
+    keyPoints: ["网络→解析→渲染三层拆解", "CSS 渲染阻塞、JS 解析阻塞", "preconnect/关键 CSS 内联/defer 逐段优化"],
+    followUps: ["TLS 握手具体过程？TLS1.3 为什么更快？", "预加载扫描器如何工作，什么情况会失效？"],
+    favorited: false,
+  },
+  {
+    id: "fe-215",
+    nodeId: "browser-rendering",
+    question: "重排（reflow）与重绘（repaint）的区别是什么？哪些操作会触发？如何系统性减少重排？",
+    bigTech: true,
+    answer: `结论：重排是几何属性变化导致重新布局（Layout），重绘是外观变化导致重新绘制（Paint）。重排必然引发重绘，重绘不一定重排。重排成本远高于重绘。
+
+触发重排：增删可见 DOM、元素尺寸/位置变化（width/height/margin/padding）、内容变化（文本字数、图片加载完）、窗口 resize、字体加载、读取布局信息（offsetWidth/scrollTop/getBoundingClientRect 等，会强制同步刷新布局队列）。
+只触发重绘：color、background、visibility、outline、box-shadow。
+两者都跳过（只合成）：transform、opacity（前提是该元素已被提升为合成层）。
+
+在携程酒店列表页优化时，筛选面板展开动画用 height 0→auto 实现，低端机上帧率只有 20fps。改成 transform: scaleY + opacity 并把面板提升为合成层后稳定 60fps：
+
+\`\`\`css
+/* 坏：height 动画每帧触发重排 */
+.panel { transition: height .3s; }
+/* 好：transform 走合成线程，主线程空闲 */
+.panel { transform-origin: top; transition: transform .3s, opacity .3s; will-change: transform; }
+.panel.collapsed { transform: scaleY(0); opacity: 0; pointer-events: none; }
+\`\`\`
+
+系统性减少重排的手法：①批量改样式（用 class 切换代替逐条 style 赋值）；②读写分离（先集中读布局值，再集中写，避免强制同步布局）；③离线操作（DocumentFragment 或 display:none 下批量改 DOM，一次重排）；④脱离文档流做动画（absolute/fixed 元素重排范围限于自身子树）；⑤resize/scroll 回调里只记录状态，DOM 修改放到 rAF 里统一做。
+
+踩坑：display:none 的元素不参与渲染树，改它不触发任何重排重绘，但重新显示时是一次性大重排；visibility:hidden 只触发重绘；读写交替（for 循环里 offsetWidth → 改 style → 再读）是最隐蔽的性能杀手，每轮循环都是一次强制同步布局。`,
+    keyPoints: ["重排=几何变化必带重绘，重绘=外观变化", "读布局属性会强制同步刷新队列", "transform/opacity 走合成线程跳过排绘"],
+    followUps: ["如何验证某操作是否触发重排（DevTools Performance 面板）？", "display:none 与 visibility:hidden 在渲染树中的差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-216",
+    nodeId: "browser-rendering",
+    question: "为什么用 transform 和 opacity 做动画性能高？合成层（compositing layer）的提升条件与代价是什么？",
+    bigTech: true,
+    answer: `结论：transform/opacity 动画可以只在合成线程（Compositor Thread）上执行，完全不经过主线程的布局和绘制，即使主线程被 JS 阻塞动画也不掉帧。
+
+原理：渲染流水线是 Layout → Paint → Composite。普通属性的动画每帧都要走完整流水线；而被提升为独立合成层的元素，其位图已光栅化好，动画时合成线程只需对位图做矩阵变换（transform）或透明度混合（opacity），交给 GPU 合成输出。
+
+提升为合成层的条件：will-change: transform/opacity、transform 动画、position: fixed、有 3D transform、video/canvas/iframe、opacity 动画、z-index 层叠上下文中的重叠元素（被意外提升）。
+
+在得物 App 内嵌 H5 的卡片滑动场景中，给 200 个卡片都加 will-change: transform 想"优化性能"，结果低端机直接白屏——每个合成层都要占 GPU 内存（位图 ≈ 宽×高×4 字节），200 层爆掉了 GPU 内存上限，浏览器回退软件渲染更卡。正确做法是只给当前可见的卡片动态添加 will-change，动画结束移除：
+
+\`\`\`ts
+function animateCard(el: HTMLElement) {
+  el.style.willChange = "transform";       // 动画前提升
+  el.style.transform = "translateX(100px)";
+  el.addEventListener("transitionend", () => {
+    el.style.willChange = "auto";          // 动画后释放 GPU 内存
+  }, { once: true });
+}
+\`\`\`
+
+踩坑：①层爆炸（layer explosion）：被提升元素上的重叠兄弟元素会被连带提升，层数远超预期，用 DevTools Layers 面板排查；②提升层后文本渲染模式变化，可能出现字体发虚（位图缩放导致）；③will-change 是"预言"不是"优化"，滥用等于告诉浏览器每个元素都要常驻 GPU，适得其反。`,
+    keyPoints: ["合成线程独立于主线程执行 transform/opacity", "提升条件：will-change/3D transform/动画/fixed", "代价是 GPU 内存，滥用导致层爆炸"],
+    followUps: ["如何用 DevTools 的 Layers 面板排查层爆炸？", "position:fixed 为什么也会被提升为合成层？"],
+    favorited: false,
+  },
+  {
+    id: "fe-217",
+    nodeId: "browser-rendering",
+    question: "CSS 会阻塞渲染吗？JS 会阻塞 HTML 解析吗？async、defer、type=module 的区别是什么？",
+    bigTech: true,
+    answer: `结论：CSS 不阻塞 HTML 解析，但阻塞渲染（CSSOM 没建好前不绘制首屏，避免 FOUC）；CSS 还会阻塞其后 JS 的执行。普通 JS 同步阻塞 HTML 解析（因为脚本可能 document.write 改 DOM）。
+
+script 加载执行时机对比：
+- 普通 script：遇到即阻塞解析 → 下载 → 执行 → 恢复解析。
+- async：下载不阻塞，下载完立即执行（执行时阻塞解析），执行顺序不保证，适合独立脚本（统计、广告）。
+- defer：下载不阻塞，等 HTML 解析完、DOMContentLoaded 前按声明顺序执行，适合有依赖关系的业务脚本。
+- type="module"：默认行为等同 defer，且自动严格模式、支持顶层 await；加 async 后等同 async。
+
+在网易新闻详情页，把 3 个有依赖关系的脚本从 async 改 defer 后，"组件未定义"报错率从 0.8% 降到 0：async 执行顺序随机，B 脚本依赖 A 的全局变量就炸了。
+
+\`\`\`html
+<!-- 统计 SDK：独立无依赖，用 async 尽快执行 -->
+<script async src="https://analytics.example.com/sdk.js"></script>
+<!-- 框架+业务：有依赖顺序，用 defer -->
+<script defer src="vendor.js"></script>
+<script defer src="app.js"></script>
+<!-- 现代浏览器优先 module（天然 defer + 严格模式） -->
+<script type="module" src="main.js"></script>
+<!-- 首屏关键脚本也可 preload 提前发现 -->
+<link rel="preload" href="main.js" as="script" />
+\`\`\`
+
+踩坑：①CSS 阻塞其后的 JS 执行这一特性常被忽略——把大 CSS 放 JS 前面会连带拖慢 JS 执行；②async 脚本里不能依赖 DOM 就绪状态；③module 脚本有 CORS 限制（跨域需 Access-Control-Allow-Origin），普通 script 没有；④动态插入的 script 默认是 async 行为，要保序需显式 script.async = false。`,
+    keyPoints: ["CSS 阻塞渲染和其后的 JS，不阻塞解析", "async 乱序即下即执，defer 保序等解析完", "module 默认 defer + 严格模式 + CORS"],
+    followUps: ["preload 和 prefetch 的区别？", "为什么 CSS 要放在 head、JS 要放在 body 底部（传统经验）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-218",
+    nodeId: "browser-rendering",
+    question: "requestAnimationFrame 与 setTimeout 做动画有什么区别？rAF 的执行时机在事件循环的哪个阶段？",
+    bigTech: true,
+    answer: `结论：rAF 回调在浏览器每一帧渲染前执行（60Hz 屏约 16.7ms），与屏幕刷新同步；setTimeout 只是"至少延迟 n ms 后把回调放进宏任务队列"，与刷新率无关，可能丢帧也可能一帧执行多次。
+
+差异点：
+1. 同步性：rAF 回调在 Layout/Paint 之前，回调里改样式能赶上当前帧；setTimeout 时机随机，改早了当前帧来不及用，改晚了多等一帧。
+2. 节能：页面隐藏时 rAF 自动暂停（浏览器不渲染隐藏页），setTimeout 照跑（还有最小 1s 节流）白白耗电。
+3. 节流天然性：rAF 一帧最多一次回调，天然适配刷新率（120Hz 屏就是 8.3ms 一次）。
+
+在小米商城秒杀倒计时动画里，setTimeout(16) 驱动的进度条在后台标签页照跑，用户切回来时进度跳变且手机发热；改 rAF 后后台自动暂停，切回时从当前帧继续，动画平滑且省电：
+
+\`\`\`ts
+function animate(el: HTMLElement, duration: number) {
+  const start = performance.now();
+  function frame(now: number) {
+    const p = Math.min((now - start) / duration, 1); // 用时间戳算进度，不数帧数
+    el.style.transform = \`translateX(\${p * 300}px)\`;
+    if (p < 1) requestAnimationFrame(frame); // 链式调度下一帧
+  }
+  requestAnimationFrame(frame); // 启动：回调在下一帧渲染前执行
+}
+\`\`\`
+
+执行时机：宏任务 → 所有微任务 → rAF 回调 → Layout/Paint。所以 rAF 里如果同步执行微任务（如 await Promise.resolve()），会在绘制前全部跑完。
+
+踩坑：①进度必须用回调参数的时间戳算（now - start），不能"每帧 +1px"——不同刷新率下速度不同，120Hz 屏快一倍；②rAF 回调里做重活（超过帧预算 16.7ms）照样掉帧，重活要拆片或放 Worker；③不能指望 rAF 精确 60 次/秒，弱机/省电模式会降帧。`,
+    keyPoints: ["rAF 与屏幕刷新同步，帧渲染前执行", "隐藏页 rAF 自动暂停，节能", "进度按时间戳计算，不按帧数"],
+    followUps: ["requestIdleCallback 的适用场景和坑？", "一帧的完整生命周期（JS → 样式 → 布局 → 绘制 → 合成）是怎样的？"],
+    favorited: false,
+  },
+  {
+    id: "fe-219",
+    nodeId: "browser-rendering",
+    question: "什么是强制同步布局（Forced Synchronous Layout / Layout Thrashing）？如何在真实代码中避免？",
+    bigTech: true,
+    answer: `结论：浏览器本来会把样式修改攒成队列、在帧末批量重排（异步布局）；但当你读取布局属性（offsetWidth、getBoundingClientRect 等）时，浏览器必须立刻清空队列、同步执行一次完整布局才能返回正确值——这就是强制同步布局。读写交替循环时每轮都触发，就是 Layout Thrashing。
+
+原理：JS 改了样式后，布局信息就是"脏"的。读布局属性 = 问浏览器"现在多宽？"，浏览器只能先重排再回答。改 → 读 → 改 → 读 循环，等于每轮一次完整 Layout，O(n) 次重排。
+
+在京东商品图片懒加载旧代码里见过典型反例：循环 100 张图，每张先读 container.offsetWidth 算尺寸、再写 style，低端机上主线程被卡 1.2 秒。改成读写分离后降到 15ms：
+
+\`\`\`ts
+// 反例：每次循环都强制同步布局
+for (const img of images) {
+  const w = img.parentElement!.offsetWidth; // 读：强制重排
+  img.style.height = \`\${w * 0.75}px\`;      // 写：弄脏布局
+}
+// 正例：先集中读，再集中写，一次重排
+const widths = images.map((img) => img.parentElement!.offsetWidth); // 全部读（一次重排）
+images.forEach((img, i) => {
+  img.style.height = \`\${widths[i] * 0.75}px\`; // 全部写（帧末再一次重排）
+});
+\`\`\`
+
+进一步：如果只是为了响应尺寸变化，用 ResizeObserver 替代轮询读尺寸——它在布局后异步回调，天然不会强制同步布局。
+
+踩坑：①getComputedStyle 也会强制刷新；②element.classList 改动本身不触发，但紧接着读布局就会；③React 里 useLayoutEffect 读布局再 setState 会造成"帧内两次渲染"，能用 useEffect + 预先计算就别用 useLayoutEffect 写状态；④FastDOM 这类库本质就是把读写分别批处理。`,
+    keyPoints: ["读布局属性强制同步刷新脏队列", "读写交替循环 = 每轮一次完整 Layout", "读写分离批处理 / ResizeObserver 替代轮询"],
+    followUps: ["getBoundingClientRect 和 offsetWidth 在触发重排上有区别吗？", "React 的 useLayoutEffect 什么时候必须用？"],
+    favorited: false,
+  },
+  {
+    id: "fe-220",
+    nodeId: "browser-rendering",
+    question: "浏览器匹配 CSS 选择器为什么是从右往左的？这个机制对写 CSS 有什么实际指导意义？",
+    bigTech: true,
+    answer: `结论：浏览器从右往左匹配选择器（从最关键的最右选择器开始过滤），因为 DOM 树上每个元素只有一个父链，而子孙有无数——从右往左能快速把不匹配的元素大片剪掉，从左往右则要对每个元素遍历整个子树验证。
+
+举例：.nav .list li a {} 这个选择器，从右往左的流程是：先找到页面里所有 <a>（可能 50 个）→ 检查父链上是否有 li → 是否有 .list → 是否有 .nav，任何一步不满足立即放弃，最多检查 50 次父链。若从左往右：找 .nav → 遍历其所有后代找 .list → 再遍历所有后代找 li → 再找 a，DOM 大时遍历量是数量级的差距。
+
+实际指导意义（美团 B 端后台样式重构时的规则）：
+1. 最右选择器要精确，别用通配符和标签当关键选择器：.list * 会拿页面上所有元素逐个检查，.list .item 只检查有 .item 的元素。
+2. 选择器层级别太深：.a .b .c .d .e 每层都是一次父链检查，3 层以内为宜（BEM 天然单层：.list__item--active）。
+3. 避免后代选择器堆标签：div ul li a 每层都要父链回溯。
+
+\`\`\`css
+/* 差：最右是通配符，全页面元素都要检查父链 */
+.sidebar * { color: #333; }
+/* 差：标签当关键选择器，所有 input 都要检查 */
+.form input { border: 1px solid #ddd; }
+/* 好：类名精确命中，父链检查一步 */
+.form__field { border: 1px solid #ddd; }
+\`\`\`
+
+踩坑：①现代浏览器有选择器缓存和 bloom filter 优化，普通项目选择器性能差异其实很难感知——这条规则的真正价值在 B 端超长列表（万级 DOM）和老旧 IE 兼容项目；②比起选择器优化，"减少 DOM 数量"的收益大一个数量级，别本末倒置；③CSS Modules/BEM 的扁平类名顺便解决了这个问题，这也是工程上推崇它们的原因之一。`,
+    keyPoints: ["从右往左利用父链唯一性快速剪枝", "最右选择器要精确，忌通配符/标签", "层级 ≤3 层，BEM 扁平化天然合规"],
+    followUps: [":has() 选择器为什么拖了二十年才落地（父选择器性能难题）？", "Shadow DOM 对样式匹配性能有什么影响？"],
+    favorited: false,
+  },
+  {
+    id: "fe-221",
+    nodeId: "browser-rendering",
+    question: "首屏白屏时间长，如何系统性定位瓶颈在关键渲染路径的哪个环节？",
+    bigTech: true,
+    answer: `结论：用"分段计时"定位——白屏时间 = 网络耗时（TTFB）+ HTML 解析 + 阻塞资源加载 + 首屏 JS 执行。先用 Performance 面板看瀑布图分层，再针对性优化，别一上来就盲改。
+
+定位流程（在字节 CRM 系统白屏治理中的 SOP）：
+1. 看 TTFB：>600ms 说明服务端/网络慢（查 CDN 命中率、服务端渲染耗时、慢查询）。
+2. 看 DCL（DOMContentLoaded）与 TTFB 的差值：差值大说明 HTML 大或解析被阻塞资源拖住（大 CSS、同步 JS）。
+3. 看 FP/FCP 与 DCL 的差值：差值大说明首屏依赖的 JS 执行太久（大 bundle、长任务）。
+4. 用 Performance 录制，看 Main 线程火焰图里紫色（Layout）/绿色（Paint）/黄色（JS）谁占大头。
+5. 用 Coverage 面板看未使用 CSS/JS 占比（字节那个项目首屏 JS 有 68% 未执行，CSS 有 55% 未使用）。
+
+\`\`\`ts
+// 用 PerformanceObserver 在生产环境采集分段数据
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (entry.entryType === "navigation") {
+      const nav = entry as PerformanceNavigationTiming;
+      report({
+        ttfb: nav.responseStart - nav.startTime,        // 网络+服务端
+        parse: nav.domContentLoadedEventEnd - nav.responseEnd, // 解析+阻塞资源
+      });
+    }
+    if (entry.name === "first-contentful-paint") report({ fcp: entry.startTime });
+  }
+});
+observer.observe({ type: "navigation", buffered: true });
+observer.observe({ type: "paint", buffered: true });
+\`\`\`
+
+对症优化：TTFB 慢 → CDN/边缘缓存/服务端拆慢查询；解析慢 → HTML 瘦身、关键 CSS 内联、defer 掉非首屏 JS；执行慢 → 代码分割、长任务拆分（scheduler.yield）、非首屏组件懒渲染。
+
+踩坑：①本地 DevTools 性能好不代表线上好——要用真机 + 慢网（Fast 3G 节流）+ 关闭缓存各录一遍；②SPA 的 FCP 好但 LCP 可能很差（骨架屏先出、内容后到），要同时盯 LCP 和 FID/INP；③Service Worker 首次安装反而会拖慢首屏（要下载 SW 脚本），预缓存要克制。`,
+    keyPoints: ["分段计时：TTFB→解析→执行逐层定位", "Performance 火焰图 + Coverage 面板组合拳", "生产环境用 PerformanceObserver 采集真实数据"],
+    followUps: ["LCP、FID、INP 的定义和优化手段分别是什么？", "SPA 和 SSR 在白屏问题上的差异？"],
+    favorited: false,
+  },
+  // ===== 32. browser-engine 浏览器架构与 JS 引擎 =====
+  {
+    id: "fe-222",
+    nodeId: "browser-engine",
+    question: "Chrome 的多进程架构是怎样的？为什么渲染进程要沙箱化？JS 为什么是单线程？",
+    bigTech: true,
+    answer: `结论：Chrome 是多进程架构——1 个浏览器主进程（UI/地址栏/书签/网络调度）+ N 个渲染进程（每个站点隔离一个，跑 Blink + V8）+ GPU 进程 + 网络进程 + 插件进程。渲染进程彼此隔离且运行在沙箱里。
+
+为什么沙箱化：渲染进程要执行不可信的 Web 内容（任意 JS、解析复杂 HTML/CSS——历史上浏览器 0day 大多出在渲染引擎）。沙箱限制渲染进程的系统调用（不能直接读写文件、不能直接访问网络），即使被攻破也困在沙箱里。站点隔离（Site Isolation）更进一步：不同站点的 iframe 也放进不同进程，防 Spectre 侧信道偷跨站数据。
+
+代价是内存：每个渲染进程独占一份 V8/Blink，Chrome 吃内存的根源。同站点（same-site，同 eTLD+1）的多个标签页会共享渲染进程（process-per-site-instance）。
+
+JS 为什么单线程：历史设计选择 + DOM 操作的线程安全。如果 JS 多线程，两个线程同时改 DOM（一个删节点、一个改节点样式）需要复杂的锁机制，会让脚本模型和渲染引擎都复杂到不可用。单线程 + 事件循环是简单可靠的并发模型。需要并行计算时用 Web Worker（独立线程，无 DOM 访问权，靠 postMessage 通信）：
+
+\`\`\`ts
+// 主线程：Worker 通信模型（消息传递，无共享内存）
+const worker = new Worker("./heavy.js");
+worker.postMessage({ data: bigArray });          // 结构化克隆拷贝
+worker.onmessage = (e) => render(e.data.result);
+// heavy.js 内部：无法访问 document/window，只能计算
+\`\`\`
+
+踩坑：①"一个标签页一个进程"是误解——同站点共享、iframe 按站点隔离，实际进程数由 Chrome 内存压力动态决定；②SharedArrayBuffer 允许 Worker 间共享内存，但因此能构造高精度计时器搞 Spectre 攻击，必须配 COOP/COEP 响应头（crossOriginIsolated）才能用；③Worker 启动有成本（新线程 + 新 JS 环境，约几十 ms），别为几毫秒的计算开 Worker。`,
+    keyPoints: ["主进程/渲染进程/GPU/网络进程分工", "沙箱防渲染引擎漏洞，站点隔离防 Spectre", "单线程保 DOM 线程安全，Worker 做真并行"],
+    followUps: ["Spectre 漏洞为什么催生了站点隔离？", "跨进程通信（IPC）的开销对架构设计有什么影响？"],
+    favorited: false,
+  },
+  {
+    id: "fe-223",
+    nodeId: "browser-engine",
+    question: "V8 是如何执行 JS 的？隐藏类（Hidden Class）和内联缓存（Inline Cache）的优化逻辑是什么？",
+    bigTech: true,
+    answer: `结论：V8 采用"解释 + JIT 分级优化"：Ignition 解释器先把源码编译成字节码直接执行，收集类型反馈；热点函数（执行频繁）交给 TurboFan 编译成优化机器码；若运行时发现假设不成立（类型变了），去优化（deopt）退回字节码。
+
+隐藏类：JS 对象属性可动态增删，理论上属性查找要遍历哈希表。V8 为每个对象维护隐藏类（Map），相同"形状"（属性名 + 顺序 + 类型）的对象共享同一个隐藏类，属性偏移量固定，查找变成 O(1) 的内存偏移。属性按相同顺序初始化 → 共享隐藏类；动态增删/乱序 → 隐藏类转换树分叉，查找变慢。
+
+内联缓存：函数执行时记录"上次这个对象是隐藏类 A，属性 x 在偏移 8"，下次直接比对隐藏类、命中就按偏移取值，跳过完整查找。单态（一直同一隐藏类）最快，多态（2-4 种）次之，超态（>4 种）退化为哈希表慢查。
+
+在蚂蚁数据看板项目里，图表数据点构造函数曾写成条件赋值，导致帧率从 55 掉到 18，Profile 发现 megamorphic 属性访问占 40% CPU：
+
+\`\`\`ts
+// 反例：条件赋值导致隐藏类分叉（有的对象有 extra、有的没有，顺序还不同）
+function makePoint(x: number, y: number, extra?: number) {
+  const p: Record<string, number> = { x };
+  if (extra) p.extra = extra;  // 隐藏类转换：Map1 → Map2 分叉
+  p.y = y;
+  return p;
+}
+// 正例：属性全量、固定顺序初始化，所有实例共享同一隐藏类
+function makePoint(x: number, y: number, extra?: number) {
+  return { x, y, extra: extra ?? 0 }; // 单一隐藏类，属性访问 O(1)
+}
+\`\`\`
+
+踩坑：①delete obj.prop 会让对象退回"字典模式"（慢哈希表），置 undefined 代替；②数组当对象用（arr.foo = 1）会让数组退化为字典；③turboFan 优化假设被打破会 deopt——同一函数传入时而 number 时而 string（多态参数），热点函数要参数类型单一；④for-in 遍历顺序在整数 key 上自动变数字升序，与插入顺序不符，是隐藏类机制的副作用。`,
+    keyPoints: ["Ignition 字节码 + TurboFan 热点优化 + deopt", "同形状对象共享隐藏类，属性偏移 O(1)", "IC 单态最快，超态退化为慢查"],
+    followUps: ["deopt 怎么在代码里观测到（--trace-deopt）？", "为什么 TypeScript 的类型标注不能让 JS 运行更快？"],
+    favorited: false,
+  },
+  {
+    id: "fe-224",
+    nodeId: "browser-engine",
+    question: "V8 的垃圾回收机制是怎样的？分代假说、Scavenge、标记-清除、增量标记分别解决什么问题？",
+    bigTech: true,
+    answer: `结论：V8 基于分代假说——绝大多数对象朝生夕死（临时变量、中间结果），少数对象长期存活（全局缓存、闭包引用）。堆内存据此分为新生代（小，1-8MB）和老生代（大），用不同算法回收，把 GC 停顿从百毫秒级压到毫秒级。
+
+新生代用 Scavenge（Cheney 算法）：空间分 From/To 两半，对象分配在 From，From 满了就把存活对象复制到 To，然后互换角色。复制 = 顺序内存写入，极快；适合"死的快"的小对象。对象存活过两次 Scavenge 就晋升到老生代（或 To 空间用超 25% 直接晋升）。
+
+老生代用标记-清除（Mark-Sweep）+ 标记-整理（Mark-Compact）：从根（全局对象、调用栈）出发标记可达对象，清除未标记的；内存碎片多时用整理算法把存活对象紧凑到一端。全量标记要停 JS（STW），大堆下停顿明显，所以 V8 做了三重优化：
+1. 增量标记：标记工作切成小步，与 JS 交替执行（黑灰白三色标记法记录进度）。
+2. 惰性清理：清除不一次做完，用到哪块清哪块。
+3. 并发/并行标记：Worker 线程在后台标记，主线程几乎不停。
+
+在腾讯文档协同编辑器项目里，光标位置对象每帧创建（60 次/秒），新生代 Scavenge 完美消化零停顿；但文档操作历史栈无限增长，晋升老生代后内存只涨不降——最后给历史栈加了 LRU 上限 + 定期压缩快照，老年代占用稳定在 200MB 内。
+
+\`\`\`ts
+// 短命对象留给新生代，长命缓存要有上限
+class UndoStack {
+  private items: Snapshot[] = [];
+  private readonly MAX = 50; // 防晋升后无限涨
+  push(s: Snapshot) {
+    this.items.push(s);
+    if (this.items.length > this.MAX) this.items.shift();
+  }
+}
+\`\`\`
+
+踩坑：①闭包意外持有大对象（函数引用整个作用域链），新生代照样进老生代；②"手动触发 GC"——生产环境没有，window.gc 只在 DevTools 启动参数下存在；③内存涨不一定是泄漏，V8 会故意延迟 GC 换吞吐（堆上限内不急着收），看"GC 后基线"是否持续抬升才是判断标准。`,
+    keyPoints: ["分代假说：对象朝生夕死", "新生代 Scavenge 复制，老生代标记-清除/整理", "增量+惰性+并发压缩 STW 停顿"],
+    followUps: ["三色标记法如何保证并发标记的正确性？", "WeakMap/WeakRef 在 GC 友好编程中的作用？"],
+    favorited: false,
+  },
+  {
+    id: "fe-225",
+    nodeId: "browser-engine",
+    question: "前端内存泄漏有哪些典型场景？如何用 Chrome DevTools 定位泄漏源头？",
+    bigTech: true,
+    answer: `结论：泄漏 = 不再使用的内存仍被"根"可达。前端四大典型场景：①闭包误持大对象；②DOM 移除但 JS 引用还在（游离 DOM）；③定时器/事件监听未清理；④全局缓存无上限。定位靠 DevTools Memory 面板的堆快照对比。
+
+典型场景与修复（快手直播中控台治理实录，泄漏让页面 4 小时涨到 2GB 崩溃）：
+
+\`\`\`ts
+// 场景1：闭包误持——bigData 被闭包引用，组件卸载仍存活
+function createHandler() {
+  const bigData = new Array(1e6).fill(0); // 10MB
+  const unused = () => console.log(bigData.length); // 这个闭包不被调用也占着
+  return { onClick: () => console.log("click") }; // 返回的对象间接持有 bigData
+}
+// 修复：大对象用完置空，或抽出组件级 store 手动释放
+
+// 场景2：游离 DOM——DOM 删了，JS 里的引用还在
+const refs: HTMLElement[] = [];
+function render(list: Item[]) {
+  list.forEach((item) => {
+    const el = document.createElement("div");
+    refs.push(el); // 永不清理 → 每次渲染泄漏一批
+    container.append(el);
+  });
+}
+// 修复：refs 改 WeakMap/WeakRef，或随组件卸载清空
+
+// 场景3：监听器/定时器未清理（SPA 路由切换重灾区）
+useEffect(() => {
+  const timer = setInterval(fetchStatus, 5000);
+  window.addEventListener("resize", onResize);
+  return () => { clearInterval(timer); window.removeEventListener("resize", onResize); };
+}, []); // 清理函数必须成对
+
+// 场景4：全局缓存无上限 → 加 LRU 上限
+const cache = new Map<string, Blob>();
+function setCache(k: string, v: Blob) {
+  if (cache.size > 100) cache.delete(cache.keys().next().value!); // 淘汰最旧
+  cache.set(k, v);
+}
+\`\`\`
+
+定位流程：①Performance Monitor 看 JS Heap 趋势——锯齿上升但谷值持续抬升 = 泄漏；②Memory 面板拍堆快照 A → 操作页面 → 拍快照 B → 对比视图（Comparison）按 Delta 排序，看哪类对象净增；③看 Retainers（引用链）找到谁持着不放；④Detached 筛选器直接找游离 DOM 树。
+
+踩坑：①Heap 涨不等于泄漏——V8 惰性回收，先看 GC 后基线；②React 的 fiber 树在堆快照里噪音大，用 Allocation instrumentation on timeline 看分配时间线更直观；③WeakRef 要配 FinalizationRegistry 做清理，但回调时机不确定，别拿它做精确资源管理；④console.log 大对象会让 DevTools 持有引用，排查时先清 console。`,
+    keyPoints: ["闭包/游离 DOM/未清理监听/无界缓存四大场景", "堆快照对比 + Retainers 引用链定位", "GC 后基线持续抬升才是真泄漏"],
+    followUps: ["WeakMap 为什么能解决游离 DOM 问题？", "SPA 路由切换时如何做系统性的资源清理？"],
+    favorited: false,
+  },
+  {
+    id: "fe-226",
+    nodeId: "browser-engine",
+    question: "浏览器事件循环的完整过程是什么？宏任务、微任务、渲染更新的执行次序如何？",
+    bigTech: true,
+    answer: `结论：事件循环每轮（tick）= 执行一个宏任务 → 清空全部微任务队列 → （视时机）执行 rAF 回调并渲染更新。微任务在当前宏任务结束后立即全部执行，且微任务里新产生的微任务也本轮执行（可饿死渲染）；渲染更新插在宏任务之间，不是任务源。
+
+任务分类：
+- 宏任务：script 整体、setTimeout/setInterval、setImmediate（Node）、I/O、UI 事件、postMessage、MessageChannel。
+- 微任务：Promise.then/catch/finally、queueMicrotask、MutationObserver、process.nextTick（Node，比微任务更早）。
+- 渲染步骤：rAF 回调 → style/layout/paint；rIC（requestIdleCallback）在帧空闲时。
+
+关键推论：
+1. await 后面的代码 = 微任务，所以 async 函数里 await 连续多次渲染也不会插进来。
+2. setTimeout(fn, 0) 永远排在"当前所有微任务"之后。
+3. 微任务死循环会永久阻塞渲染和交互（宏任务队列进不来），宏任务递归（setTimeout 自调）则每轮让出一次渲染机会。
+
+在猿辅导答题卡项目里，提交后连续 setState 十次期待"每步都渲染进度"，实际用户看到一步到位——十次 setState 在一个宏任务里，渲染只在最后发生一次。改成每步 await 一个宏任务（或直接用 startTransition）才能看到渐进渲染：
+
+\`\`\`ts
+// 想让渲染插进来：每步让出一个宏任务
+async function processSteps(steps: Step[]) {
+  for (const s of steps) {
+    doStep(s);
+    updateProgress(s);              // 改状态
+    await new Promise((r) => setTimeout(r)); // 让出：宏任务边界，浏览器可渲染
+  }
+}
+\`\`\`
+
+踩坑：①Promise 构造函数里的代码是同步执行的，只有 then 是微任务；②async/await 混 setTimeout 的顺序题是面试重灾区（见下一题）；③MutationObserver 是微任务——DOM 变化回调会在渲染前批量执行；④Node 的事件循环（timers/poll/check 阶段）与浏览器不同，nextTick 优先级最高，别把浏览器结论套过去。`,
+    keyPoints: ["宏任务→清空微任务→（rAF→渲染）循环", "微任务可饿死渲染，宏任务让出渲染机会", "await=微任务，setTimeout(0)排所有微任务后"],
+    followUps: ["为什么 Vue 的 nextTick 优先用 Promise 而不是 setTimeout？", "requestIdleCallback 在什么时机执行，为什么可能被饿死？"],
+    favorited: false,
+  },
+  {
+    id: "fe-227",
+    nodeId: "browser-engine",
+    question: "写出下面代码的输出顺序，并解释每一步在事件循环中的位置。",
+    bigTech: true,
+    answer: `先看题：
+
+\`\`\`ts
+console.log("1");
+setTimeout(() => console.log("2"));
+Promise.resolve().then(() => {
+  console.log("3");
+  setTimeout(() => console.log("4"));
+});
+setTimeout(() => {
+  console.log("5");
+  Promise.resolve().then(() => console.log("6"));
+});
+Promise.resolve().then(() => console.log("7"));
+console.log("8");
+\`\`\`
+
+输出：1 → 8 → 3 → 7 → 2 → 5 → 6 → 4。
+
+逐步推演（按事件循环 tick）：
+- Tick 0（script 整体是首个宏任务）：同步执行 1、8；遇到 setTimeout(2) 进宏任务队列 A；Promise.then(3) 进微任务队列；setTimeout(5) 进宏任务队列 B（在 A 后）；Promise.then(7) 进微任务队列（在 3 后）。
+- 同步结束，清空微任务：输出 3（回调里 setTimeout(4) 进宏任务队列 C，排 B 后）、输出 7。
+- Tick 1：取宏任务 A → 输出 2；无微任务。
+- Tick 2：取宏任务 B → 输出 5；then(6) 进微任务 → 本轮清空微任务输出 6。
+- Tick 3：取宏任务 C → 输出 4。
+
+记忆口诀：同步先行 → 微任务插队（每个宏任务后清空）→ 宏任务按入队顺序一个一个来；每个宏任务执行完都要回头看微任务队列。
+
+这类题在字节/美团一面出现率极高，考察的不是背答案而是"宏任务边界 + 微任务清空时机"的模型是否牢固。变体常加 async/await：await x 等价于 Promise.resolve(x).then(后续），所以 async fn 里 await 之后的代码都是微任务；再加 new Promise 构造器同步执行这个陷阱。
+
+踩坑：①Promise.resolve().then() 和 async () => await 的等价转换要熟练，变体题全靠它；②Node 环境下 process.nextTick 插队在所有微任务之前，setImmediate 与 setTimeout(0) 顺序不确定（I/O 内外有别），面试官追问环境差异别答混；③rAF 不参与这个队列模型，别把它归入微任务。`,
+    keyPoints: ["script 是首个宏任务", "每个宏任务后清空全部微任务（含新生）", "宏任务按入队顺序逐个执行"],
+    followUps: ["加入 async/await 后顺序如何推演？", "Node 的 nextTick/setImmediate 与浏览器模型差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-228",
+    nodeId: "browser-engine",
+    question: "Web Worker 能做什么、不能做什么？postMessage 的结构化克隆和 Transferable 有什么区别？",
+    bigTech: true,
+    answer: `结论：Web Worker 是浏览器提供的真线程，能做：CPU 密集计算（解析大 JSON、加解密、压缩、图像处理）、不占主线程的轮询/预取。不能做：访问 DOM、window、document、localStorage（可用 IndexedDB）、同步弹窗。与主线程只能靠 postMessage 通信。
+
+结构化克隆 vs Transferable：
+- 结构化克隆（默认）：深拷贝数据到 Worker，支持 Map/Set/Date/RegExp/ArrayBuffer/循环引用（比 JSON.stringify 强），但拷贝有成本——100MB 数据拷贝一次约 200ms，且两份内存。
+- Transferable（转移所有权）：第二个参数列出的 ArrayBuffer 直接转移给 Worker，零拷贝，转移后原线程该 buffer 长度变 0 不可用。适合二进制大数据。
+
+在 B 站投稿页的视频封面上传功能中，要在前端对 4K 截图做滤镜处理，最初在主线程跑导致页面卡死 3 秒；迁到 Worker + Transferable 后主线程零卡顿，处理 2000 万像素位图只用 800ms：
+
+\`\`\`ts
+// 主线程
+const worker = new Worker("./image-filter.js");
+const bitmap = await createImageBitmap(file);
+const pixels = await bitmapToArrayBuffer(bitmap); // 200MB
+// 转移所有权：零拷贝，主线程此 buffer 随即失效
+worker.postMessage({ pixels, width, height }, [pixels]);
+
+// image-filter.js（Worker 内：无 DOM，纯计算）
+self.onmessage = (e) => {
+  const { pixels, width, height } = e.data;
+  const result = applyFilter(new Uint8ClampedArray(pixels), width, height);
+  self.postMessage({ result }, [result.buffer]); // 结果也转移回去
+};
+\`\`\`
+
+踩坑：①Worker 里 import 第三方库要用 module Worker（new Worker(url, { type: "module" })），老浏览器要 importScripts；②postMessage 频繁小消息的开销大于想象（每次都有序列化+跨线程调度），高频通信用 SharedArrayBuffer + Atomics（需 COOP/COEP 头）；③Worker 不能复用主线程的函数/类实例（克隆只搬数据不搬代码），传过去的是"影子"；④Vite 里用 new Worker(new URL("./w.ts", import.meta.url), { type: "module" }) 才能被正确打包。`,
+    keyPoints: ["Worker 真线程但无 DOM，通信靠 postMessage", "结构化克隆深拷贝有成本，Transferable 零拷贝转移", "SharedArrayBuffer+Atomics 应对高频通信"],
+    followUps: ["Comlink 库如何简化 Worker 通信心智成本？", "Worklet（CSS Paint/Audio）与 Worker 有什么区别？"],
+    favorited: false,
+  },
+  {
+    id: "fe-229",
+    nodeId: "browser-engine",
+    question: "长任务（Long Task）如何治理？请实现一个时间切片调度器把大任务拆小，保证页面响应。",
+    bigTech: true,
+    answer: `结论：超过 50ms 的主线程任务即为长任务，会阻塞交互（INP 指标恶化）。治理思路：能进 Worker 的进 Worker；必须留在主线程的，拆成小片、每片 <50ms，片间让出主线程给渲染和输入。
+
+让出方式优先级：scheduler.yield()（新 API，让出后回到队列头部，最优先续跑）> MessageChannel 宏任务（让出且允许渲染）> setTimeout(0)（有 4ms 嵌套钳制）> await Promise.resolve()（微任务，不让渲染！）。
+
+在拼多多商家后台的对账单导入功能中，前端要解析 10 万行 Excel 行数据并校验，一次跑完主线程卡 8 秒；用时间切片后 INP 从 1200ms 降到 90ms，且能实时显示进度条：
+
+\`\`\`ts
+// 通用时间切片执行器：片间用 MessageChannel 让出（允许渲染，无 4ms 钳制）
+function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => {
+    const { port1, port2 } = new MessageChannel();
+    port1.onmessage = () => resolve();
+    port2.postMessage(null); // 触发一个宏任务，浏览器可在中间渲染/响应输入
+  });
+}
+
+async function processInSlices<T, R>(
+  items: T[],
+  fn: (item: T) => R,
+  budget = 32 // 每片预算 ms，留余量给渲染（50ms 上限内）
+): Promise<R[]> {
+  const results: R[] = [];
+  let sliceStart = performance.now();
+  for (let i = 0; i < items.length; i++) {
+    results.push(fn(items[i]));
+    if (performance.now() - sliceStart > budget) {
+      await yieldToMain();        // 预算用完，让出主线程
+      sliceStart = performance.now();
+    }
+  }
+  return results;
+}
+
+// 使用：10 万行校验切片执行，UI 全程可交互
+await processInSlices(rows, validateRow);
+\`\`\`
+
+要点：①按"时间预算"切片而非固定条数——不同机器上单条耗时不等；②让出用 MessageChannel 而非 setTimeout——后者嵌套 5 层后有 4ms 钳制，10 万次要白等 400ms+；③别用 await Promise.resolve() 让出——微任务不触发渲染，等于没让；④React 18 的 startTransition/useDeferredValue 是渲染层的时间切片，数据计算层还得自己动手。
+
+踩坑：①切片后总耗时变长（调度开销），要对用户显示进度；②scheduler.yield 兼容性（Chrome 129+），降级链 yield → MessageChannel → setTimeout；③长任务也可能在框架内部（React 大列表调和），这时要用并发特性而非手动切片；④PerformanceObserver 的 longtask 类型可在生产环境采集长任务归因（attribution 字段指出哪个容器）。`,
+    keyPoints: [">50ms 即长任务，阻塞 INP", "按时间预算切片 + MessageChannel 让出", "微任务让出是假让出，不触发渲染"],
+    followUps: ["React 并发渲染的调度与手动时间切片如何配合？", "scheduler.postTask 的优先级队列怎么用？"],
     favorited: false,
   },
 ];
