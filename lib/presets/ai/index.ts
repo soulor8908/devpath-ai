@@ -1,6 +1,9 @@
 // lib/presets/ai/index.ts
 // AI 算法工程师面试全攻略预设：聚合知识树与各域题库，生成学习计划
-// 覆盖：机器学习基础 → 深度学习 → CV → NLP → 推荐系统 → 强化学习 → 前沿与部署
+// 覆盖：机器学习基础 → 数学基础 → 深度学习 → GNN → 分布式训练 → CUDA →
+//       CV → NLP → 向量检索 → 推荐系统 → 强化学习 → 大模型专项 →
+//       前沿与部署 → 模型压缩 → 推理优化 → MLOps
+// 44 知识节点 + 270+ 道高频面试题
 // 大厂高频题答案结合真实项目场景（字节抖音推荐/阿里电商搜索/腾讯广告/百度凤巢等）
 
 import type { Question, ScheduleItem } from "../../types";
@@ -11,6 +14,7 @@ import { CV_QUESTIONS } from "./questions-cv";
 import { NLP_QUESTIONS } from "./questions-nlp";
 import { REC_RL_QUESTIONS } from "./questions-rec-rl";
 import { FRONTIER_QUESTIONS } from "./questions-frontier";
+import { INFRA_QUESTIONS } from "./questions-infrastructure";
 
 const AI_QUESTIONS: Question[] = [
   ...ML_QUESTIONS,
@@ -19,6 +23,7 @@ const AI_QUESTIONS: Question[] = [
   ...NLP_QUESTIONS,
   ...REC_RL_QUESTIONS,
   ...FRONTIER_QUESTIONS,
+  ...INFRA_QUESTIONS,
 ];
 
 // 按拓扑顺序生成学习计划：AI_NODES 数组顺序已按 prerequisites 拓扑排列，
