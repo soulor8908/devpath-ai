@@ -23,19 +23,27 @@
 //      用户无学习日志时 internal 为空，fallback `[{date: today, count: 0, level: 0}]`
 //      只渲染一个 12px 的格子，用户看不到"图"
 //      修复：fallback 填充整个 weeks 范围（weeks*7 天），渲染完整空日历
+//
+// 2026-07-26 性能优化（卡帕西视角）：
+//   react-activity-calendar 重依赖（~80KB+，含 date-fns + d3-scale）通过 dynamic import
+//   懒加载到 HeatmapContent.tsx，避免进 /stats 和 /u/[username] 路由的首屏 chunk。
+//   本文件只做数据加载和派生计算（轻量），ActivityCalendar 渲染交给 HeatmapContent。
 
-import { useEffect, useState, useMemo, cloneElement, isValidElement } from "react";
-import type { ReactElement } from "react";
-import { ActivityCalendar } from "react-activity-calendar";
+import { useEffect, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { listItems } from "@/lib/storage/db";
 import type { ReviewLog, LearnLog } from "@/lib/types";
-import { Button } from "@/components/ui";
+import type { DayData } from "./HeatmapContent";
 
-interface DayData {
-  date: string; // YYYY-MM-DD
-  count: number; // 当天总学习分钟
-  level: 0 | 1 | 2 | 3 | 4;
-}
+// 懒加载 HeatmapContent（含 react-activity-calendar 重库）
+// loading 时显示骨架，避免空白；ssr:false 因为 ActivityCalendar 依赖浏览器 API
+const HeatmapContent = dynamic(
+  () => import("./HeatmapContent").then((m) => m.HeatmapContent),
+  {
+    loading: () => <div className="h-32 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />,
+    ssr: false,
+  },
+);
 
 interface Props {
   /** 外部传入数据（优先）；不传则内部从 IndexedDB 读 */
@@ -131,50 +139,15 @@ export function Heatmap({ data, weeks = 12 }: Props) {
     calendarData.length > 0 ? calendarData : generateEmptyRange(weeks);
 
   return (
-    <div className="relative">
-      <ActivityCalendar
-        data={displayData}
-        theme={{
-          light: ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"],
-          dark: ["#1f2937", "#0e4f2c", "#166534", "#15803d", "#22c55e"],
-        }}
-        labels={{
-          totalCount: "{{count}} 分钟学习",
-        }}
-        renderBlock={(block, activity) => {
-          // 关键修复：必须返回 SVG 元素，不能包裹 HTML div
-          // 原代码 <div onClick={...}>{block}</div> 在 SVG <g> 中渲染失败 → 整个日历空白
-          // 用 cloneElement 给原 <rect> 加 onClick + cursor 样式，保持 SVG 兼容性
-          if (isValidElement(block)) {
-            return cloneElement(
-              block as ReactElement<Record<string, unknown>>,
-              {
-                onClick: () => {
-                  const d = internal.find((x) => x.date === activity.date);
-                  if (d) setSelected(d);
-                },
-                style: {
-                  ...((block.props as { style?: Record<string, unknown> }).style ?? {}),
-                  cursor: "pointer",
-                },
-              },
-            );
-          }
-          return block;
-        }}
-      />
-      {selected && (
-        <div
-          role="tooltip"
-          className="absolute right-0 top-0 z-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-lg"
-        >
-          <div className="text-sm font-medium">{selected.date}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-300">学习 {selected.count} 分钟</div>
-          <Button variant="link" size="sm" onClick={() => setSelected(null)} className="mt-1">
-            关闭
-          </Button>
-        </div>
-      )}
-    </div>
+    <HeatmapContent
+      data={displayData}
+      onDayClick={(d) => {
+        // 从 internal 找到原始数据（含真实 count/level），用于 tooltip 展示
+        const found = internal.find((x) => x.date === d.date);
+        if (found) setSelected(found);
+      }}
+      selected={selected}
+      onCloseTooltip={() => setSelected(null)}
+    />
   );
 }

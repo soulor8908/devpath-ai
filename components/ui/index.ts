@@ -39,6 +39,15 @@ export {
   type SkeletonProps,
   type SkeletonVariant,
 } from "./Skeleton";
+// ProgressBar：统一进度条，自带 ARIA + dark 配对（2026-07-26 性能优化新增）
+export {
+  ProgressBar,
+  type ProgressBarProps,
+  type ProgressBarSize,
+  type ProgressBarColor,
+} from "./ProgressBar";
+// LoadingScreen：全屏加载占位，统一文案 + spinner + ARIA（2026-07-26 性能优化新增）
+export { LoadingScreen, type LoadingScreenProps } from "./LoadingScreen";
 // Kbd：统一键盘按键样式（m8 修复）
 export { Kbd, type KbdProps, type KbdSize } from "./Kbd";
 // Toast：统一 Toast 渲染容器（success/error/warning/info + confirm 浮层）

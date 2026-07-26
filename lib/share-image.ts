@@ -7,9 +7,14 @@
 //   3. 数据可读：用户名/打卡/总时长/热力图/能力雷达 一目了然
 //
 // 数据隐私：仅渲染 profile.visibility 开启的字段，关闭的不显示
+//
+// 2026-07-26 性能优化（卡帕西视角）：
+//   html-to-image（~50KB）+ qrcode（~70KB）只在用户点击"分享"按钮时才需要，
+//   原版顶层 import 会进首屏 bundle。改为函数内 dynamic import：
+//   - 首屏不加载这两个库（用户从未点分享就永远不下载）
+//   - 第一次点分享时拉 chunk（~120KB），有几百毫秒延迟但用户体验可接受
+//   - 后续分享走浏览器缓存，无额外延迟
 
-import { toPng } from "html-to-image";
-import QRCode from "qrcode";
 import { maskUsername } from "./username-mask";
 
 interface ShareCardData {
@@ -31,6 +36,13 @@ interface ShareCardData {
  * 4. 移除 div，返回 Blob
  */
 export async function generateShareCard(data: ShareCardData): Promise<Blob> {
+  // 按需加载 html-to-image + qrcode（仅此函数被调用时才拉 chunk）
+  const [{ toPng }, QRCodeModule] = await Promise.all([
+    import("html-to-image"),
+    import("qrcode"),
+  ]);
+  const QRCode = QRCodeModule.default;
+
   const container = document.createElement("div");
   // 不使用 left:-9999px 屏幕外定位——部分浏览器会跳过屏外元素的合成/绘制，
   // 导致 html-to-image 截出空白。改为留在视口内但 opacity:0 + pointer-events:none，
