@@ -17,59 +17,102 @@ concepts:
   - Field 约束：默认值、范围、正则、自定义 validator
   - model_dump / model_validate：序列化与反序列化的显式边界
   - 在 AI 工程中的角色：LLM 输出的第一道类型闸门
+  - strict 模式：关闭隐式类型转换，"1" 不再自动变 1——按数据源可信度选择
 sourceIds: [pydantic-docs, python-docs]
 gotchas:
   - type hints 不阻止运行时类型错误——把它当文档 + lint，别当运行时保障
   - Pydantic v1 与 v2 API 差异巨大（parse_obj → model_validate），网上旧教程需甄别
   - 严格模式（strict=True）下 "1" 不会自动转 1——处理 LLM 输出时要明确选择
+  - lax 模式的隐式转换会静默吞数据问题（"01" 变 1、float 精度截断）——脏数据进库才暴露
 interview:
-  - q: 为什么 Python 有了 type hints 还需要 Pydantic？
+  - q: Python 都写了 type hints，为什么运行时还是照样炸类型错误？
     answerSkeleton: >-
-      【分层原理】因为两者工作在不同阶段、解决不同问题。静态层：type hints 是 mypy/pyright 的
-      输入，在 CI 里把类型错误挡在运行之前，但运行时完全不生效——def f(x: int) 传个字符串
-      照样跑。运行时层：程序边界处的数据（网络响应、用户输入、LLM 输出）从来不可信，type
-      hints 管不着；Pydantic 的 BaseModel 提供声明式 schema、运行时校验与类型 coercion、
-      结构化错误（ValidationError）、显式序列化边界（model_validate/model_dump）。一句话：
-      type hints 保证"我自己写的代码类型自洽"，Pydantic 保证"外部进来的数据符合我的假设"。
-      在 AI 工程里它还有第三个角色：LLM 输出的第一道类型闸门——先用 schema 约束生成
-      （Structured Outputs），再用 Pydantic 校验解析结果。【实际案例】我做"从工单文本抽
-      结构化字段"功能时，LLM 返回 JSON，我们定义 TicketModel（priority 枚举、due_date 日期、
-      tags 列表）。上线前抽查发现 12% 的输出字段类型漂移——日期给成"下周三"、priority 自创
-      中文枚举值。靠 Pydantic 校验拦下漂移、把 ValidationError 的错误路径回喂模型重试，两轮
-      后合格率从 88% 提到 99.2%；没有校验的基线版本则是脏数据直接写库，下游报表错了一周才被
-      发现。【举一反三】前端映射就是 Zod：你用 Zod 校验 API 响应的心智完全平移，区别是
-      Pydantic 在 Python 生态渗透更深——FastAPI 的请求校验、LangChain 的输出解析全建在它
-      之上。strict 模式的选择也对应 Zod 的 strict：处理 LLM 输出建议 lax（"1" 转 1 是特性），
-      处理金融数据建议 strict。【扣分点对照】背八股的答案是"type hints 是注释、Pydantic 做
-      校验"一句带过；真做过的能讲清静态层/运行时层的分工，并举出 LLM 输出漂移被校验拦下、
-      错误回喂重试的具体闭环。
+      【分层原理】因为 type hints 从设计上就是"擦除式"的：PEP 484 明确规定标注只是元数据，
+      解释器把它存进函数的 __annotations__ 字典后就不再参与执行——def f(x: int) 传个字符串
+      照样跑，CPython 不做也不打算做任何运行时强制。类型保障的真正提供者是静态检查器
+      （mypy/pyright）：它们在 CI 阶段把类型错误挡在运行之前，定位类似 tsc 之于 JS。这决定
+      了 type hints 的三个正确用法：当文档（读代码的人秒懂契约）、当 lint（CI 卡点）、当
+      IDE 补全的输入；以及一个错误用法：把它当运行时防线。运行时边界处的数据（网络响应、
+      用户输入、LLM 输出）它一概管不着——那是 Pydantic 的地盘。一句话分工：type hints 保证
+      "我自己写的代码类型自洽"，Pydantic 保证"外部进来的数据符合我的假设"。【实际案例】
+      我在工单抽取功能里见过这个误区的代价：函数签名标了 def save(ticket: TicketModel)，
+      开发以为"有类型标注就安全了"，结果 LLM 返回的 dict 直接传进去，运行第一步取
+      ticket.priority 就 AttributeError——标注对 dict 实参毫无约束力。改成入口处
+      TicketModel.model_validate(raw) 才真正拦住。【举一反三】这就是 TS 的类型擦除：编译后
+      的 JS 同样没有类型信息，所以前端用 Zod 校验 API 响应——同一件事在 Python 生态的两个
+      投影。【扣分点对照】背题答案是"type hints 只是提示"；有深度的能讲出 __annotations__
+      的存储位置、PEP 484 的擦除式设计、静态检查器在 CI 的定位，以及"边界数据必须运行时
+      校验"的完整分工。
     followups:
-      - Pydantic 校验失败的错误结构长什么样？（提示：errors() 的 loc/msg/type 三要素）
-      - strict 与 lax 模式各自适合什么场景？（提示：LLM 输出 vs 金融数据）
-      - v1 迁 v2 最大的坑是什么？（提示：parse_obj→model_validate、validator 装饰器重写）
-  - q: 怎么让 LLM 稳定输出合法的结构化数据？校验失败怎么办？
+      - 有没有库能让 type hints 在运行时生效？（提示：beartype/typeguard 的装饰器方案）
+      - from __future__ import annotations 改变了什么？（提示：标注延迟求值为字符串）
+      - pyright 和 mypy 怎么选？（提示：速度、严格度、与 IDE 的集成）
+  - q: Pydantic 的校验到底发生在哪一层？v2 凭什么比 v1 快一个量级？你们迁移时踩过什么？
     answerSkeleton: >-
-      【分层原理】稳定结构化输出是四层防御体系，不是一句"让它输出 JSON"。第一层生成约束：用
-      Structured Outputs/response_format 把 JSON Schema 注入解码过程，模型在 token 级别就被
-      限制只能生成合法结构——这是最强的一层。第二层运行时校验：Pydantic model_validate 解析
-      结果，捕获"结构对但语义错"的情况（枚举越界、数值离谱、日期漂移）。第三层重试闭环：
-      校验失败时把 ValidationError 的 errors()（loc 字段路径、msg 错误消息）格式化成自然语言
-      回喂模型，让它针对性修正，通常两到三轮收敛。第四层兜底降级：重试耗尽仍失败时落人工队列
-      或返回降级结果，绝不让脏数据进库。【实际案例】我做的简历解析服务，最初只在 prompt 里写
-      "请输出 JSON"，合格率只有 81%，剩下 19% 是 markdown 代码块包裹、字段漂移、枚举自创值。
-      上 Structured Outputs 后结构错误归零，但语义错误还在——把"3 年经验"解析成 30 年。加
-      Pydantic 校验加错误回喂重试（最多 2 轮），合格率到 98.7%，平均 token 消耗只涨 11%。
-      关键细节：回喂的错误要转成模型能懂的自然语言路径（"work_experience 第 2 条的 years
-      应为整数"），直接把 ValidationError 原文丢给它，修正成功率差一大截。【举一反三】这就是
-      前端表单校验的全链路思维：生成约束 ≈ input type=number（输入时就限制）、Pydantic ≈ Zod
-      提交前校验、重试闭环 ≈ 校验失败标红让用户改、兜底 ≈ 禁用提交。"永不信任外部输入"的
-      肌肉记忆，在 LLM 时代只是换了个数据源。【扣分点对照】背八股只说"让它输出 JSON 再
-      try-except"；真做过的能分清四层防御各自的职责，讲出 Structured Outputs 与 Pydantic 解决
-      的是不同层级的错误，以及重试时错误信息格式化的工程细节。
+      【分层原理】校验发生在"反序列化边界"：model_validate(data) 把不可信的外部数据（dict/
+      JSON）变成强类型模型实例的这一刻——递归遍历 schema、逐字段校验与转换、失败时收集
+      全部错误（loc 字段路径、msg 消息、type 错误类型）打包成 ValidationError 一次抛出，
+      而不是遇到第一个就停。v2 的提速来自架构重写：校验核心抽成独立的 pydantic-core，
+      用 Rust 实现，模型类定义时把 schema 编译成 Rust 侧的高效校验器，之后每次校验都走
+      编译产物而非 v1 的纯 Python 逐字段反射——官方基准常见 5-50 倍提升，模型越复杂差距
+      越大。迁移要点：parse_obj → model_validate、dict() → model_dump()、@validator →
+      @field_validator（签名与语义都变了）、Config 类 → model_config 字典，网上 v1 教程
+      必须甄别。【实际案例】我把 LLM 网关的响应校验从 v1 迁 v2：热路径上每条请求要校验
+      一个嵌套三层的 UsageReport 模型，v1 下单次校验 1.8ms，v2 降到 0.09ms，p99 延迟直接
+      削掉 12ms；迁移最大的坑是自定义 validator 重写——v1 的 values 参数在 v2 变成
+      ValidationInfo，两个老校验器静默失效，靠补测试才抓到。【举一反三】和前端 Zod 比，
+      Pydantic 更激进：Zod 是 TS 运行时库，pydantic-core 直接把热路径下沉到 Rust——对应
+      前端把解析热点下沉到 WASM 的思路。【扣分点对照】背题答案是"v2 是 Rust 写的所以快"；
+      有深度的能讲出"schema 编译成校验器"的机制、校验发生在反序列化边界的位置、以及
+      validator 重写这种只有真迁过才知道的坑。
     followups:
-      - 重试最多几轮合适？重试的成本雪球怎么控制？（提示：边际收益递减、token 计费）
-      - 模型不支持 Structured Outputs 怎么办？（提示：few-shot 加校验重试兜底）
-      - 结构对但语义错的数据怎么进一步拦截？（提示：业务规则 validator、抽样人工复核）
+      - model_validate 失败时 errors() 的结构长什么样？（提示：loc/msg/type 三要素）
+      - v2 里怎么做"跨字段"校验？（提示：model_validator(mode="after")）
+      - 校验性能还能再压吗？（提示：模型复用、TypeAdapter 避免重复构建）
+  - q: 怎么用 Pydantic 给 LLM 的结构化输出做二次校验？校验失败了怎么闭环？
+    answerSkeleton: >-
+      【分层原理】完整链路是三层。生成层先用 Structured Outputs/response_format 把 JSON
+      Schema 注入解码，结构错误在 token 级就被掐死；校验层用 Pydantic 兜"结构对但语义错"
+      ——枚举越界、数值离谱、日期漂移，model_validate 把原始 JSON 包进模型，strict 与否按
+      场景取舍（LLM 输出建议 lax，"1" 转 1 是特性不是 bug）；闭环层是失败驱动的重试：捕获
+      ValidationError 后把 errors() 格式化成模型能懂的自然语言（"work_experience 第 2 条
+      的 years 应为整数"）回喂重试，通常两到三轮收敛，耗尽则降级落人工队列，绝不让脏数据
+      进库。【实际案例】我做的简历解析服务：最初只在 prompt 里写"请输出 JSON"，合格率 81%，
+      剩下的是 markdown 代码块包裹、字段漂移、枚举自创值。上 Structured Outputs 后结构错误
+      归零，但语义错误还在——"3 年经验"被解析成 30 年。加 Pydantic 校验 + 错误回喂重试
+      （最多 2 轮）后合格率到 98.7%，平均 token 消耗只涨 11%。关键细节：回喂的错误必须转
+      自然语言路径，直接丢 ValidationError 原文，修正成功率差一大截。【举一反三】这就是
+      前端表单校验全链路：生成约束 ≈ input type=number 输入时限制、Pydantic ≈ Zod 提交前
+      校验、回喂重试 ≈ 校验失败标红让用户改、人工队列 ≈ 兜底禁用提交——"永不信任外部输入"
+      的肌肉记忆只是换了数据源。【扣分点对照】背题答案是"try-except 接住重试"；有深度的
+      能分清生成约束与运行时校验解决的是不同层级的错误、讲出错误信息格式化的工程细节，
+      以及重试轮次的边际收益账。
+    followups:
+      - 重试最多几轮合适？成本雪球怎么控制？（提示：边际收益递减、token 计费）
+      - 模型不支持 Structured Outputs 怎么办？（提示：few-shot + 校验重试兜底）
+      - 结构对但语义错的数据还能怎么拦？（提示：业务规则 validator、抽样人工复核）
+  - q: Pydantic 的隐式类型转换给你惹过什么麻烦？"1" 变 1 到底是特性还是坑？
+    answerSkeleton: >-
+      【分层原理】lax 模式（默认）下 Pydantic 会做类型 coercion：字符串 "1" 转 int 1、
+      "true" 转 bool、数字字符串转 float——对 LLM 输出、表单数据这类"类型不讲究"的源是
+      特性。但三个边界会咬人：一是语义失真——"01" 转 1 丢失前导零（邮编、身份证、固话
+      区号直接报废）；二是精度截断——JSON 数字超过 2^53 传给 float 字段会静默丢精度，
+      int 字段接 float 会截断小数（v2 下 int 接 3.7 会报错，但 float 接大整数照样精度
+      漂移）；三是宽松布尔——"yes"/"no"/"0"/"1" 都能转 bool，业务上可能并不等价。对策是
+      按数据源可信度选 strict：strict=True（或字段级 StrictStr/StrictInt）关闭一切隐式
+      转换，类型不符直接报错——金融数据、ID 类字段必须 strict，LLM 输出可以 lax。【实际
+      案例】我在订单导入功能里被咬过：上游给的 JSON 里 amount 是字符串 "19.90"，lax 模式
+      自动转 float，对账差一分钱——float 二进制表示 19.9 就不是精确值，应该第一公里就用
+      Decimal。另一次是 user_id 大雪花 ID 超 2^53，经 float 字段过一道后尾号全变，排查
+      两天才定位。修复：金额字段改 Decimal + strict，ID 字段锁 StrictStr。【举一反三】
+      这和 JS 的 == 隐式转换、Number 精度上限是同一个家族的事故，前端用 Zod 的 strict()
+      和 z.string() 锁死是同款对策。【扣分点对照】背题答案是"strict 更严格"；有深度的
+      能举出前导零丢失、2^53 精度、Decimal 治浮点这三个具体事故形态，以及按字段选
+      strict 的取舍逻辑。
+    followups:
+      - Decimal 和 float 处理金额的差别在哪？为什么 float 一定不能碰钱？
+      - 字段级 strict 和模型级 strict 怎么配合？（提示：Field(strict=True) 覆盖模型配置）
+      - JSON 大整数除了 strict 还有什么处理姿势？（提示：序列化层统一转字符串传输）
 masteryCheck:
   level: V2
   type: code-challenge

@@ -24,51 +24,94 @@ gotchas:
   - 忘记 await 一个协程不会报错，只会静默不执行（RuntimeWarning 常被忽略）
   - gather 中一个任务异常，默认行为是传播首个异常，其余任务仍在跑——需要 return_exceptions=True 时显式声明
 interview:
-  - q: asyncio 和 JS 的 Promise 模型有什么本质区别？
+  - q: asyncio 和 JS 的事件循环/Promise 模型，核心异同是什么？你从 JS 转过来时哪里最不习惯？
     answerSkeleton: >-
-      【分层原理】四处本质差异。一是调度模型：JS 的 Promise 创建即急切执行，Python 协程是惰性
-      的——调用 async 函数只返回一个协程对象，必须显式 await 或 create_task 才会被调度；忘
-      await 不报错，只静默不执行（一个常被忽略的 RuntimeWarning），这是 JS 里没有对应物的最
-      危险差异。二是生态割裂：JS 的 async 是统一生态，Python 同步/异步是两个平行世界——协程
-      里调 time.sleep 或 requests 会冻结整个事件循环，必须换 asyncio.sleep / httpx。三是并发
-      边界：GIL 之下 asyncio 只解决 IO 密集，CPU 密集任务放协程里跑和同步没区别，得上
-      multiprocessing 或 run_in_executor。四是原语对应但语义有别：gather ≈ Promise.all，但
-      默认传播首个异常、其余任务照跑，要 return_exceptions=True 才等价于 allSettled。
-      【实际案例】我在 LLM 网关服务里做批量评测：100 条 prompt 并发打模型。第一版用 for 循环
-      逐个 await，总耗时 210 秒——协程惰性意味着根本没并发，是串行；改 asyncio.gather 后降到
-      28 秒，接近最慢单条。接着踩第二坑：其中一条超时抛异常，gather 默认把它直接抛上来，其余
-      99 条的结果全丢；改 return_exceptions=True 再按异常类型分流，才把"部分失败"处理对，
-      评测报告从"全或无"变成逐条记录状态。【举一反三】心智平移前端：create_task ≈ 启动一个
-      不用等的后台 Promise，gather ≈ Promise.all，Semaphore ≈ p-limit。事件循环阻塞则完全
-      对应前端"长任务卡主线程"——只是 Python 里的凶手通常是同步库而不是重计算。【扣分点对照】
-      背八股的会背"协程是轻量级线程"；真写过的能讲出 for 循环假并发、gather 异常传播语义坑，
-      以及同步库冻结事件循环的具体事故形态。
+      【分层原理】相同点先说清：都是单线程协作式调度，await/yield 即让出控制权，IO 等待期间
+      事件循环切去跑别的任务——心智模型同源。本质差异有四。一是惰性 vs 急切：JS 的 Promise
+      创建即开始执行，Python 调用 async 函数只返回协程对象，必须 await、create_task 或 gather
+      才会被调度；忘 await 不报错，只有一个常被忽略的 RuntimeWarning，这是 JS 里没有对应物
+      的最危险差异。二是生态割裂：JS 的 async 统一了整个生态，Python 同步/异步是两个平行
+      世界——协程里调 requests 或 time.sleep 会冻结整个事件循环，必须换 httpx/asyncio.sleep。
+      三是并发边界：GIL 之下 asyncio 只救 IO 密集，CPU 密集任务放协程里跑和同步没区别。四是
+      原语语义有别：gather ≈ Promise.all 但默认传播首个异常、其余任务照跑，要
+      return_exceptions=True 才等价于 allSettled。【实际案例】我在 LLM 网关做批量评测：
+      100 条 prompt 并发打模型。第一版 for 循环逐个 await，总耗时 210 秒——协程惰性意味着
+      根本没并发，是串行；改 gather 后降到 28 秒，接近最慢单条的耗时。【举一反三】心智平移：
+      create_task ≈ 启动一个不用立即等的后台 Promise，Semaphore ≈ p-limit，事件循环阻塞 ≈
+      长任务卡主线程——只是 Python 的凶手通常是同步库而不是重计算。【扣分点对照】背题答案
+      是"都是事件循环，差不多"；有深度的能讲出惰性协程导致的假并发形态、忘 await 的静默
+      失败、gather 与 allSettled 的语义差，以及同步库冻结事件循环的机理。
     followups:
-      - 为什么 CPU 密集任务用 asyncio 没收益？该用什么？（提示：GIL 与单线程事件循环）
-      - gather 与 asyncio.TaskGroup 的错误处理差异？（提示：结构化并发、异常组）
-      - 怎么限制并发数？（提示：Semaphore，类比前端的 p-limit）
-  - q: 在 async 函数里调了同步阻塞库会发生什么？讲一个真实事故。
+      - 忘记 await 的协程为什么只是 RuntimeWarning 而不是报错？（提示：协程对象合法存在，GC 时才告警）
+      - JS 里有没有类似"惰性"的异步原语？（提示：then 链 vs Observable/生成器）
+      - await 一个普通值（非协程）会发生什么？
+  - q: GIL 到底是什么？为什么说 asyncio 只救 IO 密集救不了 CPU 密集？CPU 密集的活该怎么办？
     answerSkeleton: >-
-      【分层原理】事件循环是单线程协作式调度：所有协程跑在同一线程上，靠 await 主动让出控制权
-      实现"你方唱罢我登场"。一旦某个协程执行同步阻塞调用（requests.get、time.sleep、大文件
-      同步读写），它不会让出——整个线程被占住，事件循环里排队的所有协程全部饿死。表现不是
-      报错，而是系统"慢慢卡死"：延迟飙升、健康检查超时，但 CPU 占用可能并不高（线程阻塞在
-      IO 等待上）。这正是它的阴险之处：功能测试一切正常，压力一上来才现形，且重启能暂时
-      缓解，极具迷惑性。【实际案例】我们的 FastAPI 对话服务上线第一周，p99 延迟每到晚高峰就
-      从 400ms 飙到 8 秒，重启就好。翻监控发现事件循环 lag 尖峰和"查询用户画像"接口的调用
-      完全重合——那个接口实现里用了 requests 调内部用户服务。一个请求阻塞 2 秒，期间整个
-      worker 上几百个 SSE 流式响应全部停住，用户看到的就是"打字打到一半卡住"。修复是换
-      httpx.AsyncClient，并加事件循环 lag 监控告警，p99 回落到 500ms 以内再没复发。从此
-      Code Review 清单第一条：async 路径里出现 requests/urllib/time.sleep 一律打回。
-      【举一反三】这和前端"长任务阻塞主线程、动画掉帧"是同构事故，解法也同构：要么换异步
-      版本（fetch ≈ httpx），要么把阻塞任务扔出主线程（Web Worker ≈ run_in_executor）。CPU
-      密集任务同理——asyncio 救不了大文件解析，得 ProcessPool。【扣分点对照】背题答案是
-      "会阻塞事件循环"一句话；真处理过事故的能讲出"功能正常、高峰期 p99 爆炸、重启缓解"
-      的迷惑性表现，以及用事件循环 lag 监控定位根因的方法论。
+      【分层原理】GIL（全局解释器锁）是 CPython 解释器层面的一把互斥锁：同一时刻只允许一个
+      线程执行 Python 字节码，它的存在主要是为了让引用计数这个内存管理方案线程安全。推论
+      有两条：多线程跑 CPU 密集代码，核再多也是轮流持有 GIL 串行执行，甚至因锁竞争更慢；
+      而线程做 IO 时会释放 GIL，所以 IO 密集多线程仍有效。asyncio 是单线程事件循环，所有
+      协程跑在同一个线程上，靠的是 IO 等待时让出——CPU 密集任务在协程里执行时会一直占住
+      唯一线程，整个事件循环饿死，和写同步代码没有任何区别。出路三条：multiprocessing 或
+      ProcessPoolExecutor 开多进程（各进程独立解释器独立 GIL，真并行）；run_in_executor 把
+      阻塞/计算任务扔线程池或进程池，不污染事件循环；关注 3.13 的 free-threaded 构建（无
+      GIL 版 CPython）但生产生态尚未成熟。【实际案例】我们的文档解析服务把 PDF 文本抽取
+      放在 FastAPI 的 async 路由里直接跑，压测时并发一上来 p99 从 300ms 飙到 6 秒——解析
+      是纯 CPU 活，协程全堵死。改成 run_in_executor 扔进 ProcessPoolExecutor（4 进程）后，
+      单机吞吐从 8 req/s 提到 26 req/s，p99 回到 500ms 内。【举一反三】这和前端"长任务
+      卡主线程、移进 Web Worker"完全同构：事件循环 ≈ 主线程，ProcessPool ≈ Worker 池，
+      GIL 就是那个"为什么 JS 主线程也是单线程"的同款答案。【扣分点对照】背题答案是"GIL
+      让多线程没用"；有深度的能讲出引用计数与 GIL 的因果、IO 时释放 GIL 的细节、三条出路
+      的取舍，以及"协程里跑 CPU 任务等于同步"的临界认识。
     followups:
-      - 怎么检测事件循环被阻塞了？（提示：loop lag 监控、slow_callback_duration 类指标）
-      - 第三方库只有同步版本怎么办？（提示：run_in_executor 的代价与线程池大小）
-      - httpx 和 aiohttp 怎么选？（提示：同步/异步双 API、生态与维护状态）
+      - 多进程池为什么不开越多越好？（提示：进程内存开销、上下文切换、连接池被打爆）
+      - 协程里调用 C 扩展（如 numpy 大计算）会释放 GIL 吗？
+      - free-threaded Python（3.13 no-GIL）能取代 multiprocessing 吗？现状如何？
+  - q: 让你设计一个并发打 1000 次 LLM API 的批量器，要求限流、单条失败不影响整体——你怎么设计？给关键代码骨架。
+    answerSkeleton: >-
+      【分层原理】三个设计点：限流用 asyncio.Semaphore——信号量在协程间共享，请求前
+      async with sem 占位，同时最多 N 条在飞，对应前端 p-limit；并发编排用 gather 或 3.11+
+      的 TaskGroup——gather 更直白，配 return_exceptions=True 让每条结果独立成败；失败隔离
+      靠 try/except 包在单条任务内部，异常连同原始输入一起返回，绝不让一条炸掉整批。骨架：
+      sem = asyncio.Semaphore(10)；async def one(item): async with sem: try: return await
+      client.post(...) except Exception as e: return {"error": str(e), "input": item}；
+      results = await asyncio.gather(*(one(it) for it in items), return_exceptions=True)。
+      生产再补两件：每条加 wait_for 超时防某条挂死拖住整批，429/5xx 指数退避
+      重试（带 jitter 防惊群）。【实际案例】我们的离线评测管道就这么跑的：1000
+      条 prompt、信号量 10、单条 60 秒超时、429 退避最多 3 次。整批从串行 3 个多小时压到
+      11 分钟；一次上游限流事故中，12% 的请求走退避后成功，只有 0.4% 最终失败落盘重跑。
+      教训是初期没加 jitter，退避齐刷刷撞在同一时刻，二次触发限流。【举一反三】这就是前端
+      批量请求的思维平移：p-limit ≈ Semaphore、Promise.allSettled ≈
+      gather(return_exceptions=True)、fetch 超时 ≈ wait_for、退避 jitter 两边一字不差。
+      【扣分点对照】背题答案是"用 gather 并发"；有深度的能画出信号量限流的骨架代码、讲清
+      失败隔离的两层做法（任务内 try + return_exceptions 兜底），以及超时与退避 jitter 这些
+      只在生产里才会补的件。
+    followups:
+      - Semaphore 限制的是"并发数"，怎么限制"每分钟请求数"这种速率？（提示：令牌桶、aiolimiter）
+      - 整批跑到一半进程挂了怎么办？（提示：checkpoint 落盘、断点续跑）
+      - 1000 个协程对象一次性创建有代价吗？（提示：内存可控，但可用 as_completed 流式处理）
+  - q: gather 里一个任务抛异常，其他任务到底会怎样？生产上怎么兜底？
+    answerSkeleton: >-
+      【分层原理】默认行为很容易被误解：gather 遇到首个异常会立刻把该异常抛给 await 方，
+      但其余任务并不会被取消——它们还在事件循环里继续跑，只是结果再也没人收，变成"孤儿
+      任务"，异常若发生在任务内部还可能打出 unhandled 警告。三条生产防线：一、
+      return_exceptions=True——异常变成结果列表里的元素，逐条判断类型分流，等价于
+      Promise.allSettled，这是批量场景的默认姿势；二、3.11+ 的 TaskGroup——语义相反，一个
+      任务失败会取消所有兄弟任务并抛 ExceptionGroup，适合"一条失败整批无意义"的场景，
+      配合 except* 语法按异常类型处理；三、asyncio.wait_for 包单条超时，防止个别请求挂死
+      拖住整批。选型原则：要"尽力而为"选 gather + return_exceptions，要"同生共死"选
+      TaskGroup。【实际案例】我在批量评测里踩过默认行为的坑：一条超时抛异常，gather 直接
+      抛上来，其余 99 条结果全丢——它们在后台跑完了，但没人收尸，API 费用白花了。改
+      return_exceptions=True 再按异常类型分流后，报告从"全或无"变成逐条记录状态；另一次
+      用 TaskGroup 做"一组相关 embedding 请求"，一条失败整组取消，省下了无意义的后继调用，
+      成本降了 18%。【举一反三】Promise.all 的失败快退 + allSettled 的各自为政，和 gather
+      两种模式的对应关系一字不差；TaskGroup 则更像 Promise.all 配 AbortController 的合体。
+      【扣分点对照】背题答案是"gather 会抛异常"；有深度的能讲出"抛出但不取消"的孤儿任务
+      现象、TaskGroup 的反向取消语义与 ExceptionGroup，以及两种模式的选型依据。
+    followups:
+      - gather 抛异常后，后台继续跑的任务怎么回收或取消？（提示：保存 task 引用、cancel()）
+      - ExceptionGroup 和传统异常的处理方式差异？（提示：except* 按类型分流）
+      - wait_for 超时后底层协程真的停了吗？（提示：会收到 CancelledError，但阻塞在同步调用里的停不下来）
 masteryCheck:
   level: V2
   type: code-challenge
