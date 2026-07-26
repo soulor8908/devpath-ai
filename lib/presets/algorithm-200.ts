@@ -3760,20 +3760,17 @@ def spiral_order(matrix: list[list[int]]) -> list[int]:
     question: "48. 旋转图像（LeetCode 48）\n将 n×n 矩阵顺时针旋转 90 度，原地操作。",
     answer: `【思路推导】暴力解开新矩阵拷贝，题目要求原地。关键洞察：顺时针 90 度等于主对角线转置加每行左右翻转，两步都是原地交换。推导：转置把 (i,j) 变 (j,i)，行翻转再变 (j,n-1-i)，合成正是顺时针映射。类比两次照镜子：两次镜像等于一次旋转。
 【代码实现】
-function rotate(matrix: number[][]): void {
-  const n = matrix.length;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {   // 转置：只走上三角
-      [matrix[i][j], matrix[j][i]] = [matrix[j][i], matrix[i][j]];
-    }
-  }
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n / 2; j++) {   // 每行左右翻转
-      [matrix[i][j], matrix[i][n - 1 - j]] = [matrix[i][n - 1 - j], matrix[i][j]];
-    }
-  }
-}
-时间 O(n²)，空间 O(1)。
+\`\`\`python
+def rotate(matrix: list[list[int]]) -> None:
+    n = len(matrix)
+    for i in range(n):
+        for j in range(i + 1, n):   # 转置：只走上三角
+            matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]
+    for i in range(n):
+        for j in range(n // 2):     # 每行左右翻转
+            matrix[i][j], matrix[i][n - 1 - j] = matrix[i][n - 1 - j], matrix[i][j]
+# 时间 O(n²)，空间 O(1)
+\`\`\`
 【实际应用】图像库 EXIF 旋转、手机相机旋正、游戏地图朝向变换都用此分解。面试官考察坐标变换分解能力，以及对遍历范围的把控——j 从 i+1 开始避免换回去。
 【踩坑与变体】1) 转置时 j 从 0 开始会把元素换回原位。2) 逐环四层旋转法易错在环边界，转置法更稳。3) 逆时针 90 度等于转置加列翻转；180 度等于行列各翻一次。4) 变体：LeetCode 54 螺旋矩阵用同样的按层坐标思维。`,
     keyPoints: ["顺时针 90 度等于主对角线转置加每行左右翻转，两步都是原地交换","转置内层 j 从 i+1 开始只走上三角，从 0 开始会换回原位","逆时针 90 度等于转置加列翻转，180 度等于行列各翻一次","坐标推导：(i,j) 转置变 (j,i) 再行翻转变 (j,n-1-i)，正是顺时针映射"],
@@ -3786,19 +3783,18 @@ function rotate(matrix: number[][]): void {
     question: "14. 最长公共前缀（LeetCode 14）\n找字符串数组的最长公共前缀。",
     answer: `【思路推导】暴力解两两求公共前缀再与下一个合并，最坏多次重复比较。关键洞察：公共前缀一定是第一个串的前缀，以它为基准逐列纵向比较所有串的第 i 个字符，一旦遇到不等或某串到头，前缀即终止。这是上限递减思想：公共前缀长度不超过最短串。类比合唱：整齐部分在最短歌词结束或有人唱错时戛然而止。
 【代码实现】
-function longestCommonPrefix(strs: string[]): string {
-  if (strs.length === 0) return '';
-  const base = strs[0];
-  for (let i = 0; i < base.length; i++) {
-    for (let j = 1; j < strs.length; j++) {
-      if (i >= strs[j].length || strs[j][i] !== base[i]) {
-        return base.slice(0, i);   // 越界或不等，前缀到此为止
-      }
-    }
-  }
-  return base;                     // base 整体都是公共前缀
-}
-时间 O(S)，S 为所有字符总数；空间 O(1)。
+\`\`\`python
+def longest_common_prefix(strs: list[str]) -> str:
+    if not strs:
+        return ''
+    base = strs[0]
+    for i in range(len(base)):
+        for j in range(1, len(strs)):
+            if i >= len(strs[j]) or strs[j][i] != base[i]:
+                return base[:i]   # 越界或不等，前缀到此为止
+    return base                    # base 整体都是公共前缀
+# 时间 O(S)，S 为所有字符总数；空间 O(1)
+\`\`\`
 【实际应用】公共前缀是 Trie、路由最长前缀匹配（IP 转发）、自动补全的核心操作，CIDR 聚合也是求二进制前缀。面试官考察基准串选取与判断顺序，以及能否扩展到分治或二分。
 【踩坑与变体】1) 空数组返回空串，单串返回自身。2) 必须先判 i 越界再比较字符，顺序反了会取到 undefined。3) 变体：二分前缀长度 O(S log m)；分治合并左右前缀。4) Unicode 下按码元与按字素簇比较结果可能不同。`,
     keyPoints: ["公共前缀必是第一个串的前缀，以它为基准纵向逐列比较","终止条件二选一：某串越界或字符不等，必须先判越界再取字符","时间 O(S) 即所有字符总数，空间 O(1)","可扩展为二分前缀长度或分治合并，应对海量短前缀场景"],
@@ -3809,31 +3805,36 @@ function longestCommonPrefix(strs: string[]): string {
     id: "algo-28",
     nodeId: "p2-highfreq",
     question: "28. 找出字符串中第一个匹配项（LeetCode 28）\n实现 strStr，返回 needle 在 haystack 中的位置。",
-    answer: `// 思路：KMP 算法
-// 时间 O(n+m)，空间 O(m)
-// 关键：next 数组记录最长前后缀，失配时跳转
+    answer: `\`\`\`python
+# 思路：KMP 算法
+# 时间 O(n+m)，空间 O(m)
+# 关键：next 数组记录最长前后缀，失配时跳转
 
-func strStr(haystack, needle string) int {
-    if needle == "" { return 0 }
-    next := buildNext(needle)
-    j := 0
-    for i := 0; i < len(haystack); i++ {
-        for j > 0 && haystack[i] != needle[j] { j = next[j-1] }
-        if haystack[i] == needle[j] { j++ }
-        if j == len(needle) { return i - j + 1 }
-    }
+def str_str(haystack: str, needle: str) -> int:
+    if needle == "":
+        return 0
+    nxt = build_next(needle)
+    j = 0
+    for i in range(len(haystack)):
+        while j > 0 and haystack[i] != needle[j]:
+            j = nxt[j - 1]
+        if haystack[i] == needle[j]:
+            j += 1
+        if j == len(needle):
+            return i - j + 1
     return -1
-}
-func buildNext(s string) []int {
-    next := make([]int, len(s))
-    j := 0
-    for i := 1; i < len(s); i++ {
-        for j > 0 && s[i] != s[j] { j = next[j-1] }
-        if s[i] == s[j] { j++ }
-        next[i] = j
-    }
-    return next
-}`,
+
+def build_next(s: str) -> list[int]:
+    nxt = [0] * len(s)
+    j = 0
+    for i in range(1, len(s)):
+        while j > 0 and s[i] != s[j]:
+            j = nxt[j - 1]
+        if s[i] == s[j]:
+            j += 1
+        nxt[i] = j
+    return nxt
+\`\`\``,
     keyPoints: ["KMP 算法", "next 数组=最长相同前后缀", "失配时跳转"],
     followUps: ["暴力法时间复杂度？", "Rabin-Karp 怎么解？"],
     favorited: false,
@@ -3844,22 +3845,23 @@ func buildNext(s string) []int {
     question: "151. 反转字符串中的单词（LeetCode 151）\n将字符串中的单词顺序反转。",
     answer: `【思路推导】最省事是 split 加 reverse 加 join 一把梭，但面试考察三段式反转思想：先整体反转，单词顺序就位但每个单词内部也反了，再逐词反转恢复，空格最后压实。类比翻烙饼：先翻整摞再翻每块。
 【代码实现】
-function reverseWords(s: string): string {
-  const a = s.split('');
-  const rev = (l: number, r: number): void => {
-    while (l < r) { const t = a[l]; a[l] = a[r]; a[r] = t; l++; r--; }
-  };
-  rev(0, a.length - 1);            // 整体反转
-  let start = 0;
-  for (let i = 0; i <= a.length; i++) {
-    if (i === a.length || a[i] === ' ') {
-      rev(start, i - 1);           // 逐词反转
-      start = i + 1;
-    }
-  }
-  return a.join('').replace(/\s+/g, ' ').trim(); // 压实多余空格
-}
-时间 O(n)，空间 O(n)（字符串不可变须转数组）。
+\`\`\`python
+def reverse_words(s: str) -> str:
+    a = list(s)
+    def rev(l: int, r: int) -> None:
+        while l < r:
+            a[l], a[r] = a[r], a[l]
+            l += 1
+            r -= 1
+    rev(0, len(a) - 1)              # 整体反转
+    start = 0
+    for i in range(len(a) + 1):
+        if i == len(a) or a[i] == ' ':
+            rev(start, i - 1)       # 逐词反转
+            start = i + 1
+    return ' '.join(''.join(a).split())   # 压实多余空格
+# 时间 O(n)，空间 O(n)（字符串不可变须转数组）
+\`\`\`
 【实际应用】三段式反转与旋转数组（LeetCode 189）同构。面试官真正考察空间认知：C++ 可原地 O(1)，JS/Java/Go 字符串不可变必须 O(n)，答不出会露馅。
 【踩坑与变体】1) 忘压实空格输出含多余空格。2) 逐词反转必须处理到末尾的边界，否则最后一词漏反。3) 变体：LeetCode 186 无空格版；LeetCode 557 只反转每个单词不换序。`,
     keyPoints: ["三段式：整体反转让单词顺序就位，再逐词反转恢复内部，空格最后压实","JS/Java/Go 字符串不可变，O(n) 空间不可避免；C++ 可原地 O(1)","逐词反转必须处理下标到末尾的边界，否则最后一个词漏反","与旋转数组（LeetCode 189）同构，都是整体加局部反转"],
@@ -3872,18 +3874,20 @@ function reverseWords(s: string): string {
     question: "7. 整数反转（LeetCode 7）\n反转 32 位有符号整数，溢出返回 0。",
     answer: `【思路推导】逐位取模拼接是显然的，真正考点是溢出：反转 1534236469 得 9646324351 越出 32 位范围。关键洞察：在乘 10 加 digit 之前预判——res 大于 214748364 则必溢出；等于则新 digit 正不超 7、负不小于 -8（上下界的个位）。类比水库放水前看水位，而不是漫坝后补救。
 【代码实现】
-function reverse(x: number): number {
-  let res = 0;
-  while (x !== 0) {
-    const digit = x % 10;          // JS 负数取模带负号，天然兼容
-    x = Math.trunc(x / 10);        // 用 trunc 而非 floor
-    if (res > 214748364 || (res === 214748364 && digit > 7)) return 0;
-    if (res < -214748364 || (res === -214748364 && digit < -8)) return 0;
-    res = res * 10 + digit;
-  }
-  return res;
-}
-时间 O(log n)，空间 O(1)。
+\`\`\`python
+def reverse(x: int) -> int:
+    res = 0
+    sign = -1 if x < 0 else 1
+    x = abs(x)                     # Python 取模与截断行为不同，先取绝对值
+    while x != 0:
+        digit = x % 10
+        x = x // 10
+        if res > 214748364 or (res == 214748364 and digit > 7):
+            return 0
+        res = res * 10 + digit
+    return sign * res
+# 时间 O(log n)，空间 O(1)
+\`\`\`
 【实际应用】溢出预判是金融计算、序列号回绕、自增 ID 设计的必修课；Integer.parseInt 内部就是乘前预判。面试官考察防御性数值思维与 7、-8 的由来。
 【踩坑与变体】1) JS 除法是浮点的，必须 Math.trunc，负数用 floor 会多减 1。2) JS 可后验但 C/Java 必须先预判，语言差异要说清。3) 变体：LeetCode 8 atoi 同款溢出处理；LeetCode 9 只反转一半可避开溢出。`,
     keyPoints: ["溢出在乘 10 之前预判：res 超 214748364 必溢出，等于则个位不能超 7 或 -8","JS 除法是浮点的，必须 Math.trunc 取整；取模带符号，负数天然兼容","时间 O(log n) 空间 O(1)，循环次数即十进制位数","语言差异要说清：JS 安全整数大可后验，C/Java 必须先预判"],
@@ -3896,17 +3900,18 @@ function reverse(x: number): number {
     question: "9. 回文数（LeetCode 9）\n判断整数是否回文，不转字符串。",
     answer: `【思路推导】转字符串双指针是作弊解；全部反转再比较可行，但大整数有溢出风险（语言相关）。关键洞察：只需反转后半段与前半段比较——当 reverted 不再小于 x 时说明已过半。负数、以及以 0 结尾的非零数（如 10）必然不是回文，提前排除。类比判断一本书是否对称：不必重抄整本，后半倒读与前半正读对照即可。
 【代码实现】
-function isPalindrome(x: number): boolean {
-  if (x < 0 || (x % 10 === 0 && x !== 0)) return false; // 负数与尾零非零数
-  let reverted = 0;
-  while (x > reverted) {
-    reverted = reverted * 10 + (x % 10);
-    x = Math.trunc(x / 10);
-  }
-  // 偶数位直接相等；奇数位 reverted 多一位，去掉末位再比
-  return x === reverted || x === Math.trunc(reverted / 10);
-}
-时间 O(log n)，空间 O(1)。
+\`\`\`python
+def is_palindrome(x: int) -> bool:
+    if x < 0 or (x % 10 == 0 and x != 0):  # 负数与尾零非零数
+        return False
+    reverted = 0
+    while x > reverted:
+        reverted = reverted * 10 + x % 10
+        x //= 10
+    # 偶数位直接相等；奇数位 reverted 多一位，去掉末位再比
+    return x == reverted or x == reverted // 10
+# 时间 O(log n)，空间 O(1)
+\`\`\`
 【实际应用】半段比较思想用于大数校验、双向对账系统（各算一半再汇合比对）、分布式幂等键的对称性检测。面试官考察循环终止条件 x 大于 reverted 的不变量分析，以及奇偶长度两种情形的统一处理。
 【踩坑与变体】1) 漏掉尾零判断：10 反转半段是 1，会被误判为回文。2) JS 里要用 Math.trunc 而非直接除法赋值。3) 变体：回文链表（LeetCode 234，快慢指针找中点加反转后半，同款半段思想）；回文子串（LeetCode 5、647）是中心扩展的另一类问题。`,
     keyPoints: ["只反转后半段：x 不再大于 reverted 时过半，偶数位直等、奇数位去末位","负数与尾零非零数必然不是回文，提前剪枝","半段反转避开全反转的溢出风险，空间 O(1)","循环不变量：reverted 始终是已剥下低位数字的反转值"],
@@ -3919,17 +3924,16 @@ function isPalindrome(x: number): boolean {
     question: "66. 加一（LeetCode 66）\n将用数组表示的非负整数加一。",
     answer: `【思路推导】模拟竖式加法：从末位加一，遇 9 变 0 继续进位，非 9 加一即结束。唯一需要扩容的是全 9 情形（999 变 1000）。关键洞察：提前返回让全 9 场景自然落到循环外统一处理，代码无冗余分支。类比里程表滚动：9 归零进位，一连串 9 就一路滚到最高位再补 1。
 【代码实现】
-function plusOne(digits: number[]): number[] {
-  for (let i = digits.length - 1; i >= 0; i--) {
-    if (digits[i] < 9) {
-      digits[i]++;           // 无进位，直接结束
-      return digits;
-    }
-    digits[i] = 0;           // 9 变 0，继续进位
-  }
-  return [1, ...digits];     // 全 9，高位补 1
-}
-时间 O(n)，空间 O(1)（不计输出数组）。
+\`\`\`python
+def plus_one(digits: list[int]) -> list[int]:
+    for i in range(len(digits) - 1, -1, -1):
+        if digits[i] < 9:
+            digits[i] += 1           # 无进位，直接结束
+            return digits
+        digits[i] = 0                # 9 变 0，继续进位
+    return [1] + digits              # 全 9，高位补 1
+# 时间 O(n)，空间 O(1)（不计输出数组）
+\`\`\`
 【实际应用】这是大数运算的入门模型：数据库自增 ID、版本号 bump、雪花算法序列位回绕处理都是同款进位逻辑。面试官考察边界设计：提前返回的简洁性与 carry 变量的通用性之取舍，以及是否意识到高位扩容。
 【踩坑与变体】1) 忘记全 9 扩容是最高频错误。2) 本题判 9 已够用，但加任意数时必须用 carry 通用写法，别生搬。3) 变体构成完整大数加法系列：LeetCode 67 二进制加法、LeetCode 415 字符串加法、LeetCode 2 链表相加；LeetCode 369 给链表加一可用栈或递归。`,
     keyPoints: ["从末位加一：非 9 加一直接返回，遇 9 置 0 继续进位","全 9 是唯一需要扩容的情形，落到循环外统一补最高位 1","提前返回消灭冗余分支，比 carry 写法更贴合本题","时间 O(n) 空间 O(1)，是大数加法系列的入门模型"],
@@ -3942,17 +3946,18 @@ function plusOne(digits: number[]): number[] {
     question: "58. 最后一个单词的长度（LeetCode 58）\n返回字符串中最后一个单词的长度。",
     answer: `【思路推导】暴力解 split 后取最后一项，但尾部空格会产生空串需额外处理，还费 O(n) 空间。关键洞察：从后往前先跳过尾部空格，再数连续非空格字符，一次扫描零额外空间。这体现倒序处理避开前置干扰的思路——正序要在多个单词间定位，倒序只需一次状态切换。类比从绳子末端找最后一个结，比从头数到尾快。
 【代码实现】
-function lengthOfLastWord(s: string): number {
-  let i = s.length - 1;
-  let len = 0;
-  while (i >= 0 && s[i] === ' ') { i--; }   // 跳过尾部空格
-  while (i >= 0 && s[i] !== ' ') {          // 统计最后一个单词
-    len++;
-    i--;
-  }
-  return len;
-}
-时间 O(n)，空间 O(1)。
+\`\`\`python
+def length_of_last_word(s: str) -> int:
+    i = len(s) - 1
+    length = 0
+    while i >= 0 and s[i] == ' ':
+        i -= 1                          # 跳过尾部空格
+    while i >= 0 and s[i] != ' ':       # 统计最后一个单词
+        length += 1
+        i -= 1
+    return length
+# 时间 O(n)，空间 O(1)
+\`\`\`
 【实际应用】倒序扫描在文本处理很常见：编辑器 Ctrl+Backspace 回退到词首、URL 提取最后一段路径、日志 tail 倒读。面试官考察边界严谨性：全空格串返回 0、整串无空格、单字符。
 【踩坑与变体】1) 不跳尾部空格直接数，对尾部带空格的输入会得 0。2) split(' ') 在多空格下产生空串元素，正则又要处理首尾空项，不如手写扫描干净。3) 变体：LeetCode 151 反转单词是其升级版；LeetCode 165 版本号比较同样需要分段解析的思维。`,
     keyPoints: ["倒序扫描：先跳尾部空格，再数连续非空格字符，一次遍历 O(1) 空间","不跳尾部空格是最高频错误，尾部带空格会得到 0","split 方案在多空格下产生空串元素，边界处理反而更脏","正序要管理多个单词的状态，倒序只需一次状态切换"],
@@ -3965,20 +3970,21 @@ function lengthOfLastWord(s: string): number {
     question: "383. 赎金信（LeetCode 383）\n判断 magazine 能否构造 ransomNote。",
     answer: `【思路推导】暴力解对每个字符去 magazine 找并标记已用，O(mn)。关键洞察：只有 26 个小写字母，用定长数组计数——magazine 计数相当于盘点库存，ransomNote 逐个扣减，出现负数即缺货。即容量大于等于需求的判定。
 【代码实现】
-function canConstruct(ransomNote: string, magazine: string): boolean {
-  if (ransomNote.length > magazine.length) return false; // 提前剪枝
-  const count: number[] = new Array(26).fill(0);
-  for (const ch of magazine) {
-    count[ch.charCodeAt(0) - 97]++;        // 盘点库存
-  }
-  for (const ch of ransomNote) {
-    const idx = ch.charCodeAt(0) - 97;
-    count[idx]--;
-    if (count[idx] < 0) return false;      // 缺货立即失败
-  }
-  return true;
-}
-时间 O(m+n)，空间 O(1)（定长 26）。
+\`\`\`python
+def can_construct(ransom_note: str, magazine: str) -> bool:
+    if len(ransom_note) > len(magazine):
+        return False                      # 提前剪枝
+    count = [0] * 26
+    for ch in magazine:
+        count[ord(ch) - 97] += 1          # 盘点库存
+    for ch in ransom_note:
+        idx = ord(ch) - 97
+        count[idx] -= 1
+        if count[idx] < 0:                # 缺货立即失败
+            return False
+    return True
+# 时间 O(m+n)，空间 O(1)（定长 26）
+\`\`\`
 【实际应用】定长数组计数是桶思想原型：限流令牌桶、库存预占、拼写检查候选生成。面试官考察：知道 26 字母约束时用数组而非哈希表（常数小、缓存友好），以及约束放松后方案如何演化。
 【踩坑与变体】1) 忘记先剪枝：ransomNote 更长可直接 false。2) 变体：字母异位词（LeetCode 242 计数相等；LeetCode 438 滑动窗口）；字符集放宽到 Unicode 时数组失效，必须换 Map。`,
     keyPoints: ["26 个小写字母约束下用定长数组计数，比哈希表常数小且缓存友好","magazine 先建库存，ransomNote 逐项扣减，出现负数即失败","ransomNote 更长直接 false，是最便宜的提前剪枝","本质是资源容量大于等于需求的判定模型，时间 O(m+n)"],
@@ -3992,19 +3998,21 @@ function canConstruct(ransomNote: string, magazine: string): boolean {
     answer: `【思路推导】
 同构的本质是字符一一映射：s 中每个字符唯一映射到 t 中某字符，反向也唯一。用两个哈希表分别记录 s 到 t、t 到 s 的映射，遍历时若 s[i] 已映射但目标不是 t[i]，或 t[i] 已被别的字符占用，即冲突返回 false。时间 O(n)，空间 O(字符集)。
 【代码实现】
-function isIsomorphic(s: string, t: string): boolean {
-  if (s.length !== t.length) return false;
-  const s2t = new Map<string, string>();
-  const t2s = new Map<string, string>();
-  for (let i = 0; i < s.length; i++) {
-    const a = s[i], b = t[i];
-    if (s2t.has(a) && s2t.get(a) !== b) return false;
-    if (t2s.has(b) && t2s.get(b) !== a) return false;
-    s2t.set(a, b);
-    t2s.set(b, a);
-  }
-  return true;
-}
+\`\`\`python
+def is_isomorphic(s: str, t: str) -> bool:
+    if len(s) != len(t):
+        return False
+    s2t: dict[str, str] = {}
+    t2s: dict[str, str] = {}
+    for a, b in zip(s, t):
+        if a in s2t and s2t[a] != b:
+            return False
+        if b in t2s and t2s[b] != a:
+            return False
+        s2t[a] = b
+        t2s[b] = a
+    return True
+\`\`\`
 【实际应用】
 字符映射很常见：替换密码合法性校验、编译器标识符重命名检查、文本模板匹配（word pattern）、数据脱敏的映射一致性保证。双向约束是举一反三的关键。
 【踩坑与变体】
@@ -4017,21 +4025,27 @@ function isIsomorphic(s: string, t: string): boolean {
     id: "algo-290",
     nodeId: "p2-highfreq",
     question: "290. 单词规律（LeetCode 290）\n判断字符串是否遵循给定规律。",
-    answer: `// 思路：双向映射，split 后逐词对应
-// 时间 O(n)，空间 O(1)
-// 关键：pattern→word 和 word→pattern 双向
+    answer: `\`\`\`python
+# 思路：双向映射，split 后逐词对应
+# 时间 O(n)，空间 O(1)
+# 关键：pattern→word 和 word→pattern 双向
+# 注意：只建单向映射会被 abba/aa 反例击穿，必须双向校验
 
-func wordPattern(pattern, s string) bool {
-    words := strings.Split(s, " ")
-    if len(pattern) != len(words) { return false }
-    m1, m2 := map[byte]string{}, map[string]byte{}
-    for i := 0; i < len(pattern); i++ {
-        if v, ok := m1[pattern[i]]; ok && v != words[i] { return false }
-        if v, ok := m2[words[i]]; ok && v != pattern[i] { return false }
-        m1[pattern[i]] = words[i]; m2[words[i]] = pattern[i]
-    }
-    return true
-}`,
+def word_pattern(pattern: str, s: str) -> bool:
+    words = s.split(' ')
+    if len(pattern) != len(words):
+        return False
+    m1: dict[str, str] = {}   # pattern → word
+    m2: dict[str, str] = {}   # word → pattern
+    for ch, w in zip(pattern, words):
+        if ch in m1 and m1[ch] != w:
+            return False      # 同一 pattern 字符映射到不同单词
+        if w in m2 and m2[w] != ch:
+            return False      # 同一单词被不同 pattern 字符占用
+        m1[ch] = w
+        m2[w] = ch
+    return True
+\`\`\``,
     keyPoints: ["双向映射", "pattern↔word", "长度先判"],
     followUps: ["同构字符串的扩展？", "Unicode 怎么处理？"],
     favorited: false,
@@ -4043,16 +4057,17 @@ func wordPattern(pattern, s string) bool {
     answer: `【思路推导】
 异位词要求字符种类与频次完全一致、顺序无关。先比长度，不等直接 false。然后用计数法：开 26 长度数组，一次循环里对 s 的字符加一、对 t 的字符减一，最后数组全零即异位。排序后比较也行，但 O(n log n) 更慢，计数法时间 O(n)、空间 O(1)，是定长小字符集下的最优解。
 【代码实现】
-function isAnagram(s: string, t: string): boolean {
-  if (s.length !== t.length) return false;
-  const cnt = new Array(26).fill(0);
-  const base = "a".charCodeAt(0);
-  for (let i = 0; i < s.length; i++) {
-    cnt[s.charCodeAt(i) - base]++;
-    cnt[t.charCodeAt(i) - base]--;
-  }
-  return cnt.every((c) => c === 0);
-}
+\`\`\`python
+def is_anagram(s: str, t: str) -> bool:
+    if len(s) != len(t):
+        return False
+    cnt = [0] * 26
+    base = ord('a')
+    for ch_s, ch_t in zip(s, t):
+        cnt[ord(ch_s) - base] += 1
+        cnt[ord(ch_t) - base] -= 1
+    return all(c == 0 for c in cnt)
+\`\`\`
 【实际应用】
 字符频次统计是文本处理的基本功：拼写纠错中判断可重排候选词、输入法组词、搜索引擎同义词归并、抄袭检测里的文档指纹比对。用数组代替哈希表是固定小字符集场景的经典优化手法。
 【踩坑与变体】
@@ -4070,18 +4085,17 @@ function isAnagram(s: string, t: string): boolean {
     answer: `【思路推导】
 暴力是对每条预订给区间内每个航班加座位数，O(n·bookings) 会超时。观察到这里是大量区间加法加最后一次整体查询，差分数组正是为此设计：diff[i] 记录第 i 站相对前一站的增量，区间 [l, r] 加 k 只需 diff[l] += k、diff[r+1] -= k，两次操作 O(1)；全部修改做完后跑一遍前缀和即可还原每个位置的真实值。总时间 O(n+bookings)，空间 O(n)。
 【代码实现】
-function corpFlightBookings(bookings: number[][], n: number): number[] {
-  const diff = new Array(n + 1).fill(0);
-  for (const b of bookings) {
-    diff[b[0] - 1] += b[2];
-    diff[b[1]] -= b[2];
-  }
-  const res = new Array(n).fill(0);
-  for (let i = 0; i < n; i++) {
-    res[i] = (i === 0 ? 0 : res[i - 1]) + diff[i];
-  }
-  return res;
-}
+\`\`\`python
+def corp_flight_bookings(bookings: list[list[int]], n: int) -> list[int]:
+    diff = [0] * (n + 1)
+    for b in bookings:
+        diff[b[0] - 1] += b[2]
+        diff[b[1]] -= b[2]
+    res = [0] * n
+    for i in range(n):
+        res[i] = (0 if i == 0 else res[i - 1]) + diff[i]
+    return res
+\`\`\`
 【实际应用】
 差分适合先批量改、后统一查的离线场景：日志系统按时间段统计请求量、运营活动按日期区间加减库存、数据库范围批量更新、图像区域亮度批量调整。
 【踩坑与变体】
@@ -4097,20 +4111,21 @@ function corpFlightBookings(bookings: number[][], n: number): number[] {
     answer: `【思路推导】
 最少会议室数等于同一时刻并行会议的峰值。用扫描线思想：把开始时间和结束时间分别排序，双指针扫描——每当一个会议开始，先把所有结束时间不晚于它的会议释放掉，再占用一间房，过程中记录占用的最大值。另一解法：按开始排序加最小堆维护最早结束时间，堆顶可复用则弹出，堆峰值同为答案。时间 O(n log n)，空间 O(n)。
 【代码实现】
-function minMeetingRooms(intervals: number[][]): number {
-  const starts = intervals.map((v) => v[0]).sort((a, b) => a - b);
-  const ends = intervals.map((v) => v[1]).sort((a, b) => a - b);
-  let rooms = 0, ans = 0, j = 0;
-  for (let i = 0; i < starts.length; i++) {
-    while (j < ends.length && ends[j] <= starts[i]) {
-      rooms--;
-      j++;
-    }
-    rooms++;
-    ans = Math.max(ans, rooms);
-  }
-  return ans;
-}
+\`\`\`python
+def min_meeting_rooms(intervals: list[list[int]]) -> int:
+    starts = sorted(v[0] for v in intervals)
+    ends = sorted(v[1] for v in intervals)
+    rooms = 0
+    ans = 0
+    j = 0
+    for i in range(len(starts)):
+        while j < len(ends) and ends[j] <= starts[i]:
+            rooms -= 1
+            j += 1
+        rooms += 1
+        ans = max(ans, rooms)
+    return ans
+\`\`\`
 【实际应用】
 峰值资源估算：服务器最大并发连接规划、网约车时段最少车辆数、影院排片所需影厅数、共享工位占用峰值分析。
 【踩坑与变体】
@@ -4123,26 +4138,30 @@ function minMeetingRooms(intervals: number[][]): number {
     id: "algo-57",
     nodeId: "p3-bytedance-tencent",
     question: "57. 插入区间（LeetCode 57）\n在无重叠有序区间列表中插入新区间并合并。",
-    answer: `// 思路：分三段——不重叠的前段、重叠合并、不重叠的后段
-// 时间 O(n)，空间 O(n)
-// 关键：分三阶段处理
+    answer: `\`\`\`python
+# 思路：分三段——不重叠的前段、重叠合并、不重叠的后段
+# 时间 O(n)，空间 O(n)
+# 关键：分三阶段处理
 
-func insert(intervals [][]int, newInterval []int) [][]int {
-    var res [][]int
-    i := 0
-    // 不重叠的前段
-    for i < len(intervals) && intervals[i][1] < newInterval[0] { res = append(res, intervals[i]); i++ }
-    // 重叠合并
-    for i < len(intervals) && intervals[i][0] <= newInterval[1] {
-        newInterval[0] = min(newInterval[0], intervals[i][0])
-        newInterval[1] = max(newInterval[1], intervals[i][1])
-        i++
-    }
-    res = append(res, newInterval)
-    // 不重叠的后段
-    for i < len(intervals) { res = append(res, intervals[i]); i++ }
+def insert(intervals: list[list[int]], new_interval: list[int]) -> list[list[int]]:
+    res: list[list[int]] = []
+    i = 0
+    # 不重叠的前段
+    while i < len(intervals) and intervals[i][1] < new_interval[0]:
+        res.append(intervals[i])
+        i += 1
+    # 重叠合并
+    while i < len(intervals) and intervals[i][0] <= new_interval[1]:
+        new_interval[0] = min(new_interval[0], intervals[i][0])
+        new_interval[1] = max(new_interval[1], intervals[i][1])
+        i += 1
+    res.append(new_interval)
+    # 不重叠的后段
+    while i < len(intervals):
+        res.append(intervals[i])
+        i += 1
     return res
-}`,
+\`\`\``,
     keyPoints: ["三阶段处理", "重叠时合并边界", "保持有序"],
     followUps: ["多个区间插入怎么解？", "区间删除？"],
     favorited: false,
@@ -4154,26 +4173,23 @@ func insert(intervals [][]int, newInterval []int) [][]int {
     answer: `【思路推导】
 要在尽量靠右的位置做最小增幅。从右往左找第一个下降点 i（nums[i] 小于 nums[i+1]），右侧已是降序最大后缀；再从右找第一个大于 nums[i] 的 j 交换，后缀仍降序；最后反转 i 之后部分成升序，即得恰好大一点的排列。整段降序则整体反转为最小排列。时间 O(n)，空间 O(1)。
 【代码实现】
-function nextPermutation(nums: number[]): void {
-  const n = nums.length;
-  let i = n - 2;
-  while (i >= 0 && nums[i] >= nums[i + 1]) i--;
-  if (i >= 0) {
-    let j = n - 1;
-    while (nums[j] <= nums[i]) j--;
-    const t = nums[i];
-    nums[i] = nums[j];
-    nums[j] = t;
-  }
-  let l = i + 1, r = n - 1;
-  while (l < r) {
-    const t = nums[l];
-    nums[l] = nums[r];
-    nums[r] = t;
-    l++;
-    r--;
-  }
-}
+\`\`\`python
+def next_permutation(nums: list[int]) -> None:
+    n = len(nums)
+    i = n - 2
+    while i >= 0 and nums[i] >= nums[i + 1]:
+        i -= 1
+    if i >= 0:
+        j = n - 1
+        while nums[j] <= nums[i]:
+            j -= 1
+        nums[i], nums[j] = nums[j], nums[i]
+    l, r = i + 1, n - 1
+    while l < r:
+        nums[l], nums[r] = nums[r], nums[l]
+        l += 1
+        r -= 1
+\`\`\`
 【实际应用】
 字典序推进是组合枚举基础：全排列穷举、调度顺序遍历、密钥空间枚举、AI 操作序列生成，标准库 next_permutation 即此逻辑。
 【踩坑与变体】
@@ -4186,27 +4202,26 @@ function nextPermutation(nums: number[]): void {
     id: "algo-10",
     nodeId: "p3-bytedance-tencent",
     question: "10. 正则表达式匹配（LeetCode 10）\n实现 . 和 * 的正则匹配。",
-    answer: `// 思路：二维 DP
-// 时间 O(m·n)，空间 O(m·n)
-// 关键：* 匹配 0 次或多次
+    answer: `\`\`\`python
+# 思路：二维 DP
+# 时间 O(m·n)，空间 O(m·n)
+# 关键：* 匹配 0 次或多次
 
-func isMatch(s, p string) bool {
-    m, n := len(s), len(p)
-    dp := make([][]bool, m+1)
-    for i := range dp { dp[i] = make([]bool, n+1) }
-    dp[0][0] = true
-    for j := 2; j <= n; j += 2 { if p[j-1] == '*' { dp[0][j] = dp[0][j-2] } }
-    for i := 1; i <= m; i++ {
-        for j := 1; j <= n; j++ {
-            if p[j-1] == '*' {
-                dp[i][j] = dp[i][j-2] || (dp[i-1][j] && (p[j-2] == '.' || p[j-2] == s[i-1]))
-            } else {
-                dp[i][j] = dp[i-1][j-1] && (p[j-1] == '.' || p[j-1] == s[i-1])
-            }
-        }
-    }
+def is_match(s: str, p: str) -> bool:
+    m, n = len(s), len(p)
+    dp = [[False] * (n + 1) for _ in range(m + 1)]
+    dp[0][0] = True
+    for j in range(2, n + 1, 2):
+        if p[j - 1] == '*':
+            dp[0][j] = dp[0][j - 2]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if p[j - 1] == '*':
+                dp[i][j] = dp[i][j - 2] or (dp[i - 1][j] and (p[j - 2] == '.' or p[j - 2] == s[i - 1]))
+            else:
+                dp[i][j] = dp[i - 1][j - 1] and (p[j - 1] == '.' or p[j - 1] == s[i - 1])
     return dp[m][n]
-}`,
+\`\`\``,
     keyPoints: ["二维 DP", "* 匹配 0 次或多次", "初始化空串匹配 a* 模式"],
     followUps: ["通配符匹配怎么解？", "递归怎么写？"],
     favorited: false,
@@ -4215,24 +4230,26 @@ func isMatch(s, p string) bool {
     id: "algo-44",
     nodeId: "p3-bytedance-tencent",
     question: "44. 通配符匹配（LeetCode 44）\n实现 ? 和 * 的通配符匹配。",
-    answer: `// 思路：二维 DP 或贪心
-// 时间 O(m·n)，空间 O(m·n) 可优化
-// 关键：* 匹配任意序列（含空）
+    answer: `\`\`\`python
+# 思路：二维 DP 或贪心
+# 时间 O(m·n)，空间 O(m·n) 可优化
+# 关键：* 匹配任意序列（含空）
 
-func isWildcardMatch(s, p string) bool {
-    m, n := len(s), len(p)
-    dp := make([][]bool, m+1)
-    for i := range dp { dp[i] = make([]bool, n+1) }
-    dp[0][0] = true
-    for j := 1; j <= n; j++ { if p[j-1] == '*' { dp[0][j] = dp[0][j-1] } }
-    for i := 1; i <= m; i++ {
-        for j := 1; j <= n; j++ {
-            if p[j-1] == '*' { dp[i][j] = dp[i-1][j] || dp[i][j-1] }
-            else if p[j-1] == '?' || p[j-1] == s[i-1] { dp[i][j] = dp[i-1][j-1] }
-        }
-    }
+def is_wildcard_match(s: str, p: str) -> bool:
+    m, n = len(s), len(p)
+    dp = [[False] * (n + 1) for _ in range(m + 1)]
+    dp[0][0] = True
+    for j in range(1, n + 1):
+        if p[j - 1] == '*':
+            dp[0][j] = dp[0][j - 1]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if p[j - 1] == '*':
+                dp[i][j] = dp[i - 1][j] or dp[i][j - 1]
+            elif p[j - 1] == '?' or p[j - 1] == s[i - 1]:
+                dp[i][j] = dp[i - 1][j - 1]
     return dp[m][n]
-}`,
+\`\`\``,
     keyPoints: ["二维 DP", "* 匹配任意序列", "也可贪心双指针 O(1) 空间"],
     followUps: ["贪心怎么解？", "正则和通配符的区别？"],
     favorited: false,
@@ -4241,77 +4258,83 @@ func isWildcardMatch(s, p string) bool {
     id: "algo-460",
     nodeId: "p3-bytedance-tencent",
     question: "460. LFU 缓存（LeetCode 460）\n设计 O(1) 的 LFU 缓存。",
-    answer: `// 思路：key→节点哈希 + freq→双向链表哈希，同频率内新节点在头（LRU）
-// 时间 O(1) 每操作，空间 O(capacity)
-// 关键：minFreq 指针——get/put 命中时节点频率 +1 并移到新链表头部；
-//       旧频率链表空了且等于 minFreq 时 minFreq++；put 新节点时 minFreq 重置为 1
+    answer: `\`\`\`python
+# 思路：key→节点哈希 + freq→双向链表哈希，同频率内新节点在头（LRU）
+# 时间 O(1) 每操作，空间 O(capacity)
+# 关键：minFreq 指针——get/put 命中时节点频率 +1 并移到新链表头部；
+#       旧频率链表空了且等于 minFreq 时 minFreq++；put 新节点时 minFreq 重置为 1
 
-type LFUNode struct {
-    key, val, freq int
-    prev, next     *LFUNode
-}
-type freqList struct {
-    head, tail *LFUNode // 哨兵
-    size       int
-}
-func newFreqList() *freqList {
-    l := &freqList{head: &LFUNode{}, tail: &LFUNode{}}
-    l.head.next = l.tail
-    l.tail.prev = l.head
-    return l
-}
-func (l *freqList) addToHead(n *LFUNode) {
-    n.prev = l.head
-    n.next = l.head.next
-    l.head.next.prev = n
-    l.head.next = n
-    l.size++
-}
-func (l *freqList) remove(n *LFUNode) {
-    n.prev.next = n.next
-    n.next.prev = n.prev
-    l.size--
-}
-func (l *freqList) removeTail() *LFUNode {
-    n := l.tail.prev
-    l.remove(n)
-    return n
-}
+class _Node:
+    __slots__ = ('key', 'val', 'freq', 'prev', 'next')
+    def __init__(self, key: int = 0, val: int = 0, freq: int = 1):
+        self.key = key
+        self.val = val
+        self.freq = freq
+        self.prev: '_Node | None' = None
+        self.next: '_Node | None' = None
 
-type LFUCache struct {
-    cap, minFreq int
-    keyToNode    map[int]*LFUNode
-    freqToList   map[int]*freqList
-}
-func ConstructorLFU(capacity int) LFUCache {
-    return LFUCache{cap: capacity, keyToNode: map[int]*LFUNode{}, freqToList: map[int]*freqList{}}
-}
-// touch：节点频率 +1，从旧频率链表摘出、插入新频率链表头部
-func (c *LFUCache) touch(n *LFUNode) {
-    old := c.freqToList[n.freq]
-    old.remove(n)
-    if old.size == 0 && n.freq == c.minFreq { c.minFreq++ }
-    n.freq++
-    if c.freqToList[n.freq] == nil { c.freqToList[n.freq] = newFreqList() }
-    c.freqToList[n.freq].addToHead(n)
-}
-func (c *LFUCache) Get(key int) int {
-    if n, ok := c.keyToNode[key]; ok { c.touch(n); return n.val }
-    return -1
-}
-func (c *LFUCache) Put(key, val int) {
-    if c.cap == 0 { return }
-    if n, ok := c.keyToNode[key]; ok { n.val = val; c.touch(n); return }
-    if len(c.keyToNode) == c.cap { // 淘汰 minFreq 链表尾部（最久未用）
-        victim := c.freqToList[c.minFreq].removeTail()
-        delete(c.keyToNode, victim.key)
-    }
-    n := &LFUNode{key: key, val: val, freq: 1}
-    c.keyToNode[key] = n
-    if c.freqToList[1] == nil { c.freqToList[1] = newFreqList() }
-    c.freqToList[1].addToHead(n)
-    c.minFreq = 1 // 新节点插入后最小频率必为 1
-}`,
+class _FreqList:
+    def __init__(self) -> None:
+        self.head = _Node()   # 哨兵
+        self.tail = _Node()
+        self.head.next = self.tail
+        self.tail.prev = self.head
+        self.size = 0
+    def add_to_head(self, n: '_Node') -> None:
+        n.prev = self.head
+        n.next = self.head.next
+        self.head.next.prev = n   # type: ignore[union-attr]
+        self.head.next = n
+        self.size += 1
+    def remove(self, n: '_Node') -> None:
+        n.prev.next = n.next       # type: ignore[union-attr]
+        n.next.prev = n.prev       # type: ignore[union-attr]
+        self.size -= 1
+    def remove_tail(self) -> '_Node':
+        n = self.tail.prev         # type: ignore[assignment]
+        self.remove(n)
+        return n
+
+class LFUCache:
+    def __init__(self, capacity: int):
+        self.cap = capacity
+        self.min_freq = 0
+        self.key_to_node: dict[int, _Node] = {}
+        self.freq_to_list: dict[int, _FreqList] = {}
+    # touch：节点频率 +1，从旧频率链表摘出、插入新频率链表头部
+    def _touch(self, n: '_Node') -> None:
+        old = self.freq_to_list[n.freq]
+        old.remove(n)
+        if old.size == 0 and n.freq == self.min_freq:
+            self.min_freq += 1
+        n.freq += 1
+        if n.freq not in self.freq_to_list:
+            self.freq_to_list[n.freq] = _FreqList()
+        self.freq_to_list[n.freq].add_to_head(n)
+    def get(self, key: int) -> int:
+        n = self.key_to_node.get(key)
+        if n is None:
+            return -1
+        self._touch(n)
+        return n.val
+    def put(self, key: int, val: int) -> None:
+        if self.cap == 0:
+            return
+        n = self.key_to_node.get(key)
+        if n is not None:
+            n.val = val
+            self._touch(n)
+            return
+        if len(self.key_to_node) == self.cap:  # 淘汰 min_freq 链表尾部（最久未用）
+            victim = self.freq_to_list[self.min_freq].remove_tail()
+            self.key_to_node.pop(victim.key)
+        n = _Node(key, val, 1)
+        self.key_to_node[key] = n
+        if 1 not in self.freq_to_list:
+            self.freq_to_list[1] = _FreqList()
+        self.freq_to_list[1].add_to_head(n)
+        self.min_freq = 1  # 新节点插入后最小频率必为 1
+\`\`\``,
     keyPoints: ["频率→双向链表", "key→节点哈希", "同频率内 LRU"],
     followUps: ["LRU 和 LFU 的区别？", "如何 O(1) 维护 minFreq？"],
     favorited: false,
@@ -4320,37 +4343,36 @@ func (c *LFUCache) Put(key, val int) {
     id: "algo-466",
     nodeId: "p3-bytedance-tencent",
     question: "466. 统计重复个数（LeetCode 466）\n求 S 在 [s1, n1] 次重复后的串中作为 [s2, n2] 出现的最大次数。",
-    answer: `// 思路：模拟 + 循环节检测 + 数学跳跃（纯模拟 O(n1·|s1|) 在 n1≤10^6 时必 TLE）
-// 时间 O(|s1|·|s2|)：idx2 最多 |s2| 种取值，|s2| 轮内必出现重复状态进入跳跃；空间 O(|s2|)
-// 关键：记录每轮结束时的 (idx2, count)，状态重复即找到循环节，剩余轮数用乘法跳过
+    answer: `\`\`\`python
+# 思路：模拟 + 循环节检测 + 数学跳跃（纯模拟 O(n1·|s1|) 在 n1≤10^6 时必 TLE）
+# 时间 O(|s1|·|s2|)：idx2 最多 |s2| 种取值，|s2| 轮内必出现重复状态进入跳跃；空间 O(|s2|)
+# 关键：记录每轮结束时的 (idx2, count)，状态重复即找到循环节，剩余轮数用乘法跳过
 
-func getMaxRepetitions(s1 string, n1 int, s2 string, n2 int) int {
-    idx2, count := 0, 0               // idx2: s2 匹配到的位置；count: 已完整匹配 s2 的次数
-    type state struct{ count, round int }
-    recall := map[int]state{}         // idx2 -> 该状态首次出现时的 (count, round)
-    round := 0
-    for round < n1 {
-        round++
-        for j := 0; j < len(s1); j++ {
-            if s1[j] == s2[idx2] {
-                idx2++
-                if idx2 == len(s2) { idx2 = 0; count++ }
-            }
-        }
-        if prev, ok := recall[idx2]; ok {
-            // 找到循环节：每 cycleRound 轮 s1 可多匹配 cycleCount 个 s2
-            cycleRound := round - prev.round
-            cycleCount := count - prev.count
-            jump := (n1 - round) / cycleRound
-            count += jump * cycleCount
-            round += jump * cycleRound
-            recall = map[int]state{} // 跳跃后剩余不足一个周期，无需再检测
-        } else {
-            recall[idx2] = state{count, round}
-        }
-    }
-    return count / n2
-}`,
+def get_max_repetitions(s1: str, n1: int, s2: str, n2: int) -> int:
+    idx2, count = 0, 0                  # idx2: s2 匹配到的位置；count: 已完整匹配 s2 的次数
+    recall: dict[int, tuple[int, int]] = {}  # idx2 -> 该状态首次出现时的 (count, round)
+    round_ = 0
+    while round_ < n1:
+        round_ += 1
+        for ch in s1:
+            if ch == s2[idx2]:
+                idx2 += 1
+                if idx2 == len(s2):
+                    idx2 = 0
+                    count += 1
+        if idx2 in recall:
+            # 找到循环节：每 cycle_round 轮 s1 可多匹配 cycle_count 个 s2
+            prev_count, prev_round = recall[idx2]
+            cycle_round = round_ - prev_round
+            cycle_count = count - prev_count
+            jump = (n1 - round_) // cycle_round
+            count += jump * cycle_count
+            round_ += jump * cycle_round
+            recall = {}                  # 跳跃后剩余不足一个周期，无需再检测
+        else:
+            recall[idx2] = (count, round_)
+    return count // n2
+\`\`\``,
     keyPoints: ["模拟匹配", "找循环节优化", "统计匹配次数"],
     followUps: ["n1 很大怎么优化？", "循环节怎么找？"],
     favorited: false,
@@ -4359,26 +4381,27 @@ func getMaxRepetitions(s1 string, n1 int, s2 string, n2 int) int {
     id: "algo-316",
     nodeId: "p3-bytedance-tencent",
     question: "316. 去除重复字母（LeetCode 316）\n使字符串只含每个字母一次且字典序最小。",
-    answer: `// 思路：单调栈 + 计数
-// 时间 O(n)，空间 O(26)
-// 关键：栈顶比当前大且后面还有则弹出
+    answer: `\`\`\`python
+# 思路：单调栈 + 计数
+# 时间 O(n)，空间 O(26)
+# 关键：栈顶比当前大且后面还有则弹出
 
-func removeDuplicateLetters(s string) string {
-    lastOccur := [26]int{}
-    for i := 0; i < len(s); i++ { lastOccur[s[i]-'a'] = i }
-    var stack []byte
-    inStack := [26]bool{}
-    for i := 0; i < len(s); i++ {
-        if inStack[s[i]-'a'] { continue }
-        for len(stack) > 0 && stack[len(stack)-1] > s[i] && lastOccur[stack[len(stack)-1]-'a'] > i {
-            inStack[stack[len(stack)-1]-'a'] = false
-            stack = stack[:len(stack)-1]
-        }
-        stack = append(stack, s[i])
-        inStack[s[i]-'a'] = true
-    }
-    return string(stack)
-}`,
+def remove_duplicate_letters(s: str) -> str:
+    last_occur = [0] * 26
+    for i, ch in enumerate(s):
+        last_occur[ord(ch) - ord('a')] = i
+    stack: list[str] = []
+    in_stack = [False] * 26
+    for i, ch in enumerate(s):
+        idx = ord(ch) - ord('a')
+        if in_stack[idx]:
+            continue
+        while stack and stack[-1] > ch and last_occur[ord(stack[-1]) - ord('a')] > i:
+            in_stack[ord(stack.pop()) - ord('a')] = False
+        stack.append(ch)
+        in_stack[idx] = True
+    return ''.join(stack)
+\`\`\``,
     keyPoints: ["单调栈", "记录最后出现位置", "栈内标记去重"],
     followUps: ["去掉重复使字典序最小？", "允许保留 K 个重复？"],
     favorited: false,
@@ -4390,24 +4413,23 @@ func removeDuplicateLetters(s string) string {
     answer: `【思路推导】
 要让剩下的数最小，高位必须尽可能小。从左到右扫描，若当前位比左边某位小，删掉左边那个较大的总更优——这是贪心。用单调递增栈维护结果：新数字入栈前，只要删除额度 k 没用完且栈顶比它大，就弹栈并 k 减一；扫完若 k 仍有剩（说明序列本身递增），从末尾继续删。最后去掉前导零，空串返回 "0"。每位最多入栈出栈各一次，时间 O(n)，空间 O(n)。
 【代码实现】
-function removeKdigits(num: string, k: number): string {
-  const stack: string[] = [];
-  for (const ch of num) {
-    while (k > 0 && stack.length > 0 && stack[stack.length - 1] > ch) {
-      stack.pop();
-      k--;
-    }
-    stack.push(ch);
-  }
-  while (k > 0) {
-    stack.pop();
-    k--;
-  }
-  let i = 0;
-  while (i < stack.length && stack[i] === "0") i++;
-  const res = stack.slice(i).join("");
-  return res === "" ? "0" : res;
-}
+\`\`\`python
+def remove_k_digits(num: str, k: int) -> str:
+    stack: list[str] = []
+    for ch in num:
+        while k > 0 and stack and stack[-1] > ch:
+            stack.pop()
+            k -= 1
+        stack.append(ch)
+    while k > 0:
+        stack.pop()
+        k -= 1
+    i = 0
+    while i < len(stack) and stack[i] == '0':
+        i += 1
+    res = ''.join(stack[i:])
+    return res if res else '0'
+\`\`\`
 【实际应用】
 单调栈处理局部删除最优问题：股价前后最近更低价、编译器表达式化简、遮挡剔除、直方图最大矩形。
 【踩坑与变体】
@@ -4420,57 +4442,52 @@ function removeKdigits(num: string, k: number): string {
     id: "algo-321",
     nodeId: "p3-bytedance-tencent",
     question: "321. 拼接最大数（LeetCode 321）\n从两个数组中取 k 个数保持相对顺序，拼成最大数。",
-    answer: `// 思路：枚举 i 个从 nums1，k-i 个从 nums2，分别取最大子序列再合并
-// 时间 O(k·(m+n))，空间 O(k)
-// 关键：单调栈取最大子序列 + 合并两个最大序列
+    answer: `\`\`\`python
+# 思路：枚举 i 个从 nums1，k-i 个从 nums2，分别取最大子序列再合并
+# 时间 O(k·(m+n))，空间 O(k)
+# 关键：单调栈取最大子序列 + 合并两个最大序列
 
-func maxNumber(nums1, nums2 []int, k int) []int {
-    var res []int
-    for i := 0; i <= k && i <= len(nums1); i++ {
-        if k-i > len(nums2) { continue }
-        merged := merge(maxSubsequence(nums1, i), maxSubsequence(nums2, k-i))
-        if greater(merged, res) { res = merged }
-    }
+def max_number(nums1: list[int], nums2: list[int], k: int) -> list[int]:
+    res: list[int] = []
+    for i in range(k + 1):
+        if i > len(nums1) or k - i > len(nums2):
+            continue
+        merged = merge(max_subsequence(nums1, i), max_subsequence(nums2, k - i))
+        if greater(merged, res):
+            res = merged
     return res
-}
 
-// maxSubsequence：单调栈取长度为 k、保持相对顺序的最大子序列
-// drop 记录还能丢弃几个元素，栈顶小于当前元素时弹出
-func maxSubsequence(nums []int, k int) []int {
-    drop := len(nums) - k
-    stack := make([]int, 0, k)
-    for _, x := range nums {
-        for drop > 0 && len(stack) > 0 && stack[len(stack)-1] < x {
-            stack = stack[:len(stack)-1]
-            drop--
-        }
-        stack = append(stack, x)
-    }
+# max_subsequence：单调栈取长度为 k、保持相对顺序的最大子序列
+# drop 记录还能丢弃几个元素，栈顶小于当前元素时弹出
+def max_subsequence(nums: list[int], k: int) -> list[int]:
+    drop = len(nums) - k
+    stack: list[int] = []
+    for x in nums:
+        while drop > 0 and stack and stack[-1] < x:
+            stack.pop()
+            drop -= 1
+        stack.append(x)
     return stack[:k]
-}
 
-// merge：贪心合并，每步从"剩余字典序更大"的序列取头元素
-// 注意：两序列当前元素相等时不能随意取，必须向后比较第一个不同元素，
-//       例如 a=[6,7], b=[6,0,4]，取 a 的 6 后面跟 7 更优
-func merge(a, b []int) []int {
-    res := make([]int, 0, len(a)+len(b))
-    for len(a) > 0 || len(b) > 0 {
-        if greater(a, b) {
-            res = append(res, a[0]); a = a[1:]
-        } else {
-            res = append(res, b[0]); b = b[1:]
-        }
-    }
+# merge：贪心合并，每步从"剩余字典序更大"的序列取头元素
+# 注意：两序列当前元素相等时不能随意取，必须向后比较第一个不同元素，
+#       例如 a=[6,7], b=[6,0,4]，取 a 的 6 后面跟 7 更优
+def merge(a: list[int], b: list[int]) -> list[int]:
+    res: list[int] = []
+    while a or b:
+        if greater(a, b):
+            res.append(a.pop(0))
+        else:
+            res.append(b.pop(0))
     return res
-}
 
-// greater：字典序比较 a > b（前缀相等时剩余更长的更大）
-func greater(a, b []int) bool {
-    for i := 0; i < len(a) && i < len(b); i++ {
-        if a[i] != b[i] { return a[i] > b[i] }
-    }
+# greater：字典序比较 a > b（前缀相等时剩余更长的更大）
+def greater(a: list[int], b: list[int]) -> bool:
+    for x, y in zip(a, b):
+        if x != y:
+            return x > y
     return len(a) > len(b)
-}`,
+\`\`\``,
     keyPoints: ["枚举分配数量", "单调栈取最大子序列", "贪心合并"],
     followUps: ["最大子序列怎么取？", "合并时相同前缀怎么处理？"],
     favorited: false,
@@ -4479,27 +4496,31 @@ func greater(a, b []int) bool {
     id: "algo-8",
     nodeId: "p3-bytedance-tencent",
     question: "8. 字符串转整数 atoi（LeetCode 8）\n实现 myAtoi，处理空格/符号/溢出。",
-    answer: `// 思路：状态机或逐字符处理
-// 时间 O(n)，空间 O(1)
-// 关键：跳空格-判符号-累数字-判溢出
+    answer: `\`\`\`python
+# 思路：状态机或逐字符处理
+# 时间 O(n)，空间 O(1)
+# 关键：跳空格-判符号-累数字-判溢出
 
-func myAtoi(s string) int {
-    i, n := 0, len(s)
-    for i < n && s[i] == ' ' { i++ }
-    sign := 1
-    if i < n && (s[i] == '+' || s[i] == '-') { if s[i] == '-' { sign = -1 }; i++ }
-    res := 0
-    for i < n && s[i] >= '0' && s[i] <= '9' {
-        digit := int(s[i] - '0')
-        if res > (1<<31-1)/10 || (res == (1<<31-1)/10 && digit > 7) {
-            if sign == 1 { return 1<<31 - 1 }
-            return -1 << 31
-        }
-        res = res*10 + digit
-        i++
-    }
-    return res * sign
-}`,
+def my_atoi(s: str) -> int:
+    i, n = 0, len(s)
+    while i < n and s[i] == ' ':
+        i += 1
+    sign = 1
+    if i < n and s[i] in '+-':
+        if s[i] == '-':
+            sign = -1
+        i += 1
+    res = 0
+    INT_MAX = 2 ** 31 - 1
+    INT_MIN = -2 ** 31
+    while i < n and s[i].isdigit():
+        digit = ord(s[i]) - ord('0')
+        if res > INT_MAX // 10 or (res == INT_MAX // 10 and digit > 7):
+            return INT_MAX if sign == 1 else INT_MIN
+        res = res * 10 + digit
+        i += 1
+    return sign * res
+\`\`\``,
     keyPoints: ["跳空格-判符号-累数字", "溢出截断", "状态机思想"],
     followUps: ["用状态机怎么实现？", "处理十六进制？"],
     favorited: false,
@@ -4508,27 +4529,27 @@ func myAtoi(s string) int {
     id: "algo-43",
     nodeId: "p3-bytedance-tencent",
     question: "43. 字符串相乘（LeetCode 43）\n给定两个非负整数字符串，返回乘积字符串。",
-    answer: `// 思路：模拟竖式乘法
-// 时间 O(m·n)，空间 O(m+n)
-// 关键：num1[i]*num2[j] 结果放在 res[i+j] 和 res[i+j+1]
+    answer: `\`\`\`python
+# 思路：模拟竖式乘法
+# 时间 O(m·n)，空间 O(m+n)
+# 关键：num1[i]*num2[j] 结果放在 res[i+j] 和 res[i+j+1]
 
-func multiply(num1, num2 string) string {
-    m, n := len(num1), len(num2)
-    res := make([]int, m+n)
-    for i := m - 1; i >= 0; i-- {
-        for j := n - 1; j >= 0; j-- {
-            mul := int(num1[i]-'0') * int(num2[j]-'0')
-            p1, p2 := i+j, i+j+1
-            sum := mul + res[p2]
-            res[p2] = sum % 10
-            res[p1] += sum / 10
-        }
-    }
-    var sb strings.Builder
-    for _, d := range res { if !(sb.Len() == 0 && d == 0) { sb.WriteByte(byte('0' + d)) } }
-    if sb.Len() == 0 { return "0" }
-    return sb.String()
-}`,
+def multiply(num1: str, num2: str) -> str:
+    m, n = len(num1), len(num2)
+    res = [0] * (m + n)
+    for i in range(m - 1, -1, -1):
+        for j in range(n - 1, -1, -1):
+            mul = (ord(num1[i]) - ord('0')) * (ord(num2[j]) - ord('0'))
+            p1, p2 = i + j, i + j + 1
+            total = mul + res[p2]
+            res[p2] = total % 10
+            res[p1] += total // 10
+    out: list[str] = []
+    for d in res:
+        if not (len(out) == 0 and d == 0):
+            out.append(str(d))
+    return ''.join(out) if out else '0'
+\`\`\``,
     keyPoints: ["竖式乘法", "结果放 i+j 和 i+j+1", "去前导零"],
     followUps: ["大数加法怎么解？", "大数除法？"],
     favorited: false,
@@ -4537,24 +4558,35 @@ func multiply(num1, num2 string) string {
     id: "algo-297",
     nodeId: "p3-bytedance-tencent",
     question: "297. 二叉树序列化与反序列化（LeetCode 297）\n设计序列化和反序列化二叉树的算法。",
-    answer: `// 思路：前序遍历 + null 标记
-// 时间 O(n)，空间 O(n)
-// 关键：用特殊字符标记 null
+    answer: `\`\`\`python
+# 思路：前序遍历 + null 标记
+# 时间 O(n)，空间 O(n)
+# 关键：用特殊字符标记 null
 
-func serialize(root *TreeNode) string {
-    if root == nil { return "#," }
-    return strconv.Itoa(root.Val) + "," + serialize(root.Left) + serialize(root.Right)
-}
-func deserialize(data string) *TreeNode {
-    vals := strings.Split(data, ",")
-    var build func() *TreeNode
-    build = func() *TreeNode {
-        if vals[0] == "#" { vals = vals[1:]; return nil }
-        val, _ := strconv.Atoi(vals[0]); vals = vals[1:]
-        return &TreeNode{Val: val, Left: build(), Right: build()}
-    }
+class TreeNode:
+    def __init__(self, val: int = 0, left: 'TreeNode | None' = None, right: 'TreeNode | None' = None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def serialize(root: 'TreeNode | None') -> str:
+    if root is None:
+        return '#,'
+    return str(root.val) + ',' + serialize(root.left) + serialize(root.right)
+
+def deserialize(data: str) -> 'TreeNode | None':
+    vals = data.split(',')
+    it = iter(vals)
+    def build() -> 'TreeNode | None':
+        v = next(it)
+        if v == '#':
+            return None
+        node = TreeNode(int(v))
+        node.left = build()
+        node.right = build()
+        return node
     return build()
-}`,
+\`\`\``,
     keyPoints: ["前序遍历", "null 用 # 标记", "递归重建"],
     followUps: ["层序序列化怎么解？", "如何压缩？"],
     favorited: false,
@@ -4563,31 +4595,45 @@ func deserialize(data string) *TreeNode {
     id: "algo-301",
     nodeId: "p3-bytedance-tencent",
     question: "301. 删除无效括号（LeetCode 301）\n删除最少括号使字符串有效，返回所有可能结果。",
-    answer: `// 思路：BFS 逐层删除检查
-// 时间 O(2^n)，空间 O(n)
-// 关键：BFS 保证最少删除
+    answer: `\`\`\`python
+# 思路：BFS 逐层删除检查
+# 时间 O(2^n)，空间 O(n)
+# 关键：BFS 保证最少删除
 
-func removeInvalidParentheses(s string) []string {
-    visited := map[string]bool{}
-    var res []string
-    queue := []string{s}
-    found := false
-    for len(queue) > 0 && !found {
-        size := len(queue)
-        for i := 0; i < size; i++ {
-            cur := queue[0]; queue = queue[1:]
-            if visited[cur] { continue }
-            visited[cur] = true
-            if isValidParentheses(cur) { res = append(res, cur); found = true }
-            if found { continue }
-            for j := 0; j < len(cur); j++ {
-                if cur[j] != '(' && cur[j] != ')' { continue }
-                queue = append(queue, cur[:j]+cur[j+1:])
-            }
-        }
-    }
+def is_valid_parentheses(s: str) -> bool:
+    bal = 0
+    for ch in s:
+        if ch == '(':
+            bal += 1
+        elif ch == ')':
+            bal -= 1
+            if bal < 0:
+                return False
+    return bal == 0
+
+def remove_invalid_parentheses(s: str) -> list[str]:
+    visited: set[str] = set()
+    res: list[str] = []
+    queue = [s]
+    found = False
+    while queue and not found:
+        size = len(queue)
+        for _ in range(size):
+            cur = queue.pop(0)
+            if cur in visited:
+                continue
+            visited.add(cur)
+            if is_valid_parentheses(cur):
+                res.append(cur)
+                found = True
+            if found:
+                continue
+            for j, ch in enumerate(cur):
+                if ch not in '()':
+                    continue
+                queue.append(cur[:j] + cur[j + 1:])
     return res
-}`,
+\`\`\``,
     keyPoints: ["BFS 逐层删除", "找到即停止", "去重"],
     followUps: ["DFS 怎么解？", "如何优化？"],
     favorited: false,
@@ -4596,38 +4642,45 @@ func removeInvalidParentheses(s string) []string {
     id: "algo-37",
     nodeId: "p3-bytedance-tencent",
     question: "37. 解数独（LeetCode 37）\n解 9×9 数独，保证有唯一解。",
-    answer: `// 思路：回溯 + 约束剪枝
-// 时间 O(9^空格数)，空间 O(9²)
-// 关键：行/列/宫格三个集合去重
+    answer: `\`\`\`python
+# 思路：回溯 + 约束剪枝
+# 时间 O(9^空格数)，空间 O(9²)
+# 关键：行/列/宫格三个集合去重
 
-func solveSudoku(board [][]byte) {
-    rows, cols, boxes := [9][9]bool{}, [9][9]bool{}, [9][9]bool{}
-    for i := 0; i < 9; i++ {
-        for j := 0; j < 9; j++ {
-            if board[i][j] != '.' {
-                idx := board[i][j] - '1'
-                rows[i][idx] = true; cols[j][idx] = true; boxes[i/3*3+j/3][idx] = true
-            }
-        }
-    }
-    var backtrack func(i, j int) bool
-    backtrack = func(i, j int) bool {
-        if j == 9 { return backtrack(i+1, 0) }
-        if i == 9 { return true }
-        if board[i][j] != '.' { return backtrack(i, j+1) }
-        for n := 0; n < 9; n++ {
-            if !rows[i][n] && !cols[j][n] && !boxes[i/3*3+j/3][n] {
-                board[i][j] = byte('1' + n)
-                rows[i][n] = true; cols[j][n] = true; boxes[i/3*3+j/3][n] = true
-                if backtrack(i, j+1) { return true }
+def solve_sudoku(board: list[list[str]]) -> None:
+    rows = [[False] * 9 for _ in range(9)]
+    cols = [[False] * 9 for _ in range(9)]
+    boxes = [[False] * 9 for _ in range(9)]
+    for i in range(9):
+        for j in range(9):
+            if board[i][j] != '.':
+                idx = ord(board[i][j]) - ord('1')
+                rows[i][idx] = True
+                cols[j][idx] = True
+                boxes[i // 3 * 3 + j // 3][idx] = True
+    def backtrack(i: int, j: int) -> bool:
+        if j == 9:
+            return backtrack(i + 1, 0)
+        if i == 9:
+            return True
+        if board[i][j] != '.':
+            return backtrack(i, j + 1)
+        for n in range(9):
+            b = i // 3 * 3 + j // 3
+            if not rows[i][n] and not cols[j][n] and not boxes[b][n]:
+                board[i][j] = chr(ord('1') + n)
+                rows[i][n] = True
+                cols[j][n] = True
+                boxes[b][n] = True
+                if backtrack(i, j + 1):
+                    return True
                 board[i][j] = '.'
-                rows[i][n] = false; cols[j][n] = false; boxes[i/3*3+j/3][n] = false
-            }
-        }
-        return false
-    }
+                rows[i][n] = False
+                cols[j][n] = False
+                boxes[b][n] = False
+        return False
     backtrack(0, 0)
-}`,
+\`\`\``,
     keyPoints: ["回溯 + 剪枝", "行/列/宫格三个集合", "找到即停"],
     followUps: ["如何优化搜索顺序？", "N 皇后数独？"],
     favorited: false,
@@ -4636,28 +4689,32 @@ func solveSudoku(board [][]byte) {
     id: "algo-51",
     nodeId: "p3-bytedance-tencent",
     question: "51. N 皇后（LeetCode 51）\n在 N×N 棋盘放 N 个皇后互不攻击，返回所有解。",
-    answer: `// 思路：回溯，按行放置，列/对角线去重
-// 时间 O(N!)，空间 O(N)
-// 关键：三个集合去重——列、主对角线、副对角线
+    answer: `\`\`\`python
+# 思路：回溯，按行放置，列/对角线去重
+# 时间 O(N!)，空间 O(N)
+# 关键：三个集合去重——列、主对角线、副对角线
 
-func solveNQueens(n int) [][]string {
-    var res [][]string
-    cols, diag1, diag2 := map[int]bool{}, map[int]bool{}, map[int]bool{}
-    board := make([][]byte, n)
-    for i := range board { board[i] = bytes.Repeat([]byte{'.'}, n) }
-    var backtrack func(row int)
-    backtrack = func(row int) {
-        if row == n { tmp := make([]string, n); for i := range board { tmp[i] = string(board[i]) }; res = append(res, tmp); return }
-        for col := 0; col < n; col++ {
-            if cols[col] || diag1[row-col] || diag2[row+col] { continue }
-            board[row][col] = 'Q'; cols[col] = true; diag1[row-col] = true; diag2[row+col] = true
+def solve_n_queens(n: int) -> list[list[str]]:
+    res: list[list[str]] = []
+    cols: set[int] = set()
+    diag1: set[int] = set()
+    diag2: set[int] = set()
+    board = [['.'] * n for _ in range(n)]
+    def backtrack(row: int) -> None:
+        if row == n:
+            res.append([''.join(r) for r in board])
+            return
+        for col in range(n):
+            if col in cols or (row - col) in diag1 or (row + col) in diag2:
+                continue
+            board[row][col] = 'Q'
+            cols.add(col); diag1.add(row - col); diag2.add(row + col)
             backtrack(row + 1)
-            board[row][col] = '.'; cols[col] = false; diag1[row-col] = false; diag2[row+col] = false
-        }
-    }
+            board[row][col] = '.'
+            cols.discard(col); diag1.discard(row - col); diag2.discard(row + col)
     backtrack(0)
     return res
-}`,
+\`\`\``,
     keyPoints: ["回溯按行放", "列+主副对角线三个集合", "主对角 row-col 副对角 row+col"],
     followUps: ["N 皇后 II 只求数量怎么解？", "数独和 N 皇后的区别？"],
     favorited: false,
@@ -4666,25 +4723,26 @@ func solveNQueens(n int) [][]string {
     id: "algo-52",
     nodeId: "p3-bytedance-tencent",
     question: "52. N 皇后 II（LeetCode 52）\n返回 N 皇后的解的数量。",
-    answer: `// 思路：同 51，只计数不存解
-// 时间 O(N!)，空间 O(N)
-// 关键：位运算优化
+    answer: `\`\`\`python
+# 思路：同 51，只计数不存解
+# 时间 O(N!)，空间 O(N)
+# 关键：位运算优化
 
-func totalNQueens(n int) int {
-    count := 0
-    var solve func(row, cols, diag1, diag2 int)
-    solve = func(row, cols, diag1, diag2 int) {
-        if row == n { count++; return }
-        bits := ((1<<n)-1) & ^(cols|diag1|diag2)
-        for bits > 0 {
-            p := bits & (-bits) // 取最低位 1
-            solve(row+1, cols|p, (diag1|p)<<1, (diag2|p)>>1)
-            bits &= bits - 1 // 清除最低位 1
-        }
-    }
+def total_n_queens(n: int) -> int:
+    count = 0
+    def solve(row: int, cols: int, diag1: int, diag2: int) -> None:
+        nonlocal count
+        if row == n:
+            count += 1
+            return
+        bits = ((1 << n) - 1) & ~(cols | diag1 | diag2)
+        while bits > 0:
+            p = bits & (-bits)              # 取最低位 1
+            solve(row + 1, cols | p, (diag1 | p) << 1, (diag2 | p) >> 1)
+            bits &= bits - 1                # 清除最低位 1
     solve(0, 0, 0, 0)
     return count
-}`,
+\`\`\``,
     keyPoints: ["位运算优化", "cols|diag1|diag2 合并可用位", "取最低位 1 放皇后"],
     followUps: ["不用位运算怎么解？", "N 很大怎么办？"],
     favorited: false,
@@ -4696,18 +4754,26 @@ func totalNQueens(n int) int {
     answer: `【思路推导】
 路径可起止于任意节点，但必须是不拐弯的链。后序遍历时对每个节点维护两个值：一是经过该节点、左右各取一条最优支链的完整路径和，用它更新全局答案；二是该节点能向上提供的单侧最大贡献，即节点值加上左右支链较大者，负支链直接舍弃取零。空节点返回零，全局最优初始为负无穷以兼容全负树。时间 O(n)，空间 O(h) 为递归栈深。
 【代码实现】
-function maxPathSum(root: TreeNode | null): number {
-  let best = -Infinity;
-  const gain = (node: TreeNode | null): number => {
-    if (node === null) return 0;
-    const l = Math.max(0, gain(node.left));
-    const r = Math.max(0, gain(node.right));
-    best = Math.max(best, node.val + l + r);
-    return node.val + Math.max(l, r);
-  };
-  gain(root);
-  return best;
-}
+\`\`\`python
+class TreeNode:
+    def __init__(self, val: int = 0, left: 'TreeNode | None' = None, right: 'TreeNode | None' = None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def max_path_sum(root: 'TreeNode | None') -> int:
+    best = float('-inf')
+    def gain(node: 'TreeNode | None') -> int:
+        nonlocal best
+        if node is None:
+            return 0
+        l = max(0, gain(node.left))
+        r = max(0, gain(node.right))
+        best = max(best, node.val + l + r)
+        return node.val + max(l, r)
+    gain(root)
+    return best
+\`\`\`
 【实际应用】
 树形结构的最大收益路径：组织架构中的影响力传播链、电网树状拓扑的最大负载路径、游戏技能树最优加点路线、依赖图中的关键链挖掘。
 【踩坑与变体】
@@ -4725,21 +4791,34 @@ function maxPathSum(root: TreeNode | null): number {
     answer: `【思路推导】
 两链表归并是基本功，扩展 K 条有三路：逐条合并 O(N·K) 最差；分治两两配对层层减半 O(N·log K)；最小堆放各链表头，弹最小接结果、推进 next 入堆，同复杂度且支持流式。分治写法无需堆结构，面试优先推荐。
 【代码实现】
-function mergeKLists(lists: Array<ListNode | null>): ListNode | null {
-  const mg = (a: ListNode | null, b: ListNode | null): ListNode | null => {
-    if (!a) return b;
-    if (!b) return a;
-    if (a.val <= b.val) { a.next = mg(a.next, b); return a; }
-    b.next = mg(a, b.next); return b;
-  };
-  if (lists.length === 0) return null;
-  for (let s = 1; s < lists.length; s *= 2) {
-    for (let i = 0; i + s < lists.length; i += s * 2) {
-      lists[i] = mg(lists[i], lists[i + s]);
-    }
-  }
-  return lists[0];
-}
+\`\`\`python
+from typing import Optional
+
+class ListNode:
+    def __init__(self, val: int = 0, next: 'Optional[ListNode]' = None):
+        self.val = val
+        self.next = next
+
+def merge_k_lists(lists: list[Optional[ListNode]]) -> Optional[ListNode]:
+    def mg(a: Optional[ListNode], b: Optional[ListNode]) -> Optional[ListNode]:
+        if a is None:
+            return b
+        if b is None:
+            return a
+        if a.val <= b.val:
+            a.next = mg(a.next, b)
+            return a
+        b.next = mg(a, b.next)
+        return b
+    if not lists:
+        return None
+    s = 1
+    while s < len(lists):
+        for i in range(0, len(lists) - s, s * 2):
+            lists[i] = mg(lists[i], lists[i + s])
+        s *= 2
+    return lists[0]
+\`\`\`
 【实际应用】
 多路有序归并：数据库外排、搜索倒排流合并、多机日志时序汇聚、MapReduce shuffle。
 【踩坑与变体】
@@ -4755,18 +4834,21 @@ function mergeKLists(lists: Array<ListNode | null>): ListNode | null {
     answer: `【思路推导】
 丑数序列从 1 开始，每个后继都是某个已有丑数乘 2、3 或 5。核心洞察：新丑数按从小到大生成，因此对每个因子维护一个指针，指向还没被该因子乘过的最小丑数。每轮取 dp[p2]*2、dp[p3]*3、dp[p5]*5 三者最小值作为下一个丑数，并把产生它的指针前移。同一值可能由多个因子同时产生（如 6=2*3），所以三个 if 并列去重而非 if-else。时间 O(n)，空间 O(n)。
 【代码实现】
-function nthUglyNumber(n: number): number {
-  const dp = new Array(n).fill(1);
-  let p2 = 0, p3 = 0, p5 = 0;
-  for (let i = 1; i < n; i++) {
-    const v = Math.min(dp[p2] * 2, dp[p3] * 3, dp[p5] * 5);
-    dp[i] = v;
-    if (v === dp[p2] * 2) p2++;
-    if (v === dp[p3] * 3) p3++;
-    if (v === dp[p5] * 5) p5++;
-  }
-  return dp[n - 1];
-}
+\`\`\`python
+def nth_ugly_number(n: int) -> int:
+    dp = [1] * n
+    p2 = p3 = p5 = 0
+    for i in range(1, n):
+        v = min(dp[p2] * 2, dp[p3] * 3, dp[p5] * 5)
+        dp[i] = v
+        if v == dp[p2] * 2:
+            p2 += 1
+        if v == dp[p3] * 3:
+            p3 += 1
+        if v == dp[p5] * 5:
+            p5 += 1
+    return dp[n - 1]
+\`\`\`
 【实际应用】
 多路归一生成单调序列的思想：推荐系统多路召回按分数合并、构建系统按依赖生成任务队列、版本号与单号递增生成器、音乐播放列表多维度混合。
 【踩坑与变体】
@@ -4782,21 +4864,18 @@ function nthUglyNumber(n: number): number {
     answer: `【思路推导】
 丑数 II 的推广：因子从固定 2、3、5 变成任意质数表 primes。为每个质数维护指针 ptr[j]，指向它还没乘过的最小丑数下标。每轮先扫所有 dp[ptr[j]]*primes[j] 取最小值作 dp[i]，再扫一遍把产生该值的指针前移去重。时间 O(n·k)，k 为质数个数，空间 O(n+k)。
 【代码实现】
-function nthSuperUglyNumber(n: number, primes: number[]): number {
-  const dp = new Array(n).fill(1);
-  const ptr = new Array(primes.length).fill(0);
-  for (let i = 1; i < n; i++) {
-    let v = Infinity;
-    for (let j = 0; j < primes.length; j++) {
-      v = Math.min(v, dp[ptr[j]] * primes[j]);
-    }
-    dp[i] = v;
-    for (let j = 0; j < primes.length; j++) {
-      if (dp[ptr[j]] * primes[j] === v) ptr[j]++;
-    }
-  }
-  return dp[n - 1];
-}
+\`\`\`python
+def nth_super_ugly_number(n: int, primes: list[int]) -> int:
+    dp = [1] * n
+    ptr = [0] * len(primes)
+    for i in range(1, n):
+        v = min(dp[ptr[j]] * primes[j] for j in range(len(primes)))
+        dp[i] = v
+        for j in range(len(primes)):
+            if dp[ptr[j]] * primes[j] == v:
+                ptr[j] += 1
+    return dp[n - 1]
+\`\`\`
 【实际应用】
 多指针协同生成单调序列：多版本数据按时间戳归并、分布式日志全局序合并、电商多仓发货优先级调度。
 【踩坑与变体】
@@ -4812,16 +4891,17 @@ function nthSuperUglyNumber(n: number, primes: number[]): number {
     answer: `【思路推导】
 把 n 看作背包容量、完全平方数看作物品，就是完全背包求最少物品数：dp[i] 表示和为 i 所需的最少平方数个数，转移 dp[i] = min(dp[i-j*j]) + 1，j 枚举所有不超过根号 i 的整数。另一视角是图论：n 到 0 每步跳一个平方数，BFS 首达 0 的层数即答案。数学上拉格朗日四平方定理保证答案不超过 4，配合勒让德三平方定理可直接分类加速。DP 版时间 O(n·sqrt n)，空间 O(n)。
 【代码实现】
-function numSquares(n: number): number {
-  const dp = new Array(n + 1).fill(0);
-  for (let i = 1; i <= n; i++) {
-    dp[i] = i;
-    for (let j = 1; j * j <= i; j++) {
-      dp[i] = Math.min(dp[i], dp[i - j * j] + 1);
-    }
-  }
-  return dp[n];
-}
+\`\`\`python
+def num_squares(n: int) -> int:
+    dp = [0] * (n + 1)
+    for i in range(1, n + 1):
+        dp[i] = i
+        j = 1
+        while j * j <= i:
+            dp[i] = min(dp[i], dp[i - j * j] + 1)
+            j += 1
+    return dp[n]
+\`\`\`
 【实际应用】
 最少量组合覆盖问题：硬币找零最少张数、排版系统最少拼版次数、云资源按规格组合覆盖需求的成本优化、图像压缩中的块划分。
 【踩坑与变体】
@@ -4834,32 +4914,33 @@ function numSquares(n: number): number {
     id: "algo-127",
     nodeId: "p3-ali-meituan",
     question: "127. 单词接龙（LeetCode 127）\n从 beginWord 到 endWord 最短转换序列长度，每次改一个字母。",
-    answer: `// 思路：BFS，逐层变换
-// 时间 O(n·L²)，空间 O(n·L)
-// 关键：BFS 求最短路径
+    answer: `\`\`\`python
+# 思路：BFS，逐层变换
+# 时间 O(n·L²)，空间 O(n·L)
+# 关键：BFS 求最短路径
 
-func ladderLength(beginWord, endWord string, wordList []string) int {
-    wordSet := map[string]bool{}
-    for _, w := range wordList { wordSet[w] = true }
-    if !wordSet[endWord] { return 0 }
-    queue := []string{beginWord}
-    level := 1
-    for len(queue) > 0 {
-        size := len(queue)
-        for i := 0; i < size; i++ {
-            word := queue[0]; queue = queue[1:]
-            if word == endWord { return level }
-            for j := 0; j < len(word); j++ {
-                for c := 'a'; c <= 'z'; c++ {
-                    newWord := word[:j] + string(c) + word[j+1:]
-                    if wordSet[newWord] { delete(wordSet, newWord); queue = append(queue, newWord) }
-                }
-            }
-        }
-        level++
-    }
+def ladder_length(begin_word: str, end_word: str, word_list: list[str]) -> int:
+    word_set = set(word_list)
+    if end_word not in word_set:
+        return 0
+    queue = [begin_word]
+    level = 1
+    while queue:
+        size = len(queue)
+        for _ in range(size):
+            word = queue.pop(0)
+            if word == end_word:
+                return level
+            for j in range(len(word)):
+                for k in range(26):
+                    ch = chr(ord('a') + k)
+                    new_word = word[:j] + ch + word[j + 1:]
+                    if new_word in word_set:
+                        word_set.discard(new_word)
+                        queue.append(new_word)
+        level += 1
     return 0
-}`,
+\`\`\``,
     keyPoints: ["BFS 最短路径", "逐字符变换", "访问过即删除"],
     followUps: ["双向 BFS 怎么优化？", "单词接龙 II 返回所有路径？"],
     favorited: false,
@@ -4868,53 +4949,51 @@ func ladderLength(beginWord, endWord string, wordList []string) int {
     id: "algo-126",
     nodeId: "p3-ali-meituan",
     question: "126. 单词接龙 II（LeetCode 126）\n返回所有最短转换序列。",
-    answer: `// 思路：BFS 分层建有向图 + DFS 回溯所有最短路径
-// 时间 O(n·26·L²)，空间 O(n·L)
-// 关键：每层开始前先把本层词从 wordSet 删除，杜绝同层连边；
-//       children 只记录指向下一层的边，DFS 沿图走天然无环
+    answer: `\`\`\`python
+# 思路：BFS 分层建有向图 + DFS 回溯所有最短路径
+# 时间 O(n·26·L²)，空间 O(n·L)
+# 关键：每层开始前先把本层词从 wordSet 删除，杜绝同层连边；
+#       children 只记录指向下一层的边，DFS 沿图走天然无环
 
-func findLadders(beginWord, endWord string, wordList []string) [][]string {
-    var res [][]string
-    wordSet := map[string]bool{}
-    for _, w := range wordList { wordSet[w] = true }
-    if !wordSet[endWord] { return res }
-    // 1. BFS 建图：children[x] = x 在下一层的所有邻居
-    children := map[string][]string{}
-    queue := []string{beginWord}
-    found := false
-    for len(queue) > 0 && !found {
-        for _, w := range queue { delete(wordSet, w) } // 本层词先删
-        next := map[string]bool{}
-        for _, word := range queue {
-            for i := 0; i < len(word); i++ {
-                for c := byte('a'); c <= 'z'; c++ {
-                    if c == word[i] { continue }
-                    nb := word[:i] + string(c) + word[i+1:]
-                    if wordSet[nb] {
-                        children[word] = append(children[word], nb)
-                        next[nb] = true
-                        if nb == endWord { found = true }
-                    }
-                }
-            }
-        }
-        queue = queue[:0]
-        for w := range next { queue = append(queue, w) }
-    }
-    // 2. DFS 回溯：沿 children 从 beginWord 走到 endWord
-    path := []string{beginWord}
-    var dfs func(word string)
-    dfs = func(word string) {
-        if word == endWord { res = append(res, append([]string{}, path...)); return }
-        for _, nb := range children[word] {
-            path = append(path, nb)
+def find_ladders(begin_word: str, end_word: str, word_list: list[str]) -> list[list[str]]:
+    res: list[list[str]] = []
+    word_set = set(word_list)
+    if end_word not in word_set:
+        return res
+    # 1. BFS 建图：children[x] = x 在下一层的所有邻居
+    children: dict[str, list[str]] = {}
+    queue = [begin_word]
+    found = False
+    while queue and not found:
+        for w in queue:
+            word_set.discard(w)        # 本层词先删
+        nxt: set[str] = set()
+        for word in queue:
+            for i in range(len(word)):
+                for k in range(26):
+                    ch = chr(ord('a') + k)
+                    if ch == word[i]:
+                        continue
+                    nb = word[:i] + ch + word[i + 1:]
+                    if nb in word_set:
+                        children.setdefault(word, []).append(nb)
+                        nxt.add(nb)
+                        if nb == end_word:
+                            found = True
+        queue = list(nxt)
+    # 2. DFS 回溯：沿 children 从 beginWord 走到 endWord
+    path = [begin_word]
+    def dfs(word: str) -> None:
+        if word == end_word:
+            res.append(path[:])
+            return
+        for nb in children.get(word, []):
+            path.append(nb)
             dfs(nb)
-            path = path[:len(path)-1]
-        }
-    }
-    dfs(beginWord)
+            path.pop()
+    dfs(begin_word)
     return res
-}`,
+\`\`\``,
     keyPoints: ["BFS 建图", "DFS 回溯所有路径", "避免重复访问"],
     followUps: ["如何避免超时？", "双向 BFS 优化？"],
     favorited: false,
@@ -4923,36 +5002,35 @@ func findLadders(beginWord, endWord string, wordList []string) [][]string {
     id: "algo-773",
     nodeId: "p3-ali-meituan",
     question: "773. 滑动谜题（LeetCode 773）\n解 2×3 滑动拼图，返回最少移动步数。",
-    answer: `// 思路：BFS，状态用字符串编码
-// 时间 O(6!)，空间 O(6!)
-// 关键：BFS 求最短路径，状态编码去重
+    answer: `\`\`\`python
+# 思路：BFS，状态用字符串编码
+# 时间 O(6!)，空间 O(6!)
+# 关键：BFS 求最短路径，状态编码去重
 
-func slidingPuzzle(board [][]int) int {
-    target := "123450"
-    var sb strings.Builder
-    for i := 0; i < 2; i++ { for j := 0; j < 3; j++ { sb.WriteByte(byte('0' + board[i][j])) } }
-    start := sb.String()
-    moves := [][]int{{1,3},{0,2,4},{1,5},{0,4},{1,3,5},{2,4}}
-    queue := []string{start}
-    visited := map[string]bool{start: true}
-    step := 0
-    for len(queue) > 0 {
-        size := len(queue)
-        for i := 0; i < size; i++ {
-            cur := queue[0]; queue = queue[1:]
-            if cur == target { return step }
-            zero := strings.IndexByte(cur, '0')
-            for _, next := range moves[zero] {
-                b := []byte(cur)
-                b[zero], b[next] = b[next], b[zero]
-                s := string(b)
-                if !visited[s] { visited[s] = true; queue = append(queue, s) }
-            }
-        }
-        step++
-    }
+def sliding_puzzle(board: list[list[int]]) -> int:
+    target = '123450'
+    start = ''.join(str(board[i][j]) for i in range(2) for j in range(3))
+    moves = [[1, 3], [0, 2, 4], [1, 5], [0, 4], [1, 3, 5], [2, 4]]
+    queue = [start]
+    visited = {start}
+    step = 0
+    while queue:
+        size = len(queue)
+        for _ in range(size):
+            cur = queue.pop(0)
+            if cur == target:
+                return step
+            zero = cur.index('0')
+            for nxt in moves[zero]:
+                b = list(cur)
+                b[zero], b[nxt] = b[nxt], b[zero]
+                s = ''.join(b)
+                if s not in visited:
+                    visited.add(s)
+                    queue.append(s)
+        step += 1
     return -1
-}`,
+\`\`\``,
     keyPoints: ["BFS 最短路径", "状态编码为字符串", "预计算可移动位置"],
     followUps: ["A* 怎么优化？", "3×3 滑动谜题？"],
     favorited: false,
@@ -4961,31 +5039,58 @@ func slidingPuzzle(board [][]int) int {
     id: "algo-212",
     nodeId: "p3-ali-meituan",
     question: "212. 单词搜索 II（LeetCode 212）\n在二维字母板中找所有字典中存在的单词。",
-    answer: `// 思路：Trie + DFS 回溯
-// 时间 O(m·n·4^L)，空间 O(字典大小)
-// 关键：Trie 存字典，DFS 搜索时沿 Trie 走
-// 注意：需在 algo-208 的 Trie 节点上扩展 word string 字段，
-//       Insert 时在结尾节点记录完整单词，命中时 O(1) 取词，无需回溯拼接路径
+    answer: `\`\`\`python
+# 思路：Trie + DFS 回溯
+# 时间 O(m·n·4^L)，空间 O(字典大小)
+# 关键：Trie 存字典，DFS 搜索时沿 Trie 走
+# 注意：需在 algo-208 的 Trie 节点上扩展 word 字段，
+#       Insert 时在结尾节点记录完整单词，命中时 O(1) 取词，无需回溯拼接路径
 
-func findWords(board [][]byte, words []string) []string {
-    trie := &Trie{} // 扩展版 Trie：type Trie struct { children [26]*Trie; isEnd bool; word string }
-    for _, w := range words { trie.Insert(w) } // Insert 末尾需 node.word = w
-    m, n := len(board), len(board[0])
-    var res []string
-    var dfs func(i, j int, node *Trie)
-    dfs = func(i, j int, node *Trie) {
-        if i < 0 || i >= m || j < 0 || j >= n || board[i][j] == '#' { return }
-        idx := board[i][j] - 'a'
-        if node.children[idx] == nil { return }
-        node = node.children[idx]
-        if node.isEnd { res = append(res, node.word); node.isEnd = false } // 去重
-        tmp := board[i][j]; board[i][j] = '#'
-        dfs(i+1, j, node); dfs(i-1, j, node); dfs(i, j+1, node); dfs(i, j-1, node)
+class TrieNode:
+    def __init__(self):
+        self.children: list['TrieNode | None'] = [None] * 26
+        self.is_end = False
+        self.word = ''
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+    def insert(self, w: str) -> None:
+        node = self.root
+        for ch in w:
+            idx = ord(ch) - ord('a')
+            if node.children[idx] is None:
+                node.children[idx] = TrieNode()
+            node = node.children[idx]   # type: ignore[assignment]
+        node.is_end = True
+        node.word = w                    # 末尾需 node.word = w
+
+def find_words(board: list[list[str]], words: list[str]) -> list[str]:
+    trie = Trie()
+    for w in words:
+        trie.insert(w)
+    m, n = len(board), len(board[0])
+    res: list[str] = []
+    def dfs(i: int, j: int, node: TrieNode) -> None:
+        if i < 0 or i >= m or j < 0 or j >= n or board[i][j] == '#':
+            return
+        idx = ord(board[i][j]) - ord('a')
+        if idx < 0 or idx >= 26 or node.children[idx] is None:
+            return
+        node = node.children[idx]       # type: ignore[assignment]
+        if node.is_end:
+            res.append(node.word)
+            node.is_end = False          # 去重
+        tmp = board[i][j]
+        board[i][j] = '#'
+        dfs(i + 1, j, node); dfs(i - 1, j, node)
+        dfs(i, j + 1, node); dfs(i, j - 1, node)
         board[i][j] = tmp
-    }
-    for i := 0; i < m; i++ { for j := 0; j < n; j++ { dfs(i, j, trie) } }
+    for i in range(m):
+        for j in range(n):
+            dfs(i, j, trie.root)
     return res
-}`,
+\`\`\``,
     keyPoints: ["Trie + DFS", "沿 Trie 走避免无效搜索", "找到后标记避免重复"],
     followUps: ["不用 Trie 怎么解？", "如何优化剪枝？"],
     favorited: false,
@@ -4994,26 +5099,31 @@ func findWords(board [][]byte, words []string) []string {
     id: "algo-289",
     nodeId: "p3-ali-meituan",
     question: "289. 生命游戏（LeetCode 289）\n原地更新生命游戏下一代状态。",
-    answer: `// 思路：用二进制位记录新旧状态
-// 时间 O(m·n)，空间 O(1)
-// 关键：低位=旧状态，高位=新状态
+    answer: `\`\`\`python
+# 思路：用二进制位记录新旧状态
+# 时间 O(m·n)，空间 O(1)
+# 关键：低位=旧状态，高位=新状态
 
-func gameOfLife(board [][]int) {
-    m, n := len(board), len(board[0])
-    for i := 0; i < m; i++ {
-        for j := 0; j < n; j++ {
-            live := 0
-            for x := -1; x <= 1; x++ { for y := -1; y <= 1; y++ {
-                if x == 0 && y == 0 { continue }
-                ni, nj := i+x, j+y
-                if ni >= 0 && ni < m && nj >= 0 && nj < n && board[ni][nj]&1 == 1 { live++ }
-            }}
-            if board[i][j] == 1 && (live == 2 || live == 3) { board[i][j] |= 2 }
-            if board[i][j] == 0 && live == 3 { board[i][j] |= 2 }
-        }
-    }
-    for i := 0; i < m; i++ { for j := 0; j < n; j++ { board[i][j] >>= 1 } }
-}`,
+def game_of_life(board: list[list[int]]) -> None:
+    m, n = len(board), len(board[0])
+    for i in range(m):
+        for j in range(n):
+            live = 0
+            for x in (-1, 0, 1):
+                for y in (-1, 0, 1):
+                    if x == 0 and y == 0:
+                        continue
+                    ni, nj = i + x, j + y
+                    if 0 <= ni < m and 0 <= nj < n and board[ni][nj] & 1 == 1:
+                        live += 1
+            if board[i][j] == 1 and (live == 2 or live == 3):
+                board[i][j] |= 2
+            if board[i][j] == 0 and live == 3:
+                board[i][j] |= 2
+    for i in range(m):
+        for j in range(n):
+            board[i][j] >>= 1
+\`\`\``,
     keyPoints: ["二进制位存新旧状态", "低位旧高位新", "最后右移取新状态"],
     followUps: ["无限棋盘怎么解？", "多代更新？"],
     favorited: false,
@@ -5025,17 +5135,16 @@ func gameOfLife(board [][]int) {
     answer: `【思路推导】
 每天结束后只可能处于三种状态之一：持股 hold、当天刚卖出进入冷冻 sold、空仓且可买 rest。转移：hold 来自继续持有或从 rest 买入（sold 后隔天不可买）；sold 只能由 hold 当天卖出得到；rest 来自继续空仓或由 sold 解冻而来。三个变量滚动更新，关键是当天所有转移必须基于前一天的旧值，更新前先暂存。时间 O(n)，空间 O(1)。
 【代码实现】
-function maxProfit(prices: number[]): number {
-  let hold = -prices[0], sold = 0, rest = 0;
-  for (let i = 1; i < prices.length; i++) {
-    const ph = hold;
-    const ps = sold;
-    hold = Math.max(ph, rest - prices[i]);
-    sold = ph + prices[i];
-    rest = Math.max(rest, ps);
-  }
-  return Math.max(sold, rest);
-}
+\`\`\`python
+def max_profit(prices: list[int]) -> int:
+    hold, sold, rest = -prices[0], 0, 0
+    for i in range(1, len(prices)):
+        ph, ps = hold, sold
+        hold = max(ph, rest - prices[i])
+        sold = ph + prices[i]
+        rest = max(rest, ps)
+    return max(sold, rest)
+\`\`\`
 【实际应用】
 状态机 DP 描述受限交易：A 股 T+1 正是真实冷冻期，量化回测要照此建模；游戏技能冷却循环的输出规划；工厂设备启停有冷却的排产优化；限流器令牌恢复策略。
 【踩坑与变体】
@@ -5051,16 +5160,16 @@ function maxProfit(prices: number[]): number {
     answer: `【思路推导】
 无限次交易，唯一区别是每次卖出付手续费 fee。两个状态滚动：hold 表示当前持股的最大净收益，cash 表示当前空仓的最大净收益。每天 hold 取继续持有与用昨天 cash 买入的较大者；cash 取继续空仓与昨天 hold 卖出并扣 fee 的较大者。fee 扣在卖出侧或买入侧等价，全程只扣一次即可。时间 O(n)，空间 O(1)。
 【代码实现】
-function maxProfit(prices: number[], fee: number): number {
-  let hold = -prices[0];
-  let cash = 0;
-  for (let i = 1; i < prices.length; i++) {
-    const ph = hold;
-    hold = Math.max(ph, cash - prices[i]);
-    cash = Math.max(cash, ph + prices[i] - fee);
-  }
-  return cash;
-}
+\`\`\`python
+def max_profit(prices: list[int], fee: int) -> int:
+    hold = -prices[0]
+    cash = 0
+    for i in range(1, len(prices)):
+        ph = hold
+        hold = max(ph, cash - prices[i])
+        cash = max(cash, ph + prices[i] - fee)
+    return cash
+\`\`\`
 【实际应用】
 含交易成本的策略建模：量化回测中的佣金与印花税、跨境电商含汇损的套利计算、游戏拍卖行手续费下的倒卖收益估算、含迁移成本的云资源调度。
 【踩坑与变体】
@@ -5073,30 +5182,29 @@ function maxProfit(prices: number[], fee: number): number {
     id: "algo-310",
     nodeId: "p3-ali-meituan",
     question: "310. 最小高度树（LeetCode 310）\n找以哪些节点为根时树的高度最小。",
-    answer: `// 思路：拓扑排序，逐层剥叶子
-// 时间 O(n)，空间 O(n)
-// 关键：从叶子（度=1）开始剥，最后 1-2 个即答案
-
-func findMinHeightTrees(n int, edges [][]int) []int {
-    if n == 1 { return []int{0} }
-    graph := make([]map[int]bool, n)
-    for i := range graph { graph[i] = map[int]bool{} }
-    for _, e := range edges { graph[e[0]][e[1]] = true; graph[e[1]][e[0]] = true }
-    var leaves []int
-    for i := 0; i < n; i++ { if len(graph[i]) == 1 { leaves = append(leaves, i) } }
-    for n > 2 {
+    answer: `\`\`\`python
+# 思路：拓扑排序，逐层剥叶子
+# 时间 O(n)，空间 O(n)
+# 关键：从叶子（度=1）开始剥，最后 1-2 个即答案
+def find_min_height_trees(n: int, edges: list[list[int]]) -> list[int]:
+    if n == 1:
+        return [0]
+    graph: list[set[int]] = [set() for _ in range(n)]
+    for a, b in edges:
+        graph[a].add(b)
+        graph[b].add(a)
+    leaves = [i for i in range(n) if len(graph[i]) == 1]
+    while n > 2:
         n -= len(leaves)
-        var newLeaves []int
-        for _, leaf := range leaves {
-            for neighbor := range graph[leaf] {
-                delete(graph[neighbor], leaf)
-                if len(graph[neighbor]) == 1 { newLeaves = append(newLeaves, neighbor) }
-            }
-        }
-        leaves = newLeaves
-    }
+        new_leaves: list[int] = []
+        for leaf in leaves:
+            for neighbor in list(graph[leaf]):
+                graph[neighbor].discard(leaf)
+                if len(graph[neighbor]) == 1:
+                    new_leaves.append(neighbor)
+        leaves = new_leaves
     return leaves
-}`,
+\`\`\``,
     keyPoints: ["拓扑排序剥叶子", "最后剩 1-2 个节点", "类似 BFS 从外向内"],
     followUps: ["为什么最多 2 个？", "DFS 怎么解？"],
     favorited: false,
@@ -5109,11 +5217,13 @@ func findMinHeightTrees(n int, edges [][]int) []int {
     bigTech: true,
     answer: `【思路推导】哈希集合能 O(n) 找出单身元素，但要 O(n) 空间。O(1) 空间的关键洞察是异或（XOR）的三个性质：a^a=0（相同抵消）、a^0=a、异或满足交换律和结合律。把数组全部元素异或一遍，成对的元素两两抵消成 0，0 再与单身元素异或就是它本身。这就像「消消乐」——不关心顺序，成对即消。
 【代码实现】
-function singleNumber(nums: number[]): number {
-  let ans = 0;
-  for (const x of nums) ans ^= x; // 成对抵消，最后剩单身
-  return ans; // 时间 O(n)，空间 O(1)
-}
+\`\`\`python
+def single_number(nums: list[int]) -> int:
+    ans = 0
+    for x in nums:
+        ans ^= x  # 成对抵消，最后剩单身
+    return ans  # 时间 O(n)，空间 O(1)
+\`\`\`
 【实际应用】异或消消乐在工程里是「无状态对账」思想：RAID 磁盘阵列用异或做奇偶校验，一块盘坏了用其余盘异或恢复数据；P2P 传输用异或校验块完整性；分布式系统比较两份数据差异时用异或指纹快速定位。面试官真正想考的是你能否把「成对抵消」抽象成位运算模型。
 【踩坑与变体】① 前提是「其余恰好出现两次」，出现三次就失效（变体 LeetCode 137 要用位计数或状态机）；② 两个单身元素的变体 LeetCode 260：全体异或得到 a^b，取 lowbit 位把数组分成两组分别异或；③ 异或结果不为 0 时才能用 lowbit 分组，注意边界。`,
     keyPoints: ["a^a=0、a^0=a、交换律结合律", "全体异或成对抵消", "O(1) 空间换思维深度", "lowbit 分组解两个单身元素"],
@@ -5127,14 +5237,14 @@ function singleNumber(nums: number[]): number {
     bigTech: false,
     answer: `【思路推导】逐位检查：循环 32 次，每次 n&1 取最低位再右移，O(32)。更优雅的是 n&(n-1) 技巧——n-1 会把 n 最低位的 1 变成 0、其后的 0 全变 1，再与 n 相与恰好消掉最低位的 1。每执行一次 n &= n-1 就消掉一个 1，循环次数等于 1 的个数，最坏 O(32) 但平均远小于逐位法。
 【代码实现】
-function hammingWeight(n: number): number {
-  let count = 0;
-  while (n !== 0) {
-    n &= n - 1; // 消掉最低位的 1
-    count++;
-  }
-  return count; // 时间 O(popcount)，空间 O(1)
-}
+\`\`\`python
+def hamming_weight(n: int) -> int:
+    count = 0
+    while n != 0:
+        n &= n - 1  # 消掉最低位的 1
+        count += 1
+    return count  # 时间 O(popcount)，空间 O(1)
+\`\`\`
 【实际应用】汉明重量是信息论基础操作：布隆过滤器用它统计位数组密度评估误判率；汉明距离（两数异或后的汉明重量）用于相似图片检索 pHash、编辑距离近似；CPU 指令集 POPCNT 一条指令完成，JDK 的 Integer.bitCount 直接映射它。位图索引（Roaring Bitmap）的基数统计也依赖它。
 【踩坑与变体】① JS 的位运算把数当 32 位有符号处理，负数右移用 >>> 无符号右移；② 逐位法写成 n>>1 会在负数上死循环；③ 变体 LeetCode 338「比特位计数」用 DP：dp[i]=dp[i&(i-1)]+1，正是 n&(n-1) 思想的递推化。`,
     keyPoints: ["n&(n-1) 消掉最低位的 1", "循环次数 = 1 的个数", "JS 注意 >>> 无符号右移", "POPCNT 硬件指令"],
@@ -5148,15 +5258,16 @@ function hammingWeight(n: number): number {
     bigTech: true,
     answer: `【思路推导】暴力解连乘 n 次 O(n)，n 到 2^31 必然超时。快速幂把指数按二进制拆分：x^13 = x^(1101b) = x^8·x^4·x^1。从低位到高位扫描 n 的二进制位，底数每轮自乘（x→x²→x⁴→x⁸），遇到当前位为 1 就把当前底数乘进答案。指数每轮右移一位，循环次数是 O(logn)。负指数先取倒数再算正幂。
 【代码实现】
-function myPow(x: number, n: number): number {
-  let ans = 1, base = x, e = Math.abs(n);
-  while (e > 0) {
-    if (e & 1) ans *= base; // 当前位为 1，收下这个因子
-    base *= base; // 底数平方：x→x²→x⁴
-    e = Math.floor(e / 2); // 等价 e >>= 1（JS 位运算 32 位溢出坑，用除法稳妥）
-  }
-  return n < 0 ? 1 / ans : ans; // 时间 O(logn)，空间 O(1)
-}
+\`\`\`python
+def my_pow(x: float, n: int) -> float:
+    ans, base, e = 1, x, abs(n)
+    while e > 0:
+        if e & 1:
+            ans *= base  # 当前位为 1，收下这个因子
+        base *= base  # 底数平方：x→x²→x⁴
+        e //= 2  # 等价 e >>= 1（JS 位运算 32 位溢出坑，用除法稳妥）
+    return 1 / ans if n < 0 else ans  # 时间 O(logn)，空间 O(1)
+\`\`\`
 【实际应用】快速幂是密码学基石：RSA 加密的 c=m^e mod n 用快速幂+取模（蒙哥马利乘法优化）实现；区块链 PoW 难度计算、斐波那契数列 O(logn) 矩阵快速幂求解、组合数取模（费马小定理求逆元）都建立在它之上。
 【踩坑与变体】① JS 位运算把操作数截成 32 位，e=-2^31 取绝对值后 >> 会出错，用 Math.floor(e/2) 规避；② n=-2^31 时 Math.abs 溢出（其他语言），先转 BigInt 或用 long；③ 递归版快速幂有 O(logn) 栈深度，迭代版 O(1) 空间；④ 变体「超级次方」需逐位快速幂+取模。`,
     keyPoints: ["指数二进制拆分", "底数自乘、位为 1 才乘进答案", "O(logn) 对数复杂度", "JS 位运算 32 位截断坑"],
@@ -5170,17 +5281,20 @@ function myPow(x: number, n: number): number {
     bigTech: false,
     answer: `【思路推导】禁乘除后最直观是反复减去除数，O(商) 会超时（如 2^31/1）。倍增思想：除数不断左移翻倍（1倍、2倍、4倍…），找到「不超过被除数的最大 2^k 倍除数」，减掉它、答案加上 2^k，然后对剩余被除数重复。这本质是二进制展开的试商——商的第 k 位为 1 当且仅当剩余被除数 ≥ 除数·2^k，O(log商) 轮完成。
 【代码实现】
-function divide(dividend: number, divisor: number): number {
-  const INT_MAX = 2147483647;
-  if (dividend === -2147483648 && divisor === -1) return INT_MAX; // 唯一溢出点
-  const neg = (dividend < 0) !== (divisor < 0);
-  let a = Math.abs(dividend), b = Math.abs(divisor), ans = 0;
-  for (let k = 31; k >= 0; k--) {
-    // 防溢出用减法比较代替 b<<k：b*2^k <= a 等价于 b <= a>>k 不成立时用位长判断
-    if ((a >>> k) >= b) { ans += 2 ** k; a -= b * 2 ** k; }
-  }
-  return neg ? -ans : ans; // 时间 O(32)，空间 O(1)
-}
+\`\`\`python
+def divide(dividend: int, divisor: int) -> int:
+    INT_MAX = 2147483647
+    if dividend == -2147483648 and divisor == -1:
+        return INT_MAX  # 唯一溢出点
+    neg = (dividend < 0) != (divisor < 0)
+    a, b, ans = abs(dividend), abs(divisor), 0
+    for k in range(31, -1, -1):
+        # 防溢出用减法比较代替 b<<k：b*2^k <= a 等价于 b <= a>>k 不成立时用位长判断
+        if (a >> k) >= b:
+            ans += 2 ** k
+            a -= b * 2 ** k
+    return -ans if neg else ans  # 时间 O(32)，空间 O(1)
+\`\`\`
 【实际应用】倍增试商是计算机除法的硬件原型：CPU 除法指令就是恢复余数/不恢复余数除法，逐位试商；SRT 除法（奔腾 FDIV bug 的那个）是它的基数-4 加速版。大数运算库（如 BigInt）的除法同样是「估计商位-乘回比较-修正」的循环。
 【踩坑与变体】① 溢出只有 -2^31 / -1 一种，特判即可；② 全部转负数计算是更稳的写法（负数范围比正数大 1，|−2^31| 溢出）；③ b<<k 可能整型溢出，比较时用 (a>>k)>=b 规避；④ 变体「不用加减乘除做加法」用异或+进位左移。`,
     keyPoints: ["倍增试商 = 二进制展开商", "O(log商) 轮试商", "-2^31 边界特判", "硬件除法的软件原型"],
@@ -5194,16 +5308,18 @@ function divide(dividend: number, divisor: number): number {
     bigTech: false,
     answer: `【思路推导】试除法判每个数：O(n√n)，n=5×10^6 时超时。埃氏筛（Eratosthenes）反过来：从 2 开始，把每个质数的所有倍数标记为合数，剩下的就是质数。关键优化：标记倍数从 i² 开始（更小的倍数已被更小质数标过），且只需筛到 √n。复杂度 O(n·loglogn)，接近线性。每个合数只会被它的最小质因子标记（线性筛 Euler 则严格 O(n)，用「每个合数只被最小质因子筛一次」做到）。
 【代码实现】
-function countPrimes(n: number): number {
-  const isComp = new Uint8Array(n); // 0=质数 1=合数
-  let count = 0;
-  for (let i = 2; i < n; i++) {
-    if (isComp[i]) continue;
-    count++;
-    for (let j = i * i; j < n; j += i) isComp[j] = 1; // 从 i² 开始标
-  }
-  return count; // 时间 O(n·loglogn)，空间 O(n)
-}
+\`\`\`python
+def count_primes(n: int) -> int:
+    is_comp = bytearray(n)  # 0=质数 1=合数
+    count = 0
+    for i in range(2, n):
+        if is_comp[i]:
+            continue
+        count += 1
+        for j in range(i * i, n, i):
+            is_comp[j] = 1  # 从 i² 开始标
+    return count  # 时间 O(n·loglogn)，空间 O(n)
+\`\`\`
 【实际应用】质数筛是密码学与数论计算的入口：RSA 密钥生成需要大质数池，先做小质数预筛再用 Miller-Rabin 概率性素性测试；区块链某些 PoW（如 Primecoin）直接挖质数链；数据库分区键设计、哈希表桶长取质数减少碰撞，都依赖对素数分布的理解。
 【踩坑与变体】① j 从 i² 开始，从 2i 开始会重复标记浪费一半时间；② i*i 在大 n 时溢出（其他语言用 long）；③  Uint8Array 比 boolean[] 省 8 倍内存；④ 线性筛变种：维护 primes 数组，i 与每个质数 p 相乘标记，遇到 i%p==0 立即 break，保证最小质因子唯一标记；⑤ 区间筛 [L,R] 用 √R 内质数筛偏移量。`,
     keyPoints: ["埃氏筛从 i² 开始标记", "只需筛到 √n", "O(n·loglogn) 近线性", "线性筛每合数只标一次"],
@@ -5217,17 +5333,20 @@ function countPrimes(n: number): number {
     bigTech: true,
     answer: `【思路推导】全体异或得到 diff = a^b（a、b 是两个单身元素）。因为 a≠b，diff 必不为 0，至少有一位是 1，而该位为 1 说明 a、b 在这一位上不同。取 diff 的 lowbit（diff & -diff，即最低位的 1），按「这一位是 0 还是 1」把数组分成两组：a、b 必分属两组，而成对元素必然同组（相同元素所有位相同）。两组各自异或，分别得到 a 和 b。
 【代码实现】
-function singleNumber(nums: number[]): number[] {
-  let diff = 0;
-  for (const x of nums) diff ^= x; // diff = a ^ b
-  const lowbit = diff & -diff; // 取最低位的 1 作分组标准
-  let a = 0, b = 0;
-  for (const x of nums) {
-    if ((x & lowbit) === 0) a ^= x; // 该位为 0 的一组
-    else b ^= x; // 该位为 1 的一组
-  }
-  return [a, b]; // 时间 O(n)，空间 O(1)
-}
+\`\`\`python
+def single_number(nums: list[int]) -> list[int]:
+    diff = 0
+    for x in nums:
+        diff ^= x  # diff = a ^ b
+    lowbit = diff & -diff  # 取最低位的 1 作分组标准
+    a, b = 0, 0
+    for x in nums:
+        if (x & lowbit) == 0:
+            a ^= x  # 该位为 0 的一组
+        else:
+            b ^= x  # 该位为 1 的一组
+    return [a, b]  # 时间 O(n)，空间 O(1)
+\`\`\`
 【实际应用】「按某个可区分维度分治」是工程通用套路：数据库一致性哈希按虚拟节点分组定位漂移；MapReduce 按 key 哈希分桶后桶内聚合；A/B 实验按用户 ID 某一位分流。lowbit 本身还是树状数组（Fenwick Tree）的核心操作，区间求和与单点更新都靠它定位父节点。
 【踩坑与变体】① lowbit 用 diff & -diff，依赖补码表示（JS 位运算自动转 32 位补码，安全）；② 分组判断用 (x & lowbit)===0 而非 ===1，lowbit 是 2 的幂、相与结果要么是 0 要么是 lowbit 本身；③ 思路可推广到「k 个单身元素」——需要 k 个线性无关的区分位；④ 姊妹题 137（出现三次）不能用此法，换位计数模 3。`,
     keyPoints: ["全体异或得 a^b", "lowbit 找可区分位", "按位分组各自异或", "lowbit 是树状数组核心"],
@@ -5242,21 +5361,27 @@ function singleNumber(nums: number[]): number[] {
     bigTech: true,
     answer: `【思路推导】暴力匹配每次失配都把模式串回退到起点、主串回退到 i-j+1，最坏 O(n·m)（如 aaa...ab 配 aaab）。KMP 的核心洞察：失配时主串指针 i 绝不回退，模式串指针 j 回退到 next[j]——next[j] 表示「模式串前 j 个字符中，最长相等真前后缀的长度」。因为已匹配的 j 个字符里，后缀与前缀有 next[j] 个天然重合，这部分不用重新比。预处理 next 数组同样用「自己匹配自己」的递推，O(m)，总复杂度 O(n+m)。
 【代码实现】
-function strStr(haystack: string, needle: string): number {
-  const m = needle.length;
-  const next = new Array(m).fill(0);
-  for (let i = 1, j = 0; i < m; i++) { // 自匹配建 next
-    while (j > 0 && needle[i] !== needle[j]) j = next[j - 1];
-    if (needle[i] === needle[j]) j++;
-    next[i] = j;
-  }
-  for (let i = 0, j = 0; i < haystack.length; i++) {
-    while (j > 0 && haystack[i] !== needle[j]) j = next[j - 1];
-    if (haystack[i] === needle[j]) j++;
-    if (j === m) return i - m + 1; // 时间 O(n+m)，空间 O(m)
-  }
-  return -1;
-}
+\`\`\`python
+def str_str(haystack: str, needle: str) -> int:
+    m = len(needle)
+    nxt = [0] * m
+    j = 0
+    for i in range(1, m):  # 自匹配建 next
+        while j > 0 and needle[i] != needle[j]:
+            j = nxt[j - 1]
+        if needle[i] == needle[j]:
+            j += 1
+        nxt[i] = j
+    j = 0
+    for i in range(len(haystack)):
+        while j > 0 and haystack[i] != needle[j]:
+            j = nxt[j - 1]
+        if haystack[i] == needle[j]:
+            j += 1
+        if j == m:
+            return i - m + 1  # 时间 O(n+m)，空间 O(m)
+    return -1
+\`\`\`
 【实际应用】KMP 是文本处理基础设施：grep/编辑器的查找、网络入侵检测（Snort 规则匹配报文特征串）、DNA 序列比对（AC 自动机多模式版）都用它或其变种。next 数组的「最长相等前后缀」思想还能迁移：判断字符串周期（459 题）、构造最短回文（214 题）。
 【踩坑与变体】① next 数组有两种定义（next[j] 是长度还是下标），混用必错，本实现 next[i]=最长相等前后缀长度；② j=next[j-1] 的回退必须 while 循环不能 if；③ 变体 Rabin-Karp 用滚动哈希平均 O(n+m)，适合多模式；④ 多模式串匹配上 AC 自动机（KMP + Trie）。`,
     keyPoints: ["失配时主串指针不回退", "next[j] = 最长相等真前后缀长度", "预处理 O(m) 匹配 O(n)", "AC 自动机 = KMP + Trie"],
@@ -5270,17 +5395,20 @@ function strStr(haystack: string, needle: string): number {
     bigTech: false,
     answer: `【思路推导】暴力解枚举所有可能的子串长度 len（必须整除 n），逐段比较，O(n²)。两个优雅解法：① 字符串旋转性质——s 由子串重复构成 ⟺ s+s 去掉首尾字符后仍包含 s（破环成链思想的镜像）；② KMP next 数组——若 s 有周期，最小周期长度 = n - next[n-1]，且 n 能被它整除。因为 next[n-1] 是最长相等前后缀，前缀移过去的那段差就是最小重复单元。两种方法都是 O(n)。
 【代码实现】
-function repeatedSubstringPattern(s: string): boolean {
-  const n = s.length;
-  const next = new Array(n).fill(0);
-  for (let i = 1, j = 0; i < n; i++) {
-    while (j > 0 && s[i] !== s[j]) j = next[j - 1];
-    if (s[i] === s[j]) j++;
-    next[i] = j;
-  }
-  const period = n - next[n - 1]; // 最小周期
-  return next[n - 1] > 0 && n % period === 0; // 时间 O(n)，空间 O(n)
-}
+\`\`\`python
+def repeated_substring_pattern(s: str) -> bool:
+    n = len(s)
+    nxt = [0] * n
+    j = 0
+    for i in range(1, n):
+        while j > 0 and s[i] != s[j]:
+            j = nxt[j - 1]
+        if s[i] == s[j]:
+            j += 1
+        nxt[i] = j
+    period = n - nxt[n - 1]  # 最小周期
+    return nxt[n - 1] > 0 and n % period == 0  # 时间 O(n)，空间 O(n)
+\`\`\`
 【实际应用】周期判定在时序数据里常用：监控系统检测「日志/指标是否按固定周期抖动」（如定时任务每 5 分钟打一条重复错误）；协议分析中识别心跳包间隔；音频处理里基频检测（自相关找周期）与这是同一思想。
 【踩坑与变体】① 必须验证 n % period === 0，否则 abcab 这类「有前后缀但不整除」会误判；② next[n-1]===0 说明连相等前后缀都没有，直接 false；③ (s+s).slice(1,-1).includes(s) 一行解法面试可提但要说清原理；④ 变体「找最小重复单元」直接返回 s.slice(0, period)。`,
     keyPoints: ["最小周期 = n - next[n-1]", "必须整除才构成重复", "s+s 去首尾包含 s 的等价判定", "KMP next 的迁移应用"],
@@ -5294,24 +5422,25 @@ function repeatedSubstringPattern(s: string): boolean {
     bigTech: false,
     answer: `【思路推导】把模式串看成一个 base 进制数算哈希 H(pattern)，主串每个长度为 m 的窗口也算哈希，相等则逐字符确认（防哈希碰撞）。朴素实现每窗口 O(m) 算哈希还是 O(n·m)。滚动哈希的关键：窗口右移一格时，新哈希 = (旧哈希 - 首字符·base^(m-1))·base + 新字符，O(1) 更新。取大质数模（如 2^31-1）防溢出，于是平均 O(n+m)。最坏情况（恶意构造碰撞）退化 O(n·m)，所以叫「平均」。
 【代码实现】
-function rabinKarp(s: string, p: string): number {
-  const base = 26n, mod = (1n << 31n) - 1n, m = p.length;
-  if (s.length < m) return -1;
-  let ph = 0n, wh = 0n, high = 1n;
-  for (let i = 0; i < m; i++) {
-    ph = (ph * base + BigInt(p.charCodeAt(i))) % mod;
-    wh = (wh * base + BigInt(s.charCodeAt(i))) % mod;
-    if (i > 0) high = (high * base) % mod; // base^(m-1)
-  }
-  for (let i = 0; i + m <= s.length; i++) {
-    if (wh === ph && s.slice(i, i + m) === p) return i; // 哈希命中再确认
-    if (i + m < s.length) {
-      wh = ((wh - BigInt(s.charCodeAt(i)) * high) * base + BigInt(s.charCodeAt(i + m))) % mod;
-      if (wh < 0n) wh += mod;
-    }
-  }
-  return -1; // 平均时间 O(n+m)，空间 O(1)
-}
+\`\`\`python
+def rabin_karp(s: str, p: str) -> int:
+    base, mod, m = 26, (1 << 31) - 1, len(p)
+    if len(s) < m:
+        return -1
+    ph = wh = 0
+    high = 1
+    for i in range(m):
+        ph = (ph * base + ord(p[i])) % mod
+        wh = (wh * base + ord(s[i])) % mod
+        if i > 0:
+            high = (high * base) % mod  # base^(m-1)
+    for i in range(len(s) - m + 1):
+        if wh == ph and s[i:i + m] == p:
+            return i  # 哈希命中再确认
+        if i + m < len(s):
+            wh = ((wh - ord(s[i]) * high) * base + ord(s[i + m])) % mod
+    return -1  # 平均时间 O(n+m)，空间 O(1)
+\`\`\`
 【实际应用】滚动哈希是「内容指纹」的鼻祖技术：rsync 文件同步用它切分变长块、只传差异块；网盘秒传（文件分块哈希比对）；抄袭检测系统（论文查重）对文档算 shingle 哈希；Git 的对象模型也用内容寻址。优势场景：多模式匹配（一次滚动比对一组模式哈希）比 KMP 更省。
 【踩坑与变体】① 哈希命中必须逐字符确认，否则碰撞误判；② 取模用 2^31-1 这类梅森质数分布更均匀；③ 双哈希（两个 mod）把误判率降到可忽略；④ 变体「最长重复子串」用二分长度+滚动哈希判重，O(nlogn)。`,
     keyPoints: ["窗口哈希 O(1) 滚动更新", "哈希命中需逐字符确认", "平均 O(n+m) 最坏 O(nm)", "多模式匹配优于 KMP"],
@@ -5325,18 +5454,20 @@ function rabinKarp(s: string, p: string): number {
     bigTech: true,
     answer: `【思路推导】暴力 O(n³)：枚举所有子串再判回文。动态规划 O(n²)：dp[i][j] 表示 s[i..j] 是否回文，dp[i][j] = s[i]===s[j] && dp[i+1][j-1]，按长度递推。中心扩展更省空间：回文串必有对称中心（单字符中心对应奇数长、双字符间隙对应偶数长），共 2n-1 个中心，每个中心向两边扩展直到失配，O(n²) 时间 O(1) 空间。最优解 Manacher 利用回文对称性复用已算半径，O(n)，面试写出中心扩展即可，Manacher 能讲清思想加分。
 【代码实现】
-function longestPalindrome(s: string): string {
-  let best = "";
-  const expand = (l: number, r: number) => {
-    while (l >= 0 && r < s.length && s[l] === s[r]) { l--; r++; }
-    return s.slice(l + 1, r);
-  };
-  for (let i = 0; i < s.length; i++) {
-    const odd = expand(i, i), even = expand(i, i + 1); // 奇偶两种中心
-    for (const cand of [odd, even]) if (cand.length > best.length) best = cand;
-  }
-  return best; // 时间 O(n²)，空间 O(1)
-}
+\`\`\`python
+def longest_palindrome(s: str) -> str:
+    best = ""
+    def expand(l: int, r: int) -> str:
+        while l >= 0 and r < len(s) and s[l] == s[r]:
+            l -= 1
+            r += 1
+        return s[l + 1:r]
+    for i in range(len(s)):
+        for cand in (expand(i, i), expand(i, i + 1)):  # 奇偶两种中心
+            if len(cand) > len(best):
+                best = cand
+    return best  # 时间 O(n²)，空间 O(1)
+\`\`\`
 【实际应用】回文结构在生物信息学中是核心信号：DNA 回文序列是限制性内切酶的识别位点（基因工程 CRISPR 靶点设计）；编译器词法分析的对称结构匹配；文本编辑器「最长对称子串」高亮。中心扩展思想还用于「枚举所有回文子串」（647 题）——每扩展一步就是一个回文。
 【踩坑与变体】① 奇偶两种中心都要试，漏掉偶数中心会错过 abba 型；② expand 返回时注意边界 l+1..r-1；③ DP 版空间可压到 O(n) 但代码更绕；④ Manacher 的臂长复用：i 在已覆盖回文内时，其臂长至少为镜像点的臂长与右边界剩余距离的较小值；⑤ 变体 214「最短回文串」用 KMP 求 s 的最长回文前缀。`,
     keyPoints: ["2n-1 个对称中心", "奇偶中心分别扩展", "O(n²)/O(1) 中心扩展", "Manacher O(n) 最优"],
@@ -5350,18 +5481,21 @@ function longestPalindrome(s: string): string {
     bigTech: true,
     answer: `【思路推导】在开头补字符构成回文 ⟺ 找 s 的「最长回文前缀」，把剩下的非回文后缀反转拼到前面即可。暴力判每个前缀是否回文 O(n²)。KMP 解法堪称神来之笔：构造 t = s + "#" + reverse(s)，对 t 求 next 数组，next[t.length-1] 就是「s 的最长前缀 = reverse(s) 的最长后缀」的长度——而 reverse(s) 的后缀对应 s 的前缀反转，相等意味着这段前缀本身就是回文。于是最长回文前缀长度 L = next[last]，答案 = reverse(s.slice(L)) + s，O(n)。
 【代码实现】
-function shortestPalindrome(s: string): string {
-  const rev = [...s].reverse().join("");
-  const t = s + "#" + rev; // # 防前后缀跨越拼接缝
-  const next = new Array(t.length).fill(0);
-  for (let i = 1, j = 0; i < t.length; i++) {
-    while (j > 0 && t[i] !== t[j]) j = next[j - 1];
-    if (t[i] === t[j]) j++;
-    next[i] = j;
-  }
-  const L = next[t.length - 1]; // 最长回文前缀长度
-  return rev.slice(0, s.length - L) + s; // 时间 O(n)，空间 O(n)
-}
+\`\`\`python
+def shortest_palindrome(s: str) -> str:
+    rev = s[::-1]
+    t = s + "#" + rev  # # 防前后缀跨越拼接缝
+    nxt = [0] * len(t)
+    j = 0
+    for i in range(1, len(t)):
+        while j > 0 and t[i] != t[j]:
+            j = nxt[j - 1]
+        if t[i] == t[j]:
+            j += 1
+        nxt[i] = j
+    L = nxt[-1]  # 最长回文前缀长度
+    return rev[: len(s) - L] + s  # 时间 O(n)，空间 O(n)
+\`\`\`
 【实际应用】「拼接 + 分隔符 + KMP」是把回文问题翻译成前后缀问题的经典手法，同类手法还用于循环移位等价判定（s2 是 s1 的旋转 ⟺ s2 是 s1+s1 的子串）。分隔符思想在协议设计里对应 magic number 定界：HTTP multipart 的 boundary、Protobuf 的 varint 分隔都是防止数据跨越语义边界。
 【踩坑与变体】① 必须加分隔符 #（且不能出现在字符集里），否则 abba 型会错误跨越拼接缝得到虚高 next 值；② 只能在前添加是本题约束，任意位置添加就变成「最少插入构成回文」的区间 DP（LeetCode 1312）；③ 反转用数组展开而非 split("")，避免 UTF-16 代理对问题（emoji 场景）。`,
     keyPoints: ["补前缀 ⟺ 找最长回文前缀", "s+#+reverse(s) 求 next", "分隔符防跨缝匹配", "O(n) KMP 解法"],
@@ -5375,20 +5509,20 @@ function shortestPalindrome(s: string): string {
     bigTech: false,
     answer: `【思路推导】与最长回文子串（第 5 题）同族，但目标是计数。中心扩展法天然适配：每个中心每向外扩展成功一步，就产生一个新回文子串，直接把扩展次数累加即可，O(n²) 时间 O(1) 空间。DP 解法同样可行：dp[i][j] 表示 s[i..j] 是否回文，转移同第 5 题，统计 true 的个数，O(n²) 时间 O(n²) 空间（可压到 O(n)）。
 【代码实现】
-function countSubstrings(s: string): number {
-  let count = 0;
-  const expand = (l: number, r: number) => {
-    while (l >= 0 && r < s.length && s[l] === s[r]) {
-      count++; // 每扩展成功一步就多一个回文
-      l--; r++;
-    }
-  };
-  for (let i = 0; i < s.length; i++) {
-    expand(i, i); // 奇数中心
-    expand(i, i + 1); // 偶数中心
-  }
-  return count; // 时间 O(n²)，空间 O(1)
-}
+\`\`\`python
+def count_substrings(s: str) -> int:
+    count = 0
+    def expand(l: int, r: int) -> None:
+        nonlocal count
+        while l >= 0 and r < len(s) and s[l] == s[r]:
+            count += 1  # 每扩展成功一步就多一个回文
+            l -= 1
+            r += 1
+    for i in range(len(s)):
+        expand(i, i)  # 奇数中心
+        expand(i, i + 1)  # 偶数中心
+    return count  # 时间 O(n²)，空间 O(1)
+\`\`\`
 【实际应用】回文计数是文本对称性分析的基础：自然语言处理中统计回文结构做文体指纹（识别特定作者的修辞习惯）；基因序列分析中回文密度异常区段往往对应功能域；压缩算法评估字符串自相似度时的参考指标。
 【踩坑与变体】① 题目规定「位置不同即算不同」，aa 算 3 个（两个 a 加一个 aa），别去重；② 单个字符恒为回文，中心扩展的第一次成功就计入了；③ 变体「不同的回文子序列」（LeetCode 730）难得多，需要按首尾字符分类的区间 DP+去重，是 Hard；④ Manacher 求出所有臂长后，Σ⌈arm/2⌉ 也是答案，O(n)。`,
     keyPoints: ["中心扩展次数 = 回文数", "位置不同算不同不去重", "O(n²) 时间 O(1) 空间", "Manacher 臂长求和 O(n)"],
@@ -5403,17 +5537,22 @@ function countSubstrings(s: string): number {
     bigTech: true,
     answer: `【思路推导】暴力每窗口扫 k 个元素，O(n·k)。关键洞察：窗口右移时，新进来的元素 x 会让队列里所有比它小的元素「永久失去成为最大值的可能」——它们既比 x 旧（更早出窗）又比 x 小，永无出头之日。于是维护一个下标单调递减的双端队列：队首始终是当前窗口最大值；入队前从队尾弹掉所有 ≤ x 的元素；队首下标滑出窗口时从队首弹出。每个元素最多入队出队各一次，均摊 O(n)。
 【代码实现】
-function maxSlidingWindow(nums: number[], k: number): number[] {
-  const dq: number[] = []; // 存下标，值单调递减
-  const ans: number[] = [];
-  for (let i = 0; i < nums.length; i++) {
-    while (dq.length && nums[dq[dq.length - 1]] <= nums[i]) dq.pop(); // 队尾让位
-    dq.push(i);
-    if (dq[0] <= i - k) dq.shift(); // 队首出窗
-    if (i >= k - 1) ans.push(nums[dq[0]]); // 时间 O(n)，空间 O(k)
-  }
-  return ans;
-}
+\`\`\`python
+from collections import deque
+
+def max_sliding_window(nums: list[int], k: int) -> list[int]:
+    dq: deque[int] = deque()  # 存下标，值单调递减
+    ans: list[int] = []
+    for i in range(len(nums)):
+        while dq and nums[dq[-1]] <= nums[i]:
+            dq.pop()  # 队尾让位
+        dq.append(i)
+        if dq[0] <= i - k:
+            dq.popleft()  # 队首出窗
+        if i >= k - 1:
+            ans.append(nums[dq[0]])  # 时间 O(n)，空间 O(k)
+    return ans
+\`\`\`
 【实际应用】单调队列是流式极值计算的标准件：实时监控大盘的「最近 5 分钟峰值」滚动统计；股票行情软件的滑动窗口最高/最低价；音视频码率自适应（ABR）算法用滑动窗口估计带宽极值；ROS 机器人滑动窗口激光雷达避障。
 【踩坑与变体】① 队列存下标而非值，否则无法判断队首是否出窗；② 弹出条件是 ≤（等于也弹），保留等值会让队首过期后拿不到正确最大值；③ JS 的 shift() 是 O(k)，严格场景用环形数组实现真 O(1)；④ 变体 1438 用两个单调队列（一增一减）维护窗口极差；⑤ 优先级队列（大顶堆）也能解但 O(nlogk)，且懒删除要哈希表配合。`,
     keyPoints: ["双端队列值单调递减", "队首即窗口最大值", "每元素均摊 O(1)", "存下标判断是否出窗"],
@@ -5427,18 +5566,20 @@ function maxSlidingWindow(nums: number[], k: number): number[] {
     bigTech: false,
     answer: `【思路推导】「下一个更大元素」族问题的通法是单调栈：从右往左扫，栈里保留「右侧可能比当前元素大的候选」，栈顶到栈底单调递减；遇到当前元素 x，弹掉所有 ≤ x 的（它们被 x 挡住，对左边元素无用），栈顶就是 x 的下一个更大元素，然后 x 入栈。循环数组的处理是经典「倍增展开」：把数组逻辑上复制一遍（下标取模 i % n），扫 2n 次，让每个元素都能看到「绕到开头」的右侧。
 【代码实现】
-function nextGreaterElements(nums: number[]): number[] {
-  const n = nums.length;
-  const ans = new Array(n).fill(-1);
-  const stack: number[] = []; // 存下标，值单调递减
-  for (let i = 2 * n - 1; i >= 0; i--) {
-    const x = nums[i % n];
-    while (stack.length && nums[stack[stack.length - 1]] <= x) stack.pop();
-    if (i < n) ans[i] = stack.length ? nums[stack[stack.length - 1]] : -1;
-    stack.push(i % n); // 时间 O(n)，空间 O(n)
-  }
-  return ans;
-}
+\`\`\`python
+def next_greater_elements(nums: list[int]) -> list[int]:
+    n = len(nums)
+    ans = [-1] * n
+    stack: list[int] = []  # 存下标，值单调递减
+    for i in range(2 * n - 1, -1, -1):
+        x = nums[i % n]
+        while stack and nums[stack[-1]] <= x:
+            stack.pop()
+        if i < n:
+            ans[i] = nums[stack[-1]] if stack else -1
+        stack.append(i % n)  # 时间 O(n)，空间 O(n)
+    return ans
+\`\`\`
 【实际应用】环形结构在系统设计中很常见：环形缓冲区（Ring Buffer）的生产者-消费者模型、时间轮（Timing Wheel）定时器、一致性哈希环上找下一个节点——都是「倍增/取模展开成线性」的思维。单调栈本身则是编译器括号匹配、直方图 UI 组件计算的底层。
 【踩坑与变体】① 循环扫 2n 但只在 i<n 时写答案，否则重复覆盖；② 栈里元素可能因取模重复入栈，但因为值单调性维护，逻辑仍正确；③ 非循环版（496/739 题）只需扫一遍 n；④ 变体「下一个更大元素 III」（找数字重排的下一个排列）是 next-permutation 问题，用「找右起第一个升序对+交换+反转后缀」三步。`,
     keyPoints: ["单调栈从右往左扫", "环形数组倍增展开 i%n", "栈顶即下一个更大元素", "≤ 弹栈保持严格递减"],
@@ -5452,19 +5593,18 @@ function nextGreaterElements(nums: number[]): number[] {
     bigTech: true,
     answer: `【思路推导】暴力对每天向右扫描，O(n²)。单调栈视角：从左往右扫，栈里存「还没等到更高温度的日子下标」，栈对应温度单调递减；当前温度 T[i] 高于栈顶日子 T[top] 时，那个日子的答案就是 i-top（它等到了），弹出并继续比较新栈顶。每个下标最多入栈出栈一次，O(n)。这与「下一个更大元素」互为镜像：一个从左往右记录等待者，一个从右往左记录候选者，选哪个方向取决于「谁等谁」。
 【代码实现】
-function dailyTemperatures(temperatures: number[]): number[] {
-  const n = temperatures.length;
-  const ans = new Array(n).fill(0);
-  const stack: number[] = []; // 等待者下标，温度单调递减
-  for (let i = 0; i < n; i++) {
-    while (stack.length && temperatures[stack[stack.length - 1]] < temperatures[i]) {
-      const top = stack.pop()!;
-      ans[top] = i - top; // 等到更高温的天数
-    }
-    stack.push(i); // 时间 O(n)，空间 O(n)
-  }
-  return ans;
-}
+\`\`\`python
+def daily_temperatures(temperatures: list[int]) -> list[int]:
+    n = len(temperatures)
+    ans = [0] * n
+    stack: list[int] = []  # 等待者下标，温度单调递减
+    for i in range(n):
+        while stack and temperatures[stack[-1]] < temperatures[i]:
+            top = stack.pop()
+            ans[top] = i - top  # 等到更高温的天数
+        stack.append(i)  # 时间 O(n)，空间 O(n)
+    return ans
+\`\`\`
 【实际应用】「等待者队列 + 触发结算」是事件驱动系统的通用模式：股票限价单撮合（价格触及即成交，订单簿就是多档单调队列）；告警系统「连续 N 次超阈值才触发」的窗口判定；游戏匹配系统按等待时长动态放宽段位差。
 【踩坑与变体】① 弹出条件 < 而非 ≤，等温不算「更高」；② ans 默认 0 覆盖「之后没有更高温」的尾巴；③ 同族题 496「下一个更大元素 I」带 nums1/nums2 映射，先对 nums2 建单调栈答案表再查表；④ 84 题「柱状图最大矩形」是单调栈的巅峰应用：每根柱子向左右找第一个更矮的位置确定宽度。`,
     keyPoints: ["栈存等待者下标", "遇高温结算等待时长", "每下标均摊 O(1)", "与下一个更大元素互为镜像"],
@@ -5478,16 +5618,20 @@ function dailyTemperatures(temperatures: number[]): number[] {
     bigTech: true,
     answer: `【思路推导】位置 i 的积水量 = min（左侧最高， 右侧最高） - height[i]（不够 0 则为 0），这是所有解法的出发点。三种实现：① 暴力：每个位置向左右各扫一遍找最高，O(n²)；② 前缀/后缀最大值数组预处理，O(n) 时间 O(n) 空间；③ 双指针 O(1) 空间：左右指针向中间收，哪边的当前最大值低就结算哪边——因为低的那边的积水量已被「它自己的最大值」决定，与另一边更高的柱子无关（木桶短板效应）。单调栈也行：维护递减栈，遇到更高的柱子说明形成凹槽，弹出结算凹槽面积。
 【代码实现】
-function trap(height: number[]): number {
-  let l = 0, r = height.length - 1, lMax = 0, rMax = 0, water = 0;
-  while (l < r) {
-    lMax = Math.max(lMax, height[l]);
-    rMax = Math.max(rMax, height[r]);
-    if (lMax < rMax) water += lMax - height[l++]; // 短板侧可结算
-    else water += rMax - height[r--]; // 时间 O(n)，空间 O(1)
-  }
-  return water;
-}
+\`\`\`python
+def trap(height: list[int]) -> int:
+    l, r, l_max, r_max, water = 0, len(height) - 1, 0, 0, 0
+    while l < r:
+        l_max = max(l_max, height[l])
+        r_max = max(r_max, height[r])
+        if l_max < r_max:
+            water += l_max - height[l]
+            l += 1  # 短板侧可结算
+        else:
+            water += r_max - height[r]
+            r -= 1  # 时间 O(n)，空间 O(1)
+    return water
+\`\`\`
 【实际应用】「短板决定容量」是系统容量规划的通用模型：服务链路的吞吐由最慢节点决定（水桶效应）；CDN 边缘节点的回源带宽按峰值短板预留；双指针压缩空间的思想还用于容器盛水（11 题）、雨季后洪水位模拟等。
 【踩坑与变体】① 双指针结算的是「当前指针位置」不是最大值位置，water += lMax - height[l] 别写反；② 两端是边界不可能积水，l/r 初始即可跳过 0 高度；③ 2D 版「接雨水 II」（407 题）要用最小堆从边界向中心 BFS；④ 单调栈版按层横向结算，理解凹槽「底-左墙-右墙」三元组。`,
     keyPoints: ["积水量 = min(左右最高) - 当前高度", "双指针短板侧先结算", "O(1) 空间最优", "2D 版用最小堆 BFS"],
@@ -5501,20 +5645,19 @@ function trap(height: number[]): number {
     bigTech: true,
     answer: `【思路推导】最大矩形必以某根柱子的高度为高、向两侧延伸到「第一根更矮的柱子」为宽。暴力对每根柱子向左右扫，O(n²)。单调栈把「向左/右第一个更矮位置」的查询降到均摊 O(1)：维护高度单调递增的栈，当前柱子 h[i] 低于栈顶时，栈顶柱子的高度已无法继续扩展（右边界就是 i），弹出结算：高=弹出的高度，宽=i-新栈顶-1。末尾加一根高度 0 的哨兵强制清空栈。每根柱子进出栈各一次，O(n)。
 【代码实现】
-function largestRectangleArea(heights: number[]): number {
-  const stack: number[] = []; // 递增栈，存下标
-  let best = 0;
-  const hs = [...heights, 0]; // 哨兵清栈
-  for (let i = 0; i < hs.length; i++) {
-    while (stack.length && hs[stack[stack.length - 1]] > hs[i]) {
-      const h = hs[stack.pop()!];
-      const w = stack.length ? i - stack[stack.length - 1] - 1 : i;
-      best = Math.max(best, h * w);
-    }
-    stack.push(i); // 时间 O(n)，空间 O(n)
-  }
-  return best;
-}
+\`\`\`python
+def largest_rectangle_area(heights: list[int]) -> int:
+    stack: list[int] = []  # 递增栈，存下标
+    best = 0
+    hs = heights + [0]  # 哨兵清栈
+    for i in range(len(hs)):
+        while stack and hs[stack[-1]] > hs[i]:
+            h = hs[stack.pop()]
+            w = i - stack[-1] - 1 if stack else i
+            best = max(best, h * w)
+        stack.append(i)  # 时间 O(n)，空间 O(n)
+    return best
+\`\`\`
 【实际应用】「以某元素为瓶颈向两侧扩展」的模型很常见：UI 排版引擎计算最大可用留白矩形；直方图均衡化的面积统计；最大全 1 矩形（85 题）把每行当柱状图逐行套用本题，是二维矩阵问题的标准降维套路；数据库列式存储的游程编码（RLE）压缩率估算。
 【踩坑与变体】① 宽度公式是 i - 新栈顶 - 1（弹出后新栈顶是左边界外第一根更矮的）；② 栈空时宽度为 i（从 0 到 i-1 全高于弹出柱）；③ 哨兵 0 必须有，否则递增序列的柱子永远不会被结算；④ 85 题逐行降维时高度数组要累加（遇到 1 则 +1，遇 0 清零）。`,
     keyPoints: ["每根柱子的矩形宽 = 左右第一根更矮柱间距", "单调递增栈遇低结算", "末尾哨兵强制清栈", "85 题逐行降维复用"],
@@ -5528,22 +5671,30 @@ function largestRectangleArea(heights: number[]): number {
     bigTech: false,
     answer: `【思路推导】滑动窗口 + 双单调队列。窗口 [left, right] 内维护两个双端队列：maxQ 值单调递减（队首窗口最大值）、minQ 值单调递增（队首最小值）；右指针每纳入一个元素就更新两队列，然后检查 maxQ 队首 - minQ 队首 > limit 时收缩左指针（把 left 位置元素从两队列中剔除），直到合法。此时窗口 [left, right] 是以 right 结尾的最长合法窗口，全程 O(n)。这题是滑动窗口最大值（239）与不定长滑窗的复合。
 【代码实现】
-function longestSubarray(nums: number[], limit: number): number {
-  const maxQ: number[] = [], minQ: number[] = []; // 存下标
-  let left = 0, best = 0;
-  for (let right = 0; right < nums.length; right++) {
-    while (maxQ.length && nums[maxQ[maxQ.length - 1]] <= nums[right]) maxQ.pop();
-    while (minQ.length && nums[minQ[minQ.length - 1]] >= nums[right]) minQ.pop();
-    maxQ.push(right); minQ.push(right);
-    while (nums[maxQ[0]] - nums[minQ[0]] > limit) { // 收缩到合法
-      left++;
-      if (maxQ[0] < left) maxQ.shift();
-      if (minQ[0] < left) minQ.shift();
-    }
-    best = Math.max(best, right - left + 1); // 时间 O(n)，空间 O(n)
-  }
-  return best;
-}
+\`\`\`python
+from collections import deque
+
+def longest_subarray(nums: list[int], limit: int) -> int:
+    max_q: deque[int] = deque()
+    min_q: deque[int] = deque()  # 存下标
+    left = 0
+    best = 0
+    for right in range(len(nums)):
+        while max_q and nums[max_q[-1]] <= nums[right]:
+            max_q.pop()
+        while min_q and nums[min_q[-1]] >= nums[right]:
+            min_q.pop()
+        max_q.append(right)
+        min_q.append(right)
+        while nums[max_q[0]] - nums[min_q[0]] > limit:  # 收缩到合法
+            left += 1
+            if max_q[0] < left:
+                max_q.popleft()
+            if min_q[0] < left:
+                min_q.popleft()
+        best = max(best, right - left + 1)  # 时间 O(n)，空间 O(n)
+    return best
+\`\`\`
 【实际应用】「窗口内多约束联合维护」是流式风控的典型形态：实时交易监控「最近 1 小时内最高-最低价差超过阈值即熔断」；物联网传感器数据质量窗口（剔除抖动超差的时段）；在线算法竞赛判题系统的运行时间稳定性检测。
 【踩坑与变体】① 收缩 left 后要同时清理两个队列的过期队首；② 队列存下标才能与 left 比较判断是否过期；③ 平衡二叉搜索树（TreeMap/ multiset）替代方案 O(nlogn)，C++ 可直接用 multiset 但更慢；④ 变体「最长连续递增子数组」简单得多，一次遍历即可，注意与本题的「极差约束」区分。`,
     keyPoints: ["双单调队列维护窗口最值", "极差超限即收缩左指针", "存下标判过期", "O(n) 均摊"],
@@ -5558,17 +5709,20 @@ function longestSubarray(nums: number[], limit: number): number {
     bigTech: true,
     answer: `【思路推导】直接求最小 K 没有公式，但「速度 K → 所需总工时」是单调不减的：K 越大耗时越少。单调性一出现，二分答案就成立：在 [1, max(piles)] 上二分 K，check(K) = 每堆按 ⌈pile/K⌉ 小时累加是否 ≤ H。答案是「满足 check 的最小 K」，用左边界二分模板。总工时计算时注意向上取整 (pile + K - 1) / K。
 【代码实现】
-function minEatingSpeed(piles: number[], h: number): number {
-  let lo = 1, hi = Math.max(...piles);
-  while (lo < hi) { // 找最小可行 K：左边界二分
-    const mid = (lo + hi) >> 1;
-    let hours = 0;
-    for (const p of piles) hours += Math.ceil(p / mid);
-    if (hours <= h) hi = mid; // 可行，尝试更小
-    else lo = mid + 1;
-  }
-  return lo; // 时间 O(n·log(max))，空间 O(1)
-}
+\`\`\`python
+import math
+
+def min_eating_speed(piles: list[int], h: int) -> int:
+    lo, hi = 1, max(piles)
+    while lo < hi:  # 找最小可行 K：左边界二分
+        mid = (lo + hi) >> 1
+        hours = sum(math.ceil(p / mid) for p in piles)
+        if hours <= h:
+            hi = mid  # 可行，尝试更小
+        else:
+            lo = mid + 1
+    return lo  # 时间 O(n·log(max))，空间 O(1)
+\`\`\`
 【实际应用】「最小化成本满足时限」是容量规划的日常：CDN 带宽买多大才能扛住晚会峰值（二分带宽，check 是模拟压测）；线程池开多大能在 SLA 内跑完批任务；限流器阈值定多少既防雪崩又不误伤正常流量。面试识别信号：「最小化最大值 / 最大化最小值 / 求满足条件的最小参数」。
 【踩坑与变体】① hi 初始取 max(piles) 而非 piles 总和（一堆一小时最多吃一堆的量）；② 小时累加可能溢出 32 位（其他语言用 long，或累加超 h 即提前 break）；③ 左边界二分用 lo<hi + hi=mid，右边界用 lo<=hi 或 mid 上取整，两套模板别混；④ 同族题：1011 运货、410 分割数组、1482 花束，全是「check 单调 + 二分」。`,
     keyPoints: ["答案单调性 ⟺ 可二分", "check(K)=总工时≤H", "左边界二分模板", "识别信号：最小化最大值"],
@@ -5582,20 +5736,23 @@ function minEatingSpeed(piles: number[], h: number): number {
     bigTech: true,
     answer: `【思路推导】运载能力 C 与所需天数单调相关：C 越大天数越少。二分 C，下界是 max(weights)（最重的包裹也得装下），上界是 sum(weights)（一天全装走）。check(C) 用贪心：按顺序装，装不下就换船（天数+1），贪心的正确性在于「顺序固定时装到最满换船」不会比任何方案用更多天——反证：若贪心用了 d 天，任何方案第 i 艘船装的包裹集合都不会比贪心多，归纳可得天数不更少。
 【代码实现】
-function shipWithinDays(weights: number[], days: number): number {
-  let lo = Math.max(...weights), hi = weights.reduce((a, b) => a + b, 0);
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    let need = 1, cur = 0;
-    for (const w of weights) {
-      if (cur + w > mid) { need++; cur = 0; } // 换船
-      cur += w;
-    }
-    if (need <= days) hi = mid;
-    else lo = mid + 1; // 时间 O(n·log(sum))，空间 O(1)
-  }
-  return lo;
-}
+\`\`\`python
+def ship_within_days(weights: list[int], days: int) -> int:
+    lo, hi = max(weights), sum(weights)
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        need, cur = 1, 0
+        for w in weights:
+            if cur + w > mid:
+                need += 1
+                cur = 0  # 换船
+            cur += w
+        if need <= days:
+            hi = mid
+        else:
+            lo = mid + 1  # 时间 O(n·log(sum))，空间 O(1)
+    return lo
+\`\`\`
 【实际应用】这就是物流系统的真实缩影：集装箱配载（顺序约束对应「先到先装」的传送带规则）；消息队列分区数规划（C 类比单分区吞吐，D 类比消费延迟 SLA）；CDN 回源并发度规划。二分答案的本质是把「最优化问题」转化为「可行性判定问题」，后者往往有简单贪心。
 【踩坑与变体】① lo 必须从 max(weights) 开始，从 1 开始会算出装不下重包裹的假解；② 换船逻辑是先判断再装，cur+w>mid 才换；③ 天数从 1 起算（第一艘船）；④ 410 题「分割数组的最大值」是同构换皮：把数组分成 m 段使最大段和最小，check 同样是贪心切分计数；⑤ 若允许调整包裹顺序，问题变成装箱问题（NP-hard），二分不再适用。`,
     keyPoints: ["C 与天数单调负相关", "贪心装满即最优（顺序固定）", "下界 max 上界 sum", "与 410 分割数组同构"],
@@ -5609,20 +5766,23 @@ function shipWithinDays(weights: number[], days: number): number {
     bigTech: true,
     answer: `【思路推导】这是二分答案的招牌题。「最大段和 ≤ X 时能否分成 ≤ m 段」关于 X 单调：X 越大越容易满足。于是二分 X ∈ [max(nums), sum(nums)]，check(X) 贪心切分：累加当前段，超过 X 就切一刀段数+1，最后段数 ≤ m 则 X 可行。注意是「≤ m」而非「= m」——段数少了可以把某段再拆开（和只会更小），所以段数 ≤ m 等价于可行。DP 解法 O(n²·m)（dp[i][j]=前 i 个分 j 段的最小最大段和）在面试中作为对照提及即可。
 【代码实现】
-function splitArray(nums: number[], m: number): number {
-  let lo = Math.max(...nums), hi = nums.reduce((a, b) => a + b, 0);
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    let parts = 1, cur = 0;
-    for (const x of nums) {
-      if (cur + x > mid) { parts++; cur = 0; }
-      cur += x;
-    }
-    if (parts <= m) hi = mid;
-    else lo = mid + 1; // 时间 O(n·log(sum))，空间 O(1)
-  }
-  return lo;
-}
+\`\`\`python
+def split_array(nums: list[int], m: int) -> int:
+    lo, hi = max(nums), sum(nums)
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        parts, cur = 1, 0
+        for x in nums:
+            if cur + x > mid:
+                parts += 1
+                cur = 0
+            cur += x
+        if parts <= m:
+            hi = mid
+        else:
+            lo = mid + 1  # 时间 O(n·log(sum))，空间 O(1)
+    return lo
+\`\`\`
 【实际应用】负载均衡的数学原型：把任务列表切给 m 台机器使最忙的机器最闲（makespan 最小化）；视频转码任务分片；大文件分块上传的块大小规划。工业界这类「连续分配 + 最小化最大负载」还出现在印刷排版（行宽最小化最大行高）和内存分配器设计里。
 【踩坑与变体】① check 里段数是 ≤ m 不是 == m，想通「可再拆」这一点是关键；② 负数元素会破坏单调性（本题约束非负），含负数时贪心失效；③ DP 版是「 painter partition」经典，空间可滚动压缩；④ 变体「最小化去 K 个元素后的最大值」等，识别信号一致：答案对约束单调。`,
     keyPoints: ["最小化最大值 ⟹ 二分答案", "check=贪心切段数≤m", "段数少可再拆等价可行", "DP 对照 O(n²m)"],
@@ -5636,15 +5796,17 @@ function splitArray(nums: number[], m: number): number {
     bigTech: false,
     answer: `【思路推导】旋转数组的最小值是「两段有序的分界点」，也是唯一满足「比前一个元素小」的位置。二分的关键是选对标：拿 mid 与 right 比较——若 nums[mid] > nums[right]，说明 mid 在左段（大数段），最小值必在 mid 右侧，lo=mid+1；否则 mid 在右段（含最小值的有序段）或就是最小值，hi=mid（不丢候选）。与 right 比而非与 left 比的原因：与 left 比无法区分「mid 在左段」与「数组根本没旋转」两种情况。
 【代码实现】
-function findMin(nums: number[]): number {
-  let lo = 0, hi = nums.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (nums[mid] > nums[hi]) lo = mid + 1; // 最小值在右半
-    else hi = mid; // mid 可能就是最小值
-  }
-  return nums[lo]; // 时间 O(logn)，空间 O(1)
-}
+\`\`\`python
+def find_min(nums: list[int]) -> int:
+    lo, hi = 0, len(nums) - 1
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        if nums[mid] > nums[hi]:
+            lo = mid + 1  # 最小值在右半
+        else:
+            hi = mid  # mid 可能就是最小值
+    return nums[lo]  # 时间 O(logn)，空间 O(1)
+\`\`\`
 【实际应用】「循环移位序列找分界」在系统领域对应：环形日志文件定位最旧记录；时间轮定时器的当前槽位校正；分布式版本向量中找分叉点。变形的 33 题「旋转数组搜索 target」是先找分界再在对应段二分，或一次二分每步判断哪半有序。
 【踩坑与变体】① hi=mid 不能写成 hi=mid-1，否则丢掉「mid 即最小值」的候选；② 循环不变式：最小值始终在 [lo,hi] 内；③ 含重复元素的 154 题遇到 nums[mid]===nums[hi] 只能 hi-- 线性收缩，最坏 O(n)；④ 33 题搜索 target 时先判断 [lo,mid] 是否有序，再决定 target 落在哪半。`,
     keyPoints: ["最小值=两段分界点", "与 right 比较定向", "hi=mid 保候选", "重复元素退化 O(n)"],
@@ -5658,24 +5820,27 @@ function findMin(nums: number[]): number {
     bigTech: false,
     answer: `【思路推导】堆解法：最小堆放 k 个候选（初始第一列，每次弹出并推入同行下一个），弹 k 次得答案，O(k·logn)。更妙的是值域二分：矩阵值域 [matrix[0][0], matrix[n-1][n-1]]，对任意 mid 能 O(n) 数出「≤ mid 的元素个数」——从左下角出发，当前值 ≤ mid 则整列向上都 ≤ mid（计数 += i+1，右移），否则上移。count ≤ mid 关于 mid 单调，二分找「count ≥ k 的最小 mid」，它必等于第 k 小元素本身（因为 count 只在矩阵元素值处跳变）。O(n·log(max-min))。
 【代码实现】
-function kthSmallest(matrix: number[][], k: number): number {
-  const n = matrix.length;
-  let lo = matrix[0][0], hi = matrix[n - 1][n - 1];
-  const countLE = (mid: number) => {
-    let cnt = 0, i = n - 1, j = 0;
-    while (i >= 0 && j < n) {
-      if (matrix[i][j] <= mid) { cnt += i + 1; j++; } // 整列计入
-      else i--;
-    }
-    return cnt;
-  };
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (countLE(mid) >= k) hi = mid;
-    else lo = mid + 1;
-  }
-  return lo; // 时间 O(n·log值域)，空间 O(1)
-}
+\`\`\`python
+def kth_smallest(matrix: list[list[int]], k: int) -> int:
+    n = len(matrix)
+    lo, hi = matrix[0][0], matrix[n - 1][n - 1]
+    def count_le(mid: int) -> int:
+        cnt, i, j = 0, n - 1, 0
+        while i >= 0 and j < n:
+            if matrix[i][j] <= mid:
+                cnt += i + 1
+                j += 1  # 整列计入
+            else:
+                i -= 1
+        return cnt
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        if count_le(mid) >= k:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo  # 时间 O(n·log值域)，空间 O(1)
+\`\`\`
 【实际应用】「在排序空间上二分计数」是分位数计算的范式：OLAP 引擎（ClickHouse/Doris）求 P99 延迟的近似分位数；时序数据库在有序分段上二分定位时间窗；倒排索引的 docID 归并查找。
 【踩坑与变体】① 从左下角（或右上角）出发才能每步唯一定向，从左上出发两个方向都 ≤/≥ 无法抉择；② 二分出的是「值」不是「位置」，最终 lo 必为矩阵中存在的值；③ 堆解法 k 很小时更优，值域二分在值域小或 k 接近 n² 时更优；④ 变体「第 K 小的距离对」「第 K 小的分数对」同用值域二分+双指针计数。`,
     keyPoints: ["值域二分 + 计数判定", "左下角出发 O(n) 计数", "count 在元素值处跳变", "堆解法 O(klogn) 对照"],
@@ -5689,22 +5854,26 @@ function kthSmallest(matrix: number[][], k: number): number {
     bigTech: false,
     answer: `【思路推导】天数 d 与「能做出的花束数」单调：等得越久开的花越多。二分 d ∈ [min(bloomDay), max(bloomDay)]，check(d) 一趟扫描：维护连续已开放计数，满 k 朵即成一束、计数清零（贪心从左到右成束不会错过任何可行解——相邻约束下从左贪心与最优解束数相同，交换论证可证）。总束数 ≥ m 则 d 可行。无解判定：m*k > n 直接 -1。
 【代码实现】
-function minDays(bloomDay: number[], m: number, k: number): number {
-  const n = bloomDay.length;
-  if (m * k > n) return -1;
-  let lo = Math.min(...bloomDay), hi = Math.max(...bloomDay);
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    let bouquets = 0, run = 0;
-    for (const d of bloomDay) {
-      run = d <= mid ? run + 1 : 0; // 连续开放段
-      if (run === k) { bouquets++; run = 0; }
-    }
-    if (bouquets >= m) hi = mid;
-    else lo = mid + 1; // 时间 O(n·log(max))，空间 O(1)
-  }
-  return lo;
-}
+\`\`\`python
+def min_days(bloom_day: list[int], m: int, k: int) -> int:
+    n = len(bloom_day)
+    if m * k > n:
+        return -1
+    lo, hi = min(bloom_day), max(bloom_day)
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        bouquets, run = 0, 0
+        for d in bloom_day:
+            run = run + 1 if d <= mid else 0  # 连续开放段
+            if run == k:
+                bouquets += 1
+                run = 0
+        if bouquets >= m:
+            hi = mid
+        else:
+            lo = mid + 1  # 时间 O(n·log(max))，空间 O(1)
+    return lo
+\`\`\`
 【实际应用】「资源就绪时间 + 批量约束」模型：制造业排产（零件到齐才能组装，求最早交付日）；分布式任务依赖（等齐 k 个上游分片再触发下游）；库存系统的可售天数预估。check 里的「连续段计数清零」技巧与滑动窗口、游程编码一脉相承。
 【踩坑与变体】① 必须先判 m*k > n 无解；② run 归零的时机是满 k 立即成束，不能等到段末；③ 相邻约束是核心——去掉相邻就变成「第 m·k 小的 bloomDay」，直接排序/快速选择即可；④ 同族：1283「使结果不超过阈值的最小除数」、1870「准时到达的最小时速」，全是 check 单调+左边界二分。`,
     keyPoints: ["天数与花束数单调", "连续开放满 k 成束清零", "先判 m*k>n 无解", "相邻约束是二分前提"],
@@ -5719,30 +5888,37 @@ function minDays(bloomDay: number[], m: number, k: number): number {
     bigTech: true,
     answer: `【思路推导】哈希表能 O(L) 精确查一个词，但「前缀检索」无能为力——这正是 Trie 的主场。每个节点存 26 个子指针（或 Map）+ isEnd 标记：插入沿字符逐层下沉，路径即前缀；search 走到底且 isEnd 为真才算命中；startsWith 只需走到底。插入/查询都是 O(L)，L 为词长，与词库规模无关——这是 Trie 对比「遍历词库逐个 startsWith」的 O(N·L) 的本质优势。
 【代码实现】
-class Trie {
-  private children = new Map<string, Trie>();
-  private isEnd = false;
-  insert(word: string): void {
-    let node = this as Trie;
-    for (const ch of word) {
-      if (!node.children.has(ch)) node.children.set(ch, new Trie());
-      node = node.children.get(ch)!;
-    }
-    node.isEnd = true;
-  }
-  private walk(word: string): Trie | null {
-    let node = this as Trie;
-    for (const ch of word) {
-      const next = node.children.get(ch);
-      if (!next) return null;
-      node = next;
-    }
-    return node;
-  }
-  search(word: string): boolean { return this.walk(word)?.isEnd ?? false; }
-  startsWith(prefix: string): boolean { return this.walk(prefix) !== null; }
-  // 时间 O(L)，空间 O(ΣL)
-}
+\`\`\`python
+class Trie:
+    def __init__(self) -> None:
+        self.children: dict[str, "Trie"] = {}
+        self.is_end = False
+
+    def insert(self, word: str) -> None:
+        node = self
+        for ch in word:
+            if ch not in node.children:
+                node.children[ch] = Trie()
+            node = node.children[ch]
+        node.is_end = True
+
+    def _walk(self, word: str) -> "Trie | None":
+        node = self
+        for ch in word:
+            nxt = node.children.get(ch)
+            if nxt is None:
+                return None
+            node = nxt
+        return node
+
+    def search(self, word: str) -> bool:
+        node = self._walk(word)
+        return node.is_end if node else False
+
+    def starts_with(self, prefix: str) -> bool:
+        return self._walk(prefix) is not None
+        # 时间 O(L)，空间 O(ΣL)
+\`\`\`
 【实际应用】Trie 是自动补全的基础设施：搜索框联想词（走到前缀节点后 DFS 收集子树 Top-K）；IDE 代码补全；输入法词典；IP 路由表的最长前缀匹配（01 Trie）；敏感词过滤（AC 自动机 = Trie + KMP 失配指针）。工程上会用双数组 Trie（DAT）压缩指针空间，把内存降一个量级。
 【踩坑与变体】① search 和 startsWith 的差别只在 isEnd，别共用返回值；② 字符集大时用 Map 比定长数组省内存，字符集小用数组更快；③ 删除操作要自底向上回收无子节点且非词尾的节点；④ 变体 211「添加与搜索单词」带 . 通配符，在 Trie 上 DFS 展开分支；⑤ 01 Trie 把整数按二进制位插入，可解最大异或对（421 题）。`,
     keyPoints: ["路径即前缀", "插入/查询 O(L) 与词库规模无关", "isEnd 区分精确与前缀", "AC 自动机 = Trie + KMP"],
@@ -5756,31 +5932,38 @@ class Trie {
     bigTech: false,
     answer: `【思路推导】暴力两两异或 O(n²)。最大异或的本质是「贪心让高位尽量为 1」：从最高位到最低位，若某一位能取到 1（即两个数这一位不同）就取 1。把每个数按二进制位插入 01 Trie，然后对每个数 x 在 Trie 里走「尽量相反位」的路径（当前位是 0 就走 1 分支，反之亦然），走不通才妥协走相同位。每个数 O(32)，总 O(32n)。也可以在 Trie 构建时两两在线处理：插入第 i 个数之前，先用它在已有 Trie 里查最大异或。
 【代码实现】
-function findMaximumXOR(nums: number[]): number {
-  interface Node { child: (Node | null)[] }
-  const root: Node = { child: [null, null] };
-  const insert = (x: number) => {
-    let node = root;
-    for (let b = 30; b >= 0; b--) {
-      const bit = (x >> b) & 1;
-      if (!node.child[bit]) node.child[bit] = { child: [null, null] };
-      node = node.child[bit]!;
-    }
-  };
-  const maxXorWith = (x: number) => {
-    let node = root, ans = 0;
-    for (let b = 30; b >= 0; b--) {
-      const bit = (x >> b) & 1, want = 1 - bit;
-      if (node.child[want]) { ans |= 1 << b; node = node.child[want]!; }
-      else node = node.child[bit]!;
-    }
-    return ans;
-  };
-  insert(nums[0]);
-  let best = 0;
-  for (let i = 1; i < nums.length; i++) { best = Math.max(best, maxXorWith(nums[i])); insert(nums[i]); }
-  return best; // 时间 O(32n)，空间 O(32n)
-}
+\`\`\`python
+def find_maximum_xor(nums: list[int]) -> int:
+    class Node:
+        __slots__ = ("child",)
+        def __init__(self) -> None:
+            self.child: list = [None, None]
+    root = Node()
+    def insert(x: int) -> None:
+        node = root
+        for b in range(30, -1, -1):
+            bit = (x >> b) & 1
+            if not node.child[bit]:
+                node.child[bit] = Node()
+            node = node.child[bit]
+    def max_xor_with(x: int) -> int:
+        node, ans = root, 0
+        for b in range(30, -1, -1):
+            bit = (x >> b) & 1
+            want = 1 - bit
+            if node.child[want]:
+                ans |= 1 << b
+                node = node.child[want]
+            else:
+                node = node.child[bit]
+        return ans
+    insert(nums[0])
+    best = 0
+    for i in range(1, len(nums)):
+        best = max(best, max_xor_with(nums[i]))
+        insert(nums[i])
+    return best  # 时间 O(32n)，空间 O(32n)
+\`\`\`
 【实际应用】「按位贪心 + 前缀结构」用于相似检索：局部敏感哈希（LSH）按位段索引近似最近邻；网络掩码最长前缀匹配（路由器转发表就是 01 Trie）；图形学里 Morton 码（Z-order）把多维数据交织成一维做范围查询。
 【踩坑与变体】① 位数从 30（或 31）开始，题目给非负 int；② 必须先查后插（或从 i=1 开始），否则数会和自己异或得 0；③ JS 位运算 32 位有符号，最高位处理用 >>> 或限定非负；④ 变体「与目标值异或最大的子集」用线性基（高斯消元思想），是 01 Trie 的代数化。`,
     keyPoints: ["高位优先贪心取 1", "01 Trie 走相反位", "O(32n) 线性", "先查后插防自配对"],
@@ -5794,30 +5977,42 @@ function findMaximumXOR(nums: number[]): number {
     bigTech: true,
     answer: `【思路推导】对每个单词各跑一次 DFS 回溯是 O(N·mn·4^L)，N 个词重复扫网格太慢。反转视角：把词典建成 Trie，从网格每个格子出发做 DFS，沿 Trie 节点同步下沉——当前路径不是任何词的前缀就整枝剪掉（这是比单词搜索 I 多出的关键剪枝），命中 isEnd 就收集。visited 用原地标记（改成 # 再恢复）省空间。Trie 节点的词频计数可优化：收集过的词去重并剪枝子树。
 【代码实现】
-function findWords(board: string[][], words: string[]): string[] {
-  interface N { ch: Map<string, N>; word: string | null }
-  const root: N = { ch: new Map(), word: null };
-  for (const w of words) {
-    let node = root;
-    for (const c of w) { if (!node.ch.has(c)) node.ch.set(c, { ch: new Map(), word: null }); node = node.ch.get(c)!; }
-    node.word = w;
-  }
-  const m = board.length, n = board[0].length, ans: string[] = [];
-  const dfs = (i: number, j: number, node: N) => {
-    const c = board[i][j];
-    const next = node.ch.get(c);
-    if (!next) return; // 前缀剪枝：核心提速点
-    if (next.word) { ans.push(next.word); next.word = null; } // 去重
-    board[i][j] = "#";
-    for (const [di, dj] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-      const ni = i + di, nj = j + dj;
-      if (ni >= 0 && ni < m && nj >= 0 && nj < n && board[ni][nj] !== "#") dfs(ni, nj, next);
-    }
-    board[i][j] = c;
-  };
-  for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) dfs(i, j, root);
-  return ans; // 时间 O(mn·4^L) 带前缀剪枝，空间 O(Σ词长)
-}
+\`\`\`python
+def find_words(board: list[list[str]], words: list[str]) -> list[str]:
+    class N:
+        __slots__ = ("ch", "word")
+        def __init__(self) -> None:
+            self.ch: dict[str, "N"] = {}
+            self.word: str | None = None
+    root = N()
+    for w in words:
+        node = root
+        for c in w:
+            if c not in node.ch:
+                node.ch[c] = N()
+            node = node.ch[c]
+        node.word = w
+    m, n = len(board), len(board[0])
+    ans: list[str] = []
+    def dfs(i: int, j: int, node: N) -> None:
+        c = board[i][j]
+        nxt = node.ch.get(c)
+        if not nxt:
+            return  # 前缀剪枝：核心提速点
+        if nxt.word:
+            ans.append(nxt.word)
+            nxt.word = None  # 去重
+        board[i][j] = "#"
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ni, nj = i + di, j + dj
+            if 0 <= ni < m and 0 <= nj < n and board[ni][nj] != "#":
+                dfs(ni, nj, nxt)
+        board[i][j] = c
+    for i in range(m):
+        for j in range(n):
+            dfs(i, j, root)
+    return ans  # 时间 O(mn·4^L) 带前缀剪枝，空间 O(Σ词长)
+\`\`\`
 【实际应用】「候选集索引化 + 搜索空间剪枝」是检索系统的元思想：搜索引擎倒排索引就是把文档集索引化，查询时只展开命中的 posting list；规则引擎（Drools）的 Rete 网络同理；拼写游戏（如 Wordle 求解器、Scrabble AI）都基于词典 Trie。
 【踩坑与变体】① 命中后把 next.word 置 null 去重（同一词可从多路径拼出）；② 原地标记比 visited 数组省内存且快，但必须回溯恢复；③ 极端 case：词典含超长词直接跳过（长度 > m*n 不可能拼出）；④ 前缀剪枝是与 79 题（单词搜索 I）的唯一但本质的差异。`,
     keyPoints: ["词典建 Trie + 网格 DFS", "非前缀整枝剪除", "命中置空去重", "原地标记省空间"],
@@ -5831,27 +6026,31 @@ function findWords(board: string[][], words: string[]): string[] {
     bigTech: false,
     answer: `【思路推导】连通分量计数是并查集的招牌场景：初始每个城市自立门户（count=n），每发现一对连通 (i,j) 就 union 合并，成功合并一次 count 减一。find 用路径压缩（查询时把路径上的节点直接挂到根），union 用按秩合并（小树挂大树），均摊复杂度接近 O(α(n))——α 是反阿克曼函数，任何现实输入下 α(n)≤4，可视为常数。DFS/BFS 染色也能解，但并查集在「边动态加入」的在线场景不可替代。
 【代码实现】
-function findCircleNum(isConnected: number[][]): number {
-  const n = isConnected.length;
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const rank = new Array(n).fill(1);
-  const find = (x: number): number => {
-    if (parent[x] !== x) parent[x] = find(parent[x]); // 路径压缩
-    return parent[x];
-  };
-  const union = (a: number, b: number): boolean => {
-    let ra = find(a), rb = find(b);
-    if (ra === rb) return false;
-    if (rank[ra] < rank[rb]) [ra, rb] = [rb, ra]; // 按秩：小挂大
-    parent[rb] = ra; rank[ra] += rank[rb];
-    return true;
-  };
-  let count = n;
-  for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++)
-      if (isConnected[i][j] === 1 && union(i, j)) count--;
-  return count; // 时间 O(n²·α(n))，空间 O(n)
-}
+\`\`\`python
+def find_circle_num(is_connected: list[list[int]]) -> int:
+    n = len(is_connected)
+    parent = list(range(n))
+    rank = [1] * n
+    def find(x: int) -> int:
+        if parent[x] != x:
+            parent[x] = find(parent[x])  # 路径压缩
+        return parent[x]
+    def union(a: int, b: int) -> bool:
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return False
+        if rank[ra] < rank[rb]:
+            ra, rb = rb, ra  # 按秩：小挂大
+        parent[rb] = ra
+        rank[ra] += rank[rb]
+        return True
+    count = n
+    for i in range(n):
+        for j in range(i + 1, n):
+            if is_connected[i][j] == 1 and union(i, j):
+                count -= 1
+    return count  # 时间 O(n²·α(n))，空间 O(n)
+\`\`\`
 【实际应用】并查集是「动态连通性」的工业标准：社交网络「共同好友群」聚类；分布式系统的节点分区检测；图像处理的连通区域标记（等价表法）；Kruskal 最小生成树的核心数据结构；数据库 GROUP BY 的等价类合并优化。
 【踩坑与变体】① 矩阵对称，只扫上三角避免重复 union；② 路径压缩用递归版注意栈深（n 很大时写迭代版）；③ 只压缩不按秩，或只按秩不压缩，复杂度都会退化——两者配合才是近 O(1)；④ 变体 990「等式方程的可满足性」：先 union 所有 ==，再检查每个 != 是否同根；⑤ 684「冗余连接」：第一条两端已连通的边即答案。`,
     keyPoints: ["union 成功一次分量减一", "路径压缩 + 按秩合并", "均摊 O(α(n))≈O(1)", "在线动态连通性首选"],
@@ -5865,20 +6064,22 @@ function findCircleNum(isConnected: number[][]): number {
     bigTech: false,
     answer: `【思路推导】树有 n 个节点 n-1 条边且无环，多出来的那条边必然构成环。按顺序遍历边做 union：若边两端已属同一连通分量，说明加入它会成环——这条边就是冗余边。「返回最后出现的」天然被顺序处理满足（第一条成环的边是环上最后被遍历到的边）。判断成环是本题本质：并查集 find 同根即环。DFS 判环也可，但要建图+递归，代码更长且不如并查集在线处理自然。
 【代码实现】
-function findRedundantConnection(edges: number[][]): number[] {
-  const n = edges.length;
-  const parent = Array.from({ length: n + 1 }, (_, i) => i);
-  const find = (x: number): number => {
-    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } // 迭代路径压缩
-    return x;
-  };
-  for (const [u, v] of edges) {
-    const ru = find(u), rv = find(v);
-    if (ru === rv) return [u, v]; // 成环边
-    parent[ru] = rv;
-  }
-  return []; // 时间 O(n·α(n))，空间 O(n)
-}
+\`\`\`python
+def find_redundant_connection(edges: list[list[int]]) -> list[int]:
+    n = len(edges)
+    parent = list(range(n + 1))
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]  # 迭代路径压缩
+            x = parent[x]
+        return x
+    for u, v in edges:
+        ru, rv = find(u), find(v)
+        if ru == rv:
+            return [u, v]  # 成环边
+        parent[ru] = rv
+    return []  # 时间 O(n·α(n))，空间 O(n)
+\`\`\`
 【实际应用】「检测约束冲突」的通用件：网络拓扑变更时检测环路（STP 生成树协议的软件模拟）；依赖注入框架检测循环依赖；Git 合并时检测祖先关系成环；电子表格公式循环引用检测（Excel 的 circular reference 警告）。
 【踩坑与变体】① 节点编号 1..n，parent 数组开 n+1；② 迭代版路径压缩用「隔代指向」（parent[x]=parent[parent[x]]）即可，不必一步到根；③ 有向图版本（685 题「冗余连接 II」）难得多：要分「入度为 2 的节点」与「环」两种情况讨论；④ 若要求返回「使图变树的任意一条边」而非最后一条，当前解同样成立。`,
     keyPoints: ["树+一边必有且仅有一个环", "find 同根即成环", "顺序处理天然满足最后出现", "有向版 685 分情况讨论"],
@@ -5892,20 +6093,25 @@ function findRedundantConnection(edges: number[][]): number[] {
     bigTech: false,
     answer: `【思路推导】== 是等价关系（自反/对称/传递），!= 是不等价约束。处理顺序是题眼：先把所有 == 的变量 union 进同一连通分量（等价类合并），再逐条检查 != 约束——若某条 a!=b 的 a、b 已在同一分量，说明矛盾（等价类内部必须相等），返回 false。顺序反过来就错了：先查 != 时等价类还没合并完，会漏掉传递性推出的矛盾（如 a==b, b==c, a!=c）。
 【代码实现】
-function equationsPossible(equations: string[]): boolean {
-  const parent = Array.from({ length: 26 }, (_, i) => i); // 仅小写字母
-  const find = (x: number): number => {
-    if (parent[x] !== x) parent[x] = find(parent[x]);
-    return parent[x];
-  };
-  const union = (a: number, b: number) => { parent[find(a)] = find(b); };
-  const idx = (s: string) => s.charCodeAt(0) - 97;
-  for (const eq of equations) // 第一遍：合并所有 ==
-    if (eq[1] === "=") union(idx(eq[0]), idx(eq[3]));
-  for (const eq of equations) // 第二遍：检查所有 !=
-    if (eq[1] === "!" && find(idx(eq[0])) === find(idx(eq[3]))) return false;
-  return true; // 时间 O(n·α(26))，空间 O(1)
-}
+\`\`\`python
+def equations_possible(equations: list[str]) -> bool:
+    parent = list(range(26))  # 仅小写字母
+    def find(x: int) -> int:
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    def union(a: int, b: int) -> None:
+        parent[find(a)] = find(b)
+    def idx(s: str) -> int:
+        return ord(s) - 97
+    for eq in equations:  # 第一遍：合并所有 ==
+        if eq[1] == "=":
+            union(idx(eq[0]), idx(eq[3]))
+    for eq in equations:  # 第二遍：检查所有 !=
+        if eq[1] == "!" and find(idx(eq[0])) == find(idx(eq[3])):
+            return False
+    return True  # 时间 O(n·α(26))，空间 O(1)
+\`\`\`
 【实际应用】等价类合并是编译器与数据库的常驻技术：编译器寄存器分配的「合并相同值变量」（公共子表达式消除）；数据库优化器把 WHERE a=b AND b=c 推出 a=c 用于索引选择；类型系统的 Union-Find 实现（Hindley-Milner 类型推导的 unify）；实体对齐（同一用户的多个账号合并）。
 【踩坑与变体】① 顺序！先全部 == 再全部 !=，这是唯一易错点；② 自等约束 a==a 合法，a!=a 恒矛盾（find 同根）会被正确判 false；③ 变量不止小写字母时用哈希 Map 动态编号；④ 进阶「带权等式」如 x-y=3 的差分约束，用带权并查集或 Bellman-Ford。`,
     keyPoints: ["== 合并、!= 校验", "顺序不可颠倒", "等价关系传递性", "a!=a 恒矛盾"],
@@ -5919,33 +6125,38 @@ function equationsPossible(equations: string[]): boolean {
     bigTech: true,
     answer: `【思路推导】把变量看作点、a/b=v 看作边权为 v 的有向边（反向边权 1/v），则 x/y = x 到 y 路径上边权的乘积。带权并查集是优雅解：每个节点维护「它到根的倍数」weight[x]（即 x = weight[x] × root）；find 路径压缩时同步更新 weight；union(a,b,v) 时设两节点根 ra、rb，令 weight[ra] 使等式成立：weight[ra] = weight[b]·v / weight[a]。查询时 x、y 同根才能求值，结果 = weight[x]/weight[y]。Floyd 或 DFS 建图也可，但带权并查集支持在线加入等式。
 【代码实现】
-function calcEquation(equations: string[][], values: number[], queries: string[][]): number[] {
-  const parent = new Map<string, string>();
-  const weight = new Map<string, number>(); // weight[x]: x = weight[x] * parent[x]
-  const find = (x: string): string => {
-    if (!parent.has(x)) { parent.set(x, x); weight.set(x, 1); return x; }
-    const p = parent.get(x)!;
-    if (p !== x) {
-      const root = find(p);
-      weight.set(x, weight.get(x)! * weight.get(p)!); // 压缩时连乘
-      parent.set(x, root);
-    }
-    return parent.get(x)!;
-  };
-  equations.forEach(([a, b], i) => {
-    const ra = find(a), rb = find(b), v = values[i];
-    if (ra !== rb) {
-      parent.set(ra, rb);
-      weight.set(ra, (weight.get(b)! * v) / weight.get(a)!); // 关键一步
-    }
-  });
-  return queries.map(([x, y]) => {
-    if (!parent.has(x) && !parent.has(y)) return -1;
-    const rx = find(x), ry = find(y);
-    if (rx !== ry) return -1;
-    return weight.get(x)! / weight.get(y)!;
-  }); // 时间 O((E+Q)·α(n))，空间 O(n)
-}
+\`\`\`python
+def calc_equation(equations: list[list[str]], values: list[float], queries: list[list[str]]) -> list[float]:
+    parent: dict[str, str] = {}
+    weight: dict[str, float] = {}  # weight[x]: x = weight[x] * parent[x]
+    def find(x: str) -> str:
+        if x not in parent:
+            parent[x] = x
+            weight[x] = 1.0
+            return x
+        p = parent[x]
+        if p != x:
+            root = find(p)
+            weight[x] *= weight[p]  # 压缩时连乘
+            parent[x] = root
+        return parent[x]
+    for (a, b), v in zip(equations, values):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            weight[ra] = weight[b] * v / weight[a]  # 关键一步
+    result: list[float] = []
+    for x, y in queries:
+        if x not in parent and y not in parent:
+            result.append(-1.0)
+            continue
+        rx, ry = find(x), find(y)
+        if rx != ry:
+            result.append(-1.0)
+        else:
+            result.append(weight[x] / weight[y])
+    return result  # 时间 O((E+Q)·α(n))，空间 O(n)
+\`\`\`
 【实际应用】「比值/汇率传导」模型直接对应金融系统：外汇多级换算（USD→EUR→JPY 推导任意交叉汇率）；会计系统的多币种折算；单位换算引擎（UCUM 医疗单位标准）；供应链 BOM 表的用量比例传导。
 【踩坑与变体】① find 里必须先递归拿根再更新 weight，顺序反了权重会错；② 查询的变量没出现过要返回 -1（Map 未注册）；③ 除 0 不存在的约束题目保证合法；④ 离线场景 Floyd 全源最短路（乘法取对数变加法）也行但 O(n³)；⑤ 变体「分数加减法」纯属解析题，别混淆。`,
     keyPoints: ["变量为点、比值为边权", "weight[x]=x 到根的倍数", "find 压缩同步连乘权重", "同根才可求值"],
@@ -5960,22 +6171,26 @@ function calcEquation(equations: string[][], values: number[], queries: string[]
     bigTech: true,
     answer: `【思路推导】拓扑排序的标准应用：Kahn 算法（BFS 版）。建图后统计每个节点的入度，入度为 0 的节点（无先修课）先入队；每次出队一个节点就「修掉」它——把它加入结果、所有后继入度减 1，减到 0 的后继入队。若最终结果不足 n 个节点，说明剩下的节点互相等待成环，无解。DFS 版则用三色标记（白/灰/黑）：DFS 中遇到灰色节点说明存在回边即成环，正常退栈时逆序加入结果。
 【代码实现】
-function findOrder(numCourses: number, prerequisites: number[][]): number[] {
-  const graph: number[][] = Array.from({ length: numCourses }, () => []);
-  const indeg = new Array(numCourses).fill(0);
-  for (const [course, pre] of prerequisites) {
-    graph[pre].push(course);
-    indeg[course]++;
-  }
-  const queue = indeg.flatMap((d, i) => (d === 0 ? [i] : []));
-  const order: number[] = [];
-  for (let head = 0; head < queue.length; head++) { // 不用 shift，O(1)
-    const u = queue[head];
-    order.push(u);
-    for (const v of graph[u]) if (--indeg[v] === 0) queue.push(v);
-  }
-  return order.length === numCourses ? order : []; // 时间 O(V+E)，空间 O(V+E)
-}
+\`\`\`python
+from collections import deque
+
+def find_order(num_courses: int, prerequisites: list[list[int]]) -> list[int]:
+    graph: list[list[int]] = [[] for _ in range(num_courses)]
+    indeg = [0] * num_courses
+    for course, pre in prerequisites:
+        graph[pre].append(course)
+        indeg[course] += 1
+    queue = deque(i for i, d in enumerate(indeg) if d == 0)
+    order: list[int] = []
+    while queue:
+        u = queue.popleft()
+        order.append(u)
+        for v in graph[u]:
+            indeg[v] -= 1
+            if indeg[v] == 0:
+                queue.append(v)
+    return order if len(order) == num_courses else []  # 时间 O(V+E)，空间 O(V+E)
+\`\`\`
 【实际应用】拓扑排序是依赖调度的数学骨架：构建系统（Make/Bazel）按依赖图编排编译任务；CI/CD 流水线的 stage 编排；Kubernetes 的 InitContainer 顺序；前端打包器的模块解析顺序；数据库迁移（migration）脚本的依赖排序。入队顺序可用优先队列控制（如字典序最小方案，630/269 题变体）。
 【踩坑与变体】① 注意边方向：prerequisites[i]=[a,b] 表示 b→a（先 b 后 a），建反图答案全错；② 队列用数组+head 指针替代 shift()，否则 O(n²)；③ 结果个数 < n 即环，但「具体是哪几个点成环」要 DFS 三色版定位；④ 269「外星文字典」是拓扑排序的进阶：先从相邻词比较中推字母序关系再排。`,
     keyPoints: ["Kahn：入度 0 入队逐层剥离", "结果数 < n 即成环", "DFS 三色标记判环", "依赖调度的通用骨架"],
@@ -5989,26 +6204,30 @@ function findOrder(numCourses: number, prerequisites: number[][]): number[] {
     bigTech: false,
     answer: `【思路推导】路径概率是边权的乘积，求最大乘积路径——这是 Dijkstra 的变形：把「距离最小」换成「概率最大」，用小顶堆换大顶堆，松弛条件从 dist[u]+w<dist[v] 变成 prob[u]·w>prob[v]。为什么贪心仍成立？概率 ∈[0,1]，乘积单调不增，已确定最大概率的节点不会被其他路径改进（非负权 Dijkstra 正确性在「乘法单调+值域有界」下同样成立）。也可用取对数把乘法变加法（权重 -log(p) 求最短路），但浮点精度要小心。
 【代码实现】
-function maxProbability(n: number, edges: number[][], succProb: number[], start: number, end: number): number {
-  const graph: [number, number][][] = Array.from({ length: n }, () => []);
-  edges.forEach(([a, b], i) => {
-    graph[a].push([b, succProb[i]]);
-    graph[b].push([a, succProb[i]]);
-  });
-  const prob = new Array(n).fill(0);
-  prob[start] = 1;
-  const heap: [number, number][] = [[1, start]]; // [概率, 节点] 简易大顶堆
-  while (heap.length) {
-    heap.sort((a, b) => b[0] - a[0]); // 生产环境换真堆结构
-    const [p, u] = heap.shift()!;
-    if (u === end) return p; // 首次弹出即最优
-    if (p < prob[u]) continue; // 过期堆元素
-    for (const [v, w] of graph[u]) {
-      if (p * w > prob[v]) { prob[v] = p * w; heap.push([p * w, v]); }
-    }
-  }
-  return 0; // 时间 O(E·logV)，空间 O(V+E)
-}
+\`\`\`python
+import heapq
+
+def max_probability(n: int, edges: list[list[int]], succ_prob: list[float], start: int, end: int) -> float:
+    graph: list[list[tuple[int, float]]] = [[] for _ in range(n)]
+    for (a, b), p in zip(edges, succ_prob):
+        graph[a].append((b, p))
+        graph[b].append((a, p))
+    prob = [0.0] * n
+    prob[start] = 1.0
+    heap: list[tuple[float, int]] = [(-1.0, start)]  # 取负模拟大顶堆
+    while heap:
+        neg_p, u = heapq.heappop(heap)
+        p = -neg_p
+        if u == end:
+            return p  # 首次弹出即最优
+        if p < prob[u]:
+            continue  # 过期堆元素
+        for v, w in graph[u]:
+            if p * w > prob[v]:
+                prob[v] = p * w
+                heapq.heappush(heap, (-prob[v], v))
+    return 0.0  # 时间 O(E·logV)，空间 O(V+E)
+\`\`\`
 【实际应用】「最大可信路径」模型：网络可靠性规划（每条链路有可用率，选整体可用率最高的路由）；金融反欺诈的关联路径置信度计算；推荐系统知识图谱中实体关系的置信度传播；自动驾驶路径规划的成功通过率优化。
 【踩坑与变体】① 弹出 end 即可返回（Dijkstra 性质：首次弹出即最优）；② 堆中过期元素（概率小于已记录值）要跳过；③ JS 无内置堆，sort+shift 仅适合演示，生产用二叉堆实现；④ 概率连乘下溢（长路径趋近 0）时用对数域计算；⑤ 对比 Bellman-Ford：边权为正（或对数域非负）时 Dijkstra 更优。`,
     keyPoints: ["Dijkstra 变形：最小→最大乘积", "概率∈[0,1]保证贪心正确", "首次弹出 end 即最优", "对数域化乘为加"],
@@ -6022,33 +6241,40 @@ function maxProbability(n: number, edges: number[][], succProb: number[], start:
     bigTech: false,
     answer: `【思路推导】路径代价 = 路径上最大边权，求最小化这个最大值——「最小瓶颈路径」问题。两种主流解：① 变形 Dijkstra：dist[x] 表示到 x 的最小瓶颈值，松弛 dist[v]=min(dist[v], max(dist[u], |h[u]-h[v]|))，大顶堆每次扩展当前瓶颈最小的节点，O(mn·log(mn))；② 二分答案+并查集/BFS：二分瓶颈值 D，只走高度差 ≤ D 的边看能否连通左上右下，单调性显然，O(mn·log(高度差))。识别信号与二分答案家族一致：最小化最大值。
 【代码实现】
-function minimumEffortPath(heights: number[][]): number {
-  const m = heights.length, n = heights[0].length;
-  let lo = 0, hi = 0;
-  for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) {
-    if (i + 1 < m) hi = Math.max(hi, Math.abs(heights[i][j] - heights[i + 1][j]));
-    if (j + 1 < n) hi = Math.max(hi, Math.abs(heights[i][j] - heights[i][j + 1]));
-  }
-  const canReach = (D: number) => {
-    const seen = Array.from({ length: m }, () => new Array(n).fill(false));
-    const stack: [number, number][] = [[0, 0]];
-    seen[0][0] = true;
-    while (stack.length) {
-      const [i, j] = stack.pop()!;
-      if (i === m - 1 && j === n - 1) return true;
-      for (const [di, dj] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-        const ni = i + di, nj = j + dj;
-        if (ni >= 0 && ni < m && nj >= 0 && nj < n && !seen[ni][nj]
-            && Math.abs(heights[ni][nj] - heights[i][j]) <= D) {
-          seen[ni][nj] = true; stack.push([ni, nj]);
-        }
-      }
-    }
-    return false;
-  };
-  while (lo < hi) { const mid = (lo + hi) >> 1; canReach(mid) ? (hi = mid) : (lo = mid + 1); }
-  return lo; // 时间 O(mn·log(hi))，空间 O(mn)
-}
+\`\`\`python
+def minimum_effort_path(heights: list[list[int]]) -> int:
+    m, n = len(heights), len(heights[0])
+    lo = 0
+    hi = 0
+    for i in range(m):
+        for j in range(n):
+            if i + 1 < m:
+                hi = max(hi, abs(heights[i][j] - heights[i + 1][j]))
+            if j + 1 < n:
+                hi = max(hi, abs(heights[i][j] - heights[i][j + 1]))
+    def can_reach(d: int) -> bool:
+        seen = [[False] * n for _ in range(m)]
+        stack: list[tuple[int, int]] = [(0, 0)]
+        seen[0][0] = True
+        while stack:
+            i, j = stack.pop()
+            if i == m - 1 and j == n - 1:
+                return True
+            for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ni, nj = i + di, j + dj
+                if 0 <= ni < m and 0 <= nj < n and not seen[ni][nj] \\
+                        and abs(heights[ni][nj] - heights[i][j]) <= d:
+                    seen[ni][nj] = True
+                    stack.append((ni, nj))
+        return False
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        if can_reach(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo  # 时间 O(mn·log(hi))，空间 O(mn)
+\`\`\`
 【实际应用】瓶颈路径是网络规划的常客：选路时让「链路中最差一跳的带宽」尽量大（宽宽路径 widest path，QoS 路由）；物流配送让路线中「最陡路段坡度」最小（电动车续航友好）；数据中心选址考虑最坏时延。
 【踩坑与变体】① 别错用「路径总长度最小」——本题是最大边最小，BFS 无权图思路不适用；② 二分上界 hi 预先扫描最大相邻差，比固定 10^6 省迭代；③ 变形 Dijkstra 的堆排键是瓶颈值而非累加和；④ Kruskal 视角：按边权从小到大加边，左上右下首次连通时的边权即答案（最小生成树的路径最小化最大边）。`,
     keyPoints: ["最小瓶颈路径", "二分+BFS 连通判定", "变形 Dijkstra 堆排瓶颈值", "Kruskal 首次连通边权即解"],
@@ -6062,31 +6288,34 @@ function minimumEffortPath(heights: number[][]): number {
     bigTech: true,
     answer: `【思路推导】标准 MST：Kruskal 与 Prim 都要会。Kruskal：生成所有 O(n²) 条边按权排序，从小到大用并查集加边（不成环就纳入），加到 n-1 条即完成，O(E·logE)；Prim：从任意点出发，维护「树内到树外的最小边」（懒删除堆或 dist 数组），每次把最近的树外点拉入树，稠密图用数组版 O(n²) 更优。曼哈顿距离完全图边数 O(n²)，n=1000 时 50 万条边，Kruskal 排序可行；点更多时需利用曼哈顿距离的几何性质剪枝（只保留最近邻候选边）。
 【代码实现】
-function minCostConnectPoints(points: number[][]): number {
-  const n = points.length;
-  const edges: [number, number, number][] = [];
-  for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++)
-      edges.push([
-        Math.abs(points[i][0] - points[j][0]) + Math.abs(points[i][1] - points[j][1]),
-        i, j,
-      ]);
-  edges.sort((a, b) => a[0] - b[0]);
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const find = (x: number): number => {
-    if (parent[x] !== x) parent[x] = find(parent[x]);
-    return parent[x];
-  };
-  let cost = 0, used = 0;
-  for (const [w, u, v] of edges) {
-    const ru = find(u), rv = find(v);
-    if (ru === rv) continue; // 成环跳过
-    parent[ru] = rv;
-    cost += w;
-    if (++used === n - 1) break; // 树已成型
-  }
-  return cost; // 时间 O(E·logE)，空间 O(E)
-}
+\`\`\`python
+def min_cost_connect_points(points: list[list[int]]) -> int:
+    n = len(points)
+    edges: list[tuple[int, int, int]] = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            edges.append((
+                abs(points[i][0] - points[j][0]) + abs(points[i][1] - points[j][1]),
+                i, j,
+            ))
+    edges.sort(key=lambda e: e[0])
+    parent = list(range(n))
+    def find(x: int) -> int:
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    cost, used = 0, 0
+    for w, u, v in edges:
+        ru, rv = find(u), find(v)
+        if ru == rv:
+            continue  # 成环跳过
+        parent[ru] = rv
+        cost += w
+        used += 1
+        if used == n - 1:
+            break  # 树已成型
+    return cost  # 时间 O(E·logE)，空间 O(E)
+\`\`\`
 【实际应用】MST 是网络建设成本优化的原型：电网/光缆铺设的最小总长；聚类分析的单链接层次聚类（MST 删最长 k-1 条边得 k 簇）；芯片布线的 Steiner 树近似；图像分割（Graph-based Segmentation，Felzenszwalb 算法）直接用 MST。
 【踩坑与变体】① Kruskal 加到 n-1 条边立即停，别扫完所有边；② 完全图无需显式存边可改用 Prim 数组版省内存；③ 曼哈顿距离下最优解只可能含「按 x、x+y、x-y 排序后相邻点」的边（高级剪枝）；④ Prim 懒删除版堆里有旧 dist 条目要跳过；⑤ 对比：次小生成树、度限制生成树是竞赛进阶。`,
     keyPoints: ["Kruskal：排序+并查集加边", "Prim：树外最近点贪心", "n-1 条边即停", "MST 路径最小化最大边"],
@@ -6100,22 +6329,24 @@ function minCostConnectPoints(points: number[][]): number {
     bigTech: true,
     answer: `【思路推导】用完所有边恰好一次 ⟺ 欧拉路径（Hierholzer 算法）。贪心 DFS 会走进死胡同（先用了关键边导致剩余边走不完），Hierholzer 的精髓是「逆序插入」：DFS 到底（某节点没有未用出边）时才把它压入结果栈，最后逆序输出——先被困住的节点排在行程后部，保证所有边都被走掉。字典序最小通过「邻接表按目的地升序」实现：DFS 总是先尝试字典序最小的下一段。多重边用「每个邻接表项弹出即消费」处理。
 【代码实现】
-function findItinerary(tickets: string[][]): string[] {
-  const graph = new Map<string, string[]>();
-  for (const [from, to] of tickets) {
-    if (!graph.has(from)) graph.set(from, []);
-    graph.get(from)!.push(to);
-  }
-  for (const list of graph.values()) list.sort(); // 字典序优先
-  const route: string[] = [];
-  const dfs = (u: string) => {
-    const list = graph.get(u);
-    while (list && list.length) dfs(list.shift()!); // 消费边
-    route.push(u); // 死路节点逆序入栈
-  };
-  dfs("JFK");
-  return route.reverse(); // 时间 O(E·logE)，空间 O(E)
-}
+\`\`\`python
+from collections import defaultdict
+
+def find_itinerary(tickets: list[list[str]]) -> list[str]:
+    graph: dict[str, list[str]] = defaultdict(list)
+    for from_, to in tickets:
+        graph[from_].append(to)
+    for lst in graph.values():
+        lst.sort()  # 字典序优先
+    route: list[str] = []
+    def dfs(u: str) -> None:
+        lst = graph.get(u)
+        while lst:
+            dfs(lst.pop(0))  # 消费边
+        route.append(u)  # 死路节点逆序入栈
+    dfs("JFK")
+    return route[::-1]  # 时间 O(E·logE)，空间 O(E)
+\`\`\`
 【实际应用】欧拉路径是「一笔画」的工程化身：物流派送的无重复路线规划（邮路问题）；PCB 自动布线的一次走线；DNA 测序的 De Bruijn 图拼接（reads 重建成基因组，bioinformatics 核心）；网络抓包的 TCP 流重组。
 【踩坑与变体】① 必须「先递归后入栈再逆序」，先记录访问顺序会得到非法行程（死胡同场景）；② shift() 是 O(E)，生产用下标指针；③ 图不保证连通？本题保证有解，但工程上要校验欧拉条件（入度出度差 ≤1）；④ 对比「字母序最小拓扑序」：欧拉用 Hierholzer 逆序，拓扑用优先队列 Kahn，别混。`,
     keyPoints: ["Hierholzer 逆序插入", "邻接表排序保字典序", "边消费制防重用", "死路节点排尾部"],
@@ -6129,23 +6360,28 @@ function findItinerary(tickets: string[][]): string[] {
     bigTech: true,
     answer: `【思路推导】这就是单源最短路径的直球应用：dist[x] = k 到 x 的最短耗时，答案是 max(dist)，有 dist 为 ∞ 则 -1。正权图用 Dijkstra（堆优化 O(E·logV)）：每次从堆中取 dist 最小的未确定节点，它的最短路已确定（贪心核心：正权保证不会有更短路径绕过来），用它松弛所有出边。Bellman-Ford（O(V·E)）作为对照：支持负权、可判负环，但正权场景 Dijkstra 完胜。SPFA 是 Bellman-Ford 的队列优化，最坏退化。
 【代码实现】
-function networkDelayTime(times: number[][], n: number, k: number): number {
-  const graph: [number, number][][] = Array.from({ length: n + 1 }, () => []);
-  for (const [u, v, w] of times) graph[u].push([v, w]);
-  const dist = new Array(n + 1).fill(Infinity);
-  dist[k] = 0;
-  const heap: [number, number][] = [[0, k]]; // [dist, 节点]
-  while (heap.length) {
-    heap.sort((a, b) => a[0] - b[0]); // 演示用，生产换二叉堆
-    const [d, u] = heap.shift()!;
-    if (d > dist[u]) continue; // 过期条目
-    for (const [v, w] of graph[u]) {
-      if (d + w < dist[v]) { dist[v] = d + w; heap.push([dist[v], v]); }
-    }
-  }
-  const ans = Math.max(...dist.slice(1));
-  return ans === Infinity ? -1 : ans; // 时间 O(E·logV)，空间 O(V+E)
-}
+\`\`\`python
+import heapq
+import math
+
+def network_delay_time(times: list[list[int]], n: int, k: int) -> int:
+    graph: list[list[tuple[int, int]]] = [[] for _ in range(n + 1)]
+    for u, v, w in times:
+        graph[u].append((v, w))
+    dist: list[float] = [math.inf] * (n + 1)
+    dist[k] = 0
+    heap: list[tuple[int, int]] = [(0, k)]  # [dist, 节点]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist[u]:
+            continue  # 过期条目
+        for v, w in graph[u]:
+            if d + w < dist[v]:
+                dist[v] = d + w
+                heapq.heappush(heap, (int(dist[v]), v))
+    ans = max(dist[1:])  # 节点编号 1..n
+    return -1 if ans == math.inf else int(ans)  # 时间 O(E·logV)，空间 O(V+E)
+\`\`\`
 【实际应用】Dijkstra 是一切「最小代价传播」的原型：OSPF 路由协议每台路由器独立跑 Dijkstra 算最短路径树；地图导航的驾车路径（配 A* 启发加速）；社交网络信息传播时延分析；游戏中的 NPC 寻路。BGP 协议则用路径向量（类 Bellman-Ford），因为策略路由不满足纯距离贪心。
 【踩坑与变体】① 节点编号 1..n，dist 开 n+1 并切掉 0 号再取 max；② 懒删除堆必须跳过 d>dist[u] 的过期条目；③ 负权边时 Dijkstra 失效（已确定节点可能被改进），换 Bellman-Ford；④ 求「信号从任意点出发的全源最短」用 Floyd；⑤ 变体「概率最大路径」把加法换乘法、最小换最大。`,
     keyPoints: ["单源最短路取 max(dist)", "Dijkstra 正权贪心", "过期堆条目跳过", "负权换 Bellman-Ford"],
