@@ -1,16 +1,71 @@
 // lib/presets/backend.ts
-// 后端工程师（含 AI 后端方向）预设：30 知识节点 + 215 道高频面试题 + 学习计划
-// 覆盖：语言基础（Java/Python/Go）→ 数据存储（MySQL/Redis/MQ/NoSQL/ES）→
-//       架构与设计（微服务/分布式/系统设计/高并发/高可用/API）→
-//       运维与工程（容器/CI-CD/监控）→ AI 后端方向（推理/管线/网关/成本/评估）
-// 大厂高频题标注 bigTech: true，答案结合真实项目场景（阿里双 11、美团外卖、字节抖音、腾讯微信等）
+// 后端工程师（含 AI 后端方向）预设：46 知识节点 + 340+ 道高频面试题 + 学习计划
+// 覆盖：计算机基础（TCP/HTTP/QUIC、操作系统、IO 模型、设计模式）→
+//       语言与框架（Java/JVM/Spring/MyBatis/Netty、Python、Go）→
+//       数据存储（MySQL/Redis/MQ/NoSQL/ES）→
+//       架构与分布式（微服务/一致性/系统设计/高并发/高可用/ZK/etcd/分布式 DB/Flink/OLAP/DDD）→
+//       安全与认证（OWASP/注入/XSS/CSRF、JWT/OAuth2/SSO/RBAC）→
+//       运维与工程（容器/CI-CD/监控/线上排查/云原生）→ AI 后端方向（推理/管线/网关/成本/评估）
+// 大厂高频题标注 bigTech: true，答案结合真实项目场景（阿里双 11、美团外卖、字节抖音、腾讯微信、12306 等）
+// 答案统一结构：结论分层 → 真实案例 → 可运行代码/命令 → 对比表格 → 生产踩坑 → 举一反三追问
 
 import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 
-// ===== 知识节点（30 个）=====
+// ===== 知识节点（46 个）=====
 
 const BACKEND_NODES: KnowledgeNode[] = [
-  // ----- Java 语言（5 个节点） -----
+  // ----- 计算机基础（5 个节点） -----
+  {
+    id: "be-network-tcp",
+    title: "TCP 与网络层（三次握手/四次挥手/拥塞控制/TIME_WAIT）",
+    difficulty: 4,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "三次握手与 SYN 泛洪、四次挥手 TIME_WAIT/CLOSE_WAIT、滑动窗口与拥塞控制慢启动/拥塞避免、TCP vs UDP 选型、粘包拆包、Keepalive、tcpdump 抓包实战。",
+    mastery: 0,
+  },
+  {
+    id: "be-network-http",
+    title: "HTTP/HTTPS/QUIC（HTTP1.1→3/TLS1.3/WebSocket）",
+    difficulty: 4,
+    prerequisites: ["be-network-tcp"],
+    frequency: "高",
+    bigTech: true,
+    summary: "HTTP1.1 管线化 vs HTTP2 多路复用 vs HTTP3 QUIC 0-RTT、TLS1.2/1.3 握手流程、证书链校验与 HSTS、WebSocket/SSE、状态码与缓存协商、DNS 与 DoH。",
+    mastery: 0,
+  },
+  {
+    id: "be-os-linux",
+    title: "操作系统与 Linux（进程线程协程/内存/调度/排查命令）",
+    difficulty: 4,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "进程/线程/协程区别、IPC 七种方式、虚拟内存与分页、页面置换 LRU、上下文切换开销、CPU 负载与 top/vmstat/iostat 排查、死锁四条件与破解。",
+    mastery: 0,
+  },
+  {
+    id: "be-io-model",
+    title: "IO 模型（BIO/NIO/AIO/epoll/零拷贝/Reactor）",
+    difficulty: 4,
+    prerequisites: ["be-os-linux"],
+    frequency: "高",
+    bigTech: true,
+    summary: "五种 IO 模型对比、select/poll/epoll 红黑树+就绪链表、epoll ET/LT 触发、零拷贝 sendfile/mmap、splice、Reactor 单线程/多线程/主从模型、C10K→C10M。",
+    mastery: 0,
+  },
+  {
+    id: "be-design-pattern",
+    title: "设计模式与 SOLID（单例/工厂/代理/观察者/策略）",
+    difficulty: 3,
+    prerequisites: [],
+    frequency: "高",
+    bigTech: true,
+    summary: "手写线程安全单例五种写法、三大工厂模式、JDK/CGLIB 动态代理、观察者事件驱动、策略+模板消除 if-else、SOLID 六原则、Spring/MyBatis 源码中的模式。",
+    mastery: 0,
+  },
+  // ----- Java 语言与框架（7 个节点） -----
   {
     id: "be-java-core",
     title: "Java 核心（集合/泛型/IO/反射/注解）",
@@ -59,6 +114,26 @@ const BACKEND_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "@Conditional 自动装配、Starter 开发、Actuator 健康检查、Profile 多环境、配置加载优先级、启动事件流程。",
+    mastery: 0,
+  },
+  {
+    id: "be-mybatis",
+    title: "MyBatis 与 ORM（#{} vs ${}/缓存/插件/执行流程）",
+    difficulty: 3,
+    prerequisites: ["be-spring-core"],
+    frequency: "高",
+    bigTech: true,
+    summary: "#{} 预编译防注入 vs ${} 字符串拼接、一级/二级缓存机制与坑、Executor→StatementHandler 执行链、Interceptor 插件分页、Mapper 接口动态代理、MyBatis-Plus 增强。",
+    mastery: 0,
+  },
+  {
+    id: "be-netty",
+    title: "Netty 网络编程（EventLoop/ByteBuf/粘包拆包/心跳）",
+    difficulty: 4,
+    prerequisites: ["be-io-model"],
+    frequency: "中",
+    bigTech: true,
+    summary: "主从 Reactor EventLoopGroup、ByteBuf 池化与零拷贝、LengthFieldBasedFrameDecoder 拆包、IdleStateHandler 心跳保活、Pipeline Handler 责任链、Dubbo/gRPC/IM 中的应用。",
     mastery: 0,
   },
   // ----- Python 后端（3 个节点） -----
@@ -171,7 +246,7 @@ const BACKEND_NODES: KnowledgeNode[] = [
     summary: "ES 倒排索引 FST、IK 分词器、BM25 相关性评分、聚合分析、集群分片与副本、深度分页 scroll/search_after、写入 translog。",
     mastery: 0,
   },
-  // ----- 架构与分布式（6 个节点） -----
+  // ----- 架构与分布式（11 个节点） -----
   {
     id: "be-microservice",
     title: "微服务（注册发现/熔断/链路追踪/网关）",
@@ -231,7 +306,75 @@ const BACKEND_NODES: KnowledgeNode[] = [
     summary: "RESTful 资源设计、GraphQL Schema 与 N+1、gRPC Protobuf 接口、API 版本管理、Swagger/OpenAPI 文档、API 安全认证。",
     mastery: 0,
   },
-  // ----- DevOps 与运维（3 个节点） -----
+  {
+    id: "be-zk-etcd",
+    title: "协调服务（ZooKeeper ZAB/watch/etcd Raft）",
+    difficulty: 4,
+    prerequisites: ["be-distributed"],
+    frequency: "中",
+    bigTech: true,
+    summary: "ZAB 协议崩溃恢复与原子广播、临时顺序节点+Watcher 实现分布式锁、羊群效应、etcd Raft 与租约 Lease、服务注册发现、脑裂与奇数节点部署。",
+    mastery: 0,
+  },
+  {
+    id: "be-distributed-db",
+    title: "分布式数据库（TiDB/OceanBase/NewSQL/HTAP）",
+    difficulty: 5,
+    prerequisites: ["be-mysql", "be-distributed"],
+    frequency: "中",
+    summary: "TiDB TiKV Raft 多副本与 PD 调度、OceanBase Paxos 与 LSM 树、Spanner TrueTime 全局一致、PolarDB 存储计算分离、HTAP 混合负载、分布式事务 2PC 优化。",
+    mastery: 0,
+  },
+  {
+    id: "be-flink",
+    title: "实时计算（Flink 状态/窗口/水位线/Exactly-Once）",
+    difficulty: 4,
+    prerequisites: ["be-mq"],
+    frequency: "中",
+    bigTech: true,
+    summary: "KeyedState/RocksDB 状态后端、滚动/滑动/会话窗口、Watermark 乱序处理、Checkpoint 两阶段提交、Exactly-Once 语义、反压机制、实时数仓分层。",
+    mastery: 0,
+  },
+  {
+    id: "be-olap-bigdata",
+    title: "大数据与 OLAP（HBase/ClickHouse/Doris/数据湖）",
+    difficulty: 4,
+    prerequisites: ["be-mq"],
+    frequency: "中",
+    summary: "HBase LSM 树与 Region 分裂、ClickHouse 列存与向量化执行、Doris MPP 架构、Hive 分区与分桶、Iceberg/Hudi 数据湖、Lambda vs Kappa 架构选型。",
+    mastery: 0,
+  },
+  {
+    id: "be-ddd",
+    title: "架构设计与 DDD（架构演进/领域建模/中台）",
+    difficulty: 4,
+    prerequisites: ["be-microservice"],
+    frequency: "中",
+    summary: "单体→微服务→Serverless 演进、DDD 战略（限界上下文/上下文映射）与战术（实体/值对象/聚合根/领域服务）、整洁架构与六边形架构、中台战略、充血模型 vs 贫血模型。",
+    mastery: 0,
+  },
+  // ----- 安全与认证（2 个节点） -----
+  {
+    id: "be-security",
+    title: "Web 安全（SQL 注入/XSS/CSRF/SSRF/加密/防重放）",
+    difficulty: 4,
+    prerequisites: ["be-network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "SQL 注入与预编译、XSS 存储/反射/DOM 三型与 CSP、CSRF Token 与 SameSite、SSRF 内网探测、对称/非对称/国密、接口签名+时间戳+nonce 防重放、越权 IDOR。",
+    mastery: 0,
+  },
+  {
+    id: "be-auth",
+    title: "认证授权（Session-Cookie/JWT/OAuth2/SSO/RBAC）",
+    difficulty: 3,
+    prerequisites: ["be-network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "Session-Cookie vs JWT 无状态、JWT 结构与刷新令牌双 Token、OAuth2 四种模式与 OIDC、SSO 单点登录 CAS、RBAC/ABAC 权限模型、扫码登录全流程。",
+    mastery: 0,
+  },
+  // ----- DevOps 与运维（5 个节点） -----
   {
     id: "be-container",
     title: "容器化（Docker/K8s/Helm/服务网格）",
@@ -258,6 +401,25 @@ const BACKEND_NODES: KnowledgeNode[] = [
     prerequisites: [],
     frequency: "中",
     summary: "Prometheus 指标采集与 PromQL、Grafana 仪表盘、ELK 日志采集、Jaeger/SkyWalking 链路追踪、告警规则与通知。",
+    mastery: 0,
+  },
+  {
+    id: "be-perf-troubleshoot",
+    title: "线上排查与性能调优（CPU100%/OOM/慢查询/压测）",
+    difficulty: 4,
+    prerequisites: ["be-jvm", "be-mysql"],
+    frequency: "高",
+    bigTech: true,
+    summary: "CPU 100% top+jstack 定位、OOM dump+MAT 分析、Full GC 频繁排查、慢 SQL explain 优化、Arthas watch/trace 实战、全链路压测与影子库、接口超时治理。",
+    mastery: 0,
+  },
+  {
+    id: "be-cloud-native",
+    title: "云原生进阶（Service Mesh/eBPF/Serverless/FinOps）",
+    difficulty: 4,
+    prerequisites: ["be-container"],
+    frequency: "中",
+    summary: "Istio Sidecar 与 Envoy 流量治理、eBPF 可观测与网络加速、Knative Serverless 冷启动、Karpenter 弹性伸缩、FinOps 成本治理、GraalVM Native Image。",
     mastery: 0,
   },
   // ----- AI 后端方向（5 个节点） -----
