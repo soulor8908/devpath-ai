@@ -14912,6 +14912,1200 @@ watch 扇出    单连接串行推送       gRPC 流式多路   10 万 watcher �
     followUps: ["Nacos 2.x gRPC 推送相比长轮询省了什么（连接数/包大小）？", "K8s apiserver 的 watch cache 怎么缓冲 etcd 压力？"],
     favorited: false,
   },
+  // ===== 数据与存储：分布式数据库（be-285 ~ be-291）=====
+  {
+    id: "be-285",
+    nodeId: "be-distributed-db",
+    question: "分库分表中间件（ShardingSphere）和 NewSQL（TiDB/OceanBase）的本质区别？怎么选？",
+    bigTech: true,
+    answer: `结论：分库分表是「应用层分片」——多个独立 MySQL 实例，靠中间件路由 SQL，分片逻辑侵入业务；NewSQL 是「数据库原生分布式」——存储层自带分片+共识复制+分布式事务，对应用透明，像用单机 MySQL 一样用。本质差异：分布式能力做在应用侧还是数据库内核侧。
+
+\`\`\`text
+架构对比：
+分库分表（ShardingSphere/MyCat）：
+  App → 中间件(路由/改写SQL/归并结果) → MySQL×N（实例间互不通信）
+  - 中间件只懂「分片键路由」，跨分片事务/Join/子查询是噩梦
+  - 每个 MySQL 还是单机主从，高可用靠 MHA/Orchestrator 外挂
+
+NewSQL（TiDB/OceanBase/CockroachDB）：
+  App → 计算层(无状态SQL层) → 存储层(Raft 多副本，自动分片均衡)
+  - 数据按 Range/Tablet 自动切分+搬迁，扩容对应用无感
+  - 原生分布式事务（Percolator/Paxos-2PC），跨「分片」无感
+  - 副本级高可用：单节点故障 Raft 自动选主，RPO=0
+\`\`\`
+
+\`\`\`text
+选型决策树：
+数据量 < 5000 万          单机 MySQL 足够，别折腾
+数据量大但模型简单         分库分表（订单按 user_id 分片，查询全带分片键）
+（纯按 ID 查/写）          成本最低，DBA 团队成熟
+复杂查询+跨分片事务        NewSQL（TiDB）：JOIN/聚合/事务透明
++弹性扩缩容+在线 DDL
+金融级强一致+高可用        OceanBase：Paxos+三地五中心，蚂蚁/支付宝背书
+全球化部署+跨洲一致        Spanner/CockroachDB：TrueTime/原子钟或 HLC
+团队无分布式 DBA           云 RDS 分库分表 或 TiDB Cloud（托管）
+\`\`\`
+
+\`\`\`text
+迁移路线的现实考量：
+1. 分库分表 → NewSQL 的触发点：
+   - 跨分片查询需求压不住（运营/财务要全量统计）
+   - 分片键选错历史包袱（早期按时间分，后来要按用户查）
+   - 扩容要停服迁数据（rehash 32→64 库痛不欲生）
+2. NewSQL 的代价：
+   - 硬件要求高（TiKV 要 SSD+大内存，三地部署×3 副本成本）
+   - 单机性能不如原生 MySQL（网络+共识开销，点查慢 2-5 倍）
+   - 运维复杂度上移（PD 调度/TiKV 参数/热点 Region 治理）
+\`\`\`
+
+案例：拼多多/字节跳动核心交易用 TiDB——分库分表时代大促前「扩库迁移」要备一个月，换 TiDB 后在线扩容；OceanBase 支撑支付宝核心账务，双 11 峰值 6100 万次/秒，三地五中心 RPO=0 RTO<8s（2023 数据）；京东物流用 ShardingSphere 扛运单（模型简单按运单号分片）；美团将酒店业务从 Mycat 迁移到自研 NewSQL（后开源为 Titan/内部转 TiDB）。
+
+踩坑：把 NewSQL 当「更快的 MySQL」用——点查场景 TiDB 延迟 2-5ms vs MySQL 0.5ms，纯 KV 场景血亏；分库分表后还用 SELECT * 不带分片键（广播全分片，中间件归并 OOM）；NewSQL 里滥用自增 ID 当主键（写入全压到尾部 Region 形成热点，TiDB 要 SHARD_ROW_ID_BITS 打散）；以为分布式事务免费——跨 Region 事务延迟是单机 10 倍，热点行冲突性能雪崩（账务类要把热点账户拆分）；分库分表的全局 ID 用数据库自增（步长错位法维护痛苦，直接上雪花 ID/号段）。`,
+    keyPoints: ["应用层分片 vs 内核级分布式", "NewSQL=透明分片+原生分布式事务+Raft 高可用", "点查场景 NewSQL 不如单机，复杂查询才回本"],
+    followUps: ["TiDB 的 SHARD_ROW_ID_BITS 和 AUTO_RANDOM 怎么防写热点？", "分库分表平滑迁移到 TiDB 的双写方案怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "be-286",
+    nodeId: "be-distributed-db",
+    question: "TiDB 的架构（TiDB Server/TiKV/PD）？数据怎么分布和调度？",
+    bigTech: true,
+    answer: `结论：TiDB 三层分离：TiDB Server = 无状态 SQL 计算层（解析/优化/执行，可水平扩）；TiKV = 分布式 KV 存储层（数据按 96MB Region 切片，每 Region 三副本 Raft 组）；PD（Placement Driver）= 集群大脑（存元数据+分配 TSO 全局时间戳+调度 Region 均衡/热点）。存储计算分离 + Raft 每 Region 独立选主，是它能弹性扩缩且 RPO=0 的根本。
+
+\`\`\`text
+数据分布全景：
+表数据 → 按主键范围切成多个 Region（默认 96MB/144 万行切分）
+每个 Region = 一个 Raft Group（3 副本：1 Leader + 2 Follower）
+Region 的副本分布在不同 TiKV 节点上（PD 保证跨机架/AZ）
+
+写入路径：
+SQL → TiDB Server → 找 PD 查「key 属于哪个 Region、Leader 在哪」
+  → 发请求给该 Region 的 Leader 副本 → Raft 复制到 2 个 Follower
+  → 过半提交 → 返回
+（PD 路由信息缓存在 TiDB Server，miss 或 Leader 迁移时刷新）
+
+扩容过程（加一台 TiKV）：
+1. PD 发现新节点 → 逐步把部分 Region 的副本「搬」过去
+2. 搬迁=新节点加入 Raft Group 作 Learner → 同步完 → 转 Voter
+   → 老副本删除（全程在线，业务无感）
+\`\`\`
+
+\`\`\`text
+PD 的三大职责：
+1. 元数据：Region→TiKV 的路由表（客户端查询入口）
+2. TSO（Timestamp Oracle）：全局单调递增时间戳分配
+   = 物理时间(18位前缀) + 逻辑计数，分布式事务的「全局时钟」
+   （TiDB 4.0 后 TSO 支持批量+本地缓存，不然 TSO 是瓶颈）
+3. 调度器：
+   - 均衡：各 TiKV 的 Region 数/Leader 数/存储量均衡
+   - 热点治理：热点 Region 拆分+迁移（follow-the-workload）
+   - 高可用：副本丢失（节点宕机）后补齐副本
+\`\`\`
+
+\`\`\`text
+Raft 在 TiKV 的优化（Multi-Raft）：
+单机可能有 10 万个 Region = 10 万个 Raft Group
+- 心跳合并：同一对 TiKV 之间的所有 Raft 心跳打包发送（Raft Message 合并）
+- 批量复制：日志 append 按批提交
+- 负载感知：Leader 不集中在某节点（PD 调度 Leader 均衡）
+- Hibernate Region：静默 Region（无流量）暂停心跳省 CPU
+\`\`\`
+
+案例：TiDB 在知乎已读服务——10 万亿行 KV，靠 Region 自动分裂合并承载；小红书将 MySQL 分库分表迁 TiDB，PD 热点调度扛住双 11 笔记流；神州数码用 TiDB 替换 Oracle 的 RAC，PD 的 TSO 支撑跨 Region 的 SI 隔离事务。热点治理案例：某厂按时间戳递增 ID 写日志表，尾部 Region 单点 5 万 QPS 打满，PD 自动 split + 手动 split region 打散。
+
+踩坑：Region 热点——顺序写入（自增主键/时间索引）永远压向最后一个 Region，其他节点围观（必须 AUTO_RANDOM 或预分裂）；PD 宕机=集群不可写新时间戳（PD 自身也是 Raft 3/5 节点，但 TSO 分配停顿=事务阻塞）；大范围扫表（count(*) 全表）打爆 TiKV 的 Coprocessor 线程池（要下推计算或走 TiFlash 列存）；大事务（单事务 100MB 上限）撑爆 TiKV 内存（拆批提交或开 BigTxn 优化）；跨机房三副本（RT 10ms=写延迟 10ms，同城三 AZ 是上限）；region merge 参数不当导致小 Region 过多（百万 Region 时 PD 心跳和元数据压力陡增）。`,
+    keyPoints: ["计算无状态+存储 Multi-Raft+PD 大脑", "Region 96MB 切片，搬迁=Learner→Voter", "TSO 全局时钟是分布式事务地基"],
+    followUps: ["TiKV 的 Coprocessor 下推了哪些计算（谓词/聚合）？", "PD 的 TSO 为什么不做成批量预分配（性能 vs 时钟回拨）？"],
+    favorited: false,
+  },
+  {
+    id: "be-287",
+    nodeId: "be-distributed-db",
+    question: "OceanBase 和 Google Spanner 各自怎么实现全球级强一致？（Paxos vs TrueTime）",
+    bigTech: false,
+    answer: `结论：两者都解决「跨地域部署下的强一致读写」，路线不同。OceanBase 走 Multi-Paxos——每个分区（Partition）独立 Paxos 组，多数派部署在多数城市，单机故障/单城灾难不影响多数派；Spanner 走 TrueTime——用原子钟+GPS 把「物理时钟不确定区间」变成可计算的 TT.after() 等待，实现全球外部一致性（线性一致），无需每次跨洲共识读。
+
+\`\`\`text
+OceanBase 的 Paxos 落地（三地五中心=蚂蚁经典部署）：
+- 数据按 Partition 分片，每 Partition 5 副本：
+  上海×2 + 杭州×2 + 深圳×1（或类似组合）
+- 多数派=3：上海+杭州任意组合即可达成多数 → 单城全灭不丢数据
+  （深圳挂了：沪杭 4 副本在；上海挂了：杭州 2+深圳 1=3 仍多数）
+- 写路径：Leader 在本城，日志同步多数派（跨城 RT 1-5ms 级，可接受）
+- 读优化：Follower 提供「弱一致读」分流；强读走 Leader 或
+  「读已提交的最大版本」（max_committed_ts 之后即可）
+- 存储：LSM 树（写友好），基线 SSTable + 增量 MemTable，
+  每日合并（merge）是著名运维点（大合并期间 IO 压力）
+\`\`\`
+
+\`\`\`text
+Spanner 的 TrueTime（2012 论文，全球分布式标杆）：
+问题：跨洲共识延迟无法接受每次读都走 Paxos（美欧 RT 100ms+）
+方案：让时钟本身成为「一致性凭证」
+1. 每个数据中心配 GPS 接收器+原子钟，全局校准
+2. TrueTime API 返回的不是一个时间点，而是区间 [earliest, latest]
+   （误差 ε 通常 1-7ms）
+3. 提交等待（Commit Wait）：
+   事务提交时间戳 s = TT.now().latest
+   必须等到 TT.after(s) 为真（真实时间确定越过 s）才返回客户端
+   → 任何后来的读（无论哪个洲）时间戳 > s，必然看到该事务
+   → 用「等待 ε」换来「全球线性一致」，ε 越小等待越短
+4. 读：快照读@时间戳，任何副本上满足 safe_time 即可服务，无需共识
+\`\`\`
+
+\`\`\`text
+对比总结：
+维度        OceanBase                Spanner
+一致性机制  Paxos 多数派              TrueTime+Paxos（写）+等待（提交）
+跨城写延迟  多数派 RT（同城级可优化）   跨洲 Paxos RT（100ms+，但批量摊薄）
+跨城读      弱读副本/强读 Leader       快照读本地副本（safe_time 内免费）
+硬件依赖    无特殊依赖                原子钟+GPS（云厂商才玩得起）
+开源/获取   开源+蚂蚁云               Google Cloud 独占（CockroachDB 是
+                                    开源平替，用 HLC 混合逻辑时钟）
+适用        国内金融级强一致           全球化业务（Google AdWords 账本）
+\`\`\`
+
+案例：OceanBase 在支付宝账务——双 11 核心链路三地五中心，2019 年 tpmC 7088 万破 TPC-C 纪录；江西银行/招商证券核心系统去 IOE 上 OB。Spanner 支撑 Google AdWords 广告账本——全球广告扣费的强一致；CockroachDB 用 HLC（无原子钟，ε 放宽到 250-500ms，commit wait 换 max_offset）在 Commerzbank 等欧洲银行落地；TiDB 的 follow-the-sun 多活借鉴 Spanner 的 placement 思路。
+
+踩坑：OB 的每日大合并没错峰（IO 打满业务抖动，要按 zone 轮转合并）；以为 Paxos 五副本没有成本（存储×5+网络×5，OB 的 2-2-1 是成本妥协）；Spanner 的 commit wait 在 ε 抖动时尾延迟飙升（GPS 信号受干扰时 ε 变大）；CockroachDB 把 max_clock_offset 配太小（时钟跳变直接致命错误 kill 节点）；把跨城强一致用于所有业务（80% 的业务最终一致就够，强一致留给账务/库存核心）。`,
+    keyPoints: ["OB=Paxos 多数派地理分布，三地五中心", "Spanner=TrueTime 区间+Commit Wait 换全球线性一致", "强一致有地域 RT 成本，核心链路才用"],
+    followUps: ["CockroachDB 的 HLC 在时钟回拨时怎么处理（restart 保护）？", "OB 4.x 的单机分布式一体化怎么降低小客户门槛？"],
+    favorited: false,
+  },
+  {
+    id: "be-288",
+    nodeId: "be-distributed-db",
+    question: "分布式事务怎么做？2PC、TCC、Saga、Percolator 各适合什么场景？",
+    bigTech: true,
+    answer: `结论：按「一致性强度×侵入性」分四档：2PC/XA = 强一致+零业务侵入但阻塞（数据库级，吞吐低）；Percolator = 强一致快照隔离+乐观锁（NewSQL 内核用，对应用透明）；TCC = 业务自己写 Try/Confirm/Cancel（强一致+高性能但侵入大，金融核心用）；Saga = 最终一致+补偿回滚（长流程用，如旅行预订）。选型一句话：内核能搞定的别写业务代码，写业务代码的选好幂等和防悬挂。
+
+\`\`\`text
+四种模式速览：
+模式        一致性    业务侵入  性能    典型应用
+2PC/XA      强一致    无        差      MySQL XA 事务（金融老系统联机）
+Percolator  快照隔离  无        中      TiDB/OceanBase 内核跨 Region 事务
+TCC         强一致    极大      高      蚂蚁金服从支付宝时代传承的核心交易
+Saga        最终一致  大        高      电商订单履约（下单→扣库存→支付→发货）
+本地消息表  最终一致  中        高      业务与 MQ 的一致性（最常用兜底）
+\`\`\`
+
+\`\`\`text
+Percolator（Google 论文，TiKV 实现）——快照隔离的分布式事务：
+核心数据结构：每行有 lock 列 + write 列（CF 存储）
+事务流程：
+1. 取 start_ts（TSO）
+2. Prewrite（所有写操作）：写 lock{primary: 主锁key, ts: start_ts}
+   检查：无其他锁 & 该 ts 之后无新写入（写写冲突检测）
+3. 取 commit_ts（TSO）
+4. Commit：先提交 primary lock（写 write{start_ts→commit_ts}，删 lock）
+   → 主锁提交成功=事务成功（原子点！），异步提交其他 secondary 锁
+读流程：遇到 lock → 检查 lock 的 ts 是否过期 → 过期则 resolve（回滚或
+补提交），未过期则等待/返回冲突
+故障恢复：任何节点挂了，其他事务靠 primary lock 状态推断事务结局
+（主锁没了+write 有记录=已提交；主锁还在且过期=回滚）
+\`\`\`
+
+\`\`\`java
+// TCC（Try-Confirm-Cancel）手写骨架——以扣款为例
+@Transactional
+public boolean tryDeduct(String txId, long userId, long amount) {
+    // Try：资源预留（冻结，不是真扣！）
+    if (accountMapper.freeze(txId, userId, amount) == 0) return false;
+    // 幂等：txId 唯一约束，重复 Try 直接返回已有记录
+    // 防悬挂：插入事务状态表 TRYING，空回滚时检查到就拒收 Cancel
+    return true;
+}
+public boolean confirmDeduct(String txId) {
+    // Confirm：真扣（冻结转实扣），必须幂等
+    return accountMapper.freezeToDeduct(txId) > 0;
+}
+public boolean cancelDeduct(String txId) {
+    // Cancel：解冻，必须幂等 + 防空回滚（没 Try 过的 Cancel 要记录）
+    return accountMapper.unfreeze(txId) > 0;
+}
+// 框架（Seata TCC/ByteTCC）负责驱动 Confirm/Cancel 重试直到成功
+\`\`\`
+
+\`\`\`text
+Saga 补偿（长流程标配）：
+正向：下单 → 扣库存 → 支付 → 发货
+补偿：       ↑释放    ↑退款    ↑拦截物流
+每个步骤失败 → 反向按序执行补偿（补偿也要幂等！）
+编排方式：
+- 编排式（Orchestration）：中央 Saga 状态机驱动（Seata Saga/Camunda）
+- 事件式（Choreography）：各服务听 MQ 事件接力（简单但链路难追踪）
+\`\`\`
+
+案例：蚂蚁核心交易全链路 TCC——支付宝转账的「冻结-扣款」模型支撑双 11 百万 TPS；TiDB 用 Percolator 支撑跨 Region 转账事务（知乎/拼多多在用）；Seata AT 模式（改进版 XA：全局锁+undo_log 自动补偿）在中腰部电商流行；Uber 自研 Saga（Cadence/Temporal 前身）编排打车长流程；本地消息表在美团外卖订单→积分发放链路兜底 MQ 一致性。
+
+踩坑：TCC 三异常全踩——空回滚（Cancel 先于 Try 到达：Try 网络超时触发 Cancel，要记录 Cancel 状态让后来的 Try 拒绝=防悬挂）、悬挂（Try 比 Cancel 晚到，资源永久冻结）、幂等（Confirm/Cancel 重试重复执行）；Saga 补偿本身失败（补偿要有独立告警+人工入口+死信队列）；2PC 的协调者单点+同步阻塞（参与者 locked 等协调者恢复，数据锁死——生产少用 XA 跨库）；Percolator 的热点行（所有事务改同一行=串行化，账务热点账户要拆分子账户）；Seata AT 的全局锁在长事务下锁竞争雪崩（AT 适合短事务，长流程上 Saga/TCC）。`,
+    keyPoints: ["2PC 阻塞/TCC 高性能高侵入/Saga 补偿最终一致", "Percolator=主锁原子提交点+快照隔离", "TCC 三防：幂等+空回滚+悬挂"],
+    followUps: ["Seata AT 的 undo_log 怎么实现自动补偿（前后镜像）？", "Percolator 的 async commit 怎么再省一次 RPC？"],
+    favorited: false,
+  },
+  {
+    id: "be-289",
+    nodeId: "be-distributed-db",
+    question: "PolarDB/Aurora 的存储计算分离架构是什么？为什么能 15 分钟扩容？",
+    bigTech: false,
+    answer: `结论：存储计算分离 = 计算节点（无状态，只跑 SQL 引擎）与存储节点（分布式共享存储，多副本）解耦，计算节点通过 RDMA 高速网访问共享存储。相比传统主从复制：数据只有一份（存储层三副本是存储自己的事），加只读节点不用拷数据（挂载即用）——这是「15 分钟扩 1 个只读节点 vs 传统几小时拷数据」的根本原因。核心黑科技：redo log 即数据（Aurora 名言：The log is the database）。
+
+\`\`\`text
+架构（以 Aurora/PolarDB 为蓝本）：
+计算层：1 主（读写）+ N 只读（最多 15 个），无状态
+  - Buffer Pool、undo、事务状态全在计算节点内存
+  - 崩溃恢复：重启后从共享存储拉 redo 回放，分钟级（传统要全量恢复）
+存储层：6 副本跨 3 AZ（Aurora）/ 3 副本（PolarDB PolarStore）
+  - 写入只发 redo log（不发数据页！）→ 网络流量降 10 倍+
+  - 存储节点后台把 redo 持续物化成数据页（page materialize）
+  - 读页：计算节点缺页 → 向存储节点请求「某页的某 LSN 版本」
+  - 写 quorum 4/6，读 quorum 3/6 → 容忍 2 副本写失败/3 副本读失败
+
+扩容为什么快：
+- 加只读 = 启动计算节点 + 挂载共享存储（数据已在）→ 分钟级
+- 传统主从加只读 = 全量备份恢复 + binlog 追平 → TB 级数据要数小时
+- 存储扩容 = 存储层按 10GB 块（Protection Group）自动条带化扩展，
+  对计算透明 → 单实例 128TB（Aurora）
+\`\`\`
+
+\`\`\`text
+redo log 即数据的深义：
+传统 MySQL 主从：binlog 复制 → 从库 SQL 线程重放 → 延迟且耗 CPU
+Aurora 模式：
+- 主库只把 redo log（物理日志，「某页某偏移改某字节」）发给存储层
+- 只读节点读数据时：页缓存 miss → 从共享存储读「最新物化页」
+- 只读延迟 = 主库 redo 到达存储层并被物化的延迟 ≈ 毫秒级
+  （传统主从复制延迟秒级~分钟级）
+- 存储层自行维护多副本一致（quorum 自愈：坏副本从好副本重建）
+\`\`\`
+
+\`\`\`text
+对比：存算分离 vs 传统主从 vs NewSQL
+维度        PolarDB/Aurora        传统 RDS 主从        TiDB(NewSQL)
+数据份数    1 份逻辑(存储多副本)   N 节点 N 份          每 Region 3 副本
+加只读      分钟级(挂载)           小时级(拷数据)        加 TiDB Server 秒级
+写扩展      单写节点(垂直扩)       单写节点              多节点并发写(水平)
+存储上限    128TB                 受单机磁盘限制        近乎无限
+写延迟      本地 quorum(微秒级)    本地写               Raft 过半(毫秒级)
+跨 AZ RPO   0(6副本)              异步复制 RPO>0        0(Raft)
+适用        单写多读大实例         中小业务              海量水平扩展
+\`\`\`
+
+案例：Aurora 是 AWS 增长最快的服务——Netflix/Samsung 的 MySQL 迁移目标；PolarDB 支撑阿里电商商品库，双 11 期间分钟级加只读节点扛读流量，2021 年 tpmC 破纪录；腾讯云 TDSQL-C（原 CynosDB）同架构服务微信读书；Socrates（微软 SQL Server 存算分离）把 page server 下沉到 Azure 存储。
+
+踩坑：以为存算分离=无限扩展（写节点只有一个！写 TPS 天花板 = 单计算节点性能，要分片还得靠 NewSQL 或分库分表）；只读节点的「读己之写」场景延迟（刚写完立刻读只读节点可能读到旧物化页，要 session 一致性/强制走主）；存储层按 IOPS 计费的模式（Aurora）在扫表大户账单爆炸；页物化延迟在写入洪峰时累积（redo apply 跟不上，只读延迟增大，要监控）；共享存储的单点逻辑（多副本防的是副本坏，存储层软件 bug 是全集群风险——云厂商的保险是快照+跨区复制）；本地 NVMe 缓存（PolarDB 的 PolarProxy/Aurora 的 cache）暖机期性能爬坡。`,
+    keyPoints: ["计算无状态+共享存储，加只读=挂载即用", "redo 即数据，网络只传日志", "单写节点是天花板，海量写要 NewSQL"],
+    followUps: ["Aurora 的 quorum 自愈怎么检测坏副本（gossip+crc）？", "存算分离下 Buffer Pool 失效后性能断崖怎么缓解？"],
+    favorited: false,
+  },
+  {
+    id: "be-290",
+    nodeId: "be-distributed-db",
+    question: "HTAP 是什么？TiDB 的 TiFlash 列存副本怎么实现「一份数据两种查询」？",
+    bigTech: false,
+    answer: `结论：HTAP = 同一套系统同时扛 TP（高并发小事务）和 AP（复杂分析查询）。传统方案是「MySQL + Canal 同步 + ClickHouse」两套系统——延迟分钟级+运维两套+口径不一致。TiDB 的解法：TiKV（行存，服务 TP）+ TiFlash（列存副本，服务 AP），两者用 Raft Learner 复制保持一致（毫秒~秒级延迟），优化器按代价自动选行存还是列存——业务一份数据，两种负载。
+
+\`\`\`text
+TiDB HTAP 架构：
+              ┌──────────── TiDB Server（SQL 层，MPP 引擎）
+              │      优化器：点查/小范围→TiKV；大聚合/扫表→TiFlash
+写入 → TiKV（行存 RocksDB，Raft Leader 服务读写）
+         │ Raft Log（Learner 角色：只复制不投票，不影响 TP 共识延迟）
+         ↓
+      TiFlash（列存，DeltaTree 引擎）
+         - 作为 Raft Learner 异步复制 TiKV 数据
+         - 列式存储：同一列连续存，压缩率 10x，聚合只读需要的列
+         - 向量化执行：一次处理一批（8192 行）而非一行，SIMD 加速
+         - MPP：大查询拆成子任务下发到多个 TiFlash 节点并行
+
+一致性读：TiFlash 收到查询 → 带 TSO 向 TiKV Leader 校验
+  「我的复制进度 ≥ 该 TSO？」→ 不够就等/补 → 保证快照一致
+\`\`\`
+
+\`\`\`text
+为什么行存 TP 快、列存 AP 快（本质）：
+行存（RocksDB/B+树）：
+  点查「id=9527 的整行」→ 一次 IO 全拿到 ✓
+  聚合「1 亿行的 amount 求和」→ 读 1 亿整行（含无用列）✗
+列存（DeltaTree/Parquet）：
+  点查 → 要拼装 N 个列文件 ✗（小查询放大 100 倍）
+  聚合 → 只读 amount 列 + 压缩 + SIMD 批量 → 快 100 倍 ✓
+  谓词下推+zone map（min/max 索引）跳过无关数据块
+\`\`\`
+
+\`\`\`text
+HTAP 方案横向对比：
+方案                    延迟      一致性      运维      代表
+ETL 同步到 OLAP          分钟~小时  最终一致    两套      MySQL+Canal+ClickHouse
+TiDB TiFlash            毫秒~秒    快照一致    一套      字节/小红书部分在用
+OceanBase 行列混存       秒级       强一致      一套      OB 4.x（行存+列存副本）
+PolarDB IMCI            秒级       快照一致    一套      阿里 IMCI 列索引
+Oracle In-Memory        实时       强一致      一套(贵)  老牌商用
+Google AlloyDB          秒级       快照一致    云托管    AWS/GCP 托管路线
+\`\`\`
+
+案例：小红书用 TiDB HTAP 支撑「交易订单实时看板」——订单写 TiKV，运营实时 SQL 直接打 TiFlash，告别凌晨 ETL；中通快递把 Oracle 报表迁 TiDB，运单轨迹实时分析从 T+1 变 T+10s；某券商用 OB 行列混存做盘后实时风控。反面：某厂把所有分析 SQL 打 TiFlash 但忘了设资源隔离，AP 大查询挤爆 CPU 导致 TP 点查超时（要开 MPP 资源组/独立 TiFlash 节点）。
+
+踩坑：以为 TiFlash 能完全替代 ClickHouse（极端宽表+超高压缩比的纯 AP 场景，专业 OLAP 仍领先 2-5 倍；HTAP 主打「新鲜度+一套系统」）；AP 查询没走 MPP（老版本 TiFlash 单节点执行，大查询慢，要确认 explain 里有 ExchangeSender）；行存索引在 AP 大查询里反而帮倒忙（优化器选错，要 hint read_from_storage(tiflash)）；Raft Learner 复制在写入洪峰时延迟拉大（AP 查询等待 snapshot 追赶，监控 tiflash_replica_read_delay）；列存副本默认 0（不建白搭），且要按表设置副本数，大表全列存成本翻倍（可以只给需要的表/分区开）。`,
+    keyPoints: ["TiKV 行存 TP+TiFlash 列存 AP，Raft Learner 异步复制", "优化器按代价选存储引擎", "HTAP 主打新鲜度和单系统，极端 AP 仍选专业 OLAP"],
+    followUps: ["TiFlash 的 DeltaTree 和 DeltaMerge 怎么处理更新（列存写难题）？", "MPP 的 Exchange 算子和 Spark 的 Shuffle 异同？"],
+    favorited: false,
+  },
+  {
+    id: "be-291",
+    nodeId: "be-distributed-db",
+    question: "分布式数据库的全局索引和局部索引区别？跨分片唯一约束怎么保证？",
+    bigTech: false,
+    answer: `结论：局部索引 = 每个分片只索引自己的数据（快，但非分片键查询要广播）；全局索引 = 索引本身也是一张按索引键分片的分布式表（非分片键点查直达，但写入要同步维护索引表=分布式事务开销）。跨分片唯一约束是分布式 DB 的硬骨头：单机靠 B+ 树唯一索引 O(1) 判重，跨分片必须让「同一唯一键值一定落到同一分片」或引入全局判重服务。
+
+\`\`\`text
+局部索引 vs 全局索引（以 TiDB/OceanBase 为例）：
+表：order(id PK, user_id, order_no, amount)，按 user_id 分片
+
+局部索引 idx_order_no(order_no)：
+  - 每个分片各自建 B+ 树，只含本分片数据
+  - 查询 WHERE order_no='X' → 不知道在哪个分片 → 广播所有分片各查一次
+    （分片越多扇出越惨，128 分片=128 次内部查询）
+  - 写入：索引和数据同分片，本地事务内更新，无额外开销
+
+全局索引（TiDB 5.x+ 支持）：
+  - 索引数据独立按 order_no 分片（和数据的分片规则不同）
+  - WHERE order_no='X' → 按 order_no 路由到索引分片 → 拿到主键
+    → 按主键回表 → 2 次 RPC 直达
+  - 写入：一笔订单写数据分片+写索引分片 → 跨分片 2PC 事务
+    → 写延迟翻倍，热点索引键（如 status 字段）会成为瓶颈
+\`\`\`
+
+\`\`\`text
+跨分片唯一约束的四种实现：
+1. 唯一键包含分片键（最常用！）
+   unique(user_id, order_no) → 同一 user_id 必同分片 → 本地唯一索引就够
+   业务设计时就该让唯一约束带上分片键（ShardingSphere 强制要求）
+2. 全局唯一索引（NewSQL 原生）
+   TiDB/OB：索引即表，unique 索引项按索引键分片，写入走分布式事务判重
+   成本：写放大+2PC，QPS 高的唯一键（手机号注册）要压测
+3. 全局判重服务（应用层）
+   手机号注册：先 Redis SETNX phone→uid（或独立的「分配表」单库）
+   成功才写分片 → 判重逻辑收敛到一个点
+4. 号段/雪花 ID 天然唯一（主键场景）
+   主键唯一性由 ID 生成算法保证，不靠数据库约束
+\`\`\`
+
+\`\`\`text
+选型经验：
+- 能用「分片键+业务键」做联合唯一就别上全局索引（零成本）
+- 非分片键查询 QPS 高且唯一 → 全局索引（NewSQL）或冗余映射表
+- 映射表（order_no → user_id 的一张全局小表，单库存放）
+  = 应用层全局索引，查询先路由映射表再路由数据，写入双写要事务
+- ES 异步索引：非实时场景把查询甩给搜索引擎，数据库不管
+\`\`\`
+
+案例：淘宝订单表按 buyer_id 分片，卖家查询走「卖家维度冗余表」（异构双写，数据团队维护一致性）——这就是应用层的全局索引思想；TiDB 全局索引支撑某电商「订单号直接查询」（订单号不含 user_id）场景；美团 Leaf 号段服务保证全局唯一 ID 不依赖分片约束；Instagram 早年用「逻辑时钟+用户 ID+序列」自研 ID，避免全局判重。
+
+踩坑：全局索引热点——给 status（只有 3 个值）建全局索引，所有写「status=1」索引项的事务挤一个分片；全局索引和数据一致性在「异步维护」方案里丢数据（消息队列同步索引挂了就索引缺失，要有对账任务）；全局唯一索引在 NewSQL 里写入 TPS 打 5-7 折（2PC 开销），注册中心级别的判重要 Redis 前置挡；分库分表下用 REPLACE INTO/INSERT IGNORE 依赖唯一约束（跨分片失效，变重复数据）；迁移期「老局部索引+新全局索引」并存，优化器选错导致查询扇出（要用 hint 钉死）。`,
+    keyPoints: ["局部索引快但要广播，全局索引直达但写放大", "唯一约束首选「分片键+业务键」联合唯一", "映射表=应用层全局索引"],
+    followUps: ["TiDB 全局索引的写入路径（index backfill）怎么做在线变更？", "MongoDB 分片集群的唯一索引限制（必须含分片键前缀）设计理由？"],
+    favorited: false,
+  },
+  // ===== 数据与存储：实时计算 Flink（be-292 ~ be-298）=====
+  {
+    id: "be-292",
+    nodeId: "be-flink",
+    question: "Flink 的状态（State）是什么？三种状态后端怎么选？RocksDB 状态为什么能扛 TB 级？",
+    bigTech: true,
+    answer: `结论：状态 = 流计算中「算子记住的历史信息」——窗口聚合的中间结果、去重用的集合、CEP 的匹配进度。无状态计算（map/filter）随便扩缩容，有状态计算的核心难题是「状态存哪、故障怎么恢复、扩缩容怎么迁移」。三种状态后端：Memory（堆内，测试用）、FsState（堆内+快照到 HDFS，生产中等状态）、RocksDB（本地磁盘 LSM，增量快照，TB 级状态生产标配）。
+
+\`\`\`java
+// 状态的两种形态（API 层）
+// 1. Keyed State（主流，按 key 分区存储）
+stream.keyBy("userId").process(new KeyedProcessFunction<>() {
+    private ValueState<Long> clickCount;      // 单值
+    private ListState<Event> recentEvents;    // 列表
+    private MapState<String, Long> pageStats; // Map
+    private ReducingState<Long> totalAmount;  // 聚合（自动 reduce）
+    public void open(Configuration c) {
+        clickCount = getRuntimeContext().getState(
+            new ValueStateDescriptor<>("cnt", Long.class));
+    }
+});
+// 2. Operator State（算子级，不按 key——Kafka 消费的 offset 就是典型）
+\`\`\`
+
+\`\`\`text
+三种状态后端对比：
+维度        MemoryStateBackend   FsStateBackend        RocksDBStateBackend
+运行时存    堆内对象             堆内对象              本地 RocksDB(堆外+磁盘)
+状态上限    MB 级                GB 级(受堆限制)       TB 级(受磁盘限制)
+访问延迟    纳秒级(对象引用)      纳秒级                微秒级(序列化+LSM 读)
+快照        全量，慢             全量到 HDFS           增量快照(只传变化 SSTable)
+OOM 风险    高                   中                    无(超内存自动落盘)
+适用        单元测试             中等状态(分钟级窗口)   生产大状态(小时/天级窗口)
+\`\`\`
+
+\`\`\`text
+RocksDB 扛 TB 级的原理：
+1. LSM 树：写先进 MemTable → 满则 flush 成 SSTable（顺序写，快）
+   读：MemTable → Block Cache → 逐层 SSTable（布隆过滤器过滤）
+2. 增量 Checkpoint：每次快照只需把「新增的 SSTable 文件」上传 HDFS
+   （已上传的文件不可变，引用计数共享）→ TB 状态分钟级快照
+3. 堆外内存：MemTable/BlockCache 走 native 内存，不受 GC 影响
+   （要配 taskmanager.memory.managed 系列参数，容器里注意总限额）
+4. 本地磁盘：SSD 是底线（HDD 随机读放大打死算子）
+\`\`\`
+
+案例：字节跳动广告计费——Flink 任务状态 10TB+（用户行为去重集），RocksDB + 增量 checkpoint 每分钟一次；美团实时数仓的 UV 明细状态用 RocksDB + TTL（StateTtlConfig 自动过期，防状态无限膨胀）；阿里双 11 实时大屏，单任务 keyed state 百亿条。反面：某厂用 FsStateBackend 跑 24 小时窗口去重，堆内存撑爆 Full GC 雪崩，换 RocksDB 后稳定。
+
+踩坑：状态不设 TTL——用户画像类任务状态只增不减，RocksDB 磁盘打满（StateTtlConfig 必配，按业务窗口+1 天）；RocksDB 的 BlockCache 没调大（默认 8MB 太小，读放大 CPU 飙高）；Checkpoint 目录复用（两个 job 写同一 HDFS 路径互相覆盖，恢复出别的 job 状态=数据错乱）；扩容改并行度后 KeyedState 重分布（KeyGroup 重分配，恢复时自动，但 rescale 瞬间吞吐下降要预案）；用小文件多的 HDFS 做 checkpoint（百万 checkpoint 文件打爆 NameNode，要 checkpoint 定期清理+合并）；State 里存不可序列化的对象（RocksDB 后端强制序列化，Kryo 注册表不一致恢复失败）。`,
+    keyPoints: ["KeyedState 按 key 分区，RocksDB 增量快照扛 TB", "State TTL 必配防无限膨胀", "生产大状态=RocksDB+SSD+增量 checkpoint"],
+    followUps: ["Flink 扩缩容时 KeyGroup 怎么重分布（rescale 不丢状态）？", "State 的 ForSt 新后端相比 RocksDB 改进在哪（存算分离）？"],
+    favorited: false,
+  },
+  {
+    id: "be-293",
+    nodeId: "be-flink",
+    question: "Flink 的滚动、滑动、会话窗口区别？事件时间 vs 处理时间怎么选？",
+    bigTech: true,
+    answer: `结论：窗口 = 把无限流切成有限批次做聚合的手段。滚动窗口（Tumbling）：固定长度、不重叠（每分钟一组）；滑动窗口（Sliding）：固定长度+步长、可重叠（每 10 秒统计最近 1 分钟）；会话窗口（Session）：按活动间隙切分（用户 30 分钟没操作就关窗）。时间语义：事件时间（Event Time，数据自带时间，乱序可纠正，生产必选）vs 处理时间（Processing Time，到达算子的系统时间，快但结果不可复现）。
+
+\`\`\`java
+// 三种窗口代码速览（DataStream API）
+// 1. 滚动：每分钟 UV
+stream.keyBy("page").window(TumblingEventTimeWindows.of(Time.minutes(1)))
+      .aggregate(new UvCounter());
+// 特点：12:00:00-12:01:00 一个窗，12:01:00-12:02:00 下一个，不重叠
+// 每条数据只属于 1 个窗口
+
+// 2. 滑动：每 10s 输出最近 1 分钟的均值（监控指标常用）
+stream.keyBy("metric").window(SlidingEventTimeWindows.of(
+      Time.minutes(1), Time.seconds(10))).aggregate(new Averager());
+// 特点：每条数据属于 6 个窗口（60/10），计算量×6，输出密
+
+// 3. 会话：用户行为会话切割（gap=30min）
+stream.keyBy("userId").window(EventTimeSessionWindows.withGap(Time.minutes(30)))
+      .process(new SessionAnalyzer());
+// 特点：窗口长度不固定，数据驱动；两个事件间隔<gap 就合并窗口
+\`\`\`
+
+\`\`\`text
+事件时间 vs 处理时间（面试必考对比）：
+维度        事件时间 EventTime           处理时间 ProcessingTime
+依据        数据里的 timestamp 字段       算子机器的系统时钟
+乱序        靠 Watermark 容忍             不存在乱序概念（来了就处理）
+重放结果    可复现（同数据同结果）        不可复现（重跑时间变了）
+延迟数据    可处理（allowedLateness）     无法识别
+时钟依赖    无（逻辑时钟推进）            依赖机器时钟
+适用        生产默认（报表/计费/对账）    实时监控（对绝对精度不敏感，
+                                   只要快——如 QPS 大屏）
+\`\`\`
+
+\`\`\`text
+窗口触发与迟到处理完整链路：
+1. Watermark 推进：WM = 观察到的最大事件时间 - 允许乱序(如 10s)
+2. 触发条件：WM > 窗口 endTime → 触发计算
+3. 迟到数据（WM 已越过窗口 endTime 后才到达）：
+   - allowedLateness(1min)：额外容忍 1 分钟，每条迟到数据触发重算
+   - sideOutputLateData：再晚的进侧输出流（单独收集对账/告警）
+4. 窗口销毁：WM > endTime + allowedLateness → 状态清理
+\`\`\`
+
+案例：阿里双 11 实时 GMV——事件时间+滚动窗口，Watermark 允许 5s 乱序，跨机房传输延迟靠 allowedLateness 30s 兜底；滴滴实时计费按行程事件时间开窗（手机弱网补传数据也能正确计费）；某厂用处理时间做实时对账，凌晨机房时钟跳变（NTP 校准）导致窗口数据重复计算，资损数万——计费类必须事件时间。会话窗口经典场景：App 用户行为分析（友盟/GrowingIO 的会话切割逻辑同源）。
+
+踩坑：滑动窗口步长太小（1min 窗口 1s 步长=60 倍计算量，metric 全聚合 CPU 爆炸）；会话窗口 gap 设太大（用户隔夜回来被并入昨天会话）或太小（一次浏览被切成多个会话，行业标准 gap=30min）；事件时间字段解析错（日志里多个时间戳，取了采集时间不是业务时间）；Watermark 设太保守（允许乱序 10min=所有窗口延迟 10min 出结果，老板看到的「实时」大屏是 10 分钟前的）；滑动窗口+长 allowedLateness 的状态膨胀（每窗都保留到 lateness 结束）；窗口里用 ProcessWindowFunction 全量缓存数据再算（应该用增量 aggregate，全量缓存大窗口必 OOM）。`,
+    keyPoints: ["滚动 1 对 1/滑动 1 对 N/会话数据驱动", "生产用事件时间+Watermark，处理时间只做粗监控", "迟到三档：乱序容忍→allowedLateness→侧输出"],
+    followUps: ["Watermark 多并发/多分区时怎么取最小值（对齐语义）？", "会话窗口的合并机制在 Checkpoint 里怎么保证一致？"],
+    favorited: false,
+  },
+  {
+    id: "be-294",
+    nodeId: "be-flink",
+    question: "Watermark 水位线机制详解：乱序数据怎么处理？为什么 idle 分区会导致窗口不触发？",
+    bigTech: true,
+    answer: `结论：Watermark = 「逻辑时钟的推进承诺」——算子看到 WM=t 就相信「事件时间 ≤ t 的数据已经全部到齐」（允许 t 之后仍有少量迟到，但不等它们）。WM = 已见最大事件时间 - 允许乱序时长。它是事件时间语义的引擎：窗口触发、定时器、状态清理全靠 WM 推进。idle 分区陷阱：多分区 WM 取所有分区的最小值，一个分区没数据（idle）就不推进 WM，全局 WM 卡住，窗口永远不触发——Flink 1.11+ 用 withIdleness 标记空闲分区解决。
+
+\`\`\`text
+Watermark 生成与传播：
+1. 源头生成（推荐在 Source 或最早的算子）：
+   assignTimestampsAndWatermarks(
+     WatermarkStrategy.<Event>forBoundedOutOfOrderness(Duration.ofSeconds(10))
+       .withTimestampAssigner((e, ts) -> e.getEventTime()))
+   含义：最多容忍 10s 乱序 → WM = maxEventTime - 10s
+
+2. 传播规则：
+   - 单算子多输入分区：WM = min(所有上游分区 WM) ← 木桶效应！
+   - 下游算子：拿到上游广播的 WM
+   - WM 单调递增（新 WM 必须 > 当前 WM 才更新）
+\`\`\`
+
+\`\`\`text
+idle 分区卡死问题（真实事故高发）：
+场景：Kafka 8 分区，夜间低峰只有 2 个分区有数据
+- 6 个 idle 分区不发数据也不发 WM
+- 下游算子 WM = min(8 个分区) = 卡在 6 个 idle 分区的旧 WM
+- 2 个有数据分区的数据疯狂缓存，窗口永不触发，任务看似 hang 死
+
+解法：
+WatermarkStrategy.<Event>forBoundedOutOfOrderness(...)
+    .withIdleness(Duration.ofMinutes(1));
+// 1 分钟没数据 → 该分区被标记 idle → WM 计算时排除它
+// 注意：idle 分区恢复有数据时自动「复活」
+// Kafka source 还会因「分区数 > 并行度」部分 subtask 无分区可消费
+// → 这些 subtask 也标 idle
+\`\`\`
+
+\`\`\`text
+乱序处理决策参数（面试追问「乱序程度怎么定」）：
+乱序容忍 = 业务可接受延迟 与 数据完整性 的权衡
+- 日志采集链路（Flume→Kafka）：典型乱序 2-10s → 设 10-15s
+- 移动端弱网（地铁断网补传）：乱序可达分钟级 → WM 容忍 1min
+  + allowedLateness 10min + 侧输出兜底（三层防线）
+- 跨洋专线（全球数据汇总）：乱序秒级但抖动大 → 按 P99 延迟设
+观测先行：先用 metric 统计 eventTime lag 分布（P50/P99），
+再定容忍值——拍脑袋设的值不是浪费内存就是丢数据
+\`\`\`
+
+案例：滴滴行程计费——乘客手机进隧道断网 5 分钟，出站后行程事件批量补传，WM 容忍 2min+lateness 10min 保证计费不重不漏；阿里云实时大屏全球机房数据汇总，跨洋链路 WM 设 30s+按机房分区对齐；某厂没配 withIdleness，Kafka 分区夜间 idle，凌晨报表窗口数据卡在 23:50 不触发，早高峰数据洪峰+积压数据齐发直接打挂下游——加 idleness 后解决。
+
+踩坑：WM 生成放错位置（在 keyBy 之后生成——keyBy 前数据已乱序，要在 source 或第一个算子）；以为 WM 能处理任意迟到（迟到超出容忍就靠 lateness/侧输出，WM 不是万能的）；多流 join 时两边 WM 不同步（双流对齐：各自 WM 都要越过 join 窗口才触发，一条流 idle 全卡住，两流都要 withIdleness）；WM 时间戳用错字段（日志的 @timestamp 是采集时间不是业务时间，乱序评估全错）；allowedLateness 内每条迟到数据触发一次重算（高频迟到=结果疯狂更新，下游写入放大，要评估下游幂等能力）；测试环境时钟和生产差时区（eventTime 是 UTC 解析成 CST，WM 差 8 小时，窗口全废）。`,
+    keyPoints: ["WM=maxEventTime-乱序容忍，多分区取最小", "idle 分区用 withIdleness 排除，否则全局卡死", "乱序容忍按 P99 lag 观测定，别拍脑袋"],
+    followUps: ["Watermark 对齐（watermark alignment）解决多源时钟倾斜？", "周期性 WM vs 标点式 WM 的取舍（生成频率 vs 延迟）？"],
+    favorited: false,
+  },
+  {
+    id: "be-295",
+    nodeId: "be-flink",
+    question: "Flink Checkpoint 机制（Chandy-Lamport）怎么实现分布式快照？对齐 vs 非对齐？",
+    bigTech: true,
+    answer: `结论：Checkpoint = 全局一致性快照，基于 Chandy-Lamport 算法变种：JobManager 注入 barrier（屏障标记）随数据流流动，算子收到 barrier 就快照自己的状态，barrier 流过即「这一刀切下去」——所有算子的快照拼起来就是全局一致状态（恰好处理到 barrier 位置的数据）。对齐 checkpoint：多输入算子等所有输入的 barrier 到齐才快照（期间缓存后到数据）；非对齐（1.11+）：barrier 优先「插队」通过，in-flight 数据一并入快照，反压时快照时间从分钟级降到秒级。
+
+\`\`\`text
+对齐 Checkpoint 完整流程（单并行度理解）：
+1. JM 触发 checkpoint-n → Source 记录 Kafka offset → 注入 barrier-n
+2. barrier 随数据流向下游流动（和数据一起排队，不插队）
+3. 算子收到 barrier：
+   - 单输入：立即快照状态 → barrier 继续往下游发
+   - 多输入（如 keyBy 后接收 8 个分区）：等所有 8 个分区的 barrier
+     到齐（barrier alignment），先到分区的数据缓存不处理 →
+     全到齐 → 快照 → 继续
+4. Sink 收到 barrier → 快照 → 上报 JM
+5. JM 收齐所有算子确认 → checkpoint 完成（状态已持久化到 HDFS/S3）
+恢复：从最近完成的 checkpoint 恢复所有状态 + Source 回到记录的
+offset 重放 → 端到端恰好一次
+\`\`\`
+
+\`\`\`text
+对齐的致命伤（为什么发明非对齐）：
+反压场景：下游慢 → 数据在 channel 里排队 → barrier 也排队
+→ barrier 到达时间 = 排队数据消费完的时间 = 分钟级
+→ checkpoint 超时失败 → 故障恢复点回退 → 状态更旧 → 更慢（恶性循环）
+
+非对齐 Checkpoint（Unaligned Checkpoint）：
+1. barrier 到达输入通道时「插队」到队首优先通过
+2. 被超越的 in-flight 数据（队列里未处理的）作为通道状态
+   一并快照（channel state）
+3. 算子无需等待对齐 → 快照耗时 ≈ 状态写 HDFS 时间 ≈ 秒级
+代价：快照体积变大（含 channel 数据），恢复时要先回放 in-flight
+适用：反压常态化的高吞吐任务（双 11 大促期默认开）
+\`\`\`
+
+\`\`\`text
+生产配置清单（面试加分项）：
+env.enableCheckpointing(60_000);                    // 间隔 1min
+conf.set(EXECUTION_CHECKPOINTING_MODE, EXACTLY_ONCE);
+conf.set(EXECUTION_CHECKPOINTING_TIMEOUT, 10min);   // 超时任其失败别强杀
+conf.set(EXECUTION_CHECKPOINTING_MIN_PAUSE, 30s);   // 两次 ck 最小间隔
+conf.set(EXECUTION_CHECKPOINTING_MAX_CONCURRENT, 1);// 串行，防资源争抢
+conf.set(ENABLE_UNALIGNED, true);                   // 反压任务开非对齐
+conf.set(EXECUTION_CHECKPOINTING_TOLERABLE_FAILED, 3); // 容忍失败次数
+state.backend.incremental=true;                     // RocksDB 增量快照
+externalized checkpoint：RETAIN_ON_CANCELLATION     // 取消任务保留快照
+\`\`\`
+
+案例：字节跳动推荐特征流——每秒千万事件，常态反压，非对齐 checkpoint 把快照时间从 8 分钟压到 20 秒；阿里实时数仓用增量 RocksDB checkpoint，10TB 状态每分钟快照仅上传 GB 级增量；Netflix Keystone 管道用 externalized checkpoint 做蓝绿部署（新旧任务从同一快照启动，对比输出）。反面：某厂 checkpoint 间隔 10s 且 max_concurrent>1，快照互相争抢 IO 全部超时，任务「永远恢复中」。
+
+踩坑：checkpoint 超时设太短（大状态全量快照 5 分钟，超时 1 分钟永远失败——要按观测逐步调）；HDFS 小文件（每次 ck 写几万小文件，NameNode 压力大，用 S3/合并上传）；非对齐 checkpoint 与「两阶段提交 sink」组合的版本兼容问题（老版本不支持，升 1.13+）；恢复时改并行度（KeyedState 按 KeyGroup 重分布没问题，OperatorState 的 ListState 会均分导致 offset 错乱——Kafka source 的 union redistribution 要懂）；checkpoint 成功但「上一次完成的 ck」被清理策略删掉（retained_checkpoints 数量要≥2）；barrier 在「多输入 join」算子对齐时缓存暴涨 OOM（反压+大窗口 join 开非对齐）。`,
+    keyPoints: ["barrier 切分数据流，算子快照拼全局一致", "对齐等齐/非对齐插队+通道状态", "反压任务必开非对齐+增量快照"],
+    followUps: ["Generic Log（changelog）快照和非对齐的关系？", "Savepoint 和 Checkpoint 的工程差异（手动触发+版本兼容）？"],
+    favorited: false,
+  },
+  {
+    id: "be-296",
+    nodeId: "be-flink",
+    question: "Flink 的 Exactly-Once 语义怎么实现端到端？Kafka→Flink→MySQL/ES 分别怎么做？",
+    bigTech: true,
+    answer: `结论：Exactly-Once 是「端到端」概念，三段缺一不可：Source 可重放（offset 记录进 checkpoint）、内部状态一致（barrier 快照保证）、Sink 幂等或事务（恢复重放时不产生重复副作用）。Flink 内部只保证状态级 exactly-once；端到端要靠 Sink 的两阶段提交（2PC Sink）或幂等写入。At-least-once（重放重复）和 Exactly-once 的差别只在 Sink 怎么处理重复。
+
+\`\`\`text
+三段拆解（Kafka → Flink → 外部系统）：
+1. Source 端：Kafka offset 作为 OperatorState 存入 checkpoint
+   → 故障恢复从记录的 offset 重读 → 输入不丢（可能重）
+2. Flink 内部：barrier checkpoint → 状态快照一致
+   → 恢复后状态 = barrier 切点状态（恰好一次处理到切点）
+3. Sink 端（决定成败）：
+   恢复后，barrier 之后的数据会重放 → Sink 必须消化重复：
+   方案A 幂等写入：按业务主键 upsert（重复写=覆盖，天然去重）
+   方案B 两阶段提交：预提交随 checkpoint，checkpoint 完成才真提交
+   方案C 事务性写入：写进事务，checkpoint 完成才 commit
+\`\`\`
+
+\`\`\`java
+// TwoPhaseCommitSinkFunction 模板（Flink 提供的 2PC Sink 基类）
+class KafkaProducerSink extends TwoPhaseCommitSinkFunction<Event, KafkaTxn, Void> {
+    // 1. beginTransaction：每个 checkpoint 周期开一个 Kafka 事务
+    protected KafkaTxn beginTransaction() {
+        producer.initTransactions();        // Kafka 0.11+ 事务 API
+        producer.beginTransaction();
+        return new KafkaTxn(producer);
+    }
+    // 2. invoke：数据写进事务（未提交，外部不可见——read_committed 隔离）
+    protected void invoke(KafkaTxn txn, Event e, Context ctx) {
+        txn.producer.send(new ProducerRecord<>("topic", serialize(e)));
+    }
+    // 3. preCommit：barrier 到达 → flush（仍未提交）
+    protected void preCommit(KafkaTxn txn) { txn.producer.flush(); }
+    // 4. commit：checkpoint 全局完成 → 真正提交事务
+    protected void commit(KafkaTxn txn) { txn.producer.commitTransaction(); }
+    // 5. abort：checkpoint 失败 → 丢弃事务（外部永远没看到这批数据）
+    protected void abort(KafkaTxn txn) { txn.producer.abortTransaction(); }
+}
+// Kafka→Flink→Kafka 全链路 exactly-once 官方支持（ReadCommitted 消费者）
+\`\`\`
+
+\`\`\`text
+常见 Sink 落地方案速查：
+MySQL      幂等：INSERT ... ON DUPLICATE KEY UPDATE（业务主键）
+           或事务 sink（JDBC exactly-once connector，XA 事务，性能差慎用）
+ES         幂等：document id = 业务主键 hash，bulk upsert（重复写覆盖）
+           注意 ES 刷新可见性与 checkpoint 间隔的配合（近实时一致）
+HBase      幂等：Put 按 rowkey 覆盖（天然幂等）✓ 最省心
+ClickHouse ReplacingMergeTree 引擎 + 版本列（重复写靠引擎去重）
+Redis      SET key value（覆盖幂等）/ HSET 同理；INCR 类不幂等要 2PC
+文件/S3    StreamingFileSink 的 Bucket 按 checkpoint 切文件，
+           pending → committed 的两段式（本质也是 2PC）
+\`\`\`
+
+案例：美团实时数仓 Kafka→Flink→ES——document id 用「日志主键+时间窗口」hash，恢复重放只是重复覆盖；字节电商 GMV 用 Kafka 事务链路（source+sink 全事务，read_committed 消费下游）；某厂 Flink→MySQL 裸 JDBC sink（无幂等无事务），任务重启后数据翻倍，资损对账差 200 万——改 ON DUPLICATE KEY UPDATE 后解决；Flink CDC→StarRocks 的 exactly-once 依赖 SR 的主键模型 upsert。
+
+踩坑：把「Flink 状态 exactly-once」当「端到端 exactly-once」（Sink 不幂等照样重复）；Kafka 事务 sink 的 transactional.id 没配前缀复用（多任务共用 producer 事务 fencing 失效，僵尸 producer 提交脏数据，要配 transactionIdPrefix+唯一）；幂等 upsert 但「更新逻辑依赖旧值」（counter += 1 的 SQL 重放=重复加，要改成写绝对值）；2PC sink 的 preCommit 后任务挂（恢复时会先 commit 残留事务再继续——TwoPhaseCommitSink 已处理，自研 sink 易漏）；checkpoint 间隔 10 分钟导致事务挂太久（Kafka 事务超时 transaction.timeout.ms 默认 15min，要大于 ck 间隔）；下游「read_uncommitted」消费者看到未提交数据（要配 isolation.level=read_committed）。`,
+    keyPoints: ["端到端=可重放 Source+barrier 状态+幂等/2PC Sink", "Kafka 全链路事务官方支持，MySQL/ES 靠主键幂等", "INCR 类相对写不幂等，要写绝对值"],
+    followUps: ["Kafka 事务的 fencing（producer epoch）怎么防僵尸提交？", "两阶段提交 sink 在「最后一次 checkpoint 完成前宕机」的恢复路径？"],
+    favorited: false,
+  },
+  {
+    id: "be-297",
+    nodeId: "be-flink",
+    question: "Flink 反压（Backpressure）是什么？怎么发现和定位反压源？",
+    bigTech: false,
+    answer: `结论：反压 = 下游处理速度跟不上上游发送速度，压力沿数据流逆向传导——本质是「流控」：Flink 没有消息队列缓冲（task 间直接 TCP 传输），下游慢就挤占上游的网络缓冲，上游 send 阻塞自然降速。反压本身是保护机制（防 OOM），但持续反压 = 吞吐下降 + checkpoint 超时（barrier 排队）。定位靠 Web UI 的 backpressure 标签 + 指标分层排查。
+
+\`\`\`text
+反压传导链路（基于 credit 的流控，1.5+）：
+上游 Task ──Netty channel──→ 下游 Task
+下游：按可用 buffer 数发 credit（信用额度）给上游
+上游：credit>0 才发送，credit=0 阻塞等待
+缓冲队列打满 → credit=0 → 上游输出阻塞 → 上游的输入也堆积
+→ 一路传导到 Source（Kafka 消费 lag 开始上涨=反压的最初信号）
+\`\`\`
+
+\`\`\`text
+定位反压五板斧（Web UI + Metrics）：
+1. Job 图颜色：Backpressure 标签 HIGH（红）=该算子被下游顶住
+   关键认知：标红的是「受害者」，病根在「它下游第一个不红的算子」
+2. 反压采样：taskmanager.backpressure.samples=100（默认）
+   栈采样显示 outPoolUsage（发送池使用率）=1.0 → 发送端被堵
+3. 指标三板：
+   - outPoolUsage=1 且 inPoolUsage 低 → 我是受害者，下游慢
+   - outPoolUsage 低 且 inPoolUsage=1 → 我是病根（我消费慢）
+   - busyTimeMsPerSecond → 接近 1000 说明算子真忙（CPU 瓶颈）
+                          低但反压 → 线程在等什么（外部调用/锁）
+4. 火焰图（1.13+ Flame Graph）：看算子 CPU 热点
+5. 检查外部依赖：Sink 调用的 MySQL/ES/Redis RT 是否飙升
+\`\`\`
+
+\`\`\`text
+常见反压根因与对策：
+根因                        症状                    对策
+并行度不足                   busyTime≈1000ms         扩并行度（状态后端支持 rescale）
+数据倾斜                    个别 subtask 忙死其他闲   key 打散（加盐两阶段聚合）
+外部 Sink 慢                busyTime 低但 inPool=1   Sink 加批量/异步/扩目标集群
+窗口/状态太大                RocksDB 读放大 CPU 高    调 block cache/上 SSD/拆窗口
+GC 停顿                     周期性卡顿               G1GC 调参/RocksDB 托管内存隔离
+checkpoint 对齐等待          对齐型 ck 期间吞吐跌     开非对齐 checkpoint
+Source 端积压（lag 涨）      lag 持续增长             这是结果不是原因，找下游
+\`\`\`
+
+\`\`\`text
+数据倾斜专项（最隐蔽的反压源）：
+症状：一个 keyBy 算子部分 subtask 反压 HIGH，其他 idle
+定位：Metrics 按 subtask 看 numRecordsIn，差距 10 倍+即倾斜
+对策：
+- 两阶段聚合：key 加随机后缀(0-N)局部预聚合 → 去后缀全局聚合
+- 热点 key 拆分：TOP100 热点 key 单独广播处理
+- AGG 算子的 mini-batch（攒批减少状态访问）
+\`\`\`
+
+案例：阿里双 11 实时任务常态微反压（可控），靠非对齐 checkpoint 保证快照不超时；某厂大促 ES Sink 集群磁盘 IO 打满，RT 从 5ms 涨到 500ms，反压传导导致 Kafka lag 涨 2 亿——临时扩 ES 节点+Sink 侧攒批（bulk 1000→5000）化解；滴滴实时派单的 keyBy(driverId) 倾斜（头部司机订单密度高），两阶段聚合后 CPU 降 40%。
+
+踩坑：只看 Job 整体反压不拆 subtask（倾斜被平均数掩盖）；反压就盲目扩并行度（外部 Sink 慢的话扩 100 倍也没用，反而打爆下游）；ignore in-flight data（非对齐 checkpoint 恢复时 in-flight 数据回放瞬间洪峰，要限流）；buffer timeout 调太小（吞吐换延迟过度，batch 攒不起来 CPU 反而高）；把 lag 高当反压唯一指标（Source 限流/上游 Topic 分区少也会 lag 高，要结合 outPoolUsage 判断）；RocksDB 反压时狂加 taskmanager 内存（该调的是 managed memory 比例和 block cache，不是总内存）。`,
+    keyPoints: ["credit 流控，下游慢逆传导到 Source lag 涨", "红的是受害者，病根在下游第一个不红的算子", "倾斜用两阶段聚合，外部慢用批量+扩集群"],
+    followUps: ["Flink 1.18 的 Universal checkpoint 怎么改善反压恢复？", "Reactive Mode 弹性扩缩容对反压的自动响应？"],
+    favorited: false,
+  },
+  {
+    id: "be-298",
+    nodeId: "be-flink",
+    question: "实时数仓怎么分层（ODS/DWD/DWS/ADS）？和离线数仓的分层差异？",
+    bigTech: false,
+    answer: `结论：实时数仓沿用离线分层思想但有取舍：ODS（原始日志接入 Kafka）、DWD（明细层：清洗+维度拉宽）、DWS（轻度汇总：按主题预聚合）、ADS（应用层：面向具体报表/接口）。核心差异：离线按「T+1 全量重算」设计，实时按「持续增量计算+状态维护」设计——实时 DWD 的维度拉宽要用「维度关联」（lookup join/广播流），实时 DWS 的聚合结果是「持续变化的指标流」而非静态分区。
+
+\`\`\`text
+实时数仓四层（Kafka 为核心管道）：
+业务库 ──CDC(Canal/Flink CDC)──→ ODS(Kafka topic：binlog 原始)
+日志 ──Flume/Filebeat─────────→ ODS(Kafka topic：原始日志)
+
+ODS → [Flink: 清洗/过滤/解析/标准化] → DWD(Kafka：明细宽表)
+       └─ 维度拉宽：lookup join MySQL 维表（+Guava 缓存/旁路 Redis）
+          或 broadcast stream 小维表全量进内存
+
+DWD → [Flink: 按主题预聚合，分钟级窗口] → DWS(Kafka：轻度汇总)
+       └─ 例：dws_trade_order_1min（品类+地区维度的单量/金额）
+
+DWS → [Sink 到服务层] → ADS
+       └─ OLAP(ClickHouse/Doris)：即席查询+报表
+       └─ Redis/HBase：点查服务（实时画像/大屏）
+       └─ MySQL：简单榜单
+\`\`\`
+
+\`\`\`text
+实时 vs 离线分层关键差异：
+维度        离线数仓                实时数仓
+存储        Hive/HDFS 分区表        Kafka topic（有保留期！）
+计算        T+1 全量重算            7×24 增量流式计算
+维度关联    直接 JOIN 维表分区       lookup join/广播流（维表变更难）
+修正数据    重跑分区即可            状态已污染，要回溯重刷（Kafka 重放）
+一致性      分区完成后一致          延迟+乱序，允许秒级误差
+成本        批量错峰廉价            常驻资源，大促要常驻扩容
+退化策略    无                     实时挂→离线补（Lambda 兜底）
+\`\`\`
+
+\`\`\`text
+实时特有的工程难题：
+1. 维表变更：DWD 拉宽时用户等级是「白银」，后来升级「黄金」，
+   历史明细要不要回溯？→ 常用方案：拉宽存当时值（事件时间快照），
+   需要当前值的查询在 ADS 层再关联一次
+2. 状态寿命：DWS 聚合状态不能无限存（TTL=窗口+1 天）
+3. Kafka 保留期：DWD 层要回溯重刷的话保留 3-7 天（成本与重刷需求权衡）
+4. 双流 join：订单流 join 支付流（间隔分钟级）→ interval join
+   +状态 TTL，别指望无限等
+5. 数据质量：实时没有「跑批失败重跑」，要监控埋点（topic lag/
+   解析失败率/迟到率）+ ADS 层与离线 T+1 对账
+\`\`\`
+
+案例：美团实时数仓——Flink+Doris 架构，DWD 层 40+ 主题宽表，ADS 直查 Doris 支撑骑手大屏；阿里菜鸟物流实时数仓：CDC→ODS→DWD（lookup join 菜鸟维表+Redis 旁路缓存命中率 95%）→ DWS 分钟级汇总→ Hologres 服务化；快手实时推荐特征：DWD 双流 join（播放+互动）interval join 窗口 30 分钟。反面：某厂实时数仓不做 DWD 拉宽，报表 SQL 全在 ADS 层临时 join，20 个报表任务各自关联维表，Redis 维表缓存被打穿。
+
+踩坑：实时 DWD 搞「全量维表 join」（流 join 批要用 lookup/broadcast，双流 join 维表=状态爆炸）；DWS 预聚合粒度太细（维度组合爆炸，状态几十亿条，要按主题收敛到常用维度子集）；Kafka topic 不规划分区数（DWD 分区少导致下游并行度上限被锁死，分区要≥最大预期并行度）；实时离线两套口径（GMV 实时版和离线版差 5%，老板面前打架——口径定义要同源，差异要可解释：实时含在途/离线只算完结）；ADS 直写 MySQL 大宽表（更新放大把 MySQL 打死，ADS 该写 OLAP/Redis）；没有降级开关（Flink 集群故障时 ADS 数据停更，要有离线兜底任务和口径标识）。`,
+    keyPoints: ["四层沿用离线思想，计算改增量+状态", "维度拉宽用 lookup join/广播流，别双流 join 维表", "实时挂离线补，口径同源可解释"],
+    followUps: ["Flink CDC 的 exactly-once 入仓怎么对齐 schema 变更？", "实时数仓的回溯重刷（reprocess）标准操作流程？"],
+    favorited: false,
+  },
+  // ===== 数据与存储：OLAP 与大数据（be-299 ~ be-305）=====
+  {
+    id: "be-299",
+    nodeId: "be-olap-bigdata",
+    question: "HBase 的 LSM 树存储和 Region 分裂机制？为什么适合写多读少？",
+    bigTech: false,
+    answer: `结论：HBase = BigTable 的开源实现，核心是 LSM 树（Log-Structured Merge Tree）：写先进 WAL（预写日志）→ MemStore（内存跳表）→ 满则 flush 成 HFile（不可变有序文件）→ 后台 compact 合并。写全是「内存追加+顺序写盘」→ 写吞吐极高；读要「MemStore + N 个 HFile 归并」→ 读放大靠布隆过滤器+BlockCache 缓解。数据按 rowkey 范围切 Region，Region 写大到 10GB 自动 split，RegionServer 管理多 Region——这就是「写多读少+海量数据+按 key 查询」场景的标准答案。
+
+\`\`\`text
+LSM vs B+ 树（MySQL InnoDB）：
+维度        LSM（HBase/Cassandra/RocksDB）  B+ 树（MySQL/PG）
+写          内存+顺序追加，O(1)              随机页更新，O(logN) 且写放大
+读          多路归并，有读放大               树高 3 层，2-3 次 IO 直达
+空间        未 compact 前有冗余              紧凑（页内填充）
+适用        写多读少/日志/时序               读多写少/事务/范围点查混合
+一句话：LSM 用「读放大+后台合并」换「写吞吐」
+\`\`\`
+
+\`\`\`text
+Region 分裂与分布：
+表按 rowkey 字典序切成 Region（连续区间 [startKey, endKey)）
+- 初始 1 个 Region → 写大到 10GB → 从中间 split 成两个
+- RegionServer（RS）管理数十~数百 Region，HMaster 负责分配均衡
+- 数据持久化在 HDFS（3 副本），RS 只是计算/缓存层
+  → RS 宕机：HMaster 把其 Region 分给其他 RS，
+    靠 WAL 回放恢复 MemStore（分钟级 RTO）
+rowkey 设计是生命线：
+- 单调递增 rowkey（时间戳前缀）→ 永远写最后一个 Region
+  = 热点（其他 RS 围观）→ 要加盐/hash 前缀/反转
+- 查询模式决定 rowkey：「按用户查最近行为」→ (userId + 逆序时间戳)
+\`\`\`
+
+\`\`\`text
+读写路径细节（面试深挖点）：
+写：WAL append（HDFS，防丢）→ MemStore（跳表插入）→ 返回
+    异步 flush：MemStore 128MB → 新 HFile
+读：BlockCache（读缓存）→ MemStore → 布隆过滤器逐个 HFile 判断
+    → 命中的 HFile 归并（多个版本+删除标记一并处理）→ 返回最新
+Compact：
+- minor compact：合并小 HFile，减少文件数
+- major compact：全量合并，物理删除过期版本/墓碑标记（IO 风暴，
+  业务高峰要禁：hbase.regionserver.majorcompaction 设 0 手动错峰）
+\`\`\`
+
+案例：小米用 HBase 存 MIoT 设备消息（万亿级 KV，写读比 9:1）；滴滴轨迹存 HBase（车辆 ID+时间逆序 rowkey，按车查轨迹）；快手用户信息 Feed 底层 HBase 支撑；Pinterest 的 Zen（图存储）构建在 HBase 上。反面：某厂用 HBase 当「大 MySQL」跑随机点查+频繁 update 同一 rowkey，读放大+version 堆积，P99 从 10ms 涨到 2s——compact 跟不上写入节奏。
+
+踩坑：rowkey 热点（时间戳开头必死，盐值/反转/MD5 前缀三选一）；Region 过多（单 RS 上千 Region，MemStore 内存挤爆+compaction 队列积压，要合并小 Region）；全表 scan 不设缓存批量（rpc 风暴，scan.setCaching(500)+ 禁 BlockCache 防缓存污染）；删除标记堆积（大量 delete 后没 major compact，墓碑拖慢读）；以为 HBase 有二级索引（原生没有！Phoenix/ES 双写二选一）；预分区不做（新表 1 个 Region 开局，导入期热点全压一台 RS，要按数据规模预分 100+ Region）；ZK session 超时导致 RS 自杀（GC 停顿>session timeout，RS 被 HMaster 判死后自己 shutdown——GC 调优是 HBase 运维日常）。`,
+    keyPoints: ["LSM=写内存+顺序盘，读归并有放大", "rowkey 设计决定热点与查询效率", "写多读少+海量 KV 选 HBase，点查事务别选"],
+    followUps: ["HBase 的 MOB（中等对象）存储怎么优化 100KB-10MB 场景？", "Cassandra 和 HBase 的一致性模型差异（AP tunable vs CP）？"],
+    favorited: false,
+  },
+  {
+    id: "be-300",
+    nodeId: "be-olap-bigdata",
+    question: "ClickHouse 为什么快？列存+向量化+MergeTree 的底层原理？",
+    bigTech: true,
+    answer: `结论：ClickHouse 的快感来自三板斧：列式存储（查询只读需要的列，IO 降 10-100 倍，同列数据类型一致压缩率 5-10 倍）；向量化执行（数据按列批次进 CPU 寄存器，SIMD 一条指令处理 4-8 个值，无虚函数调用）；MergeTree 引擎（数据按主键有序存成 part，稀疏索引跳块，后台 merge 去重/合并）。它不查索引找行，而是「暴力扫描+极致工程」——用全部 CPU 核并行扫，扫得比别人用索引还快。
+
+\`\`\`text
+列存+压缩的收益拆解：
+100 列表，查询只用 3 列：
+- 行存（MySQL）：读整行 1KB → 1 亿行 = 100GB IO
+- 列存（CH）：只读 3 列 ≈ 30 字节/行 → 3GB IO
+- 再压缩：同列数据相似（地区列就几十个值）→ LZ4/ZSTD 压到 1/5
+  → 实际 IO 600MB → 100 倍差距
+zone map：每个 part 按 granule（默认 8192 行）记录 min/max
+  → WHERE dt='2026-07-01' 直接跳过不满足的 granule（数据剪枝）
+\`\`\`
+
+\`\`\`text
+向量化执行 vs 传统火山模型：
+火山模型（MySQL/PG）：
+  for row in table:           # 一次一行
+      if filter(row): emit(row)   # 每行都要虚函数调用+分支预测失败
+向量化（CH/Doris/Arrow）：
+  for batch in table.batches(8192):     # 一次 8192 行的列数组
+      mask = simd_filter(batch.col)     # SIMD 指令批量比较
+      emit(batch.select(mask))
+  收益：CPU 缓存友好（列数据连续）+ 分支预测准 + SIMD 并行
+       + 无逐行虚函数 → 单核吞吐差 10 倍
+\`\`\`
+
+\`\`\`text
+MergeTree 家族（选型速查）：
+MergeTree              基础：按 ORDER BY 键有序，part 后台 merge
+ReplacingMergeTree     同主键去重（保留最新版本）→ 幂等写入救星
+SummingMergeTree       同主键数值列自动求和 → 预聚合报表
+AggregatingMergeTree   存聚合中间态（AggregateFunction 类型）
+                       → 物化视图的载体，实时聚合核心
+VersionedCollapsing..  带版本+状态列的折叠（订单状态变更场景）
+ReplicatedMergeTree    副本（ZK 协调，多机数据一致）
+Distributed            分布式表（不存数据，路由到各分片本地表）
+\`\`\`
+
+\`\`\`sql
+-- 生产建表示例（订单明细，亿级/日）
+CREATE TABLE orders_local ON CLUSTER 'ck'
+(
+    order_id UInt64, user_id UInt64, dt Date,
+    amount Decimal(18,2), status UInt8, province LowCardinality(String)
+    -- LowCardinality：低基数列字典编码，压缩+过滤双加速
+)
+ENGINE = ReplicatedReplacingMergeTree('/ck/tables/{shard}/orders', '{replica}')
+PARTITION BY toYYYYMM(dt)          -- 按月分区（分区是管理单元：删/移快）
+ORDER BY (province, dt, order_id); -- 排序键=稀疏索引：查询过滤维度打头
+-- Distributed 表路由：按 user_id 分片（sipHash64）
+\`\`\`
+
+案例：字节跳动用户行为分析（AB 测试平台）用 ClickHouse 集群支撑日均万亿行写入、秒级即席查询；腾讯音乐用户画像系统 CH 替代 Druid，查询延迟 P99 从 30s 降到 2s；Cloudflare 的 HTTP 分析（GraphQL API 背后就是 CH）。快手用 CH 支撑内部 BI，物化视图+AggregatingMergeTree 做分钟级预聚合。
+
+踩坑：高频小批量插入（每秒几十次小 insert → part 爆炸，「too many parts」写入拒绝——必须攒批：单次 10 万行+/秒级窗口）；UPDATE/DELETE 是 mutation（重写整个 part，巨慢——业务上要当「不可变数据」用，变更走 ReplacingMergeTree 新版本）；Distributed 表直连写（应该写 local 表或经分布式表但配 internal_replication，否则副本重复写）；JOIN 是弱项（右表要进内存 hash join，大 join 先过滤或用字典 dictGet 替代）；分页深翻（LIMIT 1000000, 20 照样扫前百万行，深分页用游标 WHERE id > last_id）；ORDER BY 键把高基数字段放前面（稀疏索引失效，过滤维度低基数的放前）；副本用 ZK 协调但 ZK 压力大（CH Keeper 替代，insert 频率高时 ZK 是瓶颈）。`,
+    keyPoints: ["列存+压缩=IO 降百倍，向量化=单核快 10 倍", "MergeTree 有序+稀疏索引+后台 merge", "攒批写入，mutation 是重写，当不可变数据用"],
+    followUps: ["ClickHouse 的 Projection 和物化视图差异（自动路由 vs 显式触发）？", "Sparse index 的 granule 大小怎么权衡（8192 行默认）？"],
+    favorited: false,
+  },
+  {
+    id: "be-301",
+    nodeId: "be-olap-bigdata",
+    question: "Doris/StarRocks 的 MPP 架构和 ClickHouse 对比？明细+聚合模型怎么选？",
+    bigTech: false,
+    answer: `结论：Doris/StarRocks = MPP（大规模并行处理）架构的 OLAP 新贵——查询被拆成分片在多个 BE 节点并行执行（每个节点向量化执行），再汇总。相比 ClickHouse：CH 强在单表极致扫描（大宽表一柱擎天），Doris/StarRocks 强在多表 JOIN（MPP shuffle join/broadcast join 成熟）+ MySQL 协议兼容+在线 DDL 友好。数据模型上 Doris 提供明细（Duplicate）、聚合（Aggregate）、主键（Unique）三种表模型，选错模型性能差 10 倍。
+
+\`\`\`text
+MPP 架构（Doris）：
+FE（Frontend）：元数据+查询规划+调度（类 TiDB 的 PD+SQL 层合一）
+BE（Backend）：存储+计算（列存+向量化）
+查询流程：
+SQL → FE 解析生成分布式执行计划（Fragment）
+  → 按数据分布把 Fragment 下发给相关 BE
+  → BE 本地扫描+局部聚合 → Exchange 节点跨机 shuffle
+  → 最终聚合返回
+关键：数据本身按「分桶（bucket）」分布在 BE 上，
+     分桶键=分布键，同分桶键的 join 可本地化（colocate join 免 shuffle）
+\`\`\`
+
+\`\`\`sql
+-- 三种表模型（Doris，选错是新手第一大坑）
+-- 1. Duplicate 明细模型：原样存，适合日志/明细（默认）
+CREATE TABLE logs (...) DUPLICATE KEY(dt, hour, user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 16;
+
+-- 2. Aggregate 聚合模型：同维度 key 自动预聚合（指标列指定聚合函数）
+CREATE TABLE ads_summary (
+    dt, channel, uv BIGINT REPLACE_IF_NOT_NULL,   -- 自定义聚合方式
+    pv BIGINT SUM, amount DECIMAL SUM
+) AGGREGATE KEY(dt, channel) ...;
+-- 写入即聚合，查询不用再 SUM——但失去明细！
+
+-- 3. Unique 主键模型（1.2+ 主流）：同主键覆盖，支持 UPDATE/CDC 同步
+CREATE TABLE orders (...) UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 16;
+-- Merge-on-Read（读时合并）vs Merge-on-Write（写时合并，查询快）
+-- CDC 场景必选 Unique（Flink CDC 同步 MySQL 订单表直接 upsert）
+\`\`\`
+
+\`\`\`text
+Doris vs StarRocks vs ClickHouse 速查：
+维度        Doris                 StarRocks            ClickHouse
+JOIN        强（colocate/bcast）   最强（CBO 优化器）    弱（大 join 要避免）
+单表扫描    强                    强                   最强
+并发能力    高（MPP 隔离好）       高                   中（默认 100 并发限制）
+CDC/更新    Unique 模型成熟        Primary Key 成熟     弱（mutation 慢）
+物化视图    有（异步/同步）        强（透明改写）       有（Aggregating）
+运维        简单（无 ZK 依赖）     简单                 中（ZK/Keeper）
+生态        百度/Apache            阿里系/镜舟          国际社区最活跃
+\`\`\`
+
+案例：美团外卖实时报表用 Doris——MySQL CDC 经 Flink 入 Unique 模型，骑手/商家双维度 colocate join 免 shuffle；快手商业化报表 StarRocks 支撑广告主自助多维分析（CBO 自动选 join 顺序）；网易严选从 Greenplum 迁 Doris，查询提速 10 倍且运维从专人变兼职；腾讯微信支付的实时对账用 StarRocks Primary Key 模型接 CDC 流。
+
+踩坑：Aggregate 模型当明细用（写入即聚合，发现要查明细时数据已丢，模型不可改要重建表）；分桶数乱设（bucket 数≈BE 数×2-4 为宜，太多元数据压力、太少并行度不足）；colocate join 表组没对齐（两张表分桶键/桶数/副本数必须完全一致才生效，建错就 shuffle join 性能打回原形）；大表 join 顺序靠人肉（StarRocks 的 CBO 要收集统计信息，analyze 不做优化器瞎猜）；Doris 的 tablet 版本爆炸（高频小批量导入，version 超 2000 拒绝写入——攒批+调大 compaction）；把 OLAP 当 KV 点查用（QPS 上万的点查该走 Redis/HBase，MPP 引擎 QPS 天花板低）。`,
+    keyPoints: ["MPP=查询分片并行+Exchange shuffle", "明细/聚合/主键三模型按场景选", "多表 JOIN 选 Doris/StarRocks，单表狂扫选 ClickHouse"],
+    followUps: ["Colocate join 的表组约束和扩容时的迁移代价？", "StarRocks CBO 的统计信息收集（直方图）怎么影响 join 顺序？"],
+    favorited: false,
+  },
+  {
+    id: "be-302",
+    nodeId: "be-olap-bigdata",
+    question: "Hive 的分区表和分桶表设计？小文件问题怎么治理？",
+    bigTech: false,
+    answer: `结论：分区（Partition）= 按业务维度（通常是日期）把数据物理分目录，查询按分区裁剪跳过无关目录——是 Hive 性能的生命线；分桶（Bucket）= 按某列 hash 把数据分散到固定数量的文件，用于抽样和 join 优化（SMB join）。小文件是 Hive 头号顽疾：一个文件=一个 HDFS block=一个 MapTask，万级小文件让 NameNode 内存爆炸+任务启动开销超过计算本身。治理三板斧：写入端合并（reduce 输出控制）、存量合并（compact/重跑）、存储格式换 ORC+合理批次。
+
+\`\`\`sql
+-- 分区表（静态分区）
+CREATE TABLE dwd_order (
+    order_id STRING, amount DECIMAL(18,2), user_id STRING
+) PARTITIONED BY (dt STRING)        -- 分区键不在列里！
+STORED AS ORC;
+INSERT INTO dwd_order PARTITION(dt='2026-07-26') SELECT ...;
+-- 查询裁剪：WHERE dt='2026-07-26' → 只扫该目录，跳过其他 365 个分区
+
+-- 动态分区（按查询结果自动建分区，注意配置）
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.max.dynamic.partitions=10000;    -- 防误建万级分区
+
+-- 分桶表（join/抽样优化）
+CREATE TABLE dwd_user CLUSTERED BY (user_id) INTO 32 BUCKETS ...;
+-- 两表同分桶键同桶数 → SMB（Sort-Merge-Bucket）join：
+--   map 端桶对桶 merge join，免 shuffle，大表 join 提速 5-10 倍
+-- 抽样：TABLESAMPLE(BUCKET 1 OUT OF 32) → 1/32 均匀样本秒出
+\`\`\`
+
+\`\`\`text
+分区设计经验法则：
+- 粒度：按天最常见；量大（>10GB/天）按天+小时二级；量小按月
+- 分区数：单表分区总数 < 10 万（ metastore 压力和 HMS API 变慢）
+- 分区键用低基数字段：dt/country 好；user_id 坏（亿级分区=自杀）
+- 查询 80% 带什么过滤条件，分区键就选什么
+\`\`\`
+
+\`\`\`text
+小文件治理三板斧：
+1. 写入端（治本）：
+   - 减少 reduce 数：hive.exec.reducers.bytes.per.reducer=1GB
+     （每个 reduce 一个输出文件，按输出量自动算个数）
+   - 合并输出：SET hive.merge.mapfiles=true;
+     hive.merge.sparkfiles=true; hive.merge.size.per.task=256MB
+   - Spark 写入：repartition(N) 控制输出文件数（别 coalesce 丢并行）
+2. 存量合并（治标）：
+   - ALTER TABLE ... PARTITION(...) CONCATENATE（ORC/RCFile 支持）
+   - 或 INSERT OVERWRITE 读自己重写一遍（重跑压缩）
+   - 定期任务：检测分区文件数>阈值自动 compact
+3. 架构端（根上避免）：
+   - Flume/采集端滚动参数：rollSize(128MB)/rollInterval(600s)
+     别 1 分钟滚一个 1KB 文件
+   - 实时入湖场景用 Hudi/Iceberg（自带小文件合并 compaction）
+\`\`\`
+
+案例：字节跳动 Hive 小文件治理——HMS 元数据从数十亿级降下来，NameNode heap 从 200GB 降到 80GB，靠「采集端滚动参数+每日 compact 任务+写入规范」三管齐下；美团离线数仓分区规范：dwd 层按天，dws 层按月+业务线二级；某厂 Flume rollInterval=60s，一年攒出 50 万小文件，NameNode Full GC 集群瘫痪——存量 CONCATENATE 合并跑了两周。
+
+踩坑：动态分区 SQL 没限制（一次 insert 建 5 万分区，metastore OOM 挂掉，所有查询瘫痪）；分区键类型用 string 存日期还和函数混用（WHERE dt=date_sub(current_date,1) 类型不匹配导致分区裁剪失效=全表扫，大忌！）；分桶表写入没 enforce bucketing（数据没按桶写，SMB join 失效还难发现）；小文件合并后没删原始文件（HDFS 配额双倍占用）；ORC 的 stripe 大小默认 64MB 不合理（配合 block size 128/256MB 调）；以为分区越多越好（按小时+渠道+省份三级分区，一次日更写 1000 个分区，每个分区 2MB 小文件——分区粒度要为查询服务不为美观服务）。`,
+    keyPoints: ["分区裁剪是生命线，分区键选低基数高过滤字段", "分桶用于 SMB join 和抽样", "小文件治本在写入端，治标靠 compact"],
+    followUps: ["Hive on Tez/Spark 相比 MR 怎么减少中间小文件？", "HMS（Metastore）分库分表方案（WaggleDance）适用场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-303",
+    nodeId: "be-olap-bigdata",
+    question: "数据湖三剑客 Iceberg/Hudi/Delta Lake 解决了 Hive 的什么痛点？怎么选？",
+    bigTech: false,
+    answer: `结论：Hive 表的四大绝症：不支持行级更新（改一条重写分区）、ACID 缺失（读写并发互相看见半成品）、schema 演进痛苦（加列重写数据）、时间旅行不可能（误删分区找不回）。数据湖格式三剑客在 HDFS/S3 之上加「表格式层」：用快照（snapshot）+ 元数据清单（manifest）管理文件版本，实现 ACID、行级 upsert/delete、schema 自由演进、时间旅行、增量读取。本质是「对象存储上的数据库表语义」。
+
+\`\`\`text
+三者架构速览：
+Iceberg（Netflix 发起，引擎中立王）：
+  元数据三层：catalog → metadata.json → manifest list → manifest file
+  快照=每次提交一个 manifest list；文件级统计（min/max）跳过数据
+  杀手特性：隐藏分区（partition transform，查询不用带原始列函数）、
+           引擎中立（Flink/Spark/Trino 通吃）、schema 映射按 ID 不按名
+
+Hudi（Uber 发起，upsert 之王）：
+  两种表：COW（写时复制：更新重写文件，读快写慢）
+          MOR（读时合并：更新进 delta log，读时合并，写快读慢）
+  杀手特性：upsert 性能最好、增量视图（pull 变更流）、
+           自带小文件合并/cleaning/clustering 服务
+
+Delta Lake（Databricks，Spark 亲儿子）：
+  事务日志 _delta_log（JSON 记录每次操作）+ parquet
+  杀手特性：Spark 生态无缝、OPTIMIZE+Z-ORDER 聚簇、
+           Change Data Feed、生态绑定深（非 Spark 要三思）
+\`\`\`
+
+\`\`\`text
+选型决策（2026 年视角）：
+场景                          推荐
+多引擎共存（Flink 写+Trino 查）  Iceberg（引擎中立做得最彻底）
+CDC 入湖/高频 upsert           Hudi MOR（upsert 性能最强，增量消费成熟）
+纯 Spark 栈                    Delta Lake（原生集成最少坑）
+实时数仓入湖（分钟级新鲜）      Hudi MOR 或 Iceberg+Flink
+云厂商托管                     AWS 主推 Iceberg；Databricks=Delta；
+                              阿里云 Hologres/MaxCompute 各有内建格式
+社区趋势                      Iceberg 增长最快（Snowflake/Tabular、
+                              AWS、Cloudera 全押注），REST catalog 标准化
+\`\`\`
+
+\`\`\`text
+数据湖落地架构（实时入湖主流）：
+MySQL → Flink CDC → Hudi MOR（5 分钟可见）→ 离线 Spark 读
+                  → 下游 Kafka（增量消费，Hudi 当 changelog 源）
+价值：替代「MySQL → Canal → Kafka → Hive T+1」老链路
+     入湖即 ACID，后续离线直接读湖，新鲜度从 T+1 → 分钟级
+运维重点：compaction（MOR 合并 delta log）、cleaning（清旧版本）、
+         clustering（重排文件优化查询）三服务必须常驻
+\`\`\`
+
+案例：Netflix 全公司数据平台建在 Iceberg 上（日 PB 级写入）；字节跳动推荐系统特征入湖用 Hudi MOR，upsert 支撑样本回流的秒级更新；Uber 出行数据 Hudi 鼻祖（行程状态高频变更场景）；腾讯广告用 Iceberg+Flink 构建实时湖仓，查询走 StarRocks 外表直查免搬运；苹果 iCloud 数据湖大规模采用 Iceberg（2023 公开分享）。
+
+踩坑：MOR 表 compaction 没跟上（delta log 堆积，查询越来越慢直到不可用——compaction 服务要独立资源常驻）；Iceberg 的 manifest 膨胀（高频提交产生海量小元数据文件，要 expire_snapshots+rewrite_manifests 定期维护）；以为数据湖=不用管小文件（三剑客的小文件问题一样存在，Hudi clustering/Iceberg rewrite_data_files/Delta OPTIMIZE 都要日常跑）；catalog 选择失误（HMS catalog 在大规模下是瓶颈，Iceberg 的 REST/JDBC catalog 或云厂商 glue catalog 更稳）；时间旅行不设置过期（snapshot 永不过期=元数据无限增长+存储成本翻倍，要 expire 保留必要窗口）；流批读写同表没隔离（Flink 流写+Spark 批读要配 snapshot 隔离级别，脏读半成品 part）。`,
+    keyPoints: ["表格式层=快照+清单，给对象存储加 ACID", "Iceberg 中立/Hudi 善 upsert/Delta 绑 Spark", "入湖三服务：compaction/cleaning/clustering 必须常驻"],
+    followUps: ["Iceberg 的 Puffin 统计文件对查询优化的作用？", "Hudi MOR 的 log 文件格式（HFile vs Parquet base）选择？"],
+    favorited: false,
+  },
+  {
+    id: "be-304",
+    nodeId: "be-olap-bigdata",
+    question: "Lambda 架构和 Kappa 架构的区别？实时数仓为什么演进向 Kappa/流批一体？",
+    bigTech: false,
+    answer: `结论：Lambda = 批处理层（全量准确，T+1）+ 速度层（实时但近似）双链路并行，查询时合并两个结果——用两套系统换「既快又准」；Kappa = 只用流处理一条链路，需要重算时用消息队列回放历史（Kafka 保留窗口内全量重放）。演进方向是 Kappa/流批一体：一套代码既能跑批（bounded stream）又能跑流（unbounded stream）——Flink 的流批一体和 Iceberg 的表语义统一让「双链路痛苦」终见出路。
+
+\`\`\`text
+Lambda 架构（2011 Nathan Marz 提出）：
+           ┌→ 批处理层(Hive/Spark T+1 全量) ──→ 批视图(准确但旧) ─┐
+数据源 → 分双写                                                ├→ 合并 → 查询
+           └→ 速度层(Flink/Storm 实时增量) ───→ 实时视图(快但近似) ┘
+优点：批层兜底准确性，速度层保证新鲜度
+缺点（五宗罪）：
+1. 两套代码：同一逻辑写两遍（Hive SQL 一遍，Flink 一遍），口径必漂移
+2. 双份资源：批集群+流集群常驻
+3. 合并复杂：查询端要处理「实时与批的重叠窗口去重」
+4. 运维翻倍：两套监控/告警/值班
+5.  schema 演进双改：加个字段两处同步改
+\`\`\`
+
+\`\`\`text
+Kappa 架构（2014 Jay Kreps 提出）：
+数据源 → Kafka(保留 3-7 天或更长) → 流处理(Flink) → 服务层
+重算需求（逻辑变更/数据修正）：
+  → 启新版本任务，从 Kafka 最早 offset 重放 → 输出新表 → 切换
+前提条件：
+1. MQ 能存够重放窗口的数据（Kafka 海量存储便宜 ✓）
+2. 流引擎吞吐足够（重放要追得上，Flink 批模式加速回放 ✓）
+3. 状态可重建（checkpoint/savepoint 管理 ✓）
+优点：一套代码一套资源一种口径
+缺点：超长历史重放成本高（30 天数据重放要小时级），
+     复杂批计算（全量 join 大维表）流式做仍然费劲
+\`\`\`
+
+\`\`\`text
+流批一体（2020s 终局形态，Flink 1.12+ 支持）：
+同一套 Flink SQL/代码：
+  - 流模式：消费 Kafka 无界流，秒级延迟
+  - 批模式：消费 Hive/Iceberg 有界流，全量重算，吞吐优先
+统一存储：Iceberg/Hudi 同时暴露「表视图」（批读）和
+         「changelog 视图」（流读）
+现实落法（大厂主流折中）：
+  - 核心指标：实时链路（Kappa）秒级
+  - 财务对账/精确报表：T+1 批链路复核（Lambda 遗产）
+  - 修正场景：批链路重算结果覆盖实时累积误差
+  = 「Kappa 为主，Lambda 兜底」的实用主义
+\`\`\`
+
+案例：阿里巴巴实时计算平台（Flink 流批一体）：双 11 同一套 SQL 白天跑实时大屏，凌晨跑批模式复核口径；美团把 Lambda 的「Storm+Hive」双链路改造成「Flink 统一」，维护人力减半；LinkedIn 的 Brooklin+Kafka 支撑 Kappa 架构下的事件重放（Samza）；小红书用 Iceberg 统一流批存储，Flink 流写、Spark 批读同一张表。反面：某厂 Lambda 架构下「实时 UV」和「离线 UV」差 8%，老板会上两套数据打架——口径漂移是 Lambda 的宿命，最后全量迁流批一体。
+
+踩坑：Kappa 重放时新旧任务双写同一结果表（要 Shadow 表+原子切换）；Kafka 保留期不够（逻辑改了要重放 30 天，retention 只有 7 天=数据无法重建，retention 要为「最大重算窗口」服务）；流批一体 SQL 里用了流特有的函数（CEP/interval join 批模式不支持，写 SQL 前要确认双模式兼容）；以为流批一体=不用学批优化（批模式的 join 策略/shuffle 和流模式完全不同，执行计划要分别 explain）；Lambda 速度层和批层的「窗口对齐」没做好（实时窗口 23:59 的数据和批层 T+1 分区边界重叠，合并时双计——要用事件时间严格切分）。`,
+    keyPoints: ["Lambda 双链路换快+准，Kappa 单链路+重放", "流批一体=一套代码两种模式+统一表格式", "现实方案：Kappa 为主，T+1 批复核兜底"],
+    followUps: ["Flink 批模式的 Shuffle 和流模式的差异（blocking vs pipelined）？", "Iceberg 的 changelog 视图（incremental read）怎么支撑流批一体？"],
+    favorited: false,
+  },
+  {
+    id: "be-305",
+    nodeId: "be-olap-bigdata",
+    question: "OLAP 引擎怎么选型？ClickHouse/Doris/StarRocks/Druid/Presto 各适合什么场景？",
+    bigTech: false,
+    answer: `结论：按「查询模式×数据新鲜度×并发量」三轴选型：大宽表暴力扫描+超高压缩 → ClickHouse；多表 JOIN+高并发报表+CDC 实时更新 → Doris/StarRocks；时序事件流+亚秒级摄入可查 → Druid/Pinot；联邦查询（跨 Hive/MySQL/ES 一把梭）→ Presto/Trino；明细点查高 QPS → 这活 OLAP 不接，去 HBase/Redis。没有银弹，大厂全是组合用。
+
+\`\`\`text
+五维对比表（2026 年生产视角）：
+维度        ClickHouse      Doris/StarRocks   Druid/Pinot      Presto/Trino
+查询模型    单表扫描之王      MPP 全功能        时序聚合特化      联邦查询引擎
+JOIN        弱(大 join 避开)  强(colocate/CBO)  弱(预打宽)        中(无存储，看源)
+数据更新    弱(mutation 慢)   强(Unique/PK)     中(流批双摄入)    不负责(只查)
+摄入新鲜度  秒级(攒批)        秒级(CDC/Stream)  毫秒级(流原生)    取决于源
+并发        中(100 默认)      高(千级)          高                中
+压缩率      最高(列存极致)    高                高(rollup)        无存储
+运维成本    中(ZK/Keeper)     低(FE+BE 两角色)  高(组件多)        低(无存储)
+典型场景    用户行为分析      经营报表/驾驶舱   监控告警/时序     跨源 ad-hoc
+\`\`\`
+
+\`\`\`text
+场景对号入座：
+1. 用户行为/AB 实验（万亿行，大宽表，天级批量+少量更新）
+   → ClickHouse（字节的答案）
+2. 老板驾驶舱/经营报表（多表 join，500+ 并发，CDC 分钟级新鲜）
+   → Doris/StarRocks（美团/快手的答案）
+3. 实时监控大盘（事件流毫秒入，聚合查询，维度相对固定）
+   → Druid（kylin 监控）/ Pinot（LinkedIn/Uber 的答案）
+4. 数据分析师自助查询（Hive/MySQL/ES 混查，一天几百次 ad-hoc）
+   → Presto/Trino（Presto 之父在 FB 的答案）
+5. 实时数仓服务层（亚秒查询+支撑 API）
+   → Doris/StarRocks（高并发）或 Pinot（极致延迟）
+6. 离线 T+1 报表（成本敏感）
+   → 别上 OLAP，Hive/Spark 够了
+\`\`\`
+
+\`\`\`text
+组合架构实战（真实大厂搭配）：
+字节跳动：ClickHouse(行为分析) + Doris(商业化报表) + Abase(点查)
+美团：Doris(实时报表) + Kylin(固定维度预计算) + Hive(离线)
+阿里：Hologres(实时服务) + MaxCompute(离线) + Lindorm(点查)
+LinkedIn：Pinot(实时特征) + Presto(ad-hoc) + Espresso(点查)
+规律：没有一个引擎吃全场，按查询模式分流
+\`\`\`
+
+案例：Uber 用 Pinot 支撑骑手 App 的实时热力图（毫秒摄入+亚秒查询，自研 Upsert 支持）；携程用 Doris 替换 Kylin+ClickHouse 双引擎，统一报表层运维减半；Shopee 用 StarRocks 支撑东南亚卖家中心的多维分析（CBO 处理 join 地狱）；Facebook 的 Presto 支撑全公司分析师（每天数万 ad-hoc 查询扫 Hive）；B站用 ClickHouse 扛弹幕/播放行为分析。
+
+踩坑：拿 Presto 当低延迟服务层用（它无存储，查询受源端限制，P99 不可控，不能扛 API）；ClickHouse 集群模式高并发报表（默认 max_concurrent_queries=100，报表并发一高排队雪崩，该场景换 Doris）；Druid 上做灵活 ad-hoc（预定义 schema+rollup 后维度改不动，分析师噩梦）；Doris 里全量大宽表不打星型模型（浪费 MPP 的 join 能力，维表复用率归零）；选型只看 benchmark 不看运维（Druid 六组件架构对小团队是运维地狱，Doris 两角色最省心）；忽略生态绑定（Pinot 强但社区小，遇到问题只能靠源码；ClickHouse 中文社区最活跃，Doris/StarRocks 国内响应快）。`,
+    keyPoints: ["按查询模式×新鲜度×并发三轴选型", "CK 单表/Doris 多表高并发/Pinot 时序/Presto 联邦", "大厂全是组合架构，没有银弹"],
+    followUps: ["Hologres 的 HSAP（分析服务一体）和传统 OLAP 差异？", "DuckDB 嵌入式 OLAP 对单机分析场景的颠覆？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
