@@ -331,6 +331,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "Service Worker、IndexedDB、App Shell、Push 推送、后台同步、离线优先、安装提示。",
     mastery: 0,
   },
+  // ===== 架构层（2 个节点） =====
+  {
+    id: "arch-microfe",
+    title: "微前端架构",
+    difficulty: 5,
+    prerequisites: ["build-tools", "js-modules"],
+    frequency: "高",
+    bigTech: true,
+    summary: "qiankun 沙箱（Proxy 代理/快照）、样式隔离、主子通信、Module Federation、路由分发、公共依赖复用、适用边界。",
+    mastery: 0,
+  },
+  {
+    id: "arch-monorepo",
+    title: "Monorepo 工程",
+    difficulty: 4,
+    prerequisites: ["build-tools"],
+    frequency: "高",
+    bigTech: true,
+    summary: "pnpm workspace 依赖管理、幽灵依赖治理、Turborepo/Nx 构建缓存与拓扑编排、changesets 版本发布、包边界约束、CI 增量构建。",
+    mastery: 0,
+  },
   // ===== AI 前端方向（5 个节点，重点新增） =====
   {
     id: "ai-sdk-frontend",
@@ -9408,6 +9429,660 @@ function VirtualList({ items, itemHeight, viewportHeight }: Props) {
 踩坑：①translateY 大数精度——10 万 × 50px = 500 万像素，Chrome 元素高度上限约 1677 万像素，超限后滚动失效（需分段渲染）；②scrollTop 漂移——不定高修正逻辑有 bug 时滚动会"弹跳"，调试手段是冻结 heights 缓存对比；③屏内 focus 丢失——滚动把 focus 中的输入框回收了，焦点直接丢失（要保留 focus 项或滚动前 blur）；④SSR 场景——服务端无 scrollTop，首屏按 scrollTop=0 渲染即可，注意 hydration 一致；⑤sticky 行——表头/分组吸顶行要与虚拟区间计算联动，吸顶行自身也在被回收的列表里时要特殊处理。`,
     keyPoints: ["startIndex=floor(scrollTop/itemHeight)，总高撑滚动条，transform 偏移", "不定高：预估+实测缓存+前缀和二分+scrollTop 修正", "key 用 id；滚动 rAF 节流；缓冲区防白屏"],
     followUps: ["二维虚拟滚动（行+列都虚拟的大表格）如何计算？", "IntersectionObserver 回收池方案相对索引计算的优劣？"],
+    favorited: false,
+  },
+  // ===== 38. arch-microfe 微前端架构 =====
+  {
+    id: "fe-270",
+    nodeId: "arch-microfe",
+    question: "微前端解决什么问题？iframe、qiankun、Module Federation、Web Components 四条路线的本质差异与选型依据是什么？",
+    bigTech: true,
+    answer: `结论：微前端解决的是"巨石前端应用"的两个绝症——多个团队在同一代码库上互相阻塞（协作问题）、技术栈绑定无法渐进升级（演进问题）。核心目标是：独立开发、独立部署、独立技术栈、运行时集成。四条路线的隔离强度和集成成本各不相同。
+
+四条路线的本质：
+
+1. iframe——隔离最强（独立进程/独立 JS 环境/独立 CSS），但体验最割裂：路由不同步（刷新丢失子页面状态）、通信靠 postMessage 序列化（函数/对象传不了）、弹窗遮罩层无法穿透、滚动条双套、SEO 死绝。适合：完全隔离的第三方嵌入（支付页、客服系统）。
+2. qiankun（基于 single-spa）——运行时集成：主应用按路由激活子应用，子应用暴露 bootstrap/mount/unmount 生命周期，JS 用 Proxy 沙箱隔离、CSS 用 scoped 隔离。本质是"同页多应用编排器"，主子仍是同一 JS 环境（沙箱是软隔离）。
+3. Module Federation（webpack 5）——构建时/运行时混合：应用互相暴露模块（exposes）并消费远程模块（remotes），共享依赖（shared）在运行时协商单例。本质是"模块级的分布式构建"，没有应用生命周期概念，粒度更细（可以是组件、函数、页面）。
+4. Web Components——浏览器原生组件隔离：Custom Element + Shadow DOM 提供 DOM 和样式封装，但 Shadow DOM 带来新问题（事件 retargeting、表单关联、CSS 变量穿透要显式定义），框架组件转 WC 有损耗（React 18 前对 WC 属性/事件支持差）。
+
+选型决策树：①要绝对安全隔离（接入不信任的第三方）→ iframe；②多团队多技术栈的中后台整合（阿里系标准场景）→ qiankun；③同技术栈、追求依赖复用和细粒度共享（设计系统/组件库分发）→ Module Federation；④跨框架的"原子组件"分发且能接受 Shadow DOM 约束 → Web Components。
+
+真实项目经验：在某集团中台整合中，主应用 React + 三个子应用（React/Vue2/Vue3）用 qiankun 整合，核心价值不是技术炫技而是"团队自治"——各团队按自己的节奏发版，主应用只维护路由注册表。踩过的最大坑是：把"技术问题"当微前端的价值，实际上它的成本（公共依赖治理、通信复杂度、调试链路变长）必须由"组织协作收益"来买单，小团队单应用强上微前端是纯负债。
+
+判断是否该用的三个硬指标：①是否存在 3+ 团队在同一应用上互相阻塞发版？②是否存在必须共存的多技术栈（历史包袱）？③子应用是否有独立交付的价值（独立域名/独立 SLA）？三个都是"否"就别用——Monorepo + 模块边界就能解决 90% 的问题。`,
+    keyPoints: ["价值=团队自治+独立部署+技术栈无关，成本=隔离+通信+调试复杂度", "iframe 硬隔离 / qiankun 应用编排 / MF 模块共享 / WC 原生组件", "小团队单应用别上微前端，Monorepo 模块边界已够用"],
+    followUps: ["微前端与 Monorepo 是正交还是互斥？能否同时使用？", "如何度量微前端改造的收益？（发版频率/阻塞时长/依赖体积）"],
+    favorited: false,
+  },
+  {
+    id: "fe-271",
+    nodeId: "arch-microfe",
+    question: "qiankun 的 JS 沙箱是如何实现的？快照沙箱与代理沙箱（ProxySandbox）的原理差异和多实例支持是什么？",
+    bigTech: true,
+    answer: `结论：沙箱的目标是"子应用对全局环境的污染可隔离、可恢复"。快照沙箱靠"激活时 diff 还原、失活时恢复快照"（只支持单实例）；代理沙箱用 Proxy 给每个子应用造一个假 window，读写都被拦截到各自的沙箱副本上（支持多实例）。
+
+快照沙箱（SnapshotSandbox）原理——遍历 window 所有可枚举属性：
+
+\`\`\`ts
+class SnapshotSandbox {
+  private windowSnapshot: Record<string, unknown> = {};   // 激活前的 window 快照
+  private modifyPropsMap: Record<string, unknown> = {};   // 上次运行期间修改过的属性
+  active() {
+    // 1. 拍快照：记录当前 window 全量状态
+    for (const prop of Object.keys(window)) {
+      this.windowSnapshot[prop] = (window as any)[prop];
+    }
+    // 2. 恢复上次修改：子应用上次运行时改的属性重新写回（保活）
+    for (const prop of Object.keys(this.modifyPropsMap)) {
+      (window as any)[prop] = this.modifyPropsMap[prop];
+    }
+  }
+  inactive() {
+    // 3. diff 当前 window 与快照，记录修改，并还原
+    for (const prop of Object.keys(window)) {
+      if ((window as any)[prop] !== this.windowSnapshot[prop]) {
+        this.modifyPropsMap[prop] = (window as any)[prop];      // 记下修改
+        (window as any)[prop] = this.windowSnapshot[prop];      // 还原
+      }
+    }
+  }
+}
+\`\`\`
+
+致命短板：①全量遍历 window（上千属性）+ diff，激活/失活是 O(n) 开销；②所有子应用共享同一个真 window——同时只能激活一个（单实例），否则 A 的 window 状态会污染 B。
+
+代理沙箱（ProxySandbox）——qiankun 的默认方案：
+
+\`\`\`ts
+class ProxySandbox {
+  private fakeWindow: Record<string, unknown> = {};       // 沙箱私有的"全局对象"
+  proxy: WindowProxy;
+  constructor() {
+    const fakeWindow = this.fakeWindow;
+    const rawWindow = window;                              // 真 window
+    this.proxy = new Proxy(fakeWindow, {
+      get(target, prop) {
+        if (prop in target) return target[prop as string];  // 先查沙箱副本
+        const value = (rawWindow as any)[prop];             // 再查真 window
+        // 函数要 bind 真 window，防 this 指向假 window（如 addEventListener 非法调用）
+        return typeof value === "function" ? value.bind(rawWindow) : value;
+      },
+      set(target, prop, value) {
+        target[prop as string] = value;                     // 写操作只进沙箱副本，不污染真 window
+        return true;
+      },
+      has(target, prop) {                                   // with 语句/in 操作符拦截
+        return prop in target || prop in rawWindow;
+      },
+    });
+  }
+}
+\`\`\`
+
+子应用代码被执行时，用 with(proxy) 包裹（构建产物 UMD 的 globalObject 指向 proxy），代码里的 window.xxx、自由变量 xxx 都被引导到 proxy 上：读走"副本优先"，写只写副本。每个子应用一个 ProxySandbox 实例 → 多实例共存互不污染。
+
+沙箱的边界（面试加分——沙箱不是万能的）：①DOM 不隔离——子应用 document.body.appendChild 挂的是真 DOM，卸载时要自己清理（qiankun 靠子应用 unmount 钩子里 ReactDOM.unmount）；②定时器/全局监听——setInterval、window.addEventListener 仍在真 window 上，qiankun 的 patchers 模块记录了子应用的定时器和监听，卸载时统一清除；③ESM 逃逸——import 的模块顶层代码在模块加载时就执行，with 包裹管不到模块内部的全局访问（webpack 构建时 globalObject 配置才管得住）；④Symbol.unscopables 与特殊属性——window.top、window.parent 等不可代理属性要特殊放行；⑤原生函数 this——get 拦截里对函数 bind(rawWindow) 就是因为 addEventListener 等 DOM API 内部校验 this 必须是真 window，否则抛 Illegal invocation。
+
+对比快照沙箱，代理沙箱的代价是 Proxy 的兼容性（IE11 直接出局）和性能（每次全局访问多一层 Proxy 拦截，热路径上可感知），但换来了多实例、按需拦截、无副作用激活的能力——现代微前端的唯一选择。`,
+    keyPoints: ["快照沙箱：拍快照+diff还原，O(n) 且单实例", "代理沙箱：Proxy 假 window，读副本优先/写只进副本，多实例", "沙箱管不住 DOM/定时器/ESM 顶层副作用，靠 patchers 卸载清理"],
+    followUps: ["with 语句为何被严格模式禁用？qiankun 为何又能用它？", "如何设计支持 Shadow DOM 的多重隔离沙箱（JS+DOM+CSS 三层）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-272",
+    nodeId: "arch-microfe",
+    question: "微前端的样式隔离有哪些方案？qiankun 的 scoped CSS 与 Shadow DOM 模式各自有什么坑？",
+    bigTech: true,
+    answer: `结论：JS 沙箱隔离不了 CSS——样式是全局的，子应用的 .title 会污染主应用。方案谱系：构建时约定（BEM/CSS Modules）→ 运行时改写（scoped 属性选择器）→ 浏览器硬隔离（Shadow DOM）。强度递增，灵活性递减。
+
+方案对比：
+
+1. CSS Modules/BEM（约定层）——构建期把类名 hash 化（.title → .title_x8y2k），天然无冲突，但管不住"全局样式重置"（* { margin: 0 } 这种选择器）和第三方库的裸类名。是底线，不是微前端方案。
+2. qiankun scoped CSS（运行时改写）——给子应用所有样式规则加属性选择器前缀：.title { } → div[data-qiankun="app1"] .title { }，子应用根容器挂上该 data 属性。实现是监听子应用的 style/link 节点插入，动态改写 CSSRule。
+3. qiankun Shadow DOM（experimentalSandbox: { strictStyleIsolation }）——子应用挂载点改为 shadowRoot.appendChild，浏览器原生隔离：内部样式不外泄、外部样式不侵入（除了 CSS 变量和 ::part 显式穿透）。
+4. 动态样式表装卸——子应用卸载时把它插入的 <style>/<link> 全部移除（qiankun 默认行为），防"卸载后样式残留污染下一个应用"。
+
+scoped CSS 的坑（真实项目血泪）：①覆盖不了"子应用向 body 直接挂载的节点"——Modal/Dropdown/Tooltip 这类 portal 组件挂到 document.body，逃离了 [data-qiankun] 容器作用域，样式直接失效（antd 的 Modal 要配 getPopupContainer 或 getContainer 指定回子应用容器内）；②@global/通配符规则没法加前缀——* { box-sizing } 加前缀后语义全变，qiankun 选择跳过不改写，等于裸奔；③第三方库的 runtime CSS-in-JS——styled-components/emotion 运行时生成的样式表插到 head 顶部，qiankun 能捕获改写，但插入时机竞争（mount 前插入的样式可能漏捕获）；④优先级战争——[data-qiankun] 前缀提升了子应用选择器优先级（多了一层属性选择器），主应用想覆盖子应用样式时要跟着提权，互相加码最终 specificity 失控。
+
+Shadow DOM 的坑更深：①portal 全死——任何依赖 document.body 挂载的库（弹窗/下拉/右键菜单/toast）都挂在 shadow 外，样式丢失，要逐个库配挂载点；②事件 retargeting——shadow 内的事件 target 对外部显示为 host 元素，全局事件代理（如 analytics 的 document 级点击采集）拿到的 e.target 失真，要读 e.composedPath()[0]；③表单关联断裂——shadow 内的 input 不被外部 form 天然收集（form 关联不跨 shadow 边界）；④图标字体/@font-face 不继承——字体要在 shadow 内重新声明；⑤find-in-page 失效——浏览器 Ctrl+F 搜不到 shadow 内文本（可访问性倒退）；⑥js 全局选择器失效——document.querySelector 穿不透 shadow，主子间 DOM 互操作要走 shadowRoot API。
+
+落地决策（我们的生产标准）：①默认 scoped CSS + 团队约定（禁全局重置、portal 组件统一配挂载容器）——成本最低，覆盖 90% 场景；②接"不信任的第三方应用"（外包交付、历史 jQuery 巨石）才上 Shadow DOM，且提前验收 portal/事件/字体三类问题；③样式治理的根本是"设计系统统一"——主子应用共用一套 token（CSS 变量），冲突自然减少，比任何运行时隔离都便宜。
+
+调试技巧：子应用样式异常时，DevTools 里检查渲染后 CSSRule——document.styleSheets 找到对应表，看规则是否被正确加了前缀；portal 问题直接在 Elements 面板找挂载位置是否在 [data-qiankun] 容器内。`,
+    keyPoints: ["scoped CSS 加属性前缀，portal 逃逸 body 是最大坑", "Shadow DOM 硬隔离但 portal/事件/字体/表单全要重新适配", "根治靠设计系统 token 统一，运行时隔离只是兜底"],
+    followUps: ["CSS 变量为何能穿透 Shadow DOM？利用它如何设计主题方案？", "qiankun 如何捕获并改写运行时插入的 style 节点？（patchers 原理）"],
+    favorited: false,
+  },
+  {
+    id: "fe-273",
+    nodeId: "arch-microfe",
+    question: "微前端主子应用如何通信？props、initGlobalState、自定义事件总线、URL 状态各自的适用场景与陷阱是什么？",
+    bigTech: true,
+    answer: `结论：通信设计的头号原则是"能少通信就少通信"——频繁通信是拆分错误的信号（该合并的两个应用被硬拆开了）。手段按耦合度从低到高：URL 状态（跨刷新共享）→ props（父子数据下发）→ 全局状态（initGlobalState）→ 事件总线（最灵活也最失控）。
+
+四种方案的对决：
+
+\`\`\`ts
+// ===== 1. props 下发（qiankun 注册时传，React 父子组件思维） =====
+// 主应用
+registerMicroApps([{
+  name: "order-app",
+  props: { userInfo, theme: "dark", onNavigate: (path) => router.push(path) },
+}]);
+// 子应用 mount 时接收
+export async function mount(props) {
+  props.onGlobalStateChange?.((state) => { /* ... */ });
+  renderApp(container, { userInfo: props.userInfo });
+}
+// 特点：单向数据流，类型可推导（TS 泛型传过去），函数/对象都能传（同 JS 环境）
+
+// ===== 2. initGlobalState（qiankun 官方全局状态） =====
+// 主应用
+const actions = initGlobalState({ user: null, cart: [] });
+actions.onGlobalStateChange((state, prev) => syncToBackend(state));
+// 子应用 mount(props) 里 props.setGlobalState({ user: {...} })
+// 特点：类似迷你 EventEmitter + 状态快照，主从都能读写
+
+// ===== 3. 自定义事件总线（跨框架中立） =====
+const bus = new EventTarget();  // 原生 EventTarget 就够，别引库
+window.dispatchEvent(new CustomEvent("cart:updated", { detail: { count: 3 } }));
+// 特点：发布订阅完全解耦，但"谁发的、谁该收"无类型无约束，靠文档约定
+
+// ===== 4. URL 状态（唯一跨刷新/跨标签页的方案） =====
+// 主应用跳转时把状态编进 query：/order?from=dashboard&highlight=123
+// 子应用启动时解析 query 还原状态
+\`\`\`
+
+适用场景：①props——主子间稳定的契约数据（用户信息、主题、权限、回调函数），是首选（单向、可测、类型安全）；②initGlobalState——主子都需要读写的少量共享状态（当前租户、全局筛选条件），本质是带快照的事件；③事件总线——兄弟子应用间的瞬时通知（"购物车更新了，角标刷新"）、跨框架通信（Vue 子应用和 React 子应用都不依赖对方 API）；④URL——需要刷新保持/分享链接/浏览器前进后退感知的状态（当前 Tab、筛选条件），也是 iframe 嵌入场景的唯一可靠通道。
+
+陷阱实录：①initGlobalState 的滥用——把整棵状态树塞进去，主子应用双向写，两周后没人说得清数据流向。纪律：全局状态只放"真正的全局上下文"（用户/租户/主题），业务状态各应用自治；②事件总线的事件名冲突与幽灵监听——子应用卸载忘 removeEventListener，重复 mount 后监听翻倍（事件处理执行 N 次）。必须配合卸载清理，或用带命名空间的事件名 + AbortController 批量退订；③props 传函数的 this 陷阱——主应用传 onNavigate 是箭头函数没问题，传类方法要 bind；④URL 状态的安全——敏感状态（token）别放 URL（历史记录/代理日志会留痕），放 sessionStorage 配合 postMessage；⑤跨 realm 类型——子应用传的数组在主应用 instanceof Array === false（沙箱假 window 的 Array 与真的不同 realm），结构化校验替代 instanceof。
+
+架构原则（卡帕西视角）：通信拓扑应该反映业务拓扑——订单应用和商品应用天天互发消息，说明它们是"一个业务域被错误地切了两刀"，正解是合并或重新划界，而不是把总线做得更花哨。微前端圈的经验法则：通信 API 的复杂度与拆分的合理性成反比。`,
+    keyPoints: ["首选 props 单向流；全局状态只放真全局上下文", "事件总线要命名空间+卸载清理，防监听翻倍", "URL 是唯一跨刷新通道，敏感状态别进 URL"],
+    followUps: ["如何给跨应用事件总线加 TypeScript 类型约束（事件契约）？", "微前端间共享登录态的正确姿势？（cookie domain/token 透传）"],
+    favorited: false,
+  },
+  {
+    id: "fe-274",
+    nodeId: "arch-microfe",
+    question: "Module Federation 的核心机制是什么？exposes/remotes/shared 如何配置？共享依赖的版本冲突如何协商？",
+    bigTech: true,
+    answer: `结论：Module Federation（MF）让一个构建产物在运行时动态加载另一个构建产物的模块，并共享依赖单例。它把"应用"降级为"模块的集合"——没有主子概念，每个构建既是 host（消费方）也是 remote（提供方）。与 qiankun 的本质差异：qiankun 管应用生命周期，MF 管模块依赖图。
+
+\`\`\`ts
+// 提供方（remote）：暴露模块
+// webpack.config.js
+new ModuleFederationPlugin({
+  name: "checkout",                          // 全局唯一名
+  filename: "remoteEntry.js",                // 入口清单：暴露了什么、需要什么
+  exposes: {
+    "./Button": "./src/components/Button",   // 暴露组件
+    "./payApi": "./src/api/pay",             // 暴露工具模块
+  },
+  shared: {
+    react: { singleton: true, requiredVersion: "^18.0.0" },  // 单例共享
+    "react-dom": { singleton: true },
+    lodash: { import: "lodash", shareScope: "default" },      // 非单例可多版本
+  },
+});
+
+// 消费方（host）：声明远程来源
+new ModuleFederationPlugin({
+  name: "host",
+  remotes: {
+    checkout: "checkout@https://cdn.example.com/checkout/remoteEntry.js",
+  },
+  shared: { react: { singleton: true }, "react-dom": { singleton: true } },
+});
+
+// 运行时消费：动态 import 远程模块
+const RemoteButton = React.lazy(() => import("checkout/Button"));
+\`\`\`
+
+加载机制拆解：①remoteEntry.js 是"清单文件"——包含 exposes 映射表（模块名 → chunk URL）和 shared 声明；②host 启动时先加载 remoteEntry，注册到全局的共享作用域（share scope）；③import("checkout/Button") 时，webpack runtime 查映射表、加载对应 chunk、执行并返回模块；④shared 依赖在"共享作用域"里协商：所有参与的构建把自己的 react 版本注册进去，运行时按 semver 选一个"最高满足版本"，全局只加载这一个（单例的意义）。
+
+版本冲突协商（重点）：①singleton: true——强制全局唯一实例。若两个 remote 提供的 react 版本不满足 requiredVersion，webpack 默认行为：开发环境警告，仍可运行（可能导致两个 React 实例的灾难——hooks 报错 "Invalid hook call"，因为 React 内部状态按模块实例隔离）；②非 singleton——允许共存多版本，运行时加载"最匹配"的版本，匹配不到就用自己的 fallback（eager: true 则打包进自身）；③strictVersion: true——版本不满足直接抛错（生产推荐，快速失败胜过诡异渲染）；④shareScope——可以开多个共享域做隔离（A 组应用共享 react@18，B 组共享 react@17），高级用法。
+
+真实案例：设计系统分发——组件库作为 remote 暴露，20 个业务应用运行时消费，组件库发版后业务方零构建零发版自动获得新版本（这是 MF 最诱人的场景）。代价同样明显：①运行时加载 remoteEntry 多一个网络往返（要配 preload + CDN 强缓存 + 容错降级——远程挂了本地要有 fallback UI）；②TypeScript 类型跨边界丢失——远程模块的类型声明要通过 @module-federation/typescript 或 dts 插件同步，否则 host 端全是 any；③版本漂移——组件库 breaking change 没有构建期拦截，全靠运行时 strictVersion + 契约测试兜底；④调试链变长——sourcemap 跨构建，错误堆栈要配跨域 sourcemap 上传与拼接。
+
+与 qiankun 的组合使用（业界现状）：qiankun 负责"应用编排"（路由、生命周期、沙箱），MF 负责"依赖复用"（主子应用把 react/antd 配成 shared 避免重复加载）——两者解决不同层的问题，不是二选一。新趋势是 webpack/Rspack 的 MF 2.0（Module Federation Runtime）吸收了应用编排能力，向"一体化"演进。`,
+    keyPoints: ["remoteEntry 清单 + 运行时动态 import，应用降级为模块集合", "shared 单例协商：最高满足版本全局一份，版本不符 strictVersion 快速失败", "组件库分发是杀手场景；类型同步/远程容错/版本漂移是三大成本"],
+    followUps: ["MF 与 qiankun 组合时沙箱和 shared 如何分工？", "如何实现远程模块加载失败的本地降级（fallback chunk）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-275",
+    nodeId: "arch-microfe",
+    question: "微前端下路由如何设计？主应用路由分发、子应用路由自治、history 模式冲突分别怎么处理？",
+    bigTech: true,
+    answer: `结论：路由是微前端最棘手的集成点——全局只有一个地址栏，却有两个 router 实例要驱动。标准做法：主应用持有"一级路由"（按路径前缀激活子应用），子应用持有"二级路由"（自己的页面跳转），通过"激活规则 + 基础路径"划分主权。
+
+\`\`\`ts
+// 主应用：按前缀分发（qiankun 的 activeRule）
+registerMicroApps([
+  { name: "order", activeRule: "/order", container: "#subapp" },   // /order/** 归订单应用
+  { name: "goods", activeRule: (loc) => loc.pathname.startsWith("/goods") },
+]);
+start();
+// 当前 URL /order/detail/123 → order 应用激活，qiankun 调用其 mount
+
+// 子应用：路由基础路径对齐
+// React Router：<BrowserRouter basename="/order">
+// Vue Router：createWebHistory(window.__POWERED_BY_QIANKUN__ ? "/order" : "/")
+// 独立运行时 basename 为 "/"，嵌入运行时为 "/order"——一套代码两种部署
+
+// 子应用内部跳转：用自己的 router
+navigate("/detail/123");  // 实际 URL 变 /order/detail/123，仍命中 activeRule 保活
+\`\`\`
+
+主子跳转的三种情形：①子应用内部跳转——用自己的 router，URL 变化后 activeRule 仍命中自己，无感知；②子应用跳另一个子应用——不能直接用自己的 router（它只认 /order 前缀），要跳主应用路由：qiankun 下用 props 传入的 onNavigate 回调或直接 history.pushState + 手动触发 popstate（single-spa 的 navigateToUrl 就是干这个的）；③主应用跳子应用深层页面——主 router push /order/detail/123，qiankun 检测到 activeRule 命中，激活并等待子应用 mount 后由其内部 router 接管匹配 detail/123。
+
+history 模式的冲突根源：①popstate 事件竞争——主 router 和子 router 都监听 popstate，浏览器后退一次两个 router 都响应，可能双重跳转。single-spa 的方案是"劫持 history API"：patch pushState/replaceState + 统一派发捕获，所有 router 订阅的是 single-spa 的 URL 变化通知（single-spa-router 协调）；②hash 与 history 混用——老应用用 hash 路由（/#/page），新应用用 history，切换时 URL 形态互相破坏（主应用 push /new 会把 #/page 冲掉）。迁移期强制约定：全站统一 history，老应用改造或接受"激活时 URL 重置"；③base 路径嵌套——Nginx 把整个微前端挂在 /console/ 下，主应用 basename=/console，子应用 basename 要拼 /console/order，三层路径拼接任何一层写错都是 404，用运行时注入的全局变量统一拼装。
+
+刷新/直达链接问题：子应用路由是前端路由，直接刷新 /order/detail/123 时服务端要有该路径的 fallback（返回主应用 index.html），Nginx 配 try_files $uri /index.html；主应用 mount 子应用后，子 router 从当前 URL 解析出深层路径还原页面——这要求子应用"从任意 URL 冷启动"的能力，验收清单必备一项。
+
+真实踩坑：①子应用 mount 后路由未同步——qiankun 是先 mount 再让子 router 匹配当前 URL，子应用若用懒加载 chunk，首屏路由匹配在 chunk 加载前执行会落空，要 mount 完成后手动 router.replace(location)；②多个子应用同时激活（single-spa 支持但少用）——两个 router 同时驱动 URL，地址栏被反复改写死循环，生产环境限制"同一时刻一个一级路由应用"；③跳转后滚动位置——主子切换时 scrollTop 未重置，用户从长列表跳到新页面发现停在中间，统一在路由切换钩子 scrollTo(0,0)；④a 标签硬跳——子应用里的 <a href="/goods"> 会整页刷新，全局拦截 a 标签点击转 router 跳转（single-spa 的 urlRerouteOnly 配置）。`,
+    keyPoints: ["一级路由主应用分发（activeRule），二级路由子应用自治（basename）", "history API 被 patch 统一协调，防双 router 竞争 popstate", "子应用必须支持任意深层 URL 冷启动，Nginx fallback 到主应用"],
+    followUps: ["single-spa 如何 patch history API 实现 router 协调？", "微前端间跳转如何携带大对象状态（放不进 URL 的）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-276",
+    nodeId: "arch-microfe",
+    question: "微前端的公共依赖（React/antd/ lodash）如何避免重复加载？externals、MF shared、import map 三条路线的取舍是什么？",
+    bigTech: true,
+    answer: `结论：三个子应用各打一份 React 就是 3×140KB（gzip），公共依赖复用是微前端性能的生命线。三条路线：构建时外部化（externals + 全局变量）、运行时共享（MF shared）、浏览器原生模块映射（import map）。成熟度递减，标准化程度递增。
+
+路线一：externals + UMD 全局变量（qiankun 经典搭配）
+
+\`\`\`js
+// 每个子应用 webpack 配置：React 不打进 bundle
+externals: { react: "React", "react-dom": "ReactDOM", lodash: "_" }
+// 主应用 index.html 先加载公共 UMD（挂 window.React）
+<script src="https://cdn.example.com/react@18.2.0.umd.production.min.js"></script>
+\`\`\`
+
+简单直接、构建零侵入，但：①版本必须全局统一——三个子应用都得兼容 React 18.2，升级要全站联动（恰恰违背微前端"独立演进"的初衷）；②加载时序耦合——子应用启动前公共脚本必须就绪，串行加载阻塞首屏；③tree-shaking 失效——UMD 全量加载，lodash 用了一个函数也背 70KB。
+
+路线二：MF shared（运行时协商，见 fe-274）——版本按 semver 协商、单例只载一份、不满足可多版本共存。代价：强绑定 webpack/Rspack 生态，vite 项目要 community 插件（@originjs/vite-plugin-federation）且共享机制实现有差异。
+
+路线三：import map（浏览器原生）
+
+\`\`\`html
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://cdn.example.com/react@18.2.0.esm.js",
+    "react-dom": "https://cdn.example.com/react-dom@18.2.0.esm.js"
+  }
+}
+</script>
+\`\`\`
+
+浏览器原生解析 import "react" 到映射 URL——ESM 时代的外部化标准。优势：①HTTP 缓存友好（URL 带版本指纹，强缓存一年）；②ESM 保留 tree-shaking 成果；③多版本共存（scopes 字段给不同子路径映射不同版本）。现状：Chrome 89+ 支持，Safari 16.4+，生产要 SystemJS 做 polyfill 降级——这也是"SystemJS 在微前端圈回魂"的原因（single-spa 官方推荐 import map + SystemJS）。
+
+真实项目的组合策略（我们的生产配置）：①框架层（react/react-dom/router）——import map + ESM CDN，全站统一大版本，一年升级一次；②组件库（antd/内部设计系统）——MF shared singleton，允许次版本自动浮动；③工具库（lodash/dayjs）——各应用自行打包（体积小、API 稳定，tree-shaking 后各自 3-5KB 不值得共享）；④监控兜底——打包后校验 bundle 中是否误打 react（webpack-bundle-analyzer CI 卡点），防"配置漂移"。
+
+量化收益与成本：复用前三个应用总体积 2.1MB（gzip），复用后 1.2MB——但首屏多了 remoteEntry/公共库的往返，要用 preload + HTTP/2 多路复用摊平。别忘了度量：共享是把双刃剑，共享依赖的一次 breaking change 全站爆炸，"独立部署"的收益被"全局耦合"抵消——所以共享清单要克制，只共享"稳定到近乎基础设施"的依赖。
+
+踩坑：①externals 后子应用的 React DevTools 检测异常（全局 React 来源不直观）；②import map 必须出现在任何 module script 之前，顺序错了静默失败；③SystemJS 与原生 ESM 混用时 import.meta.url 语义差异；④CDN 公共库要配 SRI（integrity 属性）——公共脚本被篡改全站沦陷。`,
+    keyPoints: ["externals 简单但全站版本锁死；MF shared 协商灵活但绑 webpack", "import map 是 ESM 时代标准，生产配 SystemJS 降级", "共享清单要克制：只共享基础设施级依赖，工具库各打各的"],
+    followUps: ["import map 的 scopes 字段如何实现按路径多版本共存？", "SRI 与 CSP 如何联防公共 CDN 脚本被篡改？"],
+    favorited: false,
+  },
+  {
+    id: "fe-277",
+    nodeId: "arch-microfe",
+    question: "微前端落地的工程化配套：子应用独立部署、版本管理、灰度发布、监控归因分别怎么做？",
+    bigTech: true,
+    answer: `结论：微前端的价值兑现靠工程化——"能独立部署"不是框架给的，是流水线给的。四大配套：注册表驱动的部署（主应用不重新发版就能上新子应用）、版本化的入口管理（子应用版本可回滚）、按应用维度的灰度（流量切分）、带应用标签的监控（错误归因到具体子应用）。
+
+1. 独立部署与注册表：子应用产物上传 CDN（带内容 hash 路径 /order-app/1.2.3/），部署系统更新"应用注册表"（一个 JSON 配置：{ name, activeRule, entry, version }）。主应用启动时拉注册表而非硬编码——新增子应用 = 更新注册表，主应用零发版。注册表服务要有版本：配置中心的发布/回滚能力（我们用的自研配置平台，也可以用 Nacos/Apollo）。
+
+2. 版本管理：子应用入口 URL 带版本号（entry: "https://cdn.../order-app/1.2.3/index.js"），主应用按注册表里的"当前版本"加载。回滚 = 注册表指回旧版本，秒级生效（对比巨石应用回滚要重新构建部署 20 分钟）。HTML entry 模式（qiankun 支持 entry 配 HTML URL）由 qiankun 解析 HTML 中的脚本样式清单，版本切换更原子。
+
+3. 灰度发布：维度在"应用 × 用户群"。注册表返回按用户标签路由——灰度用户拿到 order-app@1.3.0-beta，普通用户拿 1.2.3。实现：注册表服务接 AB 实验平台，主应用拉配置时带用户 ID 哈希分桶。注意灰度期间主子兼容性契约（主应用传的 props 字段增减要向后兼容，用可选字段 + 默认值）。
+
+4. 监控归因：错误、性能、行为数据都要打应用标签。①错误——window.onerror 捕获时判断当前激活应用（single-spa 提供 getAppStatus 或从 URL activeRule 反推），Sentry 配 release 和 tags.app；②性能——PerformanceObserver 的 resource timing 按 URL 归属应用分桶，各子应用独立的 FCP/LCP 看板；③行为——埋点 SDK 注入 appName 上下文，漏斗分析按应用切片。没有归因能力的监控等于没有监控——"页面报错率 2%" 无法行动，"order-app 在 1.3.0-beta 报错率 8%" 才能决策回滚。
+
+真实项目的部署拓扑：主应用（React，双周发版）+ 6 个子应用（独立团队，平均每周各发 1.5 次）。注册表配置平台带审批流：子应用负责人提"版本切换申请"→ 自动灰度 5% 流量 30 分钟 → 错误率超阈值自动回切 → 全量。这套流水线让子应用发版从"跨团队协调会"变成"自助操作"，这才是微前端承诺的生产力。
+
+反模式清单：①主应用硬编码子应用 entry——每次子应用发版都要主应用跟着发，微前端白做了；②版本用 latest 标签——缓存不可控、回滚无路径，必须语义化版本 + 内容 hash；③主子应用共享构建流水线——一个子应用构建失败全站发不出去，流水线必须按应用独立；④忽略"主应用自身也是故障源"——主应用挂了全站挂，主应用要极简（只留路由/布局/注册表拉取），业务逻辑全部下放。
+
+成本提醒：这套配套（注册表服务、配置平台、灰度系统、归因监控）是 2-3 个工程师季度的投入。团队规模 < 20 人时，这个投入远超微前端带来的协作收益——再次回到那个判断：微前端是组织问题的技术解，不是技术升级的方向盘。`,
+    keyPoints: ["注册表驱动：上新/切版本主应用零发版；回滚=注册表指回旧版", "灰度按应用×用户分桶，主子契约字段向后兼容", "监控必须带 appName 归因，否则数据不可行动"],
+    followUps: ["主子应用的契约变更如何做自动化检测（契约测试）？", "子应用秒级回滚后，用户已加载到内存的旧版本如何优雅刷新？"],
+    favorited: false,
+  },
+  // ===== 39. arch-monorepo Monorepo 工程 =====
+  {
+    id: "fe-278",
+    nodeId: "arch-monorepo",
+    question: "Monorepo 与 Multirepo 的本质权衡是什么？lerna → pnpm workspace → Turborepo/Nx 的工具链演进解决了什么问题？",
+    bigTech: true,
+    answer: `结论：Monorepo 的本质是"用工具复杂度换取协作效率"——原子化变更（一次 PR 同时改库和调用方）、统一版本与工具链、代码共享零发布。代价是构建规模膨胀（仓库越大构建越慢）和权限粒度变粗（所有人看到所有代码）。工具链的演进就是围绕"把代价打下去"。
+
+权衡对比：Multirepo 下改一个组件库 API，要"发库版本 → 各应用逐个升级 → 一周内版本碎片化"；Monorepo 下是"一个 PR 改库 + 全量更新调用方 + CI 一次验证"，原子提交保证任意 commit 点全仓库可构建。但 Multirepo 的独立权限、独立 CI、仓库轻量也是真实优势——Google/Meta 用 Monorepo 是因为它们投入了专门的代码基础设施团队，不是因为它免费。
+
+工具链三代演进：
+
+1. lerna（2016）——Bootstrap 时代：把各包的 node_modules 互相软链（本地包 link 到一起），统一版本发布。痛点：依赖重复安装（每个包一份 node_modules）、安装慢、只解决"链接与发布"不管构建。lerna 本身已停止维护后由 Nx 团队接管，现在定位是"版本发布工具"。
+
+2. pnpm workspace（2020+）——解决安装与磁盘：全局 store 硬链接去重（100 个包依赖同一个 lodash，磁盘只有一份）、非扁平 node_modules（根治幽灵依赖，见 fe-279）、内置 workspace 协议（workspace:* 声明本地依赖）。安装速度比 npm 快 2-3 倍，磁盘省 50%+。但 pnpm 不管"构建什么、按什么顺序构建"。
+
+3. Turborepo/Nx（2021+）——解决构建编排：①任务图调度——turbo run build 自动按包依赖拓扑排序并行（ui 包先于 app 包构建）；②内容寻址缓存——输入（源码+依赖+环境变量）hash 作为缓存键，没变化的包直接跳过（"只构建受影响的部分"）；③远程缓存——CI 之间共享缓存，同事构建过的你直接复用。Nx 更进一步提供"依赖图可视化 + 受影响检测（affected）+ 代码生成器"，是带工程约束的全家桶。
+
+真实数字：一个 40 包的 Monorepo，无编排时全量 CI 构建 28 分钟；Turborepo 本地缓存命中后 40 秒；远程缓存让 PR CI 平均 4 分钟（只构建受影响包）。这就是"工具复杂度"买到的东西。
+
+选型决策：①只有"共享组件库 + 几个应用"（<10 包）——pnpm workspace 足够，Turborepo 可选；②中大型（10-100 包，多团队）——pnpm + Turborepo 是主流甜点组合（Vercel 生态），要更强的边界约束和生成器选 Nx；③超大规模（Google 级）——Bazel（内容寻址做到极致，但学习曲线陡峭，前端团队慎用）。
+
+卡帕西视角：Monorepo 工具链的演进方向是"增量计算的精确化"——从"每次都全量"到"按内容 hash 只重算变化的"。这和 React 的 reconciliation、构建工具的 HMR 是同一个思想：声明式系统 + 精确的失效检测 = 可扩展的性能。理解这一层，工具选型就不会再纠结。`,
+    keyPoints: ["Monorepo 核心收益=原子变更+统一工具链；核心成本=构建规模", "lerna 管链接发布→pnpm 管安装去重→Turborepo/Nx 管构建编排缓存", "中小规模 pnpm+Turborepo 是甜点组合"],
+    followUps: ["内容寻址缓存的 hash 输入应包含哪些因子？漏掉环境变量会怎样？", "Bazel 的远端执行（remote execution）与 Turborepo 远程缓存的差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-279",
+    nodeId: "arch-monorepo",
+    question: "pnpm 的依赖管理机制是什么？什么是幽灵依赖（Phantom Dependency）与依赖提升（Hoisting）问题？pnpm 如何根治？",
+    bigTech: true,
+    answer: `结论：npm/yarn 的扁平化 node_modules 把所有依赖提升到顶层，导致代码可以 import 未在 package.json 声明的包（幽灵依赖）——这是"能用但脆弱"的定时炸弹。pnpm 用"全局 store 硬链接 + 符号链接树"的非扁平结构根治：每个包只能访问自己声明的依赖。
+
+幽灵依赖的形成：npm v3+ 为了拍平嵌套依赖（node_modules/a/node_modules/b 变成顶层 b），把传递依赖也装到顶层。于是你的代码 import "b"（只被 a 依赖、你未声明）居然能跑——直到某天 a 升级不再依赖 b，你的代码在生产构建时突然"模块不存在"。更阴的版本：b 的版本被另一个包的依赖"顶"成了不兼容版本，运行时行为漂移。
+
+依赖提升的次生灾害：①版本冲突时 npm 选择"提升其中一个，其余嵌套安装"——哪个被提升取决于安装顺序（npm 的不确定性），同一份 lock 文件在不同机器上可能结构不同；②多版本共存时 bundler 可能打包了错误的版本副本，React 被打两份的经典事故就是这么来的（Invalid hook call）。
+
+pnpm 的结构（三层）：
+
+\`\`\`
+node_modules/
+├── .pnpm/                          # 真实存储：所有包所有版本
+│   ├── react@18.2.0/
+│   │   └── node_modules/react/     # 硬链接到全局 store
+│   └── lodash@4.17.21/node_modules/lodash/
+├── react -> .pnpm/react@18.2.0/node_modules/react      # 符号链接：只有声明的依赖
+└── lodash -> (不存在！除非你声明了 lodash)
+\`\`\`
+
+①全局 store——所有包内容按 hash 存一份（~/.pnpm-store），项目内用硬链接指向它：100 个项目装同一个 lodash，磁盘只有一份文件（这就是 pnpm 省 50% 磁盘的原因，Mac 上 clone store 更快）；②非扁平 node_modules——项目顶层 node_modules 只有 package.json 里声明的依赖（符号链接到 .pnpm），未声明的包物理上不可达——import 幽灵依赖直接报"找不到模块"，把隐性 bug 变成显性报错；③依赖内各自闭环——.pnpm/react@18.2.0/node_modules/ 里链着 react 自己的依赖，每个包看到的依赖树与它的声明严格一致。
+
+Monorepo 加持：workspace:* 协议声明"依赖本仓库的包"，pnpm 直接符号链接本地包（不发版也能互相引用）；--filter 参数按包过滤执行命令（pnpm --filter app-a build）。
+
+迁移真实痛点（从 npm/yarn 迁 pnpm 的坑）：①历史项目大量幽灵依赖暴露——一次性修复要批量补声明（pnpm 提供 public-hoist-pattern 把指定包提升到顶层做"缓刑"，逐步还债）；②某些库假设扁平结构——如 react-native 的 metro 打包器解析路径跟随符号链接有 bug（需要 shamefully-hoist=true 或 node-linker=hoisted 降级）；③peerDependencies 的自动安装——pnpm v8+ 默认 auto-install-peers=true，与旧行为不同可能引入意外版本；④Docker 构建要调整——layer 缓存策略改为先 COPY pnpm-lock.yaml 装依赖，store 挂载缓存大幅加速 CI。
+
+本质上，pnpm 把 Node 的模块解析"拉回规范"：node_modules 结构严格镜像依赖声明。卡帕西视角：这是"让隐式依赖显式化"的工程胜利——系统的正确性不再依赖安装顺序这种实现细节。`,
+    keyPoints: ["扁平化→传递依赖被提升→未声明可 import=幽灵依赖", "pnpm：全局 store 硬链接+符号链接树，只见到声明的依赖", "迁移要还幽灵依赖的债；public-hoist-pattern 做缓刑"],
+    followUps: ["peerDependencies 在 pnpm 下的解析规则与 npm 有何不同？", "Yarn PnP 抛弃 node_modules 的思路与 pnpm 孰优？"],
+    favorited: false,
+  },
+  {
+    id: "fe-280",
+    nodeId: "arch-monorepo",
+    question: "Turborepo/Nx 的构建缓存与任务编排原理是什么？远程缓存如何工作？如何防止缓存污染？",
+    bigTech: true,
+    answer: `结论：Turbo/Nx 把构建视为"纯函数"——同样的输入（源码 + 依赖版本 + 环境变量 + 命令）必然产生同样的输出（产物 + 日志 + 退出码）。据此做两件事：内容寻址缓存（hash 输入 → 复用输出）和任务图调度（按包间依赖拓扑并行执行）。这是把"构建系统"升级成"增量计算系统"。
+
+任务图编排：turbo run build 时，Turbo 读 turbo.json 的 pipeline 定义：
+
+\`\`\`json
+{
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],          // ^ 表示先构建依赖包
+      "outputs": ["dist/**", ".next/**"],
+      "inputs": ["src/**", "package.json", "tsconfig.json"]
+    },
+    "test": { "dependsOn": ["build"], "outputs": [] },
+    "lint": { "outputs": [] }
+  }
+}
+\`\`\`
+
+app-a 依赖 ui 包：构建 app-a 前必先完成 ui 的 build（^build 的拓扑含义）；无依赖关系的包并行执行（吃满 CPU 核）。
+
+内容寻址缓存：Turbo 为每个任务计算 hash = hash(inputs 文件内容 + 依赖包 hash + 环境变量白名单 + 命令)。命中缓存则跳过执行，直接回放产物（outputs 文件恢复 + 完整日志重放，连 console.log 都和真实执行一样）。本地缓存在 .turbo/cache；远程缓存是 HTTP 服务（Vercel 托管或自建），PUT/GET 按 hash 存取 tar 包——同事（或上午的 CI）构建过的内容，你直接下载。
+
+防缓存污染（正确性的四条军规）：①inputs 必须完备——凡影响产物的因子都要进 hash：源码、配置文件、tsconfig、甚至 .env 里被构建读取的变量（env 字段显式声明）。漏掉的后果是"改了配置却用了旧缓存"，比没缓存更糟——这种 bug 极难复现（换台机器就好）。军规：宁可选得宽（多进 hash 多重建）不可漏；②全局依赖版本——lock 文件 hash 默认参与，但全局安装的 CLI（如 graphql-codegen）版本要手动加入 globalDependencies；③非确定性任务禁缓存——依赖当前时间、随机数、网络状态的任务（如"上传产物到 CDN"）必须从缓存中排除（cache: false），否则第二个执行者会"重放"别人的上传日志以为成功；④远程缓存的信任边界——缓存服务器被投毒（恶意上传 hash 对应的假产物）会污染所有开发者，自建缓存要鉴权 + 产物签名校验，Vercel 托管缓存则继承其账号体系。
+
+受影响检测（affected）：Nx 的 nx affected --target=build 通过 git diff（base 分支 vs HEAD）定位变更包，再沿依赖图找出"下游受影响者"，只构建这个闭包。PR 改了 ui 包的一个按钮 → 只有 ui 和引用它的 3 个 app 需要构建测试，其余 36 个包 CI 直接跳过。这是 Monorepo PR CI 从 28 分钟降到 4 分钟的另一个功臣（与缓存叠加）。
+
+真实数字与调优：远程缓存命中率的健康线是 70%+。命中率低的常见原因：①inputs 配太宽（src/** 里混了经常变的快照文件）；②分支频繁变基（base 变化导致 git diff 范围扩大）；③环境变量泄漏进 hash（CI 每次注入不同的 BUILD_ID——这类变量必须排除或归一化）。
+
+卡帕西视角：这和 React 的 memo、数据库的物化视图、HTTP 的 ETag 是同构的——"基于输入签名的失效检测"。构建系统的智能化本质是把这个思想贯彻到整个仓库。调试缓存问题的第一性原理：当行为异常时先问"这次执行与上次缓存时，输入真的相同吗？"——九成问题出在"影响了产物但没进 hash"的那个隐藏输入。`,
+    keyPoints: ["构建=纯函数：hash(源码+依赖+env+命令)→复用产物，任务按 ^拓扑调度", "inputs 宁宽勿漏；非确定性任务 cache:false；远程缓存要鉴权防投毒", "affected=git diff 沿依赖图算闭包，PR 只构建受影响者"],
+    followUps: ["如何设计一个任务既享受缓存又需要访问密钥（secret 不进 hash）？", "远程缓存的 eviction 策略应如何设计（LRU vs TTL vs 引用计数）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-281",
+    nodeId: "arch-monorepo",
+    question: "Monorepo 中如何实现语义化的版本发布？changesets 的工作流（变更声明 → 版本计算 → 发布）解决了什么问题？",
+    bigTech: true,
+    answer: `结论：Monorepo 发布的难点是"N 个包互相依赖，谁的版本该涨、涨多少、谁该跟着涨"——人工决策必然出错。changesets 把版本决策前置到 PR 阶段：开发者在 PR 里提交一个"变更声明文件"（哪个包、major/minor/patch、changelog 文案），合并后工具自动计算版本、更新依赖引用、生成 CHANGELOG、发布。
+
+\`\`\`bash
+# 1. 开发者改完代码，声明变更
+npx changeset
+# 交互式选择：哪些包变了？patch/minor/major？写一句 changelog
+# 生成 .changeset/great-pandas-sing.md：
+# ---
+# "@acme/ui": minor
+# ---
+# Button 新增 loading 属性
+
+# 2. PR 评审：变更声明随代码一起评审（版本决策被 review！）
+# 3. 合并后 CI 执行 changeset version：
+#    - ui 包 1.2.3 → 1.3.0
+#    - 依赖 ui 的 app-a 其 package.json 里 ui 版本引用自动更新
+#    - 生成/更新 CHANGELOG.md
+#    - 消耗掉 .changeset/*.md（状态清零）
+# 4. changeset publish：按拓扑序发布到 npm
+\`\`\`
+
+解决的四个真问题：①版本决策滞后——lerna 时代是发布时看 commit message 猜版本（conventional commits 推断），错了已经发了；changesets 前置到编码时，开发者最清楚这次改动是不是 breaking；②依赖连锁更新——ui 升 minor，依赖它的 docs 站点和 app 该不该跟着发版？changesets 自动计算依赖图，patch 依赖引用（app 本身不发新包只更新引用，配置 updateInternalDependencies 控制）；③CHANGELOG 维护——每个包的 changelog 从变更声明聚合生成，不是发布时临时从 git log 拼凑；④快照发布（snapshot release）——PR 阶段发布 0.0.0-pr-123 版本供下游测试，验证后合并发正式版。
+
+与 fixed/locked 模式的分歧：changesets 默认独立版本（independent）——各包版本各自演进；Babel/Angular 用的是 fixed 模式——全仓库统一版本号（任何包变化全仓库一起升）。fixed 简单可预期（"v7.24.0 的 Babel 全家桶"），independent 精准但版本矩阵复杂（app-a@2.1 依赖 ui@3.2 和 utils@1.0...）。选择看发布节奏：同步发布的生态（框架）选 fixed，异步演进的（工具集）选 independent。
+
+真实工作流细节：①CI 守门——PR 检查必须包含变更声明（changesets 提供 status 命令，没加 .changeset 文件的 PR 挂红灯），否则"代码进了版本没进"等于没发；②预发布模式——changeset pre enter beta 进入预发布态，之后版本号带 -beta.0 后缀，供 beta 渠道验证；③私有包过滤——private: true 的包（如 app 应用）参与版本计算但不发布 npm，其内部依赖引用照样被更新；④发布失败的幂等——npm 已存在某版本则跳过该包继续（partial publish 恢复），避免"一个包失败全部重来"。
+
+替代方案对比：①lerna version + conventional commits——从 commit 推断版本，要求全员严格写 commit 类型，推断错误的 breaking change 是灾难源；②release-please（Google）——同样基于 conventional commits 但自动生成 release PR，思路是"commit 即声明"，与 changesets 的"显式声明文件"是两种哲学；③手写脚本——10 个包以内可控，超过就要面对依赖拓扑、连锁更新、changelog 聚合这些 changesets 已经解决的问题。
+
+卡帕西视角：changesets 的本质是"把版本这个元数据变成代码评审的对象"——版本号不再是发布时的魔法数字，而是 PR 里可读、可讨论、可回滚的声明。软件工程里一切"自动化决策"的可靠性，都不如"显式声明 + 工具执行"。`,
+    keyPoints: ["变更声明随 PR 评审：版本决策前置到编码时", "自动算依赖连锁、聚合 CHANGELOG、拓扑序发布", "independent 各自演进 / fixed 全仓统一，按发布节奏选"],
+    followUps: ["如何处理「忘记加 changeset」的漏网之鱼（已合并未声明）？", "fixed 模式下如何发布单个包的 hotfix？"],
+    favorited: false,
+  },
+  {
+    id: "fe-282",
+    nodeId: "arch-monorepo",
+    question: "Monorepo 中包之间如何共享代码？源码共享（internal package）与构建产物共享的取舍是什么？TS 项目引用与路径映射怎么配？",
+    bigTech: true,
+    answer: `结论：共享有两条路线——消费方直接引源码（internal package 模式，消费方构建时统一编译）或提供方先构建产物（dist）再被消费。前者开发体验丝滑（改库即时生效、类型直达源码）、构建责任在消费方；后者构建可缓存可并行、但改库要先 build 才能看到效果。现代 Monorepo 的甜点方案：开发时走源码，CI 构建缓存走产物。
+
+\`\`\`jsonc
+// 路线 A：internal package（源码直出）
+// packages/ui/package.json
+{
+  "name": "@acme/ui",
+  "exports": {
+    ".": "./src/index.ts",        // 直接指向 TS 源码！
+    "./button": "./src/button.tsx"
+  }
+  // 没有 main/module/types 指向 dist，没有 build 脚本
+}
+// 消费方（app）的 bundler（Vite/Next/turbopack）直接编译 node_modules 里的 TS
+// 需要 transpilePackages: ["@acme/ui"]（Next.js）或 Vite 默认支持
+
+// 路线 B：构建产物共享（经典）
+{
+  "name": "@acme/ui",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": { "build": "tsup src/index.ts --format esm,cjs --dts" }
+}
+// 消费方 import 的是 dist——ui 改了要先 build，Turbo 缓存让重复 build 近乎免费
+\`\`\`
+
+取舍对比：①开发体验——A 改 ui 的 Button，app 里 HMR 秒级热更（没有中间构建层）；B 要 ui 侧 watch build 或手动重建，链式 watch 在多层依赖下（ui→hooks→utils）脆弱；②类型跳转——A 的 cmd+click 直达 TS 源码，改类型即时反映到消费方；B 跳到 .d.ts（只读声明），改类型要重建 d.ts；③构建编排——B 的产物可以被 Turbo 缓存和并行（ui 的 build 是独立任务）；A 没有独立构建步骤，每个消费方各自编译一遍 ui（3 个 app 编 3 次），大仓库下编译总量上升；④发布要求——对外发 npm 的包必须走 B（npm 用户不该编译你的源码）；纯内部共享的包放心用 A。
+
+TypeScript 配套（两条路都要配好）：①paths 映射——tsconfig.base.json 里 "paths": { "@acme/ui": ["packages/ui/src/index.ts"] }，让 TS 解析直达源码，绕过 package.json exports 的解析分歧；②project references（项目引用）——每个包 tsconfig 里 composite: true + 根 tsconfig references 列表，tsc -b 按依赖拓扑增量编译，类型检查也能被缓存（大仓库全量 typecheck 5 分钟 → 增量 30 秒）；③references 与 paths 协同——references 管"编译顺序与缓存"，paths 管"模块解析位置"，两者是 TS 在 Monorepo 下的完整答案。
+
+真实落地（我们的配置演进）：早期全部走 B——改一次组件库要 build 三次才能在 app 里看到，团队怨声载道；迁到 A + turbopack 后开发体验质变，但 40 个包的全量 CI typecheck 从 3 分钟涨到 9 分钟（每个 app 重复编译共享包）；最终形态：开发期 A（源码+paths），CI 用 project references 做增量类型检查，发 npm 的公开包保持 B 构建。——"环境分层"是解药：别指望一个模式通吃所有环节。
+
+踩坑：①exports 指向源码后，消费方的 ESLint/测试也要能处理 node_modules 里的 TS（Jest 的 transformIgnorePatterns 要把 @acme/* 加入白名单）；②循环引用在源码模式下更容易出现（utils 引 ui、ui 引 utils，产物模式会在 build 时暴露，源码模式直接运行时炸）；③tailwind 的 content 配置要包含共享包的源码路径，否则 ui 包里的类名被 purge；④环境差异——源码模式假设消费方 bundler 能力一致，仓库里同时有 Next 14（turbopack）和老 CRA 项目时，老项目可能编不动新式语法，共享包语法要就低不就高或保留 B 产物做兼容出口。`,
+    keyPoints: ["internal package 源码直出：HMR 丝滑/类型直达，但消费方重复编译", "产物共享可缓存可并行，发 npm 必须走产物", "TS 三件套：paths 解析 + project references 增量编译 + exports 环境分层"],
+    followUps: ["turbopack 的 transpilePackages 与 webpack 的 externals 在源码共享中的角色？", "如何给 internal package 设计「既不发 npm 又能被 Turbo 缓存」的构建？"],
+    favorited: false,
+  },
+  {
+    id: "fe-283",
+    nodeId: "arch-monorepo",
+    question: "Monorepo 的包边界如何管控？如何防止跨层乱引用与循环依赖？eslint boundaries 与依赖方向约束怎么落地？",
+    bigTech: true,
+    answer: `结论：Monorepo 最大的隐性风险是"物理上在一个仓库，逻辑上变成一团乱麻"——任何包都能 import 任何包，三个月后依赖图变成 spaghetti。边界管控的目标：让依赖方向符合分层架构（app → features → shared → utils，绝不反向），用工具把"架构约定"变成"CI 红线"。
+
+分层模型（推荐四层）：①apps——可部署的应用（不得被任何包依赖）；②features——业务特性包（订单/商品，平级之间禁止互引，防业务耦合）；③shared——共享业务组件/ hooks（可被 features/apps 引用，不得引用上层）；④utils/config——纯工具与配置（零业务，处于最底层）。
+
+工具落地三板斧：
+
+\`\`\`jsonc
+// 1. Nx 的 module boundary 规则（标签化约束）
+// .eslintrc.json
+"@nx/enforce-module-boundaries": ["error", {
+  "depConstraints": [{
+    "sourceTag": "type:app",        // apps 下的包打 type:app 标签
+    "onlyDependOnLibsWithTags": ["type:feature", "type:shared", "type:util"]
+  }, {
+    "sourceTag": "type:feature",
+    "onlyDependOnLibsWithTags": ["type:shared", "type:util"]  // feature 不可引其他 feature
+  }, {
+    "sourceTag": "type:shared",
+    "onlyDependOnLibsWithTags": ["type:util"]
+  }]
+}]
+
+// 2. 通用方案：eslint-plugin-boundaries（不绑 Nx）
+// 按文件路径划元素类型，同样配 allowed 依赖矩阵
+
+// 3. 依赖健康度巡检：dependency-cruiser
+// npx depcruise --validate .dependency-cruiser.js packages/
+// 规则示例：no-circular（禁循环依赖）、not-to-unresolvable、no-orphans
+\`\`\`
+
+循环依赖的检测与危害：①ESM 循环引用（a 引 b、b 引 a）在打包产物里会导致"模块初始化顺序不确定"——某个包的顶层代码执行时，对方模块还是 undefined 的临时死区状态，报"Cannot access before initialization"；②Monorepo 放大此问题——包级循环（ui 引 hooks、hooks 引 ui）在 workspace 符号链接下静默成立，直到某天调整构建顺序才爆炸；③depcruise 的 no-circular 规则在 CI 上跑全量图分析，发现即失败；④解环手法——下沉共享部分到更底层包（把互相需要的类型/常量抽到 utils）、依赖注入（上层把实现传给下层）、事件解耦（用 emitter 替代直接调用）。
+
+真实治理案例：40 包仓库的边界修复——引入 boundaries 规则首日 lint 报出 217 处违规（feature 互引 89 处、shared 反引 feature 61 处、apps 互引 12 处）。策略：①先把规则设为 warn 全量收集，按违规聚类排期；②高频违规对（order→goods 互引）用"下沉共享 domain 包"解耦；③设置 ratchet（棘轮）机制——CI 记录违规总数基线，只允许减少不允许增加（新违规 PR 挂红灯），存量逐步清偿，三个月后归零转 error 级别。
+
+除了静态规则，还有三道防线：①CODEOWNERS 按包路径分配——跨层修改自动拉架构组 review；②包内 exports 显式声明——package.json 的 exports 字段只暴露公共 API（./internal/* 不导出），Node/打包器的 exports 解析会物理拦截深层引用（import "@acme/ui/src/internal/util" 直接报错）；③依赖图可视化（nx graph）——架构 review 时看图说话，发现"哪个包被大家乱引"（扇入过高的包要警惕变成上帝模块）。
+
+卡帕西视角：边界规则的价值不在"限制"而在"让架构意图可执行"——写在 wiki 里的分层图三个月就过期，写在 eslint 规则里的分层每次 commit 都在执行。架构腐化的速度 = 约定的可违反程度。`,
+    keyPoints: ["分层：apps→features→shared→utils，标签化 depConstraints 配 CI 红线", "exports 只暴露公共 API，物理拦截深层引用", "治理用 ratchet：存量基线只减不增，增量零容忍"],
+    followUps: ["扇入过高的共享包（上帝模块）如何拆分？", "微服务架构的「数据库隔离」原则在 Monorepo 包边界上的对应物是什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-284",
+    nodeId: "arch-monorepo",
+    question: "Monorepo 的 CI 如何设计？全量构建与增量构建如何平衡？并行度与远程缓存命中率的调优手段有哪些？",
+    bigTech: true,
+    answer: `结论：Monorepo 的 CI 设计核心是"把 PR 反馈时间和主分支可靠性解耦"——PR 阶段跑增量（affected + 远程缓存，分钟级反馈），主分支/夜间跑全量（防增量逻辑的盲区漏检）。两手都要硬，只跑增量的团队终会被一次"未受影响却挂了"的事故教育。
+
+流水线分层设计：
+
+\`\`\`yaml
+# PR 流水线（目标：<10 分钟反馈）
+pr:
+  steps:
+    - 安装: pnpm install --frozen-lockfile           # lock 不变时 store 命中，秒级
+    - 受影响检测: turbo run lint test build --filter=...[origin/main...HEAD]
+      # 或 nx affected --target=build,test,lint --base=origin/main
+    - 远程缓存: TURBO_TOKEN 注入，命中直接下载产物
+    - 质量门禁: typecheck（project references 增量）+ 守护测试
+
+# 主分支流水线（合并后）：增量 + 缓存回填（产物上传远程缓存供 PR 复用）
+# 夜间全量流水线（兜底）：清空缓存全量构建 + 全量测试 + 依赖安全扫描
+\`\`\`
+
+为什么必须保留全量兜底：①affected 的盲区——git diff 只能看到"代码变更"，看不到"环境变更"（基础镜像升级、npm 仓库里的传递依赖发布新版本、CI 环境变量调整），这些变更影响下所有包都"未受影响"；②缓存正确性的信任——缓存回放掩盖了真实的构建错误（产物 hash 碰撞理论上存在），定期全量无缓存构建是对缓存系统的审计；③交叉影响——包 A 改了共享配置（根 tsconfig、ESLint 规则），按文件依赖图可能只算到少数包，但影响面是全仓库（这种"全局输入"要显式配置 globalDependencies 让 Turbo 全量重建）。
+
+并行度调优：①任务级并行——Turbo/Nx 默认按 CPU 核数并行任务，CI 机器（如 4 核 runner）上 --concurrency 要实测调优（内存密集型构建开满会 OOM，webpack 构建常要限制 2-3 并发）；②机器级分片——测试任务按包分片到多台 runner（jest --shard=1/4），Turbo 的 --filter 按包列表分桶；③安装层并行——pnpm install 本身很快，但 postinstall 脚本（node-gyp 编译）要并行度控制；④Docker 层缓存——把 pnpm install 独立成一层（lock 文件不变则命中镜像层缓存），源码变更不触发重装。
+
+远程缓存命中率优化（健康线 70%+）：①统一基础环境——构建 Docker 镜像固定 Node/pnpm 版本（Node 版本进 hash，开发者 Node 版本不一命中率暴跌）；②归一化环境变量——CI 注入的 BUILD_NUMBER、GIT_SHA 这类每次变化的变量不能进 hash（env 白名单只保留真正影响产物的，如 NODE_ENV、PUBLIC_API_URL）；③主分支回填——主分支每次合并后跑全量构建并把产物推入远程缓存，PR 基于最新 main 时命中率高；④outputs 精确化——outputs 配少了产物恢复不全（构建成功但文件缺失），配多了缓存体积膨胀下载变慢。
+
+度量体系：①PR CI 时长 P50/P95（目标 P50 < 8min）；②缓存命中率（分本地/远程）；③affected 准确率——"PR 挂了但 affected 没跑到该包"的事故次数；④排队时长（runner 池容量规划）。我们的事故复盘：一次 affected 漏检导致主分支红了两小时——根因是共享 ESLint 配置变更未配 globalDependencies，教训写进了配置 checklist。
+
+成本视角：远程缓存服务（自建 S3 + 签名服务或 Vercel 托管）的成本对比全量 CI 的 runner 分钟数成本——40 包仓库，远程缓存每月成本 ≈ 2 个 runner 的钱，省下的 CI 分钟数 ≈ 15 个 runner。这是 Monorepo 时代 ROI 最高的基础设施投资之一。`,
+    keyPoints: ["PR 跑增量+远程缓存，主分支回填，夜间全量兜底防环境变更盲区", "全局输入（根配置）进 globalDependencies 触发全量重建", "命中率调优：统一镜像/env 白名单/主分支回填，健康线 70%"],
+    followUps: ["如何设计「夜间全量失败但白天 PR 全绿」时的归因流程？", "测试分片与 Turbo 任务图如何协同（先分片再图内并行）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-285",
+    nodeId: "arch-monorepo",
+    question: "从零落地一个 Monorepo：目录结构、包管理器、构建编排、版本发布、CI 的完整技术选型与初始化步骤是什么？",
+    bigTech: true,
+    answer: `结论：2026 年的主流甜点组合——pnpm workspace（包管理）+ Turborepo（构建编排）+ changesets（版本发布）+ GitHub Actions（CI）。这个组合的标准化程度意味着：新人半天上手、文档丰富、迁移成本低。以下是可以直接照抄的初始化蓝图。
+
+\`\`\`
+my-monorepo/
+├── apps/
+│   ├── web/                    # Next.js 主应用
+│   └── admin/                  # 管理后台
+├── packages/
+│   ├── ui/                     # 组件库（internal package，源码直出）
+│   ├── hooks/                  # 共享 hooks
+│   ├── utils/                  # 纯工具（零依赖最底层）
+│   ├── config-eslint/          # 共享 ESLint 配置
+│   └── config-ts/              # 共享 tsconfig
+├── package.json                # 根：private，只放 devDependencies 和脚本
+├── pnpm-workspace.yaml
+├── turbo.json
+├── tsconfig.base.json
+└── .changeset/
+\`\`\`
+
+初始化步骤（顺序有讲究）：
+
+\`\`\`bash
+# 1. 根 package.json：private + 包管理器钉版本
+npm init -y
+# {"private": true, "packageManager": "pnpm@9.15.0", "workspaces": 不需要(pnpm 用 yaml)}
+
+# 2. pnpm-workspace.yaml
+# packages:
+#   - "apps/*"
+#   - "packages/*"
+
+# 3. turbo.json：pipeline 定义
+# {"pipeline": {
+#   "build": {"dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"]},
+#   "lint": {}, "test": {"dependsOn": ["build"]},
+#   "typecheck": {"dependsOn": ["^build"]}
+# }}
+
+# 4. tsconfig.base.json + 各包 extends
+# {"compilerOptions": {"strict": true, "composite": true, ...}}
+
+# 5. 内部包声明：apps/web 的 package.json
+# "dependencies": {"@acme/ui": "workspace:*", "@acme/utils": "workspace:*"}
+
+# 6. changesets：npx changeset init，CI 配 changesets/action 自动发版
+
+pnpm install   # 首次安装，见证符号链接树
+pnpm build     # turbo 接管：拓扑并行 + 缓存
+\`\`\`
+
+关键决策点（每个都有回头路成本）：①internal package vs 构建产物——新仓库直接源码直出（exports: "./src/index.ts"），配合 transpilePackages，把"要不要构建 ui 包"的问题推迟到需要发 npm 那天；②标签（标签化边界）第一天就定——apps/ 和 packages/ 的物理隔离 + eslint boundaries 从空仓库开始配（历史违规为零时上线规则成本最低）；③版本策略——内部应用（apps）永远 private: true 不发版，库包用 changesets independent 模式；④Node 版本钉死——.nvmrc + packageManager 字段 + CI 镜像三层一致，防"我机器上能跑"；⑤守护测试前置——no-native-form-elements、依赖边界这类规则趁仓库小就上 CI，等 40 个包再补就是还债。
+
+第一周验收清单：①clone 后 pnpm install && pnpm build 五分钟跑通（新人体验是工程质量的晴雨表）；②改 utils 包源码，web 应用 HMR 秒级热更；③turbo run build 第二次执行全量缓存命中（<10 秒）；④PR CI 只构建受影响包（改 ui 不会触发 admin 的构建）；⑤changeset 声明 → 合并 → 自动发版到 npm 全链路走通一次（哪怕发 0.0.1）。
+
+演进路线：①30 包以内——上述组合完全够用，别过度设计；②30-80 包——加远程缓存（Vercel 或自建 S3）、依赖边界 lint、依赖图巡检（depcruise CI）；③80+ 包/多团队——评估 Nx（更强的 affected 与生成器）或 Bazel（极致增量但需专门团队），此时"Monorepo 平台"本身需要一个 owner 角色。
+
+卡帕西视角：初始化的艺术是"把不可逆决策做对，把可逆决策推迟"——包管理器和目录结构是早期就要钉死的（迁移成本高），构建缓存和边界规则可以渐进增强。最小可用配置跑通全链路 > 一次配齐所有花哨特性。`,
+    keyPoints: ["甜点组合：pnpm workspace + Turborepo + changesets + GitHub Actions", "源码直出 internal package 推迟构建决策；apps 永远 private 不发版", "验收：install 五分钟跑通/改库 HMR 秒更/二次构建全缓存命中"],
+    followUps: ["什么信号出现时该从 Turborepo 迁移到 Nx/Bazel？", "Monorepo 中如何接入已有的独立仓库（存量迁移策略）？"],
     favorited: false,
   },
 ];
