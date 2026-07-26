@@ -11351,6 +11351,601 @@ PSI > 0.5:   严重漂移（紧急干预）
     followUps: ["概念漂移如何检测？", "漂移后如何更新模型？"],
     favorited: false,
   },
+  // ===== 计算机基础：TCP 与网络层（be-216 ~ be-222）=====
+  {
+    id: "be-216",
+    nodeId: "be-network-tcp",
+    question: "TCP 三次握手全过程？为什么是三次而不是两次或四次？SYN 泛洪攻击怎么防？",
+    bigTech: true,
+    answer: `结论：三次握手的本质是「双方互相同步初始序列号 ISN + 确认彼此收发能力正常」。两次无法让服务端确认客户端的接收能力；四次则浪费——服务端的 ACK 和 SYN 可以合并。
+
+过程拆解：
+1. SYN：客户端发 SYN=1, seq=x（随机 ISN），进入 SYN_SENT
+2. SYN+ACK：服务端回 SYN=1, ACK=1, seq=y, ack=x+1，进入 SYN_RCVD
+3. ACK：客户端回 ACK=1, ack=y+1，双方 ESTABLISHED
+
+为什么不是两次：两次握手下，服务端无法确认客户端是否收到自己的 SYN+ACK。若客户端的第一个 SYN 是网络滞留的旧报文，服务端会白白建立连接等资源浪费（历史连接初始化问题）。
+
+案例：12306 春运抢票曾出现大量半开连接——黄牛脚本发 SYN 后不回应第三次握手，服务端 SYN_RCVD 队列被打满，真实用户连不上。这就是 SYN 泛洪（SYN Flood）攻击。
+
+防御手段（Linux 内核参数）：
+\`\`\`bash
+# 1. 开启 SYN Cookie：队列满时不分配资源，用 cookie 编码 ISN 验证
+sysctl -w net.ipv4.tcp_syncookies=1
+# 2. 增大半连接队列
+sysctl -w net.ipv4.tcp_max_syn_backlog=8192
+# 3. 减少 SYN+ACK 重传次数（默认 5 次约 63s）
+sysctl -w net.ipv4.tcp_synack_retries=2
+\`\`\`
+
+\`\`\`text
+SYN Cookie 原理：服务端收到 SYN 不存状态，把连接信息编码进 ISN（时间戳+MSS+哈希）
+回给客户端；第三次握手收到 ACK 时反解校验，合法才建立连接。
+代价：丢失部分 TCP 选项协商能力，只作为兜底。
+\`\`\`
+
+踩坑：netstat 看到大量 SYN_RCVD 不一定是攻击——可能是服务端 CPU 满或 backlog 太小；tcp_syncookies=1 后仍然要配合 backlog 调大，否则正常高并发下也会丢握手；容器里改内核参数要确认 net.ipv4 命名空间是否隔离。`,
+    keyPoints: ["互相同步 ISN+确认收发能力", "SYN Cookie 防泛洪", "半连接队列 backlog 调优"],
+    followUps: ["TCP  Fast Open 怎么优化握手延迟？", "如何抓包验证三次握手（tcpdump）？"],
+    favorited: false,
+  },
+  {
+    id: "be-217",
+    nodeId: "be-network-tcp",
+    question: "四次挥手全过程？为什么主动关闭方要 TIME_WAIT 等 2MSL？线上大量 TIME_WAIT 怎么处理？",
+    bigTech: true,
+    answer: `结论：四次挥手因为 TCP 全双工——两个方向要各自独立关闭。TIME_WAIT 等 2MSL 是为了「保证最后一个 ACK 能重传 + 让旧连接的报文在网络中自然消亡」。
+
+过程：
+1. FIN：主动方发 FIN，进入 FIN_WAIT_1
+2. ACK：被动方回 ACK，进入 CLOSE_WAIT；主动方收到后 FIN_WAIT_2
+3. FIN：被动方应用关闭后发 FIN，进入 LAST_ACK
+4. ACK：主动方回 ACK，进入 TIME_WAIT（2MSL 后关闭）
+
+2MSL 的两个理由：
+- 最后一个 ACK 若丢失，被动方会重传 FIN，主动方在 TIME_WAIT 期间还能再回 ACK
+- 防止本连接的旧报文在网络里游荡，串到下一个相同四元组的新连接（MSL=报文最大生存时间，Linux 默认 60s，2MSL=120s）
+
+案例：美团外卖骑手 App 高峰期，网关服务器 netstat 出现 6 万+ TIME_WAIT——因为网关对上游短连接调用，主动关闭方在网关侧。后果是端口耗尽（默认 28232 个可用端口），新连接建失败。
+
+处理方案（按优先级）：
+\`\`\`bash
+# 1. 治本：改长连接/连接池，HTTP 加 Connection: keep-alive
+# 2. 扩大可用端口范围
+sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+# 3. TIME_WAIT 快速回收（仅客户端侧、开启 tcp_timestamps 时有效）
+sysctl -w net.ipv4.tcp_tw_reuse=1
+# 注意：tcp_tw_recycle 已在 Linux 4.12 移除，NAT 环境下会导致丢包，切勿再用
+\`\`\`
+
+\`\`\`text
+TIME_WAIT  vs  CLOSE_WAIT 排查口诀：
+TIME_WAIT 多 = 自己主动关别人太多（短连接滥用）→ 改长连接
+CLOSE_WAIT 多 = 别人关了，自己代码没 close（泄漏）→ 查代码
+\`\`\`
+
+踩坑：tcp_tw_reuse 只对「主动发起连接的一方」（客户端角色）生效，服务端角色无效；LVS/HAProxy 四层代理会把 TIME_WAIT 状态转移到代理层，瓶颈要一起看；HTTP/1.0 默认短连接是历史重灾区，升级 HTTP/1.1+keep-alive 才是根本。`,
+    keyPoints: ["全双工各自独立关闭", "2MSL=防 ACK 丢失+旧报文消亡", "TIME_WAIT 治本靠长连接"],
+    followUps: ["TIME_WAIT 状态下端口能被强制复用吗（SO_REUSEADDR）？", "为什么服务端主动断开长连接更危险？"],
+    favorited: false,
+  },
+  {
+    id: "be-218",
+    nodeId: "be-network-tcp",
+    question: "CLOSE_WAIT 状态过多说明什么问题？结合一次真实故障讲排查过程。",
+    bigTech: true,
+    answer: `结论：CLOSE_WAIT 过多 = 对端已经关闭连接（发过 FIN），但本端应用代码没有调用 close()——是本端的 bug，不是网络问题。典型根因：连接池泄漏、异常分支没关流、阻塞调用没超时。
+
+案例：字节跳动某推荐服务凌晨告警——文件描述符（fd）耗尽，服务假死但进程活着。排查过程：
+
+\`\`\`bash
+# 1. 看 fd 使用量：接近 ulimit -n 上限 65535
+ls /proc/<pid>/fd | wc -l
+# 2. 看 TCP 状态分布：CLOSE_WAIT 有 5 万+
+ss -ant | awk '{print $1}' | sort | uniq -c | sort -rn
+# 3. 看 CLOSE_WAIT 的对端地址：都指向内部 Redis 代理
+ss -antp | grep CLOSE_WAIT | head
+\`\`\`
+
+定位：DB 代理中间件升级后，空闲连接主动断开（发 FIN），但业务代码用的连接池在 borrow 时没做有效性校验，拿到已半关闭的连接用完也不还——close 永远没被调用。
+
+修复三件套：
+1. 连接池加 testOnBorrow 或 keepalive 探活
+2. 所有资源用 try-with-resources / defer close 兜底
+3. 客户端超时时间必须小于服务端空闲超时，否则永远拿死连接
+
+\`\`\`java
+// 反例：异常分支漏 close，对方关闭后永远停留在 CLOSE_WAIT
+Socket socket = pool.borrow();
+socket.read();  // 阻塞读，对端已 FIN → 返回 -1
+// 异常抛出，close() 没执行 → CLOSE_WAIT 泄漏
+
+// 正例：try-with-resources 保证关闭
+try (Socket socket = pool.borrow()) {
+    socket.setSoTimeout(3000);  // 必须有超时
+    socket.read();
+}  // 自动 close
+\`\`\`
+
+\`\`\`text
+TCP 状态速查（ss -ant 输出）：
+ESTABLISHED  正常通信
+TIME_WAIT    我方主动关，等 2MSL（看 be-217）
+CLOSE_WAIT   对方已关，我方没 close → 我方代码 bug
+FIN_WAIT_2   我方已关，等对方 FIN → 对方应用没 close
+\`\`\`
+
+踩坑：CLOSE_WAIT 不占用端口四元组可复用名额，但占 fd，堆到 ulimit 就炸；Netty/连接池框架的 IdleStateHandler 只能关空闲连接，关不掉「借出去没还」的；排查时 lsof -p <pid> 能看到每个 fd 对应的连接状态，比 ss 更直观。`,
+    keyPoints: ["CLOSE_WAIT=本端没 close 的 bug", "fd 耗尽导致假死", "连接池探活+超时+try 兜底"],
+    followUps: ["FIN_WAIT_2 过多又是谁的问题？", "如何给连接池配置合理的心跳探活？"],
+    favorited: false,
+  },
+  {
+    id: "be-219",
+    nodeId: "be-network-tcp",
+    question: "TCP 滑动窗口与拥塞控制？慢启动、拥塞避免、快重传、快恢复分别解决什么？",
+    bigTech: true,
+    answer: `结论：滑动窗口解决「收发双方速度匹配」（流量控制），拥塞控制解决「网络整体不过载」。发送窗口 = min(接收窗口 rwnd, 拥塞窗口 cwnd)。
+
+拥塞控制四板斧：
+1. 慢启动：cwnd 从 1 个 MSS 开始，每收到一个 ACK 翻倍（指数增长），直到慢启动阈值 ssthresh
+2. 拥塞避免：超过 ssthresh 后每个 RTT 只 +1 MSS（线性增长），谨慎试探
+3. 快重传：收到 3 个重复 ACK 立即重传丢失包，不等超时（RTO 通常是 200ms+，太慢）
+4. 快恢复：快重传后不回到慢启动，而是 ssthresh=cwnd/2, cwnd=ssthresh 直接进入拥塞避免（认为网络只是轻微拥塞）
+
+\`\`\`text
+cwnd 增长曲线：
+慢启动(指数) ──┐
+               ├─ 到达 ssthresh → 拥塞避免(线性) ── 丢包?
+               │                                ├─ 超时: ssthresh=cwnd/2, cwnd=1 重新慢启动
+               │                                └─ 3 dupACK: ssthresh=cwnd/2, cwnd=ssthresh 快恢复
+\`\`\`
+
+案例：阿里双 11 零点，CDN 回源链路跨机房。早期用默认 Reno 算法，一旦丢包 cwnd 直接砍半，大促带宽利用率只有 40%。后来切 Google BBR——不再以丢包为拥塞信号，而是实时测量带宽×RTT 瓶颈，主动控制发送速率，跨机房吞吐提升 30%+。
+
+\`\`\`bash
+# Linux 4.9+ 启用 BBR
+sysctl -w net.ipv4.tcp_congestion_control=bbr
+# 查看当前可用算法
+sysctl net.ipv4.tcp_available_congestion_control
+\`\`\`
+
+接收窗口 rwnd 由接收方通过 ACK 报文里的 Window 字段通告；窗口扩大选项（Window Scale）最多放大 2^14 倍，否则 64KB 上限在高带宽时延积（BDP）网络下根本跑不满——100Gbps×100ms 链路需要 1.25GB 窗口。
+
+踩坑：rwnd=0 会触发发送方 Zero Window Probe 死等，应用读写卡死常查这个；BBR 对小流量/低延迟内网场景收益不明显，不要盲目全量开；拥塞控制在 QUIC（用户态）里可以按连接单独配置，比内核态 TCP 灵活得多——这也是 HTTP/3 的优势之一。`,
+    keyPoints: ["发送窗口=min(rwnd,cwnd)", "慢启动指数→拥塞避免线性", "BBR 测带宽代替丢包信号"],
+    followUps: ["BBR 和 CUBIC 混部会互相欺负吗？", "如何用 iperf3 验证窗口对吞吐的影响？"],
+    favorited: false,
+  },
+  {
+    id: "be-220",
+    nodeId: "be-network-tcp",
+    question: "TCP 和 UDP 的核心区别？各自适用什么场景？QUIC 为什么选择基于 UDP？",
+    bigTech: true,
+    answer: `结论：TCP 面向连接、可靠有序、有流量/拥塞控制；UDP 无连接、不保证可靠、无拥塞控制但延迟低、头部仅 8 字节。选型本质是「可靠性 vs 实时性 vs 定制自由度」的权衡。
+
+\`\`\`text
+对比表：
+维度        TCP                          UDP
+连接        三次握手建立                  无连接
+可靠性      ACK+重传+序号保证             尽力而为，可能丢包
+有序性      保证按序交付                  不保证
+头部开销    20-60 字节                   8 字节
+拥塞控制    有（慢启动/拥塞避免）          无（应用层自己定）
+队头阻塞    有（一个包丢失全队等）         无
+典型应用    HTTP/1.1/2、MySQL、Redis     DNS、视频直播、游戏、QUIC
+\`\`\`
+
+适用场景：
+- TCP：一切不能丢数据的——交易、消息、数据库协议
+- UDP：实时性优先可容忍丢失的——音视频（丢一帧花屏好过卡顿）、实时游戏状态同步、DNS 查询、心跳探测
+
+案例：抖音直播连麦用 UDP 私有协议——连麦延迟要求 <400ms，TCP 一次重传就 200ms+，连续丢包延迟雪崩；丢包用 FEC 前向纠错 + NACK 选择性重传在应用层补，比 TCP 全量按序重传聪明。
+
+QUIC 基于 UDP 的三个理由：
+1. 绕过内核：TCP 实现焊死在操作系统内核，升级拥塞算法要等内核换代（十年周期）；UDP 之上 QUIC 在用户态，App 发版就能升级
+2. 解决队头阻塞：TCP 一个包丢失，后面所有流都等；QUIC 的多路复用流之间真正独立，stream A 丢包不影响 stream B
+3. 连接迁移：TCP 连接绑定四元组，WiFi 切 4G 就断；QUIC 用 Connection ID 标识连接，网络切换不断连——刷短视频进电梯不卡靠的就是这个
+
+\`\`\`text
+QUIC = UDP 外壳 + 用户态的「TCP 能力」：
+可靠传输、按序交付、拥塞控制（可插拔 BBR/CUBIC）
++ TLS1.3 内建（握手合并，0-RTT 恢复）
++ 连接迁移（Connection ID）
+\`\`\`
+
+踩坑：UDP 不是「不可靠所以快」，而是「把可靠性选择权交给应用」——乱用会自己重写一个更烂的 TCP；企业网络/运营商对 UDP 有限速甚至封禁，QUIC 需要 TCP 回退兜底；游戏场景 UDP 也要防 DDoS 放大攻击（无连接易伪造源 IP）。`,
+    keyPoints: ["可靠性 vs 实时性权衡", "QUIC 用户态可迭代", "连接迁移靠 Connection ID"],
+    followUps: ["QUIC 的 0-RTT 握手有重放风险吗？", "如何给自研 RPC 选 TCP 还是 QUIC？"],
+    favorited: false,
+  },
+  {
+    id: "be-221",
+    nodeId: "be-network-tcp",
+    question: "TCP 粘包和拆包是什么？为什么会产生？业界有哪几种解决方案？",
+    bigTech: true,
+    answer: `结论：TCP 是字节流协议，没有消息边界——应用层发的两条消息可能被合并成一次 TCP 段发出（粘包），也可能一条消息被拆成多个 TCP 段（拆包）。解决方案核心：应用层自己定义消息边界。
+
+产生原因：
+1. 发送方：Nagle 算法把小包合并发送（提高网络效率）
+2. 接收方：内核缓冲区数据被应用一次 read 全部取走
+3. 链路层：MSS（最大分段大小，通常 1460 字节）超限被 IP 层分片/重组
+
+四种解决方案：
+\`\`\`text
+方案对比：
+1. 定长消息：每条消息固定 N 字节，不足补空格
+   优点：解析最简单  缺点：浪费带宽  适用：金融报文（ISO8583）
+2. 分隔符：消息尾加特殊分隔符（如 \\n）
+   优点：紧凑  缺点：内容需转义分隔符  适用：文本协议（Redis RESP 用 \\r\\n）
+3. 长度字段+消息体（主流）：[4字节长度][消息体]
+   优点：高效无歧义  缺点：需先读头  适用：Dubbo、gRPC、私有 RPC
+4. 长度字段含自身：变长头部（Protobuf varint）
+   优点：头部更省  缺点：解析复杂  适用：极致带宽优化
+\`\`\`
+
+案例：微信早期私有协议就用「4 字节长度头 + Protobuf body」。一次线上 bug：客户端弱网下重连补发消息，长度头在弱网抖动时被拆到两个 TCP 段——服务端按固定 4 字节读头时读到了半个长度，解析出 2GB 的荒谬长度直接 OOM。修复：读头必须循环读满 4 字节，且长度要做合法性校验（上限+魔数）。
+
+\`\`\`java
+// Netty 一行解决：长度字段拆包器（生产级写法）
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    1024 * 1024,  // maxFrameLength：防恶意长度头 OOM
+    0,            // lengthFieldOffset
+    4,            // lengthFieldLength
+    0,            // lengthAdjustment
+    4             // initialBytesToStrip：解码后去掉长度头
+));
+pipeline.addLast(new BusinessHandler());  // 拿到的就是完整消息
+\`\`\`
+
+踩坑：HTTP 不需要处理粘包是因为它有 Content-Length / chunked 编码——应用协议设计时别忘了边界；手写 socket 解析必须先读固定长度头再按长度读体，且每步都要处理「没读够」；长度头必须设上限，否则一个伪造的 0x7FFFFFFF 长度就能让服务端申请 2GB 内存。`,
+    keyPoints: ["TCP 字节流无消息边界", "长度头+消息体是主流", "长度上限+魔数防 OOM"],
+    followUps: ["Netty 还有哪些内置拆包器？", "HTTP/2 的帧是怎么解决边界的？"],
+    favorited: false,
+  },
+  {
+    id: "be-222",
+    nodeId: "be-network-tcp",
+    question: "TCP Keepalive 和应用层心跳有什么区别？为什么生产环境都用应用层心跳？",
+    bigTech: true,
+    answer: `结论：TCP Keepalive 是内核层的连接保活探测（默认 2 小时才发第一个包），应用层心跳是业务自己定时发的小包（通常 30s~几分钟）。生产用应用层心跳，因为 TCP Keepalive 太慢、跨不了 NAT/代理、且探活语义不是「应用还活着」。
+
+\`\`\`bash
+# TCP Keepalive 默认参数（Linux）
+net.ipv4.tcp_keepalive_time = 7200    # 2小时空闲才开始探测
+net.ipv4.tcp_keepalive_intvl = 75     # 每 75 秒探一次
+net.ipv4.tcp_keepalive_probes = 9     # 9 次无响应才判定断开
+# 结论：最坏要 2小时+11分钟 才发现死连接——生产不可接受
+\`\`\`
+
+应用层心跳的三个不可替代价值：
+1. 穿透 NAT 保活：运营商 NAT 表项 5 分钟左右过期，微信/钉钉长连接每 4-5 分钟发一次心跳就是为了续命 NAT 映射，不是为了检测对端死活
+2. 应用级语义：进程还在但业务线程池打满、DB 连接池耗尽——TCP 层照样 ACK，只有应用层心跳包带「我健康吗」的语义
+3. 智能心跳：根据网络环境动态调整（WiFi 下 4 分钟，4G 下 5 分钟），省电省流量
+
+案例：微信 Android 端心跳机制——早期固定 270s 心跳，发现部分地市 NAT 超时只有 240s，连接频繁断开重连耗电。后来做「心跳自适应」：从 180s 开始，成功则 +20s 逐步逼近 NAT 超时上限，失败则回退记录该网络的 safe interval，全国各省网络环境差异一套算法自适应。
+
+\`\`\`java
+// Netty 空闲检测三件套（IM 长连接标配）
+pipeline.addLast(new IdleStateHandler(
+    60,   // readerIdleTime：60s 没读到数据
+    30,   // writerIdleTime：30s 没写就发心跳
+    0     // allIdleTime
+));
+pipeline.addLast(new ChannelInboundHandlerAdapter() {
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent e && e.state() == READER_IDLE) {
+            ctx.close();  // 读超时：判定客户端已死，释放资源
+        }
+    }
+});
+\`\`\`
+
+踩坑：心跳间隔不是越短越好——百万长连接每 30s 一次心跳就是 3.3 万 QPS 的心跳流量，纯浪费；心跳包要带序号和时间戳，否则乱序到达时无法判断延迟；服务端读超时时间要大于 2 倍心跳间隔，给弱网留重传余量；LB 的空闲超时（如阿里云 SLB 默认 900s）也要纳入心跳设计。`,
+    keyPoints: ["TCP Keepalive 默认 2 小时太慢", "心跳保 NAT 映射+应用健康语义", "微信智能心跳自适应"],
+    followUps: ["百万长连接的心跳风暴怎么优化？", "gRPC 的 keepalive 参数怎么配？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：HTTP/HTTPS/QUIC（be-223 ~ be-229）=====
+  {
+    id: "be-223",
+    nodeId: "be-network-http",
+    question: "HTTP/1.1、HTTP/2、HTTP/3 的核心差异？每一代解决了什么痛点又引入了什么新问题？",
+    bigTech: true,
+    answer: `结论：HTTP 演进主线是「对抗延迟」——1.1 解决连接复用，2 解决应用层队头阻塞，3 解决传输层队头阻塞。
+
+\`\`\`text
+三代对比：
+维度        HTTP/1.1                HTTP/2                    HTTP/3
+传输层      TCP                     TCP                       QUIC(UDP)
+并发        keep-alive+6连接/域名    单连接多路复用(stream)     单连接多路复用(真独立)
+队头阻塞    应用层阻塞(管线化失败)    TCP层阻塞(丢包全流等待)    彻底解决
+头部压缩    无(纯文本)               HPACK                     QPACK
+握手开销    TCP 1-RTT + TLS 2-RTT    TCP+TLS 3-RTT             首次1-RTT/恢复0-RTT
+连接迁移    不支持(四元组绑定)        不支持                    Connection ID 支持
+\`\`\`
+
+HTTP/2 的坑：多路复用把所有请求塞进一条 TCP 连接，TCP 层一个包丢失，所有 stream 一起等——弱网环境下比 HTTP/1.1 的 6 条连接还慢。这是 HTTP/3 立项的直接动机。
+
+案例：字节抖音 App 全面切 HTTP/3 后，弱网环境（电梯/地铁）视频首帧时间下降 20%+，因为 QUIC 的 stream 间独立 + 0-RTT 连接恢复 + WiFi/4G 切换不断连。
+
+服务端落地（Nginx 1.25+）：
+\`\`\`nginx
+server {
+    listen 443 ssl;
+    listen 443 quic reuseport;   # HTTP/3
+    http2 on;                    # HTTP/2
+    http3_max_concurrent_streams 128;
+    ssl_certificate     cert.pem;
+    ssl_certificate_key key.pem;
+    # 告诉客户端支持 h3（Alt-Svc 头是关键）
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+}
+\`\`\`
+
+踩坑：HTTP/2 的 6 连接限制是浏览器的，服务端 RPC 用 H2 单连接没这问题；QUIC 依赖 UDP 443，企业防火墙可能拦截，必须保留 H2 回退；HTTP/3 服务端 CPU 开销比 H2 高 1.5~2 倍（用户态协议栈），需要衡量；Nginx 的 quic 需要编译时带 quiche/boringssl，直接 yum 装的版本多半没有。`,
+    keyPoints: ["1.1 连接复用→2 应用层多路复用→3 传输层去队头阻塞", "H2 弱网反而更慢", "Alt-Svc 引导客户端升 h3"],
+    followUps: ["HTTP/2 的 HPACK 是怎么压缩头部的？", "QUIC 的 0-RTT 有什么安全隐患？"],
+    favorited: false,
+  },
+  {
+    id: "be-224",
+    nodeId: "be-network-http",
+    question: "HTTPS 的 TLS 握手全过程？TLS 1.3 比 1.2 快在哪里？",
+    bigTech: true,
+    answer: `结论：TLS 握手核心是「用非对称加密协商出对称会话密钥，之后全用对称加密传输」。TLS 1.2 要 2-RTT，TLS 1.3 砍到 1-RTT，恢复连接 0-RTT。
+
+TLS 1.2 握手（RSA 密钥交换，2-RTT）：
+1. ClientHello：支持的 TLS 版本、加密套件列表、客户端随机数 Random1
+2. ServerHello + Certificate + ServerHelloDone：选定套件、服务端随机数 Random2、证书链
+3. 客户端验证书 → 生成 Pre-Master Secret，用服务端公钥加密发送（ClientKeyExchange）
+4. 双方用 Random1+Random2+Pre-Master 算出 Master Secret → 派生会话密钥
+5. ChangeCipherSpec + Finished 互发确认，开始加密通信
+
+TLS 1.3 的四个提速点：
+1. 密钥交换只留 (EC)DHE：ClientHello 里直接带上自己的密钥共享（Key Share），服务端一次就能算出会话密钥——砍到 1-RTT
+2. 删除 RSA 密钥交换：没有前向安全性（私钥泄漏历史流量全被解密），DHE 每次会话密钥独立
+3. 砍掉弱算法：RC4、DES、3DES、MD5、SHA-1、CBC 模式全删，只留 AEAD（AES-GCM、ChaCha20-Poly1305），减少协商轮次
+4. 0-RTT 会话恢复：客户端用上次会话的 PSK（预共享密钥）直接加密应用数据发送
+
+\`\`\`text
+RTT 对比（跨太平洋 150ms 场景）：
+TLS 1.2：TCP 握手 1 + TLS 2 = 3 RTT = 450ms 才能发数据
+TLS 1.3：TCP 握手 1 + TLS 1 = 2 RTT = 300ms
+TLS 1.3 恢复：TCP 1 + 0-RTT = 1 RTT = 150ms
+\`\`\`
+
+案例：阿里云 CDN 全量开启 TLS 1.3 后，移动端首包时间平均降 100ms+；微信内部 RPC 框架用 TLS 1.3 的 0-RTT 做服务间调用，跨机房调用 P99 下降一个 RTT。
+
+踩坑：0-RTT 数据可以被中间人重放——支付/转账类接口禁用 0-RTT 或加防重放 nonce；TLS 1.3 的 ESNI/ECH 加密 SNI 会导致按域名的 SNI 路由失效，网关要同步升级；企业内网做 TLS 拦截审计的盒子很多不支持 1.3，灰度时留意握手失败率。`,
+    keyPoints: ["非对称协商+对称传输", "1.3 砍到 1-RTT 靠 Key Share", "0-RTT 有重放风险"],
+    followUps: ["TLS 1.3 的前向安全性怎么理解？", "session ticket 和 session id 复用区别？"],
+    favorited: false,
+  },
+  {
+    id: "be-225",
+    nodeId: "be-network-http",
+    question: "数字证书如何防止中间人攻击？证书链校验流程？为什么 Charles/Fiddler 能抓 HTTPS 包？",
+    bigTech: true,
+    answer: `结论：证书防中间人的核心是「CA 用私钥对证书签名，客户端用内置的 CA 公钥验签」——中间人伪造的证书过不了验签，除非客户端主动信任了中间人的根证书（Charles 抓包正是利用这一点）。
+
+证书链校验流程（以访问 api.example.com 为例）：
+1. 服务端发送证书链：服务器证书 → 中间 CA 证书（根 CA 证书通常不发，客户端内置）
+2. 客户端用内置根 CA 公钥验证中间 CA 证书签名
+3. 用中间 CA 公钥验证服务器证书签名
+4. 检查：域名匹配（CN/SAN）、有效期、吊销状态（CRL/OCSP）、密钥用途
+5. 全部通过 → 信任证书里的公钥 → 用它协商会话密钥
+
+中间人攻击为什么失败：攻击者没有 CA 私钥，伪造的证书签名验不过；直接转发真证书又拿不到对应的私钥，无法完成密钥交换。
+
+Charles 抓包原理（不是攻击，是「合法的中间人」）：
+1. 客户端手动安装并信任 Charles 的根证书
+2. Charles 对客户端扮演服务器：现场签发 api.example.com 的假证书（用 Charles 根证书签名，客户端信任根所以验签通过）
+3. Charles 对服务器扮演客户端：正常完成 TLS 握手
+4. 明文在两段 TLS 之间的 Charles 里可见
+
+\`\`\`text
+防抓包手段（App 加固）：
+1. 证书固定（Certificate Pinning）：App 内置服务端证书/公钥哈希，
+   不信任系统根证书 → Charles 假证书直接拒绝
+2. 双向 TLS（mTLS）：服务端也校验客户端证书，Charles 没有客户端私钥
+代价：Pinning 后服务端换证书要强制发版，否则会全网连不上（真实事故：
+某银行 App 证书到期忘记通知客户端，Pinning 导致全量用户无法登录）
+\`\`\`
+
+案例：2020 年 Let's Encrypt 根证书 DST Root CA X3 到期，大量老 Android 设备因不识别新根 ISRG Root X1 而 HTTPS 失败——证书链校验时老设备没有交叉签名的兜底路径，教训是根证书轮换要提前 2 年做兼容。
+
+踩坑：CRL/OCSP 吊销检查有性能开销且 OCSP 服务器挂了你怎么办（软失败 vs 硬失败取舍）；内网服务间通信用自签 CA 是常态，但必须把自签 CA 证书管理纳入资产；证书有效期已从 2 年缩到 1 年（Apple 推动），自动化续期（certbot/acme.sh）是刚需。`,
+    keyPoints: ["CA 签名链+内置根证书", "Charles=客户端主动信任的合法中间人", "Pinning 防抓包但有换证风险"],
+    followUps: ["OCSP Stapling 怎么兼顾吊销检查和性能？", "内网自签 CA 怎么管理最安全？"],
+    favorited: false,
+  },
+  {
+    id: "be-226",
+    nodeId: "be-network-http",
+    question: "HTTP 缓存机制：强缓存和协商缓存的区别？Cache-Control 各指令怎么用？",
+    bigTech: true,
+    answer: `结论：强缓存不发请求直接用本地副本（200 from cache），协商缓存发请求问服务端「变没变」，没变返回 304 省传输。两级配合：静态资源走强缓存+文件名哈希，HTML 走协商缓存或不缓存。
+
+强缓存（不发请求）：
+\`\`\`http
+Cache-Control: max-age=31536000, immutable   # 一年有效，现代首选
+# 过期时间相对「响应时间」计算；public 允许 CDN 缓存，private 仅浏览器
+# no-cache = 每次都要协商（不是"不缓存"!）  no-store = 真不缓存
+\`\`\`
+
+协商缓存（发请求，304 省 body）：
+\`\`\`http
+# 服务端给
+ETag: "v2.3-abc123"        # 内容指纹，优先于 Last-Modified
+Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT
+# 客户端下次带
+If-None-Match: "v2.3-abc123"
+If-Modified-Since: Wed, 21 Oct 2025 07:28:00 GMT
+# 没变 → 304 Not Modified（只有头没有体，省 99% 流量）
+\`\`\`
+
+ETag vs Last-Modified：ETag 精确（内容哈希），Last-Modified 秒级精度且「内容没变但文件 mtime 变了」会误判——有 ETag 时 If-Modified-Since 被忽略。
+
+案例：淘宝首页发版的缓存策略——
+- HTML：Cache-Control: no-cache + ETag（每次协商，保证新活动秒级生效，但内容没变就走 304 省流量）
+- JS/CSS：文件名带内容哈希 app.8f3a2b.js + max-age=31536000, immutable（内容变则文件名变，旧文件缓存一年不浪费请求）
+- 早期教训：JS 不带哈希 + max-age=86400，大促紧急修复发出去，用户端还是旧缓存，只能等 24 小时或手动清——从此静态资源全部哈希化。
+
+\`\`\`text
+决策树：
+响应要缓存吗？─否→ no-store
+└是→ 内容会原地变化吗（同 URL 内容更新）？
+   ├是→ no-cache + ETag（每次协商）
+   └否（变化即换 URL，如带哈希）→ max-age=一年 + immutable
+\`\`\`
+
+踩坑：max-age 相对响应生成时间计算，网关多层缓存会各自起算导致实际缓存时间超预期；CDN 节点缓存和浏览器缓存是两层，刷新 CDN 不等于用户端更新；no-cache 被无数开发者误解为「不缓存」而误用；Service Worker 的 CacheStorage 优先级高于 HTTP 缓存，PWA 场景要一起排查。`,
+    keyPoints: ["强缓存不发请求/协商缓存 304", "immutable+哈希文件名是静态资源终局", "no-cache≠不缓存"],
+    followUps: ["CDN 回源时缓存头怎么传递？", "Heuristic 缓存（没有显式头时浏览器的行为）是什么？"],
+    favorited: false,
+  },
+  {
+    id: "be-227",
+    nodeId: "be-network-http",
+    question: "WebSocket、SSE、长轮询的区别？设计一个 IM 系统怎么选型？",
+    bigTech: true,
+    answer: `结论：三者都是「服务端主动推数据」的方案。WebSocket 全双工二进制帧、能力最强但要自建心跳/重连；SSE 单向文本流、基于 HTTP 自动重连；长轮询兼容性最好但开销最大。
+
+\`\`\`text
+对比表：
+维度        WebSocket              SSE                    长轮询
+方向        全双工                  服务端→客户端单向       伪双向(轮询模拟)
+协议        ws://独立协议(101升级)   纯 HTTP                纯 HTTP
+数据格式    文本+二进制              仅文本(UTF-8)           取决于实现
+自动重连    无(需自实现)             浏览器内建 EventSource  无(需自实现)
+连接数限制  无(独立协议)             HTTP/1.1 下受 6 连接限制 同左
+穿透性      代理/防火墙偶有拦截      好(就是 HTTP)           最好
+典型场景    IM/游戏/协同编辑         通知/股价/AI 流式输出   遗留系统兼容
+\`\`\`
+
+案例 1：ChatGPT/文心一言的流式输出用 SSE——AI 生成是服务端单向推送，SSE 够用且实现简单（后端就是持续写 chunk），EventSource 断线自动重连带 Last-Event-ID 续传。
+
+案例 2：微信网页版早期用长轮询（兼容老浏览器），2016 年后全面切 WebSocket；钉钉 IM 的 ws 长连接设计——单连接承载消息/已读回执/在线状态，应用层协议自定义 opcode 区分消息类型，心跳 30s，断线指数退避重连。
+
+IM 选型决策：
+- 消息双向实时 + 高频率 → WebSocket（IM 标准答案）
+- 只做通知推送 → SSE 成本最低
+- 客户端是 IoT 弱设备/老浏览器 → 长轮询兜底
+- 移动端 App → 直接 TCP 私有协议（参考微信 Mars），WebSocket 都嫌重
+
+\`\`\`java
+// Spring WebSocket 极简服务端
+@Component
+public class ImHandler extends TextWebSocketHandler {
+    private static final Map<String, WebSocketSession> SESSIONS = new ConcurrentHashMap<>();
+    @Override
+    public void afterConnectionEstablished(WebSocketSession s) {
+        SESSIONS.put(userIdOf(s), s);  // 上线注册
+    }
+    public void pushTo(String userId, String msg) throws IOException {
+        WebSocketSession s = SESSIONS.get(userId);
+        if (s != null && s.isOpen()) s.sendMessage(new TextMessage(msg));
+    }
+}
+\`\`\`
+
+踩坑：WebSocket 经 Nginx 必须配 proxy_set_header Upgrade/Connection 否则 400；LB 空闲超时（SLB 默认 900s）会静默断连，心跳必须小于它；SSE 在 HTTP/1.1 下占用 6 连接配额，多 tab 页会互相饿死，必须上 HTTP/2；长轮询的超时时间要小于网关读超时，否则网关先 504。`,
+    keyPoints: ["WebSocket 全双工/SSE 单向/长轮询兜底", "AI 流式输出选 SSE", "移动端终极方案是 TCP 私有协议"],
+    followUps: ["WebSocket 集群下如何做会话共享？", "SSE 的 Last-Event-ID 怎么实现断点续传？"],
+    favorited: false,
+  },
+  {
+    id: "be-228",
+    nodeId: "be-network-http",
+    question: "HTTP 状态码体系？生产环境 502 和 504 的排查思路有什么区别？",
+    bigTech: true,
+    answer: `结论：状态码分五段——1xx 信息、2xx 成功、3xx 重定向、4xx 客户端错、5xx 服务端错。502 是「网关收到了上游的非法/无响应」，504 是「网关等上游超时」，两者定位方向完全不同。
+
+高频状态码速记：
+\`\`\`text
+200 OK / 201 Created / 204 No Content / 206 断点续传
+301 永久重定向(缓存!) / 302 临时 / 304 协商缓存命中 / 307/308 保方法重定向
+400 参数错 / 401 未认证 / 403 无权限 / 404 不存在 / 405 方法不允许
+409 冲突(幂等) / 429 限流 / 431 头太大
+500 服务异常 / 502 上游无响应或响应非法 / 503 服务不可用(熔断) / 504 上游超时
+\`\`\`
+
+502 vs 504 排查思路：
+\`\`\`text
+502 Bad Gateway（上游「死了」或「说胡话」）：
+1. 上游进程挂了/端口不通 → telnet upstream_ip port
+2. 上游返回了非法响应（裸 TCP 数据当 HTTP 返回）
+3. 网关到上游的网络问题（防火墙/安全组）
+4. 典型场景：发布瞬间旧进程已死新进程未就绪 → 滚动发布+健康检查
+
+504 Gateway Timeout（上游「活着但太慢」）：
+1. 慢 SQL/下游 RPC 卡死 → 看 APM 链路追踪哪一段慢
+2. 线程池/连接池打满排队 → 看池监控
+3. 网关超时 < 上游处理时间 → 对齐超时配置
+4. 典型场景：大促时 DB 慢查询把 Tomcat 200 线程全占满
+\`\`\`
+
+案例：美团外卖午高峰 504 暴增——链路追踪显示订单服务调库存服务 P99 从 50ms 涨到 3s，Nginx proxy_read_timeout 2s 直接 504。根因是库存服务一条没走索引的统计 SQL 把 DB CPU 打满。修复：SQL 下线改写 + 网关超时分级（核心接口 5s，非核心 1s）+ 上游线程池隔离。
+
+\`\`\`nginx
+# 网关超时三件套（生产必须显式配置）
+proxy_connect_timeout 2s;   # 建连超时：内网应 <1s
+proxy_send_timeout    5s;   # 发请求超时
+proxy_read_timeout    5s;   # 等响应超时：按接口 SLO 分级
+# 重试陷阱：proxy_next_upstream 重试非幂等接口会重复下单！
+proxy_next_upstream error timeout;  # 不含 http_502/504 才安全
+\`\`\`
+
+踩坑：网关重试非幂等 POST 是资损事故高发区——504 后重试导致重复扣款，必须先做幂等；502 在 K8s 滚动发布时必现（Endpoints 摘除和 iptables 同步有延迟），需要 preStop 钩子+优雅退出；5xx 监控要区分「网关层」和「应用层」，否则告警互相甩锅。`,
+    keyPoints: ["502=上游死/非法响应，504=上游慢", "网关超时三件套显式配置", "非幂等接口禁止网关自动重试"],
+    followUps: ["K8s 滚动发布如何做到零 502？", "499 状态码是什么？谁产生的？"],
+    favorited: false,
+  },
+  {
+    id: "be-229",
+    nodeId: "be-network-http",
+    question: "DNS 解析全流程？DNS 劫持和污染怎么防？为什么大厂 App 都上 HTTPDNS？",
+    bigTech: true,
+    answer: `结论：DNS 是域名→IP 的分布式查询系统，解析路径「浏览器缓存→系统缓存→hosts→本地 DNS（LDNS）→根→顶级域→权威 NS」。传统 DNS 基于 UDP 明文，可被劫持/污染，HTTPDNS 用 HTTPS 直连大厂自己的解析服务绕过 LocalDNS。
+
+解析全流程（以 www.taobao.com 为例）：
+1. 浏览器缓存 → 系统缓存 → hosts 文件
+2. 问 LDNS（运营商分配的本地 DNS，如 114.114.114.114）
+3. LDNS 递归：根服务器（.）→ 顶级域（.com）→ 权威（taobao.com NS）
+4. 权威返回 A/AAAA 记录，LDNS 按 TTL 缓存后回给客户端
+
+两大威胁：
+- DNS 劫持：LDNS 或链路中间设备直接篡改应答，把 taobao.com 解析到钓鱼 IP——电商大促时友商流量被劫持到竞品页是真实发生过的
+- DNS 污染：针对 UDP 明文注入伪造应答（抢答），常见于跨境场景
+
+\`\`\`text
+防御手段对比：
+方案       原理                            局限
+Do53+校验  传统 DNS + 0x20 大小写随机化      弱，中间人仍可改
+DoH        DNS over HTTPS，443 加密          企业网难审计，部分被拦
+DoT        DNS over TLS，853 端口加密        端口特征明显易封
+HTTPDNS    App 走 HTTPS 直连厂商解析服务     依赖 SDK，需降级兜底
+\`\`\`
+
+为什么大厂 App 必上 HTTPDNS（阿里/腾讯都有商业化产品）：
+1. 防劫持：解析走 HTTPS，中间设备无法篡改——双 11 期间这是生死线
+2. 精准调度：传统 DNS 只能拿到 LDNS 的 IP 做就近调度，用户跨省用 LDNS 会被调度到错误机房；HTTPDNS 拿真实客户端 IP，调度准确率从 85%→99%
+3. 秒级生效：TTL 被 LDNS 私自延长导致切流不生效；HTTPDNS 解析结果实时可控，故障切流 30 秒完成
+
+\`\`\`text
+App 端容灾设计（降级链）：
+HTTPDNS 解析 ─失败→ 备用 HTTPDNS IP（预埋 IP 直连）
+           ─失败→ LocalDNS 传统解析兜底
+           ─失败→ 内置硬编码 IP 兜底（最后防线）
+\`\`\`
+
+踩坑：HTTPDNS 首次解析需要先有「HTTPDNS 服务器 IP」——这个 IP 必须预埋且多地域多副本；WebView/第三方 SDK（广告/统计）不走你的 HTTPDNS，劫持依然存在；IPv6 双栈下 A 和 AAAA 都要解析，只解析 A 会导致 IPv6-only 网络失败；CDN 场景 HTTPDNS 拿到的 IP 要和 CDN 调度系统打通，否则精准调度打折扣。`,
+    keyPoints: ["递归路径：LDNS→根→顶级→权威", "劫持靠 HTTPS 加密解析根治", "HTTPDNS 核心价值=防劫持+精准调度+秒级生效"],
+    followUps: ["DoH 和企业内网审计的矛盾怎么解？", "DNS 的 TTL 设置多少合理？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
