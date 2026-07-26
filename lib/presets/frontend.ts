@@ -394,6 +394,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "RN 新旧架构（Bridge→JSI/Fabric）、Flutter 自绘引擎、小程序双线程、JSBridge 双向通信、Taro 编译时 vs 运行时、Electron 进程模型、代码同构与平台抽象。",
     mastery: 0,
   },
+  // ===== 架构设计层（2 个节点） =====
+  {
+    id: "design-patterns-fe",
+    title: "前端设计模式",
+    difficulty: 4,
+    prerequisites: ["js-prototype", "js-api"],
+    frequency: "高",
+    bigTech: true,
+    summary: "观察者 vs 发布订阅、模块单例、策略模式消 if-else、责任链与中间件、装饰器 AOP、适配器、MVC/MVVM/Flux 数据流演进、SOLID 在组件设计中的落地。",
+    mastery: 0,
+  },
+  {
+    id: "component-lib-design",
+    title: "组件库设计",
+    difficulty: 5,
+    prerequisites: ["design-patterns-fe", "react-hooks"],
+    frequency: "高",
+    bigTech: true,
+    summary: "受控/非受控 API 设计、复合组件与 Context 隐式共享、Render Props vs Hooks 逻辑复用、Design Token 主题架构、按需加载与 Tree-shaking、视觉回归测试、SemVer 与 codemod、Monorepo 发布流水线。",
+    mastery: 0,
+  },
   // ===== AI 前端方向（5 个节点，重点新增） =====
   {
     id: "ai-sdk-frontend",
@@ -11628,6 +11649,815 @@ el.style.opacity = "0.8";
 真实案例：①RN 信息流页 JS fps 掉到 20——Profiler 发现每次滚动都触发"全部已渲染 cell 的重新 render"（父组件 state 变了），cell 全部 React.memo + state 下沉后恢复 58fps；②小程序首页 setData 每秒 40 次（倒计时 + 轮播 + 埋点上报共用数据通道），拆数据通道 + 倒计时改纯样式动画后降到 8 次，低端机卡顿投诉消失；③H5 活动页 iPhone Safari 掉帧——Performance 面板发现 backdrop-filter: blur(20px) 全屏使用（每帧重绘成本爆炸），改成小面积毛玻璃 + 背景预模糊图片后满帧。卡帕西视角：性能优化的第一刀永远是测量，第二刀是删（减更新量），第三刀才是换（换实现/换架构）——大多数人直接跳到第三刀，所以总是在错误的层优化。`,
     keyPoints: ["共同根因=帧预算超支，但超支位置不同：RN 在 JS 线程 / 小程序在序列化传输 / H5 在布局绘制", "RN 列表四件套+FlashList 复用；小程序拆数据通道；H5 动画只用 transform/opacity 合成器属性", "先定位慢在哪条线程再开药；帧预算记账找最大科目；低端机主动降级"],
     followUps: ["RN 的 Reanimated（UI 线程跑动画）与普通 Animated 的架构差异？", "content-visibility 与虚拟列表的适用边界（什么时候前者就够，什么时候必须上虚拟化）？"],
+    favorited: false,
+  },
+  // ===== 架构设计层：前端设计模式（fe-318~fe-325） =====
+  {
+    id: "fe-318",
+    nodeId: "design-patterns-fe",
+    question: "观察者模式与发布订阅模式的本质区别是什么？EventEmitter、DOM 事件、Redux 各自属于哪种？为什么大型应用更倾向发布订阅？",
+    bigTech: true,
+    answer: `结论：两者都是"一对多的状态通知"，区别在于**有没有中间人**——观察者模式里 Subject 直接持有 Observer 列表并逐个调用（双方互相认识，紧耦合），发布订阅模式里 Publisher 和 Subscriber 之间隔着一个事件中心/Broker（双方互不认识，只认频道名，松耦合）。判断依据就一条：订阅者注册时，是把回调交给了"被观察者本体"还是"第三方调度中心"。
+
+\`\`\`js
+// ① 观察者模式：Subject 直接持有 observers（互相认识）
+class Subject {
+  private observers: Array<(data: unknown) => void> = [];
+  addObserver(fn: (data: unknown) => void) { this.observers.push(fn); }
+  notify(data: unknown) { this.observers.forEach((fn) => fn(data)); } // 直接调用
+}
+
+// ② 发布订阅模式：事件中心做 Broker（双方只认频道名）
+class EventBus {
+  private channels = new Map<string, Set<(data: unknown) => void>>();
+  on(channel: string, fn: (data: unknown) => void) {
+    if (!this.channels.has(channel)) this.channels.set(channel, new Set());
+    this.channels.get(channel)!.add(fn);
+    return () => this.off(channel, fn); // 返回取消函数（防泄漏的关键设计）
+  }
+  emit(channel: string, data: unknown) {
+    this.channels.get(channel)?.forEach((fn) => {
+      try { fn(data); } catch (e) { console.error(e); } // 单个订阅者崩不阻塞其他
+    });
+  }
+  off(channel: string, fn: (data: unknown) => void) {
+    this.channels.get(channel)?.delete(fn);
+  }
+}
+// 发布者不知道订阅者是谁，订阅者不知道发布者是谁——只知道 "order:paid" 频道
+\`\`\`
+
+常见实现归类（面试高频辨析）：①EventEmitter（Node）——典型的发布订阅（on/emit 通过事件名解耦）；②DOM 事件 addEventListener——形式上是观察者（直接在元素上注册），但事件冒泡机制让它有"沿捕获/冒泡链传播"的调度层，实际更接近"DOM 树当 Broker"的发布订阅变体；③Redux——store.subscribe 是观察者模式（直接注册到 store），但 Flux 架构整体（action → dispatcher → store → view）是发布订阅思想：组件不依赖具体数据源，只响应 action 频道；④Vue2 的响应式——Dep 与 Watcher 是教科书级观察者模式（Dep 直接持有 Watcher 列表）；⑤RxJS——观察者模式的工业化实现（Observable 就是 Subject，加了操作符管线和背压）。
+
+为什么大型应用倾向发布订阅：①跨模块通信不引入依赖——订单模块完成支付后 emit("order:paid")，积分/通知/库存模块各自订阅，订单模块不需要 import 它们（否则订单模块成了"上帝模块"，改积分逻辑要动订单代码）；②动态增减订阅者——新需求"支付成功发企业微信通知"只需新增一个订阅，不改发布方（开闭原则）；③可测试性——发布方可以脱离订阅方单测。代价同样明显：①事件流不可追踪——页面出了 bug 要全局搜谁 emit 了 "user:update"（解法：TypeScript 给事件名建联合类型 + 事件注册表集中声明）；②内存泄漏——订阅了忘取消（组件卸载时 off，React 里 useEffect 返回清理函数）；③隐式时序——订阅顺序影响执行结果，产生"换个 import 顺序 bug 复现不了"的灵异事件。
+
+真实案例：①某中后台项目用 EventBus 通信上瘾，40+ 事件频道无文档，一次重构把 "filter:change" 改名 "filter:update"，漏改了一个订阅处，筛选失效三天才发现——之后立规：所有事件名必须注册在 src/events/registry.ts 的常量里，禁止字符串字面量直接 emit；②VS Code 的核心架构就是巨型发布订阅（vscode.EventEmitter 贯穿扩展 API），但它用"显式 disposable 对象"强制订阅者管理生命周期（每个订阅返回 Disposable，扩展 deactivate 时必须 dispose 全部）——这是把"防泄漏"做进 API 设计的典范。卡帕西视角：模式的选型不是背定义，是回答"耦合的代价谁承担"——观察者把耦合留在编译期（import 关系可见），发布订阅把耦合推到运行期（事件流黑盒），大型应用选后者是因为编译期耦合的修改成本更高，但必须用工程手段（事件注册表/类型化/disposable）把运行期黑盒照亮。`,
+    keyPoints: ["区别=有无 Broker：观察者互相认识（Subject 直持列表），发布订阅只认频道（事件中心解耦）", "归类：EventEmitter/Flux 是发布订阅，Vue2 Dep-Watcher/RxJS 是观察者，DOM 事件是带冒泡调度的变体", "发布订阅三大坑：事件流不可追踪（用类型化注册表）/订阅泄漏（返回 disposable）/隐式时序"],
+    followUps: ["RxJS 的 Subject/BehaviorSubject/ReplaySubject 在缓存语义上的差异与适用场景？", "为什么 React 生态最终放弃了全局 EventBus 而转向单向数据流（Context/状态库）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-319",
+    nodeId: "design-patterns-fe",
+    question: "单例模式在前端的正确实现方式是什么？为什么说 ES Module 本身就是单例？全局状态库（Redux/Zustand）与单例是什么关系？",
+    bigTech: true,
+    answer: `结论：前端不需要 Java 式的"私有构造函数 + getInstance"样板——ES Module 的模块缓存机制天然保证单例（同一模块路径在整个应用生命周期只执行一次，导出的对象天然全局唯一）。但要警惕三个"单例失效"场景：多实例打包（同一库被打进多个 bundle）、微前端多运行时、SSR 跨请求污染（模块级状态在 Node 服务端是跨用户共享的）。
+
+\`\`\`ts
+// ① ESM 天然单例：模块只执行一次，导出的实例全局唯一
+// api-client.ts
+class ApiClient {
+  private token: string | null = null;
+  setToken(t: string) { this.token = t; }
+  getToken() { return this.token; }
+}
+export const apiClient = new ApiClient(); // 整个应用共享这一个实例
+
+// ② 惰性单例（需要延迟初始化/依赖注入参数时用）
+let instance: ApiClient | null = null;
+export function getApiClient(): ApiClient {
+  if (!instance) {
+    instance = new ApiClient(); // 首次调用才创建
+  }
+  return instance;
+}
+// 惰性版的价值：单测时可以 reset（暴露 _resetForTest），也可以在创建时注入配置
+
+// ③ ❌ SSR 陷阱：模块级单例在 Node 服务端跨请求共享 = 用户数据串号！
+// request-cache.ts（Next.js/Nuxt API 层千万别这么写）
+const cache = new Map<string, unknown>(); // 模块级 = 所有用户共享！
+export function setUserCache(id: string, data: unknown) { cache.set(id, data); }
+// 用户 A 的缓存可能被用户 B 的请求读到——正确做法：挂到请求上下文（AsyncLocalStorage）
+\`\`\`
+
+单例失效的三大场景剖析：①多 bundle 场景——主应用和异步 chunk 如果各自打包了一份 "api-client"（webpack 配置不当或 pnpm 幽灵依赖导致两份物理文件），就是两个单例，token 在主应用设了 chunk 里读不到。解法：webpack/vite 的 dedupe、externals 公共依赖、Module Federation 的 shared 配置；②微前端——主子应用各自有自己的模块系统，qiankun 里主应用的单例子应用拿不到（除非显式挂 window 或走 props/initGlobalState 通信）。这也是"微前端里慎用模块单例传状态"的原因——状态要么走主应用中转，要么走持久层；③SSR——如上代码，Node 进程的模块缓存是进程级的，浏览器是"每个标签页一个 JS 环境"所以没有跨用户问题，服务端有。Next.js 官方文档专门警告：模块级可变状态 = SSR 数据泄漏重灾区。
+
+Redux/Zustand 与单例的关系：它们本质都是"受控单例"——Zustand 的 create() 返回的 store 就是模块级单例（所以官方文档也提醒 SSR 要用 createStore + Provider 每请求创建）；Redux 的 store 通常模块级导出，但设计为"单一数据源"这个架构约束本身就是单例思想的正面应用：状态全局唯一，但**访问被规范约束**（只能通过 dispatch 改，只能通过 selector 读）。这是单例模式的精髓：单例的问题从来不是"全局唯一"，而是"全局唯一的可变状态 + 无约束的访问路径"。Redux 用 action/reducer 约束了写入路径，Zustand 用 set 函数约束，所以它们是"好的单例"。
+
+真实案例：①某团队 SDK 被业务方 npm 安装后又被打包进业务的 vendor chunk，CDN 上还有一份独立版——运行时三份 SDK 实例，埋点队列分裂，数据丢失 30%，排查一周才发现 webpack 的 resolve.alias 没对齐；②Next.js 项目把 PrismaClient 直接模块级 new 出来，开发环境热更新每次都新建连接但不释放，数据库连接数打爆——官方解法就是"全局单例 + globalThis 缓存"（const globalForPrisma = globalThis，热更新时复用 globalThis 上已有的实例）；③微前端项目主应用挂载时把用户信息写进主应用的 authStore 单例，子应用直接 import 主应用的 store 包——联调正常，独立部署子应用时全挂。最终方案：主子通信只用 qiankun initGlobalState，store 不再跨应用共享。教训：单例的边界 = 模块系统的边界 = 部署/运行时的边界，跨边界共享状态必须走显式通信而非隐式单例。`,
+    keyPoints: ["ESM 模块缓存=天然单例，惰性单例只为延迟初始化/单测 reset；SSR 模块级状态跨用户共享=数据串号", "单例失效三场景：多 bundle 打包分裂/微前端多运行时/SSR 进程级共享", "Redux/Zustand=受控单例：单例的恶不在全局唯一，而在可变状态+无约束访问路径"],
+    followUps: ["Next.js 中 PrismaClient 用 globalThis 缓存的写法为什么能解决热更新连接泄漏？", "微前端主子应用共享状态，initGlobalState 与挂 window 的取舍？"],
+    favorited: false,
+  },
+  {
+    id: "fe-320",
+    nodeId: "design-patterns-fe",
+    question: "策略模式如何消除前端的大型 if-else/switch？以表单校验、权限渲染、多渠道分享为例说明，策略注册表与策略工厂各适合什么场景？",
+    bigTech: true,
+    answer: `结论：策略模式的前端价值不是"优雅"，而是**把"会一起变化的分支"收敛到一张表里**——if-else 的问题不在分支多，在于"新增一种情况要改动分散在各处的 N 个分支"，违反开闭原则。策略模式把每个分支抽成独立策略对象，用 Map/对象注册表索引，新增情况 = 新增一个条目 + 注册，不改既有代码。判断该不该用：分支是否随业务持续增加？是，上策略表；三五个分支十年不变，if-else 就是最简实现，过度设计反而增加阅读成本。
+
+\`\`\`tsx
+// ① 表单校验：反模式是校验逻辑堆在 onSubmit 里
+function validate(values: FormValues): string | null {
+  if (!values.email) return "邮箱必填";
+  if (!/^[^@]+@[^@]+$/.test(values.email)) return "邮箱格式错误";
+  if (values.age < 18) return "年龄需 >= 18";
+  // ...每加一个字段改这个函数，函数膨胀到 200 行
+}
+
+// ✅ 策略注册表：每个字段/规则是独立策略，可组合可复用
+type Validator = (value: unknown, ctx: FormValues) => string | null;
+const required: Validator = (v) => (v == null || v === "" ? "必填" : null);
+const pattern = (re: RegExp, msg: string): Validator => (v) =>
+  typeof v === "string" && !re.test(v) ? msg : null;
+const min = (n: number, msg: string): Validator => (v) =>
+  typeof v === "number" && v < n ? msg : null;
+
+// 声明式 schema：字段 → 策略数组（新增字段=新增一行，不改引擎）
+const schema: Record<string, Validator[]> = {
+  email: [required, pattern(/^[^@]+@[^@]+$/, "邮箱格式错误")],
+  age: [required, min(18, "年龄需 >= 18")],
+};
+function validate(values: FormValues): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const [field, rules] of Object.entries(schema)) {
+    for (const rule of rules) {
+      const msg = rule(values[field as keyof FormValues], values);
+      if (msg) { errors[field] = msg; break; } // 首错即停
+    }
+  }
+  return errors;
+}
+// 这就是 react-hook-form + zod/yup 的设计原型：schema 声明，引擎执行
+
+// ② 权限渲染：反模式是组件里塞满角色判断
+function ActionPanel({ role }: { role: string }) {
+  return (
+    <div>
+      {role === "admin" && <Button>删除</Button>}
+      {(role === "admin" || role === "editor") && <Button>编辑</Button>}
+      {/* 角色组合一多，JSX 里全是逻辑表达式，权限审计无从谈起 */}
+    </div>
+  );
+}
+
+// ✅ 策略表 + 能力声明：权限收敛到一张矩阵表
+const PERMISSIONS = {
+  "article:delete": ["admin"],
+  "article:edit": ["admin", "editor"],
+  "article:view": ["admin", "editor", "viewer"],
+} as const;
+const can = (action: keyof typeof PERMISSIONS, role: string) =>
+  (PERMISSIONS[action] as readonly string[]).includes(role);
+function ActionPanel({ role }: { role: string }) {
+  return (
+    <div>
+      {can("article:delete", role) && <Button>删除</Button>}
+      {can("article:edit", role) && <Button>编辑</Button>}
+    </div>
+  );
+}
+// 收益：权限矩阵可以导出给产品/安全团队评审，组件里零业务逻辑判断
+\`\`\`
+
+策略注册表 vs 策略工厂的选择：①注册表（Map/对象字面量）——策略是**静态已知**的，启动时全部注册（如权限矩阵、分享渠道、埋点通道），优点是简单直白、Tree-shaking 友好；②工厂（函数按 key 创建策略实例）——策略**创建有成本或依赖运行时参数**（如每个渠道要初始化不同 SDK、校验器要带配置），工厂延迟创建 + 缓存实例；③进阶：两者组合——注册表存"策略工厂"而非"策略实例"，取用方第一次使用时工厂创建并缓存（惰性单例 + 策略模式的合体）。
+
+多渠道分享的真实演进案例：早期代码 handleShare(channel) 里 switch 7 个 case，每个 case 调不同 SDK，新增"小红书渠道"要改 4 处（switch、按钮列表、图标映射、埋点）。重构为策略表：每个渠道是一个对象 { key, label, icon, available(): boolean, share(content): Promise<void>, track(): void }，注册在 channels/ 目录下每个文件一个渠道，index.ts 统一导出 Map。新增渠道 = 新增一个文件 + 一行注册，老代码零改动。意外收益：渠道能力检测（available）抽出来做"只展示当前环境可用渠道"（微信内显示微信分享，APP 内显示原生分享），这个需求用 switch 写法几乎无法干净实现。坑的教训：策略表的 key 必须是联合类型而非裸 string——曾有同事注册 "xiaohongshu" 但消费处写 "redbook"，类型系统本可拦截，裸 string 放行后到线上才发现该渠道静默失效。
+
+卡帕西视角：策略模式的本质是"用数据结构（表）替代控制结构（分支）"——表可以导出、可以评审、可以类型化、可以运行时增删，分支语句什么都不能。当你第三次给同一个 switch 加 case，就是该把它变成表的时刻。`,
+    keyPoints: ["策略=用数据表替代分支语句：新增情况=加条目注册，不改既有代码（开闭原则）", "注册表适合静态已知策略（权限矩阵/渠道列表），工厂适合创建有成本/需运行时参数的策略", "策略 key 必须类型化（联合类型），裸 string 注册导致 key 不匹配静默失效"],
+    followUps: ["zod 的 schema 校验与手写策略表的取舍（声明式 schema 何时值得引入）？", "策略模式与享元模式在大型列表渲染（千行表格单元格）中的组合应用？"],
+    favorited: false,
+  },
+  {
+    id: "fe-321",
+    nodeId: "design-patterns-fe",
+    question: "责任链模式与中间件机制的关系是什么？Koa 洋葱模型、Redux middleware、axios 拦截器三种实现的核心差异？如何中断链与传递上下文？",
+    bigTech: true,
+    answer: `结论：中间件是责任链的"双向增强版"——经典责任链是"请求沿链传递，任一节点处理或转发"（单向、单处理者），中间件是"每个节点都能在 next() 前后做事"（双向穿越、全节点参与）。Koa 洋葱模型是中间件的极致形态（异步递归穿越），Redux middleware 是同步嵌套调用，axios 拦截器是数组顺序执行（请求拦截器栈式逆序、响应拦截器队列顺序）。三者的共同抽象：把横切逻辑（日志/鉴权/错误处理/数据转换）从业务函数里剥离，挂到可组合的链上。
+
+\`\`\`ts
+// ① Koa 洋葱模型：compose 把中间件数组合成一个嵌套调用
+type Next = () => Promise<void>;
+type Middleware = (ctx: Ctx, next: Next) => Promise<void>;
+
+function compose(middlewares: Middleware[]): (ctx: Ctx) => Promise<void> {
+  return (ctx) => {
+    const dispatch = (i: number): Promise<void> => {
+      const mw = middlewares[i];
+      if (!mw) return Promise.resolve(); // 链尾
+      // 关键：把"下一个 dispatch"作为 next 传给当前中间件
+      return mw(ctx, () => dispatch(i + 1));
+    };
+    return dispatch(0);
+  };
+}
+// 执行顺序：mw1 前 → mw2 前 → mw3 → mw2 后 → mw1 后（洋葱：进去再出来）
+// 应用：mw1 日志计时（await next() 后算耗时）、mw2 错误捕获（try{await next()}catch）
+// mw3 鉴权（不通过就 return，不调 next → 链中断，但外层的"后"部分仍会执行！）
+
+// ② Redux middleware：同步嵌套（store.dispatch 被层层包装）
+const logger = (store: Store) => (next: Dispatch) => (action: Action) => {
+  console.log("dispatching", action.type);
+  const result = next(action); // 同步调用下一个
+  console.log("next state", store.getState());
+  return result;
+};
+// applyMiddleware(thunk, logger) 的洋葱：thunk 外 → logger → 真实 dispatch
+// thunk 的特殊性：它能"吞掉"函数 action 不往下传（函数 action 到达不了 reducer）
+
+// ③ axios 拦截器：不是洋葱！是两个独立数组
+// 请求拦截器：后注册的先执行（栈/unshift），响应拦截器：先注册的先执行（队列/push）
+axios.interceptors.request.use(injectToken);   // 注册顺序 A B → 执行 B A
+axios.interceptors.response.use(unwrapData);
+// 没有 next()——每个拦截器只能 return config（继续）或 throw（中断进 catch）
+\`\`\`
+
+核心差异与设计取舍：①穿越方式——Koa 的 next() 是"显式控制权移交"（中间件决定何时/是否继续，还能在回来后做事），Redux 是同步嵌套（同上但无异步语义，Redux Toolkit 建议异步逻辑用 thunk/listener 而非 middleware 里 setTimeout），axios 无 next 概念（链不可暂停后恢复，只能中断）；②中断语义——Koa 里不调 next() 内层不执行但外层"回程代码"照常（所以鉴权中间件要把"设置 401"放在不调 next 的分支里，且外层错误处理仍能兜住），axios 里 throw 直接跳 response 的 rejected 链（后续 fulfilled 拦截器全跳过）；③上下文传递——Koa 有共享 ctx 对象（挂载 state 跨中间件传值），Redux middleware 共享 store 引用，axios 靠 config 对象随链传递（headers 注入就是改 config）。
+
+真实案例：①某 Koa 网关的错误处理中间件写成了 try { await next() } catch，但鉴权中间件在 catch 到下游业务错误时误把 500 也当鉴权失败返回 401——责任链的错误语义没对齐：错误处理必须是最外层中间件（第一个注册），鉴权失败应该"不调 next + 设置状态码"而非 throw（throw 会被外层当系统错误记 error 日志，401 是业务正常分支不该刷 error）；②Redux 项目把"路由跳转"写在 middleware 里拦截特定 action 后 history.push，迁移到 React Router v6 时 middleware 拿不到 navigate 函数（组件外），连锁重构——教训：副作用跳转该用 listener middleware 或在组件层 useEffect，middleware 里做导航是把框架耦合进数据流；③axios 项目两个请求拦截器都加 token，A 加 Authorization、B 又覆盖一遍，顺序因为是栈式执行与直觉相反（后注册先执行），线上出现"永远用旧 token"的 bug——拦截器顺序必须写进 README 并用 eject/use 的返回值管理。
+
+面试加分的洞察：洋葱模型的精髓是" await next() 把异步栈帧串成了链"，这在生成器时代（co + yield）就存在，async/await 让它变得直白。而 Express（connect 派）的中间件是"线性流水"（next(err) 只往下走不回头），Koa 重写成洋葱就是为了拿到"回程能力"——错误统一处理、响应时间统计、事务提交/回滚这类"需要包住整个请求生命周期"的逻辑，线性模型做不了。这个演进史答出来，面试官就知道你理解的是设计动机而非 API 形状。`,
+    keyPoints: ["中间件=责任链双向增强版：next() 前后都能做事；Koa 洋葱异步递归，Redux 同步嵌套，axios 双数组无回程", "中断语义差异：Koa 不调 next 内层停但外层回程照走；axios throw 跳 rejected 链", "Koa 洋葱解决了 Express 线性模型做不了的「包裹整个生命周期」逻辑（统一错误/计时/事务）"],
+    followUps: ["Koa compose 如何防止同一中间件 next() 被调用两次（重复 dispatch 检测）？", "Redux listener middleware 与 saga/observable 在副作用编排上的取舍？"],
+    favorited: false,
+  },
+  {
+    id: "fe-322",
+    nodeId: "design-patterns-fe",
+    question: "装饰器模式在前端的两种形态（TS decorator 语法 vs 高阶函数/HOC）各有什么适用场景？mobx、Angular、Nest 为什么重度依赖装饰器？装饰器的执行顺序陷阱是什么？",
+    bigTech: true,
+    answer: `结论：装饰器的本质是"在不改原函数/类的前提下，包裹额外行为"——TS decorator 语法（@log class Foo）是编译期的声明式包装，高阶函数/HOC 是运行时的显式包装。声明式的价值是"横切关注点可视化"（一眼看到这个类被观察、被注入、被路由注册），代价是黑盒魔法（装饰器执行顺序、元数据反射机制不直观）。mobx/Angular/Nest 重度依赖是因为它们要收集"类的结构元数据"来做框架级编排（依赖注入、响应式追踪、路由注册），装饰器是目前 JS/TS 里最紧凑的元数据标注语法。
+
+\`\`\`ts
+// ① 方法装饰器：AOP 的经典应用（日志/性能/权限切面）
+function measure(target: object, key: string, desc: PropertyDescriptor) {
+  const original = desc.value as (...args: unknown[]) => unknown;
+  desc.value = function (...args: unknown[]) {
+    const t0 = performance.now();
+    const result = original.apply(this, args);
+    console.log(key + " took " + (performance.now() - t0) + "ms");
+    return result;
+  };
+  return desc;
+}
+class DataService {
+  @measure
+  async fetchReport() { /* 业务代码不知道自己在被计时 */ }
+}
+
+// ② 属性/参数装饰器 + 元数据：mobx/Nest 的核心机制
+// Nest 的路由注册：@Get("/users") 把 "GET /users → findAll" 写进 Reflect 元数据
+// 框架启动时扫一遍元数据表，生成路由表——业务代码只写标注，框架做编排
+class UsersController {
+  @Get("/users")
+  findAll(@Query("page") page: number) {}
+}
+
+// ③ HOC（React 的运行时装饰）：逻辑包装组件
+function withLoading<P extends object>(Comp: React.ComponentType<P>) {
+  return function Wrapped(props: P & { loading: boolean }) {
+    if (props.loading) return <Spinner />;
+    return <Comp {...props} />;
+  };
+}
+const UserListWithLoading = withLoading(UserList);
+// Hooks 时代 HOC 大部分场景被替代（useLoading 更直白），
+// 但"包装第三方组件不能改其内部"时 HOC 仍是唯一解
+\`\`\`
+
+两种形态的适用边界：①TS decorator 适合"框架编排层的元数据标注"——路由、依赖注入、序列化规则、ORM 映射（typeorm 的 @Entity/@Column），共同点是"标注给框架看，不是给人调用的"；②HOC/高阶函数适合"应用层的运行时行为包装"——权限包裹、埋点注入、错误边界、props 适配，共同点是"包装逻辑本身是业务的一部分，需要显式可见可测"。经验法则：如果包装行为需要 React 生命周期/状态，用 HOC 或 Hooks；如果只是给类附加"声明信息"，用装饰器。
+
+执行顺序陷阱（面试高频坑）：①多个装饰器装饰同一目标时，**求值从上到下，执行从下到上**——@A @B class Foo 等价于 A(B(Foo))，B 先执行（离目标近的先包，像洋葱一样从里往外）；②类的成员装饰器先于类装饰器执行（先收集完所有成员的元数据，类装饰器才能读到完整信息）；③方法装饰器里 desc.value 被替换后，后续装饰器拿到的是包装后的版本——顺序错了会出现"计时装饰器测的是权限装饰器的耗时"这种套娃测量；④TS 的 experimentalDecorators 是旧 stage-2 提案语义，与 TC39 stage-3 标准（TS 5.0 原生支持）不兼容——旧语义允许参数装饰器和新语义不同，混用 babel 插件与 tsc 时装饰器行为可能静默分裂，项目必须全链路统一一种语义。真实事故：某 Nest 项目升级 TS 5 时 babel 配置还留着旧插件，参数装饰器的元数据顺序反了，@Body 和 @Query 注错位置，接口参数全部错位——这类 bug 类型系统检测不到，只能靠装饰器语义统一 + 集成测试兜底。
+
+为什么 Angular/Nest 离不开发装饰器：依赖注入容器需要"类 → 依赖列表"的映射，装饰器 @Injectable() + constructor(private userSvc: UserService) 配合 TS 编译时发射的 design:paramtypes 元数据，容器就能自动解析依赖图。没有装饰器就得手写 factory 注册（InversifyJS 早期风格），样板爆炸。这是"框架用装饰器买开发体验，用元数据反射付运行时成本"的经典权衡。卡帕西视角：装饰器是语法糖里掺了魔法——小规模用（日志/计时切面）是免费的午餐，框架级用（DI/路由）是把控制权抵押给元数据系统，后者必须配"元数据可视化工具 + 集成测试"，否则调试时你在和看不见的系统搏斗。`,
+    keyPoints: ["decorator=编译期元数据标注（给框架编排用），HOC=运行时显式包装（业务逻辑复用）", "执行顺序：求值从上到下、执行从下到上（洋葱式包裹）；成员装饰器先于类装饰器", "TS experimentalDecorators（旧 stage-2）与 stage-3 标准不兼容，全工具链必须统一否则元数据静默错乱"],
+    followUps: ["TC39 stage-3 装饰器标准与 TS 旧语义的具体差异（参数装饰器为何被移除）？", "MobX 的 makeObservable 显式 API 相比 @observable 装饰器解决了什么问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-323",
+    nodeId: "design-patterns-fe",
+    question: "适配器模式在前端的典型应用有哪些？以接口数据适配、第三方库包装、新旧 API 兼容为例说明。适配器与防腐层（ACL）的关系？",
+    bigTech: true,
+    answer: `结论：适配器模式的前端使命是"**隔离不稳定的接口形状**"——后端返回的数据结构、第三方 SDK 的 API、浏览器兼容差异，都是"你控制不了但会变"的东西。适配器在边界处把它们转换成应用内部的稳定模型（Domain Model），让业务代码只依赖自己的模型。当后端字段改名、SDK 升级 breaking change、换供应商时，改动收敛在适配器一个文件里。防腐层（ACL）是 DDD 里的概念，本质就是"系统边界的适配器集合 + 语义翻译"，适配器是战术（单个转换函数），防腐层是战略（整个边界层的架构决策）。
+
+\`\`\`ts
+// ① 接口数据适配（最普遍）：后端模型 ≠ 前端视图模型
+// 后端返回：{ user_name, avatar_url, create_time: 1719800000, is_vip: 0 }
+// 反模式：组件里到处 user.user_name、手动除 1000 转时间戳——后端一改名全站搜索替换
+interface UserDTO {
+  user_name: string;
+  avatar_url: string;
+  create_time: number;
+  is_vip: 0 | 1;
+}
+interface User { // 应用内部模型：语义化、类型精确、单位统一
+  name: string;
+  avatar: string;
+  createdAt: Date;
+  isVip: boolean;
+}
+function adaptUser(dto: UserDTO): User {
+  return {
+    name: dto.user_name,
+    avatar: dto.avatar_url || "/default-avatar.png", // 边界处兜底，组件不做判空
+    createdAt: new Date(dto.create_time * 1000),     // 边界处统一单位
+    isVip: dto.is_vip === 1,                         // 边界处语义化
+  };
+}
+// 组件只认 User；后端改版只改 adaptUser；适配层还可以顺手做 zod 校验（DTO 不可信）
+
+// ② 第三方库包装（换供应商的保险）：图表库适配
+// 应用内定义自己的图表配置模型，不直接暴露 echarts/highcharts 的 API
+interface ChartConfig { type: "line" | "bar"; series: number[][]; }
+interface ChartAdapter {
+  mount(el: HTMLElement, config: ChartConfig): void;
+  update(config: ChartConfig): void;
+  dispose(): void;
+}
+class EChartsAdapter implements ChartAdapter { /* echarts 特定实现 */ }
+// 业务组件只 import ChartAdapter 接口和工厂
+// 某天要换 uPlot（性能原因）→ 新增 UPlotAdapter，业务代码零改动
+
+// ③ 新旧 API 兼容（渐进迁移）：老组件适配新 hooks
+function useLegacyData(props: LegacyProps) {
+  // 老组件期望 dataSource 对象，新数据源是 react-query
+  const { data, isLoading } = useQuery(["report", props.id], fetchReport);
+  return { dataSource: { data, loading: isLoading } }; // 适配成老形状，老组件无感知
+}
+\`\`\`
+
+适配器的关键设计决策：①**放在哪一层**——数据适配放 service 层（api/user.ts 里 DTO→Model），绝不让 DTO 漏进组件（组件 props 出现 user_name 下划线命名就是防腐层失守的信号）；②**校验要不要合一**——适配函数里内嵌 zod schema 校验是最佳实践（DTO 是不可信输入，边界处必须验证，运行时报错比静默 undefined 强一百倍）；③**双向适配**——提交数据时也要 Model→DTO 反向适配（PATCH 接口要 snake_case 且只传脏字段），双向适配器通常成对出现（toModel/fromModel）；④**适配器不吸收业务逻辑**——它只做形状转换和兜底，"VIP 用户显示金色头像框"这种业务判断放组件/selectors，适配器太聪明就成了藏匿业务逻辑的黑洞。
+
+防腐层（ACL）的战略视角：当系统对接的是"历史包袱重的遗留系统"或"语义完全不同的外部领域"（如支付网关的"交易"概念与你订单系统的"订单"概念），单点适配器不够，需要一个完整层：统一翻译语义（对方的 status=3 是你的"已退款"）、统一处理对方异常（错误码映射）、统一限流重试。真实案例：①某公司对接三个支付渠道，每个渠道的状态机不同（微信有"支付中"，支付宝没有），直接映射让订单状态机成了三渠道并集的烂摊子——防腐层定义了"支付领域的统一五态"，各渠道适配器负责把自己的状态机折叠进五态，订单系统从此只认五态；②前端接 GraphQL BFF 时，BFF 返回的结构直接对应 UI 卡片（服务端定 UI 数据结构），初期爽，后来多个客户端复用同一接口时 iOS 端要加的字段把 Web 端结构污染了——Web 端不得不建 ACL 把"为 iOS 加的字段"过滤掉，教训：BFF 按端定制是特性不是 bug，但客户端仍要保留薄适配层应对"服务端为别端做的变更"。
+
+卡帕西视角：适配器是"隔离变化"这一软件工程第一原则的最小实现。面试时说"我用了适配器"不值钱，值钱的是说清"我把什么变化隔离在了边界处，因此什么重构没发生"——比如"后端三次改字段名，我们的组件代码一行没动过"。`,
+    keyPoints: ["适配器=边界处形状转换：DTO→Model 在 service 层完成，组件只见内部模型；内嵌 zod 校验更稳", "第三方库包装=换供应商保险：业务依赖自己的接口，库升级只改 adapter", "防腐层=适配器的战略版：语义翻译+异常映射+状态机折叠，隔离遗留/外部系统的概念污染"],
+    followUps: ["GraphQL 时代客户端还需要数据适配层吗（Fragment 直出 UI 结构的取舍）？", "适配器与门面模式（Facade）在包装复杂子系统时的分工差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-324",
+    nodeId: "design-patterns-fe",
+    question: "MVC、MVP、MVVM、Flux/Redux 四种前端架构的演进逻辑是什么？各自解决什么痛点？为什么 React 生态最终收敛到单向数据流？",
+    bigTech: true,
+    answer: `结论：四种架构的演进主线是"**状态与视图的同步责任不断转移，数据流方向不断收紧**"——MVC 里 View 和 Model 可以直接通信（双向，依赖成网），MVP 掐断 View-Model 直连（Presenter 中转，View 变被动），MVVM 用绑定引擎自动化同步（双向绑定省样板但状态流向不可见），Flux 干脆立法"数据只能单向流"（action → store → view，任何变更可追溯）。React 生态收敛到单向数据流的根本原因：**UI = f(state) 的渲染模型要求状态变更是可预测的，双向绑定/双向通信在组件树规模上会产生"变更源头无法定位"的调试地狱**。
+
+演进痛点链：①MVC（Backbone 时代）——Controller 薄、Model 和 View 互相直接监听，小应用没问题，规模一大"谁改了 Model"成了谜（View 能改 Model，Model 又通知 N 个 View，View 再改别的 Model，事件链绕地球三圈）；②MVP——View 只暴露接口给 Presenter，所有交互走 Presenter，View 变"被动视图"（可测性大增），但 Presenter 成了臃肿的中转站（每个 View 事件都要手动转发，样板代码爆炸）；③MVVM（Angular/Vue）——引入绑定引擎（ViewModel 与 View 自动同步），Presenter 的样板没了，开发体验巅峰，但双向绑定的代价是"数据怎么变的不透明"：表单输入直接改 Model，Model 变化又刷其他绑定，大型表单里一个字段的联动规则（A 改 B、B 改 C、C 又校验 A）形成循环依赖，bug 表现为"值莫名被改但找不到 setter 调用点"；④Flux——Facebook 被 Messenger 的未读数 bug 逼出来的：多个地方改未读数，双向同步永远对不齐，解法简单粗暴——**所有变更必须发 action，store 集中处理，视图只读**。变更从"任何代码都能赋值"变成"必须通过唯一管道"，可追溯性 = 可调试性。
+
+\`\`\`tsx
+// Flux/Redux 单向数据流的纪律（对比双向绑定的"野自由"）
+// ❌ 双向绑定世界：输入框直接改 model，谁都能改，变更无记录
+// <input [(ngModel)]="user.name" /> —— name 变了，谁改的？input？还是别处的 watcher？
+
+// ✅ 单向数据流：变更 = 发 action，store 是唯一写入点，每次变更有日志
+dispatch({ type: "user/nameChanged", payload: "张三" });
+// 调试三问都有答案：改成了什么（payload）、谁发的（action 发起处/调用栈）、
+// 什么时候（Redux DevTools 时间旅行）
+// 派生数据用 selector 计算而非手动同步：
+const fullName = useSelector((s) => s.user.firstName + " " + s.user.lastName);
+// 没有"firstName 变了要记得同步 fullName"这种手动维护的同步关系
+\`\`\`
+
+MVVM 与 Flux 不是水火不容——Vue3 的组合式 API + Pinia 就是"视图层 MVVM（响应式绑定）+ 状态层 Flux（单一 store、action 变更）"的混血，React 社区也承认受控组件本质就是"表单领域的受控双向绑定"（value + onChange 是手动版的 v-model）。真正的分水岭不在"绑不绑定"，在"**状态的所有权与变更入口是否收敛**"：Vue 的响应式数据如果散落在组件各处随意 mutation，一样陷入调试地狱；Redux 用好了，useState 的局部 state 也是健康的。架构选型的实操判断：①状态共享范围大、变更来源多（多人协作/实时推送/跨页面联动）→ 强约束单向流（Redux/Zustand）；②状态局部、交互密集（图形编辑器/表单页）→ 响应式/局部 state 更顺手；③团队规模是隐藏变量——5 人团队靠 review 纪律能守住自由，50 人团队必须靠架构约束兜底。
+
+真实案例：①Angular 老项目（1.x）的 digest 循环地狱——$watch 互相触发，一次点击引发 7 轮 digest，页面假死，最后发现是三个 watcher 循环依赖（A watch B 改 C，C 的 watcher 改 B），双向绑定的"自动同步"在规模上必然产生这种图论问题——这个项目迁移 React 后同类 bug 绝迹，不是 React 更高明，是单向流让循环依赖无处藏身（action 链是 DAG）；②某 Redux 项目走到另一个极端：把"输入框每个字符"都发 action，Redux DevTools 每秒几百条 action，性能也垮了（每次 action 全 store 遍历 selector）——教训：单向流约束的是"共享状态"，局部瞬态（输入中的文本、悬停态）就该留在组件内，"所有状态进 Redux"和"所有状态双向绑定"是同一种病（不区分状态的所有权层级）的两个极端。卡帕西视角：架构演进不是新的一定好，是"自由度与约束的配比随规模调整"——MVC 的自由在 10 个模块时是生产力，在 100 个模块时是混沌；Flux 的约束在小项目是杀鸡用牛刀，在大项目是法治社会的基础设施。`,
+    keyPoints: ["演进主线=同步责任转移+数据流收紧：MVC 双向成网→MVP 被动视图→MVVM 绑定自动同步→Flux 立法单向", "Flux 的本质贡献：变更入口收敛到 action 管道，可追溯性=可调试性（DevTools 时间旅行）", "现代实践是混血：视图层响应式+状态层单向流；按状态所有权分层，局部瞬态不进全局 store"],
+    followUps: ["Zustand/Jotai/Recoil 代表的「原子化状态」相对 Redux 单一 store 解决了什么新问题？", "MVVM 的响应式依赖自动收集（Vue3 Proxy）与手动订阅在派生状态追踪上的精度差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-325",
+    nodeId: "design-patterns-fe",
+    question: "SOLID 原则如何落地到 React 组件设计？以开闭原则（组合 vs 配置）、单一职责（容器/展示分离）、依赖倒置（组件依赖抽象 props）为例写出改造前后对比。",
+    bigTech: true,
+    answer: `结论：SOLID 在 React 里的翻译：组件 = 类，props = 接口，组合 = 继承的替代，Hooks = 依赖注入容器。最有实操价值的三个：①开闭原则——对扩展开放（新需求加 slot/加子组件），对修改封闭（不改组件内部 if-else）——武器是组合（children/render props）而非配置（巨型 props 开关）；②单一职责——一个组件只干一件事（取数 or 展示 or 交互），容器/展示分离是老词但仍是良药，Hooks 时代进化为"逻辑进 Hook，渲染进组件"；③依赖倒置——组件依赖"抽象的 props 形状"而非"具体的 store/API/父组件"，高层组件注入实现。
+
+\`\`\`tsx
+// ① 开闭原则：配置式 vs 组合式
+// ❌ 配置式（违反 OCP）：每个新需求加一个 prop，组件内部 if-else 繁殖
+function Table({ data, showPagination, showExport, expandable, editable, selectable }) {
+  // 20 个布尔 prop 的组合爆炸：2^20 种行为，测试不可能覆盖
+  // 新需求"行内嵌图表"→ 加第 21 个 prop → 改组件内部 → 回归所有老用法
+}
+
+// ✅ 组合式（符合 OCP）：组件提供骨架，行为通过插槽扩展，核心永不修改
+function Table({ data, children }: { data: Row[]; children: React.ReactNode }) {
+  return <table>{children}</table>;
+}
+Table.Pagination = TablePagination;
+Table.ExportButton = ExportButton;
+Table.Row = TableRow;
+// 新需求"行内嵌图表"→ 使用者组合 <Table.Row expand={<Chart />}/>
+// Table 源码零改动 = 对修改封闭；能力可插拔 = 对扩展开放
+// Ant Design 的 Form.Item + 自定义控件、Radix UI 的 asChild 都是这个思想
+
+// ② 单一职责：Hook 管逻辑，组件管渲染
+// ❌ 300 行组件：取数 + 轮询 + 权限判断 + 渲染 + 导出 Excel 全在一起
+// ✅ 拆分后每层独立可测：
+function useUserList() {
+  const { data, isLoading, refetch } = useQuery(["users"], fetchUsers);
+  usePolling(refetch, 30_000); // 轮询逻辑也是独立 Hook
+  return { users: data, isLoading };
+}
+function UserListView({ users }: { users: User[] }) {
+  // 纯展示组件：props 进，JSX 出，Storybook 里随便造数据截图
+  return <ul>{users.map((u) => <UserRow key={u.id} user={u} />)}</ul>;
+}
+function UserListContainer() {
+  const { users, isLoading } = useUserList();
+  if (isLoading) return <Spinner />;
+  return <UserListView users={users} />;
+}
+
+// ③ 依赖倒置：组件依赖抽象 props，不依赖具体实现
+// ❌ 组件直接 import store/api（高层依赖低层，换实现=改所有组件）
+function OrderCard({ orderId }: { orderId: string }) {
+  const order = useOrderStore((s) => s.orders[orderId]); // 绑死 Zustand
+  api.trackView(orderId);                                // 绑死具体埋点 SDK
+}
+// ✅ 依赖倒置：props 定义抽象接口，由上层注入实现
+interface OrderCardProps {
+  order: Order;                    // 数据由外部给
+  onTrackView?: (id: string) => void; // 行为抽象成回调
+}
+function OrderCard({ order, onTrackView }: OrderCardProps) {
+  useEffect(() => { onTrackView?.(order.id); }, [order.id]);
+}
+// 收益：组件可以脱离 store 单测/Storybook；换状态库只动容器层；
+// 埋点 SDK 替换（神策→自研）容器层一行注入切换
+\`\`\`
+
+组合 vs 配置的决策框架（真实项目反复验证）：组件的**变化轴**在哪？①变化在"内容/布局"（表格单元格渲染、卡片头尾）→ 组合（slot/children/render props），因为内容是无限的，配置枚举不完；②变化在"有限的行为选项"（尺寸三档、主题两色）→ 配置（枚举 prop），因为选项封闭可控；③变化在"数据获取/副作用"→ Hooks 注入。判断错误的方向是配置化一切：见过 47 个 props 的"万能表单组件"，文档比组件还长，每个新需求先加 prop 再加内部分支，最终没人敢动——这就是 OCP 坟墓。反方向的错误也存在：把本该配置的两档尺寸做成组合 API，使用者每次包三层 JSX 只为改个 padding——复杂度没有消失，只是转移到了使用方。乔布斯视角：好的组件 API 像 iPhone 的按键——表面只有一个按钮（组合出口少而精），复杂留给内部；47 个 props 的组件像遥控器上 47 个按键，每个用户都只用 5 个但要为 42 个分心。
+
+真实案例：①某中后台 Table 组件从配置式重构成组合式（Compound Components + Context），props 从 31 个降到 5 个，新需求的平均改动从"组件库发包 + 业务升级依赖"（2 天）变成"业务代码内组合"（2 小时）；②容器/展示分离在 AI 流式对话界面的应用：MessageList 展示组件只认 messages 数组，流式接收逻辑全在 useChatStream Hook——接新模型（GPT→Claude）只改 Hook，UI 层零感知，Storybook 用录制的流数据回放就能复现线上渲染问题做视觉回归。`,
+    keyPoints: ["OCP 落地=组合替代配置：变化轴在内容/布局用 slot，有限行为选项用枚举 prop，副作用用 Hook 注入", "SRP 落地=Hook 管逻辑组件管渲染：展示组件 props 进 JSX 出，独立可测可截图", "DIP 落地=组件依赖抽象 props（数据+回调），store/API 由容器层注入，换实现不动组件"],
+    followUps: ["Radix UI 的 asChild 模式相比 render props 在样式合并上解决了什么痛点？", "47 props 的「万能组件」重构时如何平滑迁移存量调用（codemod 思路）？"],
+    favorited: false,
+  },
+  // ===== 架构设计层：组件库设计（fe-326~fe-333） =====
+  {
+    id: "fe-326",
+    nodeId: "component-lib-design",
+    question: "受控组件与非受控组件的设计边界是什么？为什么 antd 的 Form 选择「受控为主+defaultValue 兜底」？自研组件库如何决策一个组件该不该同时支持两种模式？",
+    bigTech: true,
+    answer: `结论：受控（value + onChange，状态由外部管理）与非受控（defaultValue + 内部 state，组件自己管）的本质分歧是"**状态的唯一事实源在哪**"。受控把事实源交给外部（可预测、可远程操控、可参与全局数据流，代价是每个用法都要写状态胶水）；非受控让组件自治（用法简单、表单这类"提交时才需要值"的场景最顺，代价是外部想干预值时束手无策）。成熟组件库的共识：**两种都支持，受控优先**——检测到传了 value 就走受控分支，没传走内部 state。这个"双模"协议是 React 组件库的事实标准。
+
+\`\`\`tsx
+// 双模组件的标准实现（useControllableValue 是组件库基础设施）
+function useControllableValue<T>({
+  value,
+  defaultValue,
+  onChange,
+}: {
+  value?: T;
+  defaultValue?: T;
+  onChange?: (v: T) => void;
+}) {
+  const [innerValue, setInnerValue] = useState(defaultValue);
+  const isControlled = value !== undefined; // 关键判断：传没传 value
+  const mergedValue = isControlled ? value : innerValue;
+  const triggerChange = useCallback((v: T) => {
+    if (!isControlled) setInnerValue(v); // 非受控：更新内部 state
+    onChange?.(v);                       // 两种模式都通知外部
+  }, [isControlled, onChange]);
+  return [mergedValue, triggerChange, isControlled] as const;
+}
+
+function Input(props: {
+  value?: string;
+  defaultValue?: string;
+  onChange?: (v: string) => void;
+}) {
+  const [value, setValue] = useControllableValue(props);
+  return <input value={value} onChange={(e) => setValue(e.target.value)} />;
+}
+// 用法 1（受控）：<Input value={v} onChange={setV} /> —— 外部完全掌控
+// 用法 2（非受控）：<Input defaultValue="初始" onChange={log} /> —— 组件自治
+\`\`\`
+
+为什么 antd Form 选"受控为主"：表单场景有三个硬需求只有受控能满足——①**字段联动**（选了省份清空城市，外部必须能 setFieldValue）；②**校验驱动 UI**（校验器要读到当前值才能报错，值必须在 Form 的事实源里）；③**提交时对齐**（提交的值 = Form store 里的值，不是散落在各组件内部 state 的碎片）。所以 Form 用 FormStore 集中管理所有字段值（受控架构），但保留 initialValues 做"首屏非受控初始化"。这个设计回答了一个关键问题：受控的成本（状态胶水）由 Form 统一承担，使用者无感——高阶组件把受控做成了基础设施。
+
+决策"一个组件该不该双模"的检查清单（自研组件库实操）：①**值是否需要被外部读取/修改/校验？** 是 → 必须受控支持（输入类组件全在此列）；②**组件内部状态是否纯粹是 UI 瞬态？** 是 → 可以纯非受控甚至不可控（如 Tooltip 的 open 通常不需要受控，但需要"点击外部关闭后通知外部"时又得支持受控 open——所以 antd Tooltip 也是双模）；③**是否存在"父组件偶尔需要重置"的场景？** 是 → 双模 + 受控优先（搜索框默认非受控，但"清空筛选"按钮要能受控清空）；④**受控成本谁承担？** 简单组件（Input/Switch）让使用者承担（自己 useState），复杂组件（Form/Table 的选中行）库内承担（提供 store/hooks）。
+
+双模的坑（组件库维护者的血泪）：①**模式切换未定义行为**——同一个组件实例从非受控切成受控（父组件条件渲染 value prop），内部 state 与外部 value 谁赢？React 官方对 input 的答案是警告 + 外部赢，自研组件必须文档明确定义（并在 dev 环境打 warning，antd 就是这么做的）；②**onChange 时序分歧**——受控模式下 onChange 后外部不更新 value，组件显示什么？（答案：显示外部 value，用户的输入"被弹回"，这是受控的语义，但要做防抖输入法的兼容——中文输入法 composition 期间不能弹回，这是 antd Input 多年的修 bug 史）；③**key 重置的滥用**——很多人用 key={JSON.stringify(value)} 强制重置非受控组件，这在有焦点/动画的组件上是灾难（焦点丢失、动画中断），正确解是受控模式或组件暴露 reset 方法（ref API）。
+
+真实案例：①某自研组件库的 DatePicker 初版只有非受控，业务做"选择开始日期后联动限制结束日期范围"时发现拿不到内部值，被迫 hack ref 读内部 state——v2 补受控后此类 issue 清零；②另一个组件库的 Tabs 受控模式下切换有 200ms 动画，外部快速连续 setActiveKey 导致动画状态机错乱（受控值变了三次，动画队列爆炸）——教训：受控组件的内部动画/过渡状态必须与受控值解耦（动画有自己的 state，受控值只决定"目标"），否则外部的高频变更直接打进动画系统。`,
+    keyPoints: ["双模标准协议：传 value 走受控（外部是事实源），没传走内部 state；onChange 两种模式都发", "antd Form 受控为主的原因：字段联动/校验驱动/提交对齐都要求值集中在 FormStore", "坑：模式切换要定义并 warning；受控+输入法 composition 不能弹回；受控值与内部动画状态要解耦"],
+    followUps: ["Vue 的 v-model 与 React 受控模式在「双向同步」语义上的实现差异？", "react-hook-form 为什么主打非受控还能做好校验（ref 直读 DOM 的取舍）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-327",
+    nodeId: "component-lib-design",
+    question: "复合组件（Compound Components）模式如何用 Context 实现隐式状态共享？以 Tabs/Select/Menu 为例说明。相比 props 逐层传递，它解决了什么问题？有什么代价？",
+    bigTech: true,
+    answer: `结论：复合组件把"一个逻辑组件拆成多个视觉部件"（<Select> + <Select.Option>），部件间用 Context 隐式共享状态（选中值、开关状态、注册表），使用者像写 HTML 一样声明结构，无需关心状态怎么流。它解决的核心问题是"**配置式 API 的表达力天花板**"——当部件需要自定义渲染（Option 里要放头像+两行文字）、需要自由布局（Tab 的 extra 区域放按钮）、需要条件组合（某些 Menu.Item 权限控制）时，props 配置枚举不完，复合组件让使用者用 JSX 的组合表达无限结构。代价：部件脱离父组件使用会报错（Context 缺失）、动态增删部件需要注册表机制、React DevTools 里组件层级变深。
+
+\`\`\`tsx
+// Tabs 的复合组件实现（Context 隐式共享 activeKey + setActiveKey）
+const TabsContext = createContext<{
+  activeKey: string;
+  setActiveKey: (k: string) => void;
+} | null>(null);
+
+function Tabs({ children, defaultActiveKey }: TabsProps) {
+  const [activeKey, setActiveKey] = useControllableValue(props);
+  return (
+    <TabsContext.Provider value={{ activeKey, setActiveKey }}>
+      <div className="tabs">{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+function TabList({ children }: { children: React.ReactNode }) {
+  return <div role="tablist">{children}</div>;
+}
+function Tab({ value, children }: { value: string; children: React.ReactNode }) {
+  const ctx = useContext(TabsContext);
+  if (!ctx) throw new Error("<Tab> 必须在 <Tabs> 内使用"); // 边界保护
+  return (
+    <button role="tab" aria-selected={ctx.activeKey === value}
+      onClick={() => ctx.setActiveKey(value)}>
+      {children}
+    </button>
+  );
+}
+function TabPanel({ value, children }: { value: string; children: React.ReactNode }) {
+  const ctx = useContext(TabsContext);
+  if (!ctx) throw new Error("<TabPanel> 必须在 <Tabs> 内使用");
+  if (ctx.activeKey !== value) return null;
+  return <div role="tabpanel">{children}</div>;
+}
+Tabs.List = TabList; Tabs.Tab = Tab; Tabs.Panel = TabPanel;
+
+// 使用方：结构即配置，插什么内容都行
+<Tabs defaultActiveKey="a">
+  <Tabs.List>
+    <Tabs.Tab value="a"><Icon name="user" /> 基本资料</Tabs.Tab>
+    <Tabs.Tab value="b">消息 <Badge count={5} /></Tabs.Tab> {/* 自由内容 */}
+    <Button size="sm" className="ml-auto">导出</Button>    {/* 自由布局 */}
+  </Tabs.List>
+  <Tabs.Panel value="a"><ProfileForm /></Tabs.Panel>
+  <Tabs.Panel value="b"><MessageList /></Tabs.Panel>
+</Tabs>
+\`\`\`
+
+对比 props 配置式（items=[{key, label, content}]）的优势场景：①**部件内容需要自定义**——Option 里放富内容（antd Select 的 option 配置 vs <Select.Option> 子组件之争，后者完胜复杂场景）；②**部件需要插槽扩展**——Tab 栏右侧放操作区（配置式要开 extra prop，复合式直接插进 List）；③**条件/循环生成部件**——权限过滤 <Menu.Item> 用数组 map + 条件渲染，JSX 原生表达，配置式要在数据层过滤（逻辑割裂）；④**ARIA 关系自动化**——Tab 与 Panel 的 aria-controls/aria-labelledby 配对可以在 Context 里注册生成，使用者不用手写 id 配对（可访问性正确率提升，Radix UI 的核心理念）。
+
+代价与应对：①**脱离上下文即崩**——<Tab> 单独渲染拿不到 Context，必须 throw 清晰错误（上面的 if (!ctx) throw 是组件库的良心）；②**动态部件的注册表**——Select 的 Option 如果允许异步加载/动态增删，父组件需要知道"当前有哪些 option"（用于键盘导航/搜索过滤），解法是部件 mount 时向 Context 注册自己（useEffect 里 register/unregister），维护有序注册表（注意顺序问题：注册顺序=挂载顺序≠视觉顺序，虚拟滚动场景尤其坑）；③**重渲染扩散**——Context value 每次 render 新建对象导致所有部件重渲染，解法：value 用 useMemo 稳定化，或拆两个 Context（state Context + dispatch Context，只调 dispatch 的部件不随 state 变）；④**React 18 的并发挑战**——注册表模式在并发渲染下可能读到"半提交"状态，Radix 等库为此引入了更复杂的 collection 机制。
+
+真实案例：①antd Menu 的 items 配置化改造（v4→v5）是反向案例——从复合组件 <Menu.Item> 迁到 items 数组，社区初期反弹，但官方理由充分：配置式可以做"菜单数据从后端来"的直出、可以做递归类型校验、可以避免 children 解析的运行时成本——启示：复合组件 vs 配置式不是谁取代谁，是"结构表达力"与"数据驱动便利"的权衡，antd 的答案是低频定制场景用配置提效（80% 后台菜单就是数据直出），高定制场景仍留 render 出口；②Radix UI（shadcn/ui 底座）把复合组件做到极致：每个部件独立可样式化、ARIA 全自动、键盘导航内建——它证明了复合组件是"无样式组件库"的唯一合理形态（样式完全交给使用者，库只提供行为与结构骨架，配置式做不到这种解耦）。`,
+    keyPoints: ["复合组件=逻辑组件拆成视觉部件+Context 隐式共享状态，JSX 组合表达无限结构（配置式枚举不完）", "适用：部件内容自定义/插槽扩展/条件生成/ARIA 关系自动化；代价：脱离上下文崩/动态部件需注册表", "性能：Context value 要 memo 稳定化或拆 state/dispatch 双 Context，防全部件重渲染"],
+    followUps: ["Select 的 Option 虚拟滚动与复合组件注册表的冲突怎么解（顺序与挂载时序）？", "antd Menu 从 children 迁到 items 配置的完整收益分析？"],
+    favorited: false,
+  },
+  {
+    id: "fe-328",
+    nodeId: "component-lib-design",
+    question: "逻辑复用范式的演进：Mixin → HOC → Render Props → Hooks，每一代解决了什么、引入了什么新问题？为什么 Hooks 最终胜出？组件库里还有哪些场景必须用 Render Props？",
+    bigTech: true,
+    answer: `结论：四代范式的演进主线是"**复用的逻辑与被复用方的耦合方式不断显式化、命名冲突不断消解**"——Mixin 隐式注入（不知道属性哪来的、重名被覆盖），HOC 包装注入（props 来源不透明、嵌套地狱、ref 断裂），Render Props 显式传递（数据流清晰了，但 JSX 金字塔回来了），Hooks 用"函数内顺序调用"一举拿下：逻辑复用不引入组件层级、数据源显式（返回值）、命名自由（解构重命名）、类型推导完美。Hooks 胜出的本质：它把"状态逻辑的复用"从"组件结构的复用"中解放出来——复用不再改变组件树形状。
+
+\`\`\`tsx
+// ① Mixin（React.createClass 时代，已被官方废弃）
+const WindowSizeMixin = {
+  getInitialState() { return { width: window.innerWidth }; },
+  componentDidMount() { window.addEventListener("resize", this.handleResize); },
+};
+// 死因：隐式契约——this.state.width 哪来的？多个 Mixin 重名 state 互相覆盖；
+// 生命周期合并规则黑盒（Mixin 的 didMount 和组件的执行顺序？）
+
+// ② HOC：显式了一点，但注入的 props 仍然来源不明
+const withWindowSize = (Comp) => (props) => (
+  <Comp {...props} windowWidth={useWindowWidth()} />
+);
+// 问题：props.windowWidth 是哪来的（要查所有外层 HOC）；
+// 三个 HOC 嵌套 = DevTools 三层匿名组件；ref 被每层 HOC 吃掉（要 forwardRef 逐层接力）
+
+// ③ Render Props：数据流完全显式（mouse 是参数，来源一眼可见）
+<MouseTracker render={({ x, y }) => <Cursor pos={{ x, y }} />} />
+// 问题：嵌套两个以上就是 JSX 金字塔（回调地狱的组件版）；
+// 且 render prop 内联函数每次渲染新建，子组件 memo 失效
+
+// ④ Hooks：逻辑复用不改变组件树形状
+function Cursor() {
+  const { x, y } = useMouse();        // 来源显式（返回值解构）
+  const size = useWindowSize();       // 多个逻辑叠加 = 多写一行，无嵌套
+  const { t } = useTranslation();     // 命名冲突？解构重命名即可
+  return <div style={{ left: x, top: y, width: size.isMobile ? 20 : 12 }}>{t("cursor")}</div>;
+}
+// 类型推导：useMouse 返回什么，x/y 就是什么类型，全程不用手写泛型
+\`\`\`
+
+Hooks 没解决的（诚实清单）：①**调用顺序约束**（不能在条件/循环里调用）——因为 React 用"调用顺序"作为 Hook 状态的 key，这是拿"API 简洁"换"心智约束"的交易，eslint-plugin-react-hooks 是必需品；②**闭包旧值陷阱**——useEffect/setInterval 里读到过期 state，要用 ref 或函数式更新绕过，这是 Hooks"每次渲染全新闭包"模型的代价（Class 的 this 反而没这个问题）；③**逻辑复用粒度变细后的组织问题**——一个组件 15 个 Hook 调用，相关逻辑被拆散在多个 Hook 里，Class 时代"这个功能的所有代码在一个 class 里"的内聚性反而丢了（解法：自定义 Hook 再聚合，但聚合的边界设计成了新难题）。
+
+组件库里 Render Props 仍不可替代的场景：①**渲染控制权必须交给使用方的部件**——Table 的单元格（columns render）、虚拟列表的 item 渲染（react-window 的 children as function）——这些场景复用的不是"状态逻辑"而是"遍历/布局机制"，Hooks 给不了"每行渲染什么"的控制权；②**需要子组件访问"只有渲染时才存在的值"**——Form 的 field render（当前字段的错误/触碰状态只在渲染该字段时有意义），react-final-form 的 <Field render={({ input, meta }) => ...}> 是标准答案（react-hook-form 用 Controller，本质同构）；③**动画库的插值驱动**——react-spring 的 <Spring from to children={styles => <div style={styles} />}>，动画帧值只能在 render 时传递，Hook 版本（useSpring）存在但返回的 animated 值需要配合 animated.div，Render Props 版在"驱动非 React 树目标"时更直接。判断准则：**复用的是"状态/副作用"→ Hooks；复用的是"渲染时机/遍历机制/每帧值"→ Render Props 仍有其位**。
+
+真实案例：①antd Table 的 columns.render 用了二十年没人质疑——因为"每行渲染什么"天然是 Render Props 的领土，曾经有人提议改 Hooks 化（useCell），连提案者自己都写不下去（Hook 无法表达"对每行调用"的语义）；②react-router v5→v6 把 Route 的 render/component props 全废，统一 element={<Page />}，配合 useNavigate/useParams Hooks——这是"路由复用逻辑 Hooks 化"的收官之战，社区争议半年后发现：以前用 render prop 做的"路由参数注入"在 Hooks 世界全部变成一行 useParams，代码量腰斩。卡帕西视角：范式的胜负不看优雅看"错误率 × 样板量"——Mixin 的错误率（隐式冲突）不可接受，HOC 的样板量（forwardRef 接力）不可接受，Render Props 在嵌套时两者皆输，Hooks 把两项都压到最低，所以它赢了；但在"渲染控制权"这个 Render Props 的主场，Hooks 根本不上场竞争。`,
+    keyPoints: ["演进主线=复用与组件结构解耦：Mixin 隐式注入→HOC 包装注入→Render Props 显式传参→Hooks 顺序调用", "Hooks 胜出本质：逻辑复用不改组件树形状+类型推导完整+命名自由；代价是顺序约束与闭包旧值陷阱", "Render Props 不可替代区：渲染控制权（Table cell/虚拟列表 item）/渲染时才存在的值（Form field）/每帧插值（动画）"],
+    followUps: ["Hooks 的「调用顺序即 key」模型与 Vue Composition API 的 setup 单次执行模型的取舍？", "React Server Components 对 Hooks 复用范式的冲击（服务端组件不能用 Hooks 怎么办）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-329",
+    nodeId: "component-lib-design",
+    question: "组件库的主题系统如何设计？Design Token 的三层架构（原始 token/语义 token/组件 token）是什么？CSS 变量 vs CSS-in-JS 运行时主题的取舍？暗色模式如何不落一色？",
+    bigTech: true,
+    answer: `结论：主题系统的核心矛盾是"**设计的灵活性与实现的一致性**"——设计师要改一个品牌色，工程师要保证 200 个组件、暗色模式、高低对比度模式全部正确跟随。解法是把颜色决策分层：原始 token（palette-blue-6 这类物理色值）→ 语义 token（color-primary 表达"品牌主色"意图）→ 组件 token（button-primary-bg 绑定到具体组件槽位）。三层隔离后，改品牌色只动语义层的映射，组件层零改动。CSS 变量是目前运行时主题的最优解（浏览器原生、JS 可读写、媒体查询可联动、无运行时成本），CSS-in-JS 运行时主题（styled-components ThemeProvider）在动态性上更强但付 JS 运行时税，且 SSR/ hydration 复杂。
+
+\`\`\`css
+/* 三层 token 架构（CSS 变量实现） */
+:root {
+  /* L1 原始层：物理色板，设计师交付的调色盘，不被组件直接使用 */
+  --palette-blue-1: #e6f4ff;
+  --palette-blue-6: #1677ff;
+  --palette-gray-1: #ffffff;
+  --palette-gray-13: #000000;
+
+  /* L2 语义层：表达意图（这个角色是什么颜色），亮暗主题的分叉点 */
+  --color-primary: var(--palette-blue-6);
+  --color-bg-container: var(--palette-gray-1);
+  --color-text: rgb(0 0 0 / 88%);
+  --color-border: #d9d9d9;
+}
+[data-theme="dark"] {
+  /* 暗色模式只覆盖语义层：组件引用的 token 名不变，映射的物理值换 */
+  --color-primary: var(--palette-blue-6); /* 主色可不变 */
+  --color-bg-container: #141414;
+  --color-text: rgb(255 255 255 / 85%);
+  --color-border: #424242;
+}
+
+/* L3 组件层：组件只引用语义层，槽位化命名 */
+.button-primary {
+  background: var(--color-primary);       /* 直接引语义层（简单组件） */
+}
+/* 复杂组件可以再定义自己的组件级 token，允许单独定制 */
+.card {
+  --card-bg: var(--color-bg-container);   /* 组件 token 默认引语义层 */
+  background: var(--card-bg);
+}
+/* 业务方定制单卡片：.my-card { --card-bg: #f0f0f0; } —— 不改库源码 */
+\`\`\`
+
+三层架构的价值论证（每层解决一类变化）：①换品牌色/换色板 → 只改 L2 映射（--color-primary 从 blue-6 指向 green-6），组件无感；②暗色模式 → 只加 [data-theme="dark"] 的 L2 覆盖，组件无感；③单个业务方要定制某组件 → 改 L3 组件 token（--card-bg），不动全局语义；④设计师要全局调"边框都浅一点" → 改 L2 的 --color-border，所有组件的边框统一变化。**没有 L2 语义层的系统（组件直接用 #1677ff）在暗色模式下是灾难**：你得搜遍 200 个组件找"哪些颜色在暗色下要换"，必然漏——漏一个就是用户截图反馈"这里暗色模式瞎眼"。
+
+暗色模式的完整正确姿势（"不落一色"的工程体系）：①**组件样式零硬编码色值**——所有颜色必须 var() 引用 token，lint 规则强制（stylelint 禁止 hex/rgb 字面量出现在组件样式，只允许 token 定义文件）；②**语义 token 全集评审**——文本（主/次/弱/禁用）、背景（页面/容器/浮层/填充）、边框、功能色（成功/警告/错误/信息）各档位定义齐全，暗色映射表由设计师交付（不是工程师拍脑袋反色）；③**特殊资产处理**——图片/插画/图表配色不进 token 系统，图表库（echarts）主题要单独适配（token 导出成 JS 对象喂给 echarts theme），图片建议用 mask/滤镜或双份资产；④**跟随系统 vs 手动切换**——media (prefers-color-scheme) 做默认，用户手动选择覆盖并持久化（localStorage），切换时 html[data-theme] 属性翻转 + transition 防闪烁（给 background/color 加 200ms transition，但注意只对影响的属性加，全属性 transition 会引发布局动画）。
+
+CSS 变量 vs CSS-in-JS 运行时主题的真实权衡：CSS 变量赢面——①零运行时成本（主题切换是改一个 html 属性，浏览器原生级联）；②SSR 友好（首屏直出主题，无 hydration 主题闪烁问题——styled-components 的主题在 hydration 前后不一致会闪）；③DevTools 可调试（变量面板直读）；④非 JS 环境（服务端模板/iframe 注入样式）也能用。CSS-in-JS 赢面——①token 有类型（TS 主题对象补全）；②动态计算主题（根据用户上传 logo 提取主色生成整套色板，运行时算法派生 token——CSS 变量要 JS 算出再 setProperty，其实也能做，只是没类型）；③样式与组件同文件的内聚性。**现代答案（antd v5 / MUI v6 都收敛于此）：CSS 变量做 token 载体 + JS 侧保留 token 的类型化对象供逻辑使用（如图表配色、canvas 绘制）**，两者通过构建时或运行时同步（token 单一事实源在 CSS 或 TS，另一边生成）。
+
+真实案例：①antd v4→v5 的主题重构——v4 用 less 变量（编译期主题：改主色要重编译 less，运行时换主题基本不可能），v5 全量迁 CSS 变量 + cssinjs，运行时换主题、多主题并存（一个页面两个主题区域）都成为可能，但迁移期社区组件大量硬编码色值失效，官方出 codemod + 视觉回归清单才平息——教训：token 化必须在组件库 v1 就做，后补的代价是生态级重构；②某 SaaS 产品做租户级主题（每个企业客户上传品牌色），方案：租户主色 → 色板生成算法（antd 的色阶算法，主色派生 10 档）→ 运行时 setProperty 注入语义 token → 全部组件自动跟随，上线后"换品牌色"从发版需求变成运营后台的表单配置。`,
+    keyPoints: ["三层 token：L1 物理色板→L2 语义意图（主题分叉点）→L3 组件槽位；改品牌色/暗色只动 L2", "暗色不落一色体系：组件零硬编码（lint 强制）+语义 token 全集设计师交付+图表/图片特殊处理+切换防闪烁", "CSS 变量赢运行时/SSR/调试；CSS-in-JS 赢类型/动态派生；现代共识=CSS 变量承载+TS 对象供逻辑层消费"],
+    followUps: ["antd 色板算法（主色派生 10 档）的 HSV 变换逻辑与可访问性对比度校验？", "多主题并存（同页两主题区域）的 CSS 变量作用域隔离方案？"],
+    favorited: false,
+  },
+  {
+    id: "fe-330",
+    nodeId: "component-lib-design",
+    question: "组件库的按需加载与 Tree-shaking 如何实现？ESM + sideEffects 的原理是什么？为什么 babel-plugin-import 仍是很多项目的现实选择？组件库作者要做对哪些事？",
+    bigTech: true,
+    answer: `结论：按需加载的理想路径是"**ESM 静态结构 + bundler Tree-shaking**"——库以 ESM 发布（保留 import/export 静态分析能力），package.json 声明 sideEffects: false（告诉 bundler"模块无副作用，未引用的导出可以安全删除"），业务代码 import { Button } from "lib"，webpack/rollup/vite 构建时只打包 Button 及其依赖的子树。但现实骨感：组件库普遍有 CSS 文件（样式 import 是"副作用"，sideEffects: false 会误删样式）、有全局 polyfill/样式重置、有的库内部模块图有循环依赖导致摇树失效——所以 babel-plugin-import（把 import { Button } 改写成 import Button from "lib/es/button" + 自动引入样式）这种"编译期路径重写"仍是大量存量项目的现实最优解。
+
+\`\`\`jsonc
+// 组件库 package.json 的按需加载四件套
+{
+  "main": "./lib/index.js",        // CJS 产物（老环境/Node 工具链）
+  "module": "./es/index.js",       // ESM 产物（Tree-shaking 的入口）
+  "exports": {
+    ".": { "import": "./es/index.js", "require": "./lib/index.js" },
+    "./*": { "import": "./es/*", "require": "./lib/*" }  // 深路径按需引入
+  },
+  "sideEffects": [
+    "*.css",                        // 样式文件有副作用（不能摇掉）
+    "./es/style/**"                 // 样式入口保留
+  ]
+}
+\`\`\`
+
+Tree-shaking 失效的常见原因（库作者的检查清单）：①**产物不是真 ESM**——用 tsc/babel 转 ESM 时配置错误输出了 CJS（bundler 对 CJS 只能全量打包，因为 require 是动态的无法静态分析）；验证方法：产物里搜 module.exports，有就是失败；②**sideEffects 声明错误**——声明 false 但库里 import "./style/index.css"，样式被摇掉（线上样式全无，经典事故）；正确做法是数组形式把 CSS 文件列入白名单；③**桶文件 re-export 陷阱**——index.ts 里 export * from "./components"，如果某个组件模块有顶层副作用（如 window 监听注册），整个桶都被标记有副作用而保留（摇树是模块粒度的）；④**CSS 架构问题**——CSS-in-JS 库样式随 JS 摇树自然按需，但传统 less/css 文件的库，样式按需要靠 babel-plugin-import 自动补 import 样式文件，或要求用户全量引入样式（antd v4 的 css 全量 600KB+ 是按需加载时代的痛点，v5 改 cssinjs 才根治）。
+
+babel-plugin-import 的工作机制与现实意义：它在编译期把 import { Button, Table } from "antd" 改写成两行深路径引入 import Button from "antd/es/button" + import "antd/es/button/style"，绕过桶文件直取模块——这样即使库的 ESM 摇树配置不完美，业务侧也能精确按需。它在 2026 年的今天仍大量存在的原因：①存量项目的库升级不动（锁定在老版本组件库，ESM 产物质量差）；②样式按需的自动化（免手动 import 样式文件，对开发者透明）；③构建速度——深路径引入跳过桶文件解析，大型组件库（300+ 组件）的全量 ESM 分析对 bundler 是负担。代价：它是 babel 层的私有协议，与 SWC/esbuild/Rspack 等新工具链不兼容（这些工具要么提供等价插件如 swc-plugin-import，要么要求库本身 ESM 质量过关）。
+
+库作者的完整正确姿势（2026 年标准）：①**双产物发布**——es/（ESM，Tree-shaking 用）+ lib/（CJS，Node 工具链用），tsc 双目标编译或 rollup 多格式；②**sideEffects 精确声明**——数组白名单列出 CSS/全局样式/初始化脚本，其余默认无副作用；③**样式策略三选一**——cssinjs（样式随 JS 摇树，最现代）、CSS 文件 + 自动按需引入约定（配插件）、原子化 CSS（样式极致复用，antd v5 的 cssinjs 也带原子化缓存）；④**避免模块级副作用**——不在组件模块顶层做 window 监听/全局注册（改到组件 mount 时做），这是摇树友好的内功；⑤**验证**——CI 里加一个"摇树验证"步骤：建一个只 import Button 的 fixture 项目，webpack 打包后断言产物里没有 Table 的代码字符串（很多知名库都栽在这步）。
+
+真实案例：①某业务项目首屏 bundle 2.8MB，排查发现组件库虽然标了 ESM，但库内 utils 模块在顶层执行了 dayjs.locale("zh-cn")（副作用），整个 utils 模块被保留，utils 又引用了全部组件的常量定义，连锁保留——bundle 里 60% 是没用到的组件。修复：utils 的 locale 设置改到显式 init() 函数，业务 bundle 降到 900KB；②lodash 的教训史——lodash（CJS 全量） vs lodash-es（ESM 可摇树），多少项目 import { debounce } from "lodash" 打包进 70KB 全量库，这是"产物格式决定摇树命运"的教科书案例，后来 es-toolkit 等现代替代品直接 ESM-only 发布。卡帕西视角：按需加载不是"构建技巧"，是"库与业务的契约"——库承诺无副作用的模块结构，bundler 才能兑现摇树；契约的任何一环说谎（sideEffects 乱标、ESM 是假货、顶层有副作用），买单的都是用户的加载时间。`,
+    keyPoints: ["理想路径=ESM 产物+sideEffects 精确白名单+静态 import；桶文件内任何顶层副作用让摇树模块级失效", "babel-plugin-import 仍存在的理由：老库 ESM 质量差/样式按需自动化/构建速度；但绑死 babel 生态", "库作者五件事：双产物/sideEffects 白名单/样式策略/无顶层副作用/CI 摇树验证断言"],
+    followUps: ["sideEffects: false 误删样式的线上事故如何用视觉回归测试兜底？", "es-toolkit/Radix 等现代库 ESM-only 发布策略对 Node 工具链用户的影响与对策？"],
+    favorited: false,
+  },
+  {
+    id: "fe-331",
+    nodeId: "component-lib-design",
+    question: "组件库的质量保障体系怎么建？单元测试、视觉回归测试、文档即代码、API 变更检测四道防线各自防什么？为什么快照测试在组件库场景要慎用？",
+    bigTech: true,
+    answer: `结论：组件库的特殊性在于"**一次缺陷，全部业务方受害**"——业务代码的 bug 影响一个产品，组件库的 bug 影响几百个引用方。四道防线分工：单测防"行为逻辑错误"（交互/状态机/边界），视觉回归防"样式意外变更"（改 padding 波及 50 个组件），文档即代码防"文档与实现漂移"（示例代码跑不通），API 变更检测防"无意识 breaking change"（删了个 prop 没发 major 版本）。快照测试要慎用是因为组件库的快照噪音极大（任何 class 名/hash/结构微调都全量失败），维护者会形成"看都不看就 update snapshot"的肌肉记忆，测试形同虚设。
+
+\`\`\`tsx
+// ① 单测：测行为契约，不测实现细节（Testing Library 哲学）
+test("受控模式下 onChange 不直接改值，等外部更新", async () => {
+  const onChange = vi.fn();
+  const { rerender } = render(<Input value="a" onChange={onChange} />);
+  await userEvent.type(screen.getByRole("textbox"), "b");
+  expect(onChange).toHaveBeenCalledWith("ab");
+  expect(screen.getByRole("textbox")).toHaveValue("a"); // 外部没更新，值被弹回
+  rerender(<Input value="ab" onChange={onChange} />);     // 外部更新后才显示
+  expect(screen.getByRole("textbox")).toHaveValue("ab");
+});
+// 交互行为覆盖：键盘导航（Tab/方向键/ESC）、焦点管理、ARIA 属性、受控/非受控双模、
+// 边界（空数据/超长文本/disabled 态）——这些是"行为契约"，业务方依赖的语义
+
+// ② 视觉回归：Storybook 每个 story 截图对比（Chromatic/Loki/Playwright）
+// stories: Button 的 4 种 type × 3 种 size × disabled/loading = 全组合截图
+// CI 里像素 diff 超阈值 → 失败。防的是"改了 token 色值，30 个组件样式全变，
+// 单测全绿（行为没错），但 UI 面目全非"
+
+// ③ 文档即代码：示例代码从真实可运行文件提取（dumi/storybook docs 模式）
+// 反模式：markdown 里手写示例（API 改名后示例静默失效，用户复制就跑不通）
+// 正解：示例是真实 .tsx 文件，被文档引用 + 被测试执行（示例即测试用例）
+
+// ④ API 变更检测：构建时导出 API 报告（api-extractor），diff 检测
+// Button.d.ts 的 props 从 { size?: "sm"|"lg" } 变成 { size?: "sm"|"md"|"lg" } = minor
+// 删了 ghost prop = major。CI 检测到 breaking 但版本号没 bump major → 拦截
+\`\`\`
+
+快照测试在组件库场景的失败模式：①**序列化噪音**——emotion/cssinjs 生成的 hash class 名每次构建变（css-1x2y3z），快照全红，维护者机械执行 jest -u，测试信用破产；②**结构快照不等于正确性**——快照记录了 <div class="wrapper"><span>，但没记录"aria-expanded 应该是 true"（这才是用户可感知的契约），结构对了 ARIA 错了照样过；③**大快照无人 review**——一个 500 行快照的 diff 在 PR 里没人逐行看，变更混进去就混进去了。正确的替代：①行为断言替代结构快照（expect(button).toHaveAttribute("aria-expanded", "true") 比 toMatchSnapshot 精确一百倍）；②真要快照只快照"稳定的叶子"（如 svg 图标路径、错误消息文本），且快照文件控制在 50 行内可人工 review；③视觉的事交给视觉回归（像素 diff 对"意外样式变更"的捕获能力远超 DOM 快照）。
+
+四道防线的投入配比（组件库团队的资源现实）：单测是地基必须厚（核心组件 Button/Input/Form 行为覆盖率 90%+），视觉回归投入产出比最高（一次接入，每次改样式都有网兜底），文档即代码是长期信用（组件库的竞争一半是文档体验的竞争），API 检测是版本纪律的执法者（没有它，SemVer 全靠自觉=没有 SemVer）。真实案例：①Material UI 的视觉回归体系——每个 PR 自动跑 2000+ 截图对比，一次"修复 Tooltip 定位"的 PR 被发现顺带改变了 Popover 的定位（共用定位引擎），视觉 diff 直接标红，避免了一次跨组件回归——单测全部通过的情况下，只有像素说了真话；②某内部组件库的"文档漂移"事故——Select 组件 v2 把 options 的数据结构从 {label, value} 改成 {label, value, disabled}，文档站示例还是手写的老结构，新业务方复制示例跑起来 disabled 不生效，提了 5 个重复 issue——后来接入 dumi 的"示例即源码"模式，示例文件进 CI 单测，漂移绝迹；③api-extractor 在 Fluent UI（微软）的应用——每次 PR 自动评论"本 PR 的 API 变更：+2 props, -1 prop(breaking)"，reviewer 一眼看到 breaking 标记，没有检测工具时这类变更藏在 500 行 diff 里根本没人注意。
+
+卡帕西视角：组件库的质量体系本质是"**信任的基础设施**"——业务方敢不敢升级你的 minor 版本，取决于历史上你有没有"minor 里夹带 breaking"的前科。四道防线防的不是 bug，是信任的复利流失。`,
+    keyPoints: ["四道防线：单测防行为错/视觉回归防样式意外/文档即代码防示例漂移/API 检测防无意识 breaking", "快照测试失败模式：hash class 噪音→机械 update→测试信用破产；改用行为断言+视觉回归", "业务方敢升级 minor 的前提是版本纪律被工具执法（api-extractor diff 自动评论）"],
+    followUps: ["Chromatic 的 TurboSnap（只重截受影响 story）原理与成本优化？", "组件库的可访问性测试（axe-core 集成）如何自动化进 CI？"],
+    favorited: false,
+  },
+  {
+    id: "fe-332",
+    nodeId: "component-lib-design",
+    question: "组件库的版本管理（SemVer）在「样式也算 API」的现实下怎么执行？breaking change 如何平滑迁移（deprecation 周期 + codemod）？多版本共存问题怎么解？",
+    bigTech: true,
+    answer: `结论：组件库的 SemVer 比普通库难在"**什么是 breaking 的边界模糊**"——删 prop 是 breaking，改默认样式算不算？改 DOM 结构（多包一层 div）算不算（业务方有 CSS 选择器穿透）？改 z-index 层级呢？成熟组件库的实践共识：行为 API（props/事件/方法）严格 SemVer；样式变更凡"视觉上可感知"按 minor 谨慎对待、重大视觉重构（antd v4→v5）按 major；DOM 结构视为半公开 API（文档声明"不要依赖内部结构"但仍尽量 minor 不动）。迁移体系三件套：deprecation 警告周期（一个 major 周期内新旧并存 + console warning）、codemod 自动迁移工具、详尽的迁移指南。
+
+\`\`\`tsx
+// ① Deprecation 周期的标准做法：旧 API 保留一个 major 周期，运行时警告
+function Button({ type, variant, ...rest }: ButtonProps) {
+  if (type !== undefined) {
+    // v5 用 variant 替代 type，但 type 在 v5 全周期仍可用（只是警告）
+    warningOnce(
+      false,
+      "[Button] type 已废弃，请使用 variant。v6 将移除 type。" +
+      "迁移指南: https://lib.dev/migration/v5"
+    );
+  }
+  const mergedVariant = variant ?? typeToVariant(type);
+  // ...
+}
+// warningOnce 保证每个调用点只警告一次（不刷屏）
+// 业务方升级 v5：功能不破 + 控制台黄字引导，一个周期内从容迁移
+
+// ② Codemod：用 jscodeshift 写 AST 变换脚本，库随 major 版本附带
+// npx @mylib/codemod v5-to-v6 src/
+// 自动完成：<Button type="primary"> → <Button variant="primary">
+//           import { LocaleProvider } → import { ConfigProvider }
+// codemod 覆盖 80% 机械变更，剩下 20% 特殊用法迁移指南人工处理
+
+// ③ 多版本共存的样式隔离：CSS 变量前缀 + 类名前缀可配置
+// v5 和 v6 同页共存（微前端主子应用不同版本）：
+<ConfigProvider prefixCls="v6-lib" theme={{ cssVarPrefix: "v6" }}>
+  <App />
+</ConfigProvider>
+// 类名从 lib-button 变 v6-lib-button，CSS 变量从 --lib-color 变 --v6-color
+// 两版样式互不污染（antd 的 prefixCls 机制就是为此设计）
+\`\`\`
+
+"样式算不算 breaking"的实操判据（业界吵了十年的问题的可执行答案）：①**明确 breaking**——删/改 prop 语义、改默认值（defaultPageSize 20→50 会让依赖旧默认的分页逻辑错）、改 DOM 结构且业务方有已知依赖（组件库文档里提供过 className 定制口子的，动结构就是 breaking）；②**灰色地带按 minor + changelog 醒目标注**——微调间距/字号/色值（视觉回归让业务方自己判断要不要跟进）、新增 DOM 包裹层（不影响已声明的定制口子时）；③**不算 breaking 但要 changelog**——修 bug 导致的样式变化（bug 本身就是错的）、性能优化不触摸觉。关键纪律：**changelog 按"用户可感知"写而非按 commit 写**——"fix: adjust padding" 无意义，要写成 "Button: 水平 padding 从 15px 调整为 16px，如您有依赖旧间距的布局请检查"。
+
+多版本共存的三大场景与解法：①**微前端主子应用版本不一致**——主子应用各自打包自己的组件库版本，样式靠 prefixCls/CSS 变量前缀隔离，但**全局副作用会打架**（两版的 message 组件都往 body append 容器、两版的 ResizeObserver polyfill 重复打）——解法：全局单例资源通过 window symbol 协调（先到先得），或主应用统一提供基础能力子应用复用；②**monorepo 内多包依赖不同版本**——pnpm 的严格 node_modules 结构会装两份（components-a 依赖 lib@5，components-b 依赖 lib@6），React 上下文断裂（lib@5 的 ConfigProvider 包不住 lib@6 的组件——两个版本的 Context 是不同对象）——解法：组件库声明为 peerDependency（宿主统一版本），或 pnpm overrides 强制对齐；③**渐进升级期**——大应用不可能一夜升级，新旧页面用不同版本过渡，路由级隔离 + 统一升级排期，过渡期不超过一个季度（否则永久双份 bundle）。
+
+真实案例：①antd v3→v4 的迁移工程——官方提供 codemod（@ant-design/codemod-v4）自动处理 Icon 的 type 字符串改组件式（<Icon type="check" /> → <CheckOutlined />），一个 200 个页面的中后台项目 codemod 跑了 10 分钟完成 85% 迁移，剩下 15% 动态 type 拼接（type={iconMap[k]}）人工处理 2 天——没有 codemod 时同类项目迁移以"月"计；②某组件库 v2 把 message.success 的全局容器从 document.body 直挂改成 Shadow DOM（隔离样式），这看起来是内部实现，但业务方大量 e2e 测试用 document.querySelector(".lib-message") 断言——全部失败。教训：e2e 测试选择器也是"隐式 API"，组件库变更要评估对业务方测试设施的影响，官方应提供 data-testid 稳定契约；③Element Plus 的 unplugin-vue-components 自动按需引入 + 版本升级时的 resolver 兼容——解析器与库版本耦合，库目录结构调整（es/ 改 modules/）导致老 resolver 解析 404，这类"工具链耦合的 breaking"最容易被 SemVer 遗漏，现在库变更目录结构必须同步发 resolver 大版本。`,
+    keyPoints: ["SemVer 扩展判据：行为 API 严格执行；样式按用户可感知分级；DOM 结构半公开（有定制口子就算 API）", "迁移三件套：deprecation 警告一个 major 周期/codemod 覆盖 80% 机械变更/迁移指南处理边角", "多版本共存：prefixCls+CSS 变量前缀隔离样式；Context 断裂用 peerDeps/overrides 对齐；全局副作用 window symbol 协调"],
+    followUps: ["组件库的 data-testid 稳定契约如何设计（哪些元素承诺稳定）？", "微前端场景两版组件库的全局 message/notification 容器冲突的具体协调代码？"],
+    favorited: false,
+  },
+  {
+    id: "fe-333",
+    nodeId: "component-lib-design",
+    question: "组件库的 Monorepo 工程架构怎么搭？包划分策略（core/icons/hooks/单组件包）、构建产物矩阵（esm/cjs/umd/types）、发布流水线（changesets）与文档站如何协同？",
+    bigTech: true,
+    answer: `结论：组件库 Monorepo 的核心决策是"**包的粒度**"——单包（antd 式，一个 antd 包装所有组件）还是多包（@scope/button、@scope/table 独立发布）？答案取决于消费方式：业务方 90% 场景是"装一个库用一堆组件"→ 单包 + 内部模块化（摇树按需）是最优；组件要被其他设计系统二次封装或按需单装（如 @radix-ui/react-* 每个组件独立包）→ 多包。现代主流（2026 共识）：**单主包 + 少数独立包**（icons/hooks/utils/theme 独立，组件集中在主包）——icons 独立是因为图标集巨大且更新频率不同，hooks 独立是因为无 UI 依赖可被非本库项目复用。
+
+\`\`\`
+packages/
+├── components/          # 主包 @mylib/components：全部组件，内部按目录分模块
+│   ├── button/          #   每组件一个目录：index.tsx / style/ / __tests__/ / demo/
+│   ├── table/
+│   └── package.json     #   sideEffects 白名单样式，exports 双格式
+├── icons/               # @mylib/icons：SVG 组件化（构建期 svgr 转换）
+├── hooks/               # @mylib/hooks：useControllableValue 等无 UI 依赖
+├── theme/               # @mylib/theme：token 定义 + 主题生成算法
+└── shared/              # 内部构建配置/工具（不发布，workspace 内部复用）
+docs/                    # 文档站（dumi/vitepress），引用 workspace 包源码
+\`\`\`
+
+构建产物矩阵的现代答案：①**es/（ESM + 保留目录结构）**——Tree-shaking 主战场，tsc --module esnext 直出（不做 bundle，保留模块粒度让业务方 bundler 摇树）；②**lib/（CJS）**——Node 工具链（jest/SSR 老配置）兼容，同一份 tsc 双目标；③**类型 .d.ts**——tsc 生成，注意 exports 字段的 types 条件指向；④**umd 已死**——2026 年不需要为 script 标签出 umd 包（CDN 场景用 esm.sh 这类 ESM CDN 自动转换）；⑤**CSS 策略**——cssinjs 免构建（样式在 JS 里），CSS 文件方案要构建 less→css + 拷贝 + sideEffects 白名单。构建工具的选型现实：tsup（esbuild 内核）快但类型生成要另跑 tsc；rollup 生态最全但配置重；tsdown/rolldown 是新趋势（Rust 内核 + rollup 兼容 API）。
+
+Changesets 发布流水线（多包版本管理的行业标准）：①开发者在 PR 里跑 npx changeset 生成"变更声明文件"（哪个包 + patch/minor/major + changelog 描述），随 PR 提交；②合入 main 后，changesets/action 自动开一个"Version Packages"PR——消费所有 changeset 文件，bump 版本号、生成 CHANGELOG、处理包间依赖联动（components 依赖 hooks，hooks bump minor 则 components 至少 bump patch）；③合并 Version PR 后自动发布到 npm + 打 git tag。这套机制的价值：**版本决策左移到写代码时**（开发者最清楚自己的改动是什么级别），changelog 不再是发版时从 commit 里考古。配套纪律：PR 模板强制要求"是否包含 changeset"，CI 检查 feat/fix 类 PR 无 changeset 则警告。
+
+文档站与源码的协同（文档即代码的落地）：①**demo 即测试**——docs 里的示例从 packages/components/*/demo/ 目录真实 .tsx 文件加载，这些 demo 文件同时被 jest 渲染测试引用（示例坏 = 测试红）；②**API 表格自动生成**——从 TS 类型注释（react-docgen-typescript）提取 props 表，类型改了文档自动更新（不手写 markdown 表格——手写表格与类型的漂移率是 100%）；③**文档站直接 import workspace 源码**（vite alias 指向 src 而非 dist）——改组件代码文档站热更新即时可见，且文档站本身就是组件的"第一个真实用户"（构建/SSR/主题切换问题在文档站先暴露）；④**每个版本快照**——文档站按版本部署（v5.lib.dev / v6.lib.dev），老版本用户不迷路（changesets 的 tag 触发对应版本文档构建）。
+
+真实案例：①Radix UI 的多包策略——@radix-ui/react-dialog 等 30+ 独立包，每个可单装，配合 changesets 管理（一次 Dialog 的 a11y 修复只 bump 一个包），这服务了它的定位"被设计系统二次封装"（shadcn/ui 只装了需要的十几个包）；反面是版本碎片化——业务方 lock 文件里 radix 各包版本交错，Dialog v1.0.3 + Popover v1.0.7 的内部依赖（都依赖 react-dismissable-layer）出现版本分裂，靠 pnpm overrides 压平；②antd 的单包巨无霸模式——一个 antd 包 300+ 组件，靠 ESM 摇树按需，业务方 lock 文件干净（就一个 antd 版本），但"只想用一个 DatePicker 却要装整个 antd（哪怕摇树，安装体积/类型检查速度都是成本）"的抱怨从未停止；③某团队组件库发布事故——手改版本号发版，忘了 components 依赖的 hooks 也变了，发了 components minor 但 hooks 没发，业务方安装后拿到老 hooks 新 components，运行时 undefined 函数崩溃——接入 changesets 后包间依赖联动 bump 自动化，此类事故绝迹。教训：Monorepo 的发布纪律必须工具化，人肉协调多包版本的错误率是 100%（只是时间问题）。`,
+    keyPoints: ["包粒度决策：组件集中主包+icons/hooks/theme 独立包；多包只服务于「二次封装/单装」场景", "产物矩阵 2026：es（不 bundle 保模块粒度）+lib（CJS 兼容）+d.ts；umd 已死，CDN 用 esm.sh", "changesets 把版本决策左移到 PR 时+包间依赖联动自动 bump；人肉协调多包版本必出事故"],
+    followUps: ["Radix 多包版本分裂的 pnpm overrides 压平策略与风险？", "文档站 import 源码（vite alias 到 src）在组件用了构建期宏/插件时的处理？"],
     favorited: false,
   },
 ];
