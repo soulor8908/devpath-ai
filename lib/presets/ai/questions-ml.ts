@@ -1443,4 +1443,222 @@ def woe(df, feat, label):
   },
 
   // ===== 9. ai-nn-fundamentals =====,
+
+
+  // ===== 从远程合入：ai-math-foundations =====
+  {
+    id: "ai-306",
+    nodeId: "ai-math-foundations",
+    question: "特征值分解与 SVD 的区别与联系？SVD 在推荐和降维中怎么用？",
+    answer: `结论：特征值分解 A=VDV⁻¹ 只适用于方阵，且要求 A 可对角化（有 n 个线性无关特征向量）；SVD（奇异值分解）A=UΣVᵀ 适用于任意 m×n 矩阵，U/V 是正交矩阵、Σ 是对角奇异值矩阵——SVD 是特征值分解的广义化：AAᵀ 的特征向量是 U、AᵀA 的特征向量是 V、奇异值 σᵢ=√λᵢ。几何直觉：任何线性变换都可以分解为"旋转→按奇异值缩放→再旋转"。截断 SVD 取 top-k 奇异值即最优低秩近似（Eckart-Young 定理，F 范数意义下误差最小），这是 PCA 和矩阵分解推荐的数学根基。
+
+\`\`\`python
+import numpy as np
+U, S, Vt = np.linalg.svd(A, full_matrices=False)
+k = 20
+A_k = U[:, :k] @ np.diag(S[:k]) @ Vt[:k, :]   # 最优秩 k 近似
+err = np.linalg.norm(A - A_k, "fro")          # = sqrt(sum(S[k:]**2))
+# 信息保留率 = 前 k 奇异值平方和 / 全部奇异值平方和
+ratio = (S[:k]**2).sum() / (S**2).sum()
+\`\`\`
+
+实际案例：Netflix Prize 时代 Funk-SVD 把用户-物品评分矩阵分解为隐因子向量，RMSE 降 8%+；推荐系统用截断 SVD 做 embedding 初始化（亿级物品维度压到 128 维）；NLP 早期 LSA 用 SVD 把词-文档矩阵降维做语义检索；某搜索团队用 SVD 压缩双塔 query embedding 层参数，存储降 75% 而召回率损失 <1%。
+
+踩坑与 tradeoff：SVD 复杂度 O(mn·min(m,n))，亿级矩阵要用随机化 SVD（randomized SVD，复杂度降到 O(mnk)）或增量 SVD；稀疏矩阵做 SVD 要先填缺失值（推荐里填充策略影响巨大，填 0 vs 填均值 vs 只优化观测项的 Funk-SVD 是三代演进）；奇异值衰减慢的矩阵（如 attention 权重）低秩近似误差大；SVD 给出的是线性近似，非线性结构要用 autoencoder 或核方法；数值上优先用 np.linalg.svd 而不是手写 AᵀA 特征分解——AᵀA 会平方条件数，丢失精度。`,
+    keyPoints: ["SVD 是任意矩阵的广义特征分解，σᵢ=√λᵢ(AᵀA)", "截断 SVD=最优低秩近似（Eckart-Young）", "大矩阵用随机化 SVD，推荐场景缺失值填充策略决定效果"],
+    followUps: ["随机化 SVD 的原理与误差界？", "为什么直接对 AᵀA 做特征分解数值不稳定？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-307",
+    nodeId: "ai-math-foundations",
+    question: "矩阵求导常用结论？如何推导最小二乘的正规方程？",
+    answer: `结论：矩阵求导先定布局约定（分母布局 denominator layout 最常用：标量对向量求导得到列向量）。核心结论三板斧：①∂(aᵀx)/∂x = a；②∂(xᵀAx)/∂x = (A+Aᵀ)x（A 对称时为 2Ax）；③∂||Ax-b||²/∂x = 2Aᵀ(Ax-b)。最小二乘推导：目标 f(x)=||Ax-b||²=(Ax-b)ᵀ(Ax-b)，展开得 xᵀAᵀAx - 2bᵀAx + bᵀb，对 x 求导用结论①②得 2AᵀAx - 2Aᵀb，令梯度为零即正规方程 AᵀAx = Aᵀb；AᵀA 可逆时 x=(AᵀA)⁻¹Aᵀb。二阶条件：Hessian=2AᵀA 半正定，故为极小值点。面试常追问"为什么不用手算逆矩阵"——实际用 QR 分解或 SVD 求解，数值更稳。
+
+\`\`\`python
+import numpy as np
+# 正规方程（教学用，生产别这么写）
+x_ne = np.linalg.solve(A.T @ A, A.T @ b)
+# 生产做法 1：QR 分解（A 列满秩时数值稳定）
+Q, R = np.linalg.qr(A)
+x_qr = np.linalg.solve(R, Q.T @ b)
+# 生产做法 2：lstsq 内部走 SVD，能处理秩亏
+x_svd, *_ = np.linalg.lstsq(A, b, rcond=None)
+\`\`\`
+
+实际案例：CTR 预估的线性模型冷启动用正规方程闭式解（特征几十万时用共轭梯度）；在线学习 FTRL 出现前，广告系统每天用 MapReduce 算 AᵀA 和 Aᵀb 解正规方程更新 LR；某风控团队特征共线性严重（AᵀA 近奇异），加岭正则 (AᵀA+λI) 后权重从爆炸量级回到合理范围，KS 稳定 +3 个点。
+
+踩坑与 tradeoff：AᵀA 的条件数是 A 的条件数平方——病态矩阵直接炸，这就是"为什么代码里写 lstsq 不写 inv(AᵀA)Aᵀb"；特征强相关（多重共线性）时解不唯一，要加 L2；样本量 n<特征数 p 时 AᵀA 必不可逆，必须用正则或伪逆；面试常考"梯度=0 为什么是最小值"，答 Hessian 半正定即可；推导时最容易错的是 xᵀAx 的导数忘记 A 不对称时要 (A+Aᵀ)x。`,
+    keyPoints: ["三条求导结论覆盖 90% 面试推导题", "正规方程 AᵀAx=Aᵀb，生产用 QR/SVD 而非求逆", "AᵀA 条件数平方是数值灾难根源"],
+    followUps: ["岭回归的贝叶斯解释（先验是什么）？", "共轭梯度为什么适合大规模正规方程？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-308",
+    nodeId: "ai-math-foundations",
+    question: "MLE 与 MAP 的区别？与正则化的关系？",
+    answer: `结论：MLE（最大似然估计）只问"什么参数让观测数据最可能"：θ_MLE = argmax P(D|θ) = argmax Σ log P(xᵢ|θ)，大数据下一致且渐近有效，但对小数据过拟合、对参数毫无偏好。MAP（最大后验）乘上先验：θ_MAP = argmax P(D|θ)P(θ)，取对数后是 log P(D|θ) + log P(θ)——先验取对数就是正则项：高斯先验 N(0,τ²) → log 先验 = -||θ||²/2τ² + const，正好对应 L2 正则（λ=1/2τ²）；拉普拉斯先验 → |θ| 求和，对应 L1 正则。所以"L2 正则=高斯先验、L1 正则=拉普拉斯先验"不是类比，是恒等。贝叶斯方法再进一步：不求点估计，直接维护后验分布 P(θ|D)，预测时积分掉参数。
+
+\`\`\`python
+# 同一模型的三种估计视角（逻辑回归）
+from sklearn.linear_model import LogisticRegression
+# MLE：C→∞ 等价无正则
+mle = LogisticRegression(C=1e9, penalty=None)
+# MAP + 高斯先验 = L2；C = 1/λ 控制先验强度
+map_l2 = LogisticRegression(C=1.0, penalty="l2")
+# MAP + 拉普拉斯先验 = L1 → 稀疏解
+map_l1 = LogisticRegression(C=1.0, penalty="l1", solver="liblinear")
+\`\`\`
+
+实际案例：医疗小样本场景（几百例）纯 MLE 的 LR 权重方差巨大，加 L2（高斯先验）后交叉验证 AUC 从 0.71 稳到 0.78；广告 LR 用 L1 把千万维特征压到十万维非零， serving 内存降 90%；贝叶斯优化用高斯过程后验指导超参搜索，比网格搜索省 10 倍实验次数。
+
+踩坑与 tradeoff：先验是双刃剑——先验错了（如真实权重很大而先验压得狠）MAP 会有偏，偏差-方差权衡里它是"用偏差换方差"；样本量 n→∞ 时似然项主导、先验被淹没，MAP≈MLE（贝叶斯一致性）；L1 的"稀疏先验"其实是零处尖峰不可导的拉普拉斯分布，优化要用次梯度/近端算子；面试加分点：MAP 仍是点估计，丢失了不确定性信息——知道"参数大概在哪"和"参数后验分布长什么样"在风险决策（金融/医疗）里差别巨大，这是贝叶斯方法的真正卖点。`,
+    keyPoints: ["MAP = MLE + log 先验，L2↔高斯先验、L1↔拉普拉斯先验", "n→∞ 时似然主导，MAP 退化为 MLE", "MAP 是点估计，完整贝叶斯保留后验不确定性"],
+    followUps: ["为什么拉普拉斯先验（L1）产生稀疏解而高斯先验不产生？", "贝叶斯 logistic 回归怎么做在线推断？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-309",
+    nodeId: "ai-math-foundations",
+    question: "常见概率分布及应用场景？什么是共轭先验？",
+    answer: `结论：建模第一步是选对分布。伯努利分布建模单次二元事件（点击/不点击，CTR 的似然就是伯努利乘积→交叉熵）；二项分布是 n 次伯努利的计数；多项分布建模单次多类（softmax 分类的似然）；高斯分布由中心极限定理背书，建模误差/身高类连续量，最大熵原理说"只知道均值方差时高斯是假设最少的分布"；泊松分布建模单位时间计数（每分钟请求数、曝光数），均值=方差；指数分布建模等待时间，无记忆性；Dirichlet 是多项分布参数上的分布（LDA 主题模型的先验）。共轭先验：先验与似然共轭 ⇒ 后验与先验同族——Beta 是伯努利/二项的共轭先验（Beta-Binomial），Dirichlet 是多项的共轭先验，高斯均值在方差已知时的共轭先验还是高斯。共轭让后验有闭式解，观测数据只是更新超参数（如 Beta(α,β) 观测 s 次成功 f 次失败 → Beta(α+s, β+f)）。
+
+\`\`\`python
+from scipy import stats
+# Beta-Binomial 共轭更新：先验 Beta(2,2)（弱信息，等价 2+2 个虚拟样本）
+alpha, beta = 2, 2
+s, f = 47, 3          # 观测：50 次展示 47 次点击
+post = stats.beta(alpha + s, beta + f)   # 后验 Beta(49,5)
+post.mean()           # ≈0.907，比 MLE 的 0.94 温和（先验收缩）
+post.ppf([0.025, 0.975])   # 95% 后验区间，小样本也有量化不确定性的能力
+\`\`\`
+
+实际案例：广告 CTR 平滑用 Beta-Binomial——新广告 3 次展示 2 次点击的 MLE=0.67 不可信，加先验 Beta(20,2000)（大盘 CTR≈1%）后收缩到 2% 附近，防冷启动高估；多臂老虎机 Thompson sampling 本质就是 Beta 后验采样；LDA 主题模型全程 Dirichlet-Multinomial 共轭才使 Gibbs 采样可行。
+
+踩坑与 tradeoff：分布选错全盘皆输——曝光数方差远超均值（过度离散）时用泊松会低估波动，应换负二项分布；高斯假设下厚尾数据（收入、停留时长）的均值方差被极端值带偏，要先 log 变换或用中位数；共轭先验计算优雅但表达力有限，真实先验复杂时只能 MCMC/变分推断；样本量大后先验影响消失，别在亿级数据上纠结先验形式。`,
+    keyPoints: ["似然选择=分布选择：伯努利→CTR、多项→softmax、泊松→计数", "共轭先验让后验闭式可更新（Beta-Binomial/Dirichlet-Multinomial）", "小样本靠先验收缩防 MLE 过自信"],
+    followUps: ["泊松分布过度离散时为什么换负二项？", "Thompson sampling 为什么比 UCB 更适合延迟反馈场景？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-310",
+    nodeId: "ai-math-foundations",
+    question: "熵、交叉熵、KL 散度、互信息的定义与关系？为什么 KL 不对称？",
+    answer: `结论：熵 H(P) = -Σ p log p 是分布自身的不确定性（最优编码平均码长下界）；交叉熵 H(P,Q) = -Σ p log q 是用 Q 的编码方案编 P 的平均码长；KL 散度 D_KL(P||Q) = Σ p log(p/q) = H(P,Q) - H(P) 是多花的码长/信息损失，恒 ≥0（Gibbs 不等式），等号当且仅当 P=Q。训练分类器时标注分布 P 固定，最小化交叉熵 ≡ 最小化 KL 散度——这就是"交叉熵损失"的信息论解释。KL 不对称的根源：对数里放的是 p/q——P 有质量而 Q 接近零的地方，log(p/q)→∞ 惩罚爆炸；反过来 Q 有 P 无的地方 P 根本不参与求和。后果：D_KL(P||Q) 是"正向 KL/均值寻求 mode-covering"（Q 不敢漏掉 P 的任何模式），D_KL(Q||P) 是"反向 KL/模式寻求 mode-seeking"（Q 挑 P 的一个峰贴上）。互信息 I(X;Y) = D_KL(P(X,Y)||P(X)P(Y)) = H(X)-H(X|Y)，衡量知道 Y 后 X 不确定性降多少。
+
+\`\`\`python
+import numpy as np
+def kl(p, q):
+    mask = p > 0
+    return np.sum(p[mask] * np.log(p[mask] / q[mask]))
+p = np.array([0.5, 0.4, 0.1]); q = np.array([0.4, 0.4, 0.2])
+kl(p, q)   # ≈0.034
+kl(q, p)   # ≈0.038 —— 不相等，即不对称
+# 交叉熵 = 熵 + KL
+H = -np.sum(p * np.log(p)); CE = -np.sum(p * np.log(q))
+assert np.isclose(CE, H + kl(p, q))
+\`\`\`
+
+实际案例：知识蒸馏最小化 D_KL(teacher||student)（正向 KL，student 要覆盖 teacher 的整个软分布）；VAE 的 ELBO 里 D_KL(q(z|x)||p(z)) 是反向 KL，导致后验坍缩倾向单峰；扩散模型训练等价于变分下界串起一串 KL；某对话系统用互信息做特征选择，把与意图标签互信息 top-2000 的词喂给 FastText，小模型 F1 +2 个点。
+
+踩坑与 tradeoff：KL 不是距离（不满足三角不等式），需要真距离用 Wasserstein 或 JS 散度（JSD 对称、有界，GAN 初期用 JSD 解释训练饱和）；P 支持集外 Q=0 时 KL=∞，工程实现要加 eps 平滑；反向 KL 的 mode-seeking 解释了 RLHF 后模型输出多样性下降（策略向奖励模型主峰收缩）；熵的单位取决于 log 底：底 2 是 bit，底 e 是 nat，比较论文数字先确认单位。`,
+    keyPoints: ["交叉熵=熵+KL，P 固定时二者等价优化", "KL 不对称：正向 mode-covering、反向 mode-seeking", "互信息=联合分布与独立假设的 KL"],
+    followUps: ["JS 散度为什么对称有界？与 GAN 训练饱和的关系？", "RLHF 中反向 KL 如何导致多样性塌缩？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-311",
+    nodeId: "ai-math-foundations",
+    question: "什么是凸优化？为什么凸函数保证全局最优？深度学习是凸的吗？",
+    answer: `结论：凸集：集合内任意两点连线仍在集合内；凸函数：定义域是凸集且 f(θx+(1-θ)y) ≤ θf(x)+(1-θ)f(y)（弦在函数上方），严格凸则不等号严格成立。判定三法：①定义（难用）；②一阶条件：可微 f 凸 ⟺ f(y) ≥ f(x)+∇f(x)ᵀ(y-x)（任意点切线是全局下界——这一条直接推出"梯度为零即全局最优"，因为 f(y) ≥ f(x*)+0 = f(x*)）；③二阶条件：二阶可微 f 凸 ⟺ Hessian 半正定。凸优化=凸目标+凸约束集，核心性质：任何局部极小都是全局极小，且解集是凸集。常见凸问题：线性回归（Hessian=2AᵀA 半正定）、逻辑回归、SVM、Lasso；深度学习损失对参数高度非凸（置换对称性就保证多个等价极小点），但实际中 SGD 能找到很好的解——现代理论解释：过参数化网络的损失面"坏局部极小很少、鞍点很多"，SGD 的噪声帮助逃离鞍点。
+
+\`\`\`python
+import numpy as np
+# 验证凸性：随机点对检查弦在函数上方
+def is_convex_empirical(f, lo, hi, n=1000):
+    for _ in range(n):
+        x, y = np.random.uniform(lo, hi, 2)
+        t = np.random.rand()
+        if f(t*x + (1-t)*y) > t*f(x) + (1-t)*f(y) + 1e-12:
+            return False
+    return True
+is_convex_empirical(lambda z: z**2, -10, 10)      # True
+is_convex_empirical(lambda z: np.sin(z), -10, 10) # False
+# Hessian 半正定判定：特征值全 >= 0
+np.linalg.eigvalsh(2 * A.T @ A).min() >= 0  # 线性回归凸性证明
+\`\`\`
+
+实际案例：SVM 的辉煌时代（2000s）很大程度因为凸优化保证全局解+可复现，而同期神经网络"炼金术"口碑差；广告 LR 时代亿级特征照样每天稳定收敛到同一解——凸性就是工业可复现性的底气；运筹排产（线性规划也是凸问题）至今是供应链核心。
+
+踩坑与 tradeoff：凸性对变换敏感——log-sum-exp 凸、max 凸，但 f(x)=x⁴ 凸而 ∇² 在原点为零（半正定不是正定，仍凸）；范数都凸，但 ||x||⁰（非零元个数）不凸，这是 L0 稀疏必须用 L1 松弛的原因；约束条件凸性同样重要——等式约束必须仿射才保凸；面试陷阱："深度学习非凸所以找不到好解"是错误论断，过参数化+SGD 隐式偏置（倾向低范数/低秩解）让经验效果远超经典理论预期；证明题套路：先写定义或求 Hessian，别空喊"显然凸"。`,
+    keyPoints: ["凸函数一阶条件：切线是全局下界 ⇒ 梯度零即全局最优", "Hessian 半正定 ⟺ 二阶可微函数凸", "深度学习非凸但坏局部极小少，SGD 隐式偏置兜底"],
+    followUps: ["为什么 L0 正则不凸？L1 是最佳凸松弛怎么证？", "过参数化为什么让非凸问题变好优化？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-312",
+    nodeId: "ai-math-foundations",
+    question: "拉格朗日乘子法与 KKT 条件？SVM 中如何应用？",
+    answer: `结论：等式约束 min f(x) s.t. h(x)=0：构造 L(x,λ)=f(x)+λh(x)，最优解满足 ∇f+λ∇h=0——几何意义是目标梯度与约束梯度平行（约束曲面上走不动更优方向）。不等式约束升级为 KKT 条件（凸问题+slater 条件下是充要）：①平稳性 ∇f+Σλᵢ∇gᵢ+Σμⱼ∇hⱼ=0；②原始可行 gᵢ(x)≤0、hⱼ(x)=0；③对偶可行 λᵢ≥0；④互补松弛 λᵢgᵢ(x)=0——最后一条是灵魂：要么约束紧（g=0，支撑向量），要么乘子零（λ=0，无关样本）。SVM 应用：原始问题 min ||w||²/2 s.t. yᵢ(wᵀxᵢ+b)≥1，KKT 互补松弛 ⇒ 只有间隔边界上的样本 λᵢ>0（这就是"支持向量"），w=Σλᵢyᵢxᵢ 只由支持向量展开；对偶问题把 w 消去后只剩内积 xᵢᵀxⱼ，核技巧得以无缝插入（内积换成核函数 K(xᵢ,xⱼ)）。
+
+\`\`\`python
+# SVM 对偶问题（cvxpy 直接解，教学版）
+import cvxpy as cp
+lam = cp.Variable(n)
+dual = cp.Maximize(cp.sum(lam) - 0.5*cp.sum_squares(lam * y @ K))  # K 为核矩阵
+prob = cp.Problem(dual, [lam >= 0, cp.sum(lam * y) == 0])
+prob.solve()
+sv = lam.value > 1e-5            # 互补松弛：只有支持向量非零
+w = (lam.value * y) @ X          # w 完全由支持向量张成
+print(f"支持向量占比: {sv.mean():.1%}")   # 通常 <10%
+\`\`\`
+
+实际案例：SVM 面试必考"为什么只依赖支持向量"——答案就是互补松弛；推荐系统带约束排序（如 GMV 最大化 s.t. 用户体验损失≤阈值）用拉格朗日把约束转进目标，线上调节 λ 即可在指标间滑动，某电商广告团队用此法把"收入-体验"权衡从周级调参变成实时旋钮；强化学习约束策略优化（CPO/RCPO）同样靠拉格朗日对偶。
+
+踩坑与 tradeoff：KKT 对非凸问题只是必要非充分（满足 KKT 不等于全局最优）；互补松弛 λg=0 数值上难严格成立，求解器都用容差 1e-6 量级；对偶间隙（duality gap）凸问题+slater 为零，非凸问题可能很大，别把对偶解当原问题解；面试高频推导"SVM 原问题→对偶"的关键两步：先对 w、b 求导得 w=Σλyx 和 Σλy=0，再代回消元；SVM 大样本不用对偶直接 primal SGD（如 liblinear）反而更快——对偶是为核技巧和小样本理论美而生的。`,
+    keyPoints: ["KKT 四条件：平稳/原始可行/对偶可行/互补松弛", "互补松弛 ⇒ SVM 只依赖支持向量，w 是支持向量线性组合", "对偶把内积暴露出来，核技巧由此插入"],
+    followUps: ["Slater 条件是什么？缺了它会怎样？", "推荐系统用拉格朗日做约束排序的工程细节？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-313",
+    nodeId: "ai-math-foundations",
+    question: "大数定律与中心极限定理？在 A/B 测试与模型评估中如何用？",
+    answer: `结论：大数定律（LLN）：样本均值依概率收敛到期望——n 越大估计越准，这是一切"用数据估计真实指标"的合法性来源；中心极限定理（CLT）更强：不管原始分布长什么样（只要方差有限），标准化后的样本均值 (x̄-μ)/(σ/√n) 依分布收敛到标准正态——CTR 这种伯努利量、时长这种重尾量，n 足够大时均值都近似正态，置信区间 x̄±1.96σ/√n 才可用。两个直接推论：①标准误随 √n 衰减——想精度翻倍，样本要 4 倍，这就是 A/B 测试样本量公式的由来；②方差 σ² 越大所需 n 越大——高方差指标（GMV、时长）比低方差指标（CTR）需要更长实验周期。A/B 检验里，两组的差 x̄₁-x̄₂ 也近似正态，z 检验/t 检验皆出于 CLT。
+
+\`\`\`python
+import numpy as np
+from scipy import stats
+# A/B 样本量公式（MDE=最小可检测效应）
+def sample_size(p, mde, alpha=0.05, power=0.8):
+    z_a, z_b = stats.norm.ppf(1-alpha/2), stats.norm.ppf(power)
+    return 2 * (z_a + z_b)**2 * p*(1-p) / mde**2
+n = sample_size(p=0.10, mde=0.005)   # CTR 10%，检测 +0.5pt：每组约 2.76 万
+# 模拟验证 CLT：指数分布（重偏）的样本均值仍趋正态
+means = [np.mean(np.random.exponential(1, 50)) for _ in range(10000)]
+stats.normaltest(means).pvalue       # p 大 ⇒ 无法拒绝正态
+\`\`\`
+
+实际案例：某内容平台实验平台默认配置：CTR 类指标 5% MDE 需 3 天流量，GMV 类高方差指标同 MDE 要 14 天——强行缩短周期曾把噪声当提升全量上线，复盘损失数百万；模型离线评估同样吃 CLT：测试集 1 万条时 AUC±0.005 是噪声范围，比较两个 AUC 差 0.003 的模型毫无意义，需要 10 万级样本或 bootstrap 置信区间。
+
+踩坑与 tradeoff：CLT 要求 i.i.d.——用户级指标按"请求"随机分流会违反独立性（同一用户多次出现），要按用户分流且方差用 cluster-robust 估计；重尾分布（收入）收敛慢，n=几百时正态近似很差，用 bootstrap 或对数变换；多重检验（同时看 20 个指标）假阳性暴增，需 Bonferroni/FDR 校正；连续监控（天天看 p 值，显著就停）会让假阳性率从 5% 膨胀到 30%+，要用序贯检验（mSPRT）或固定 horizon；"p=0.051 就是没效果"是误读——报告效应量+置信区间比二元判定诚实得多。`,
+    keyPoints: ["LLN 保证均值收敛，CLT 保证正态近似→置信区间可用", "精度翻倍样本 4 倍（√n 律），高方差指标需更长周期", "i.i.d. 假设被用户级分流破坏时用 cluster-robust"],
+    followUps: ["bootstrap 置信区间怎么算？何时优于正态近似？", "序贯检验如何控制连续监控的假阳性？"],
+    favorited: false,
+    bigTech: true,
+  },
+
 ];

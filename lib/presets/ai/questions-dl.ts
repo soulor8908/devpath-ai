@@ -1088,4 +1088,227 @@ opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
     favorited: false,
     bigTech: false,
   },
+
+
+  // ===== 从远程合入：ai-gnn =====
+  {
+    id: "ai-314",
+    nodeId: "ai-gnn",
+    question: "GNN 消息传递（Message Passing）范式？聚合-更新两步如何工作？",
+    answer: `结论：GNN 的统一抽象是消息传递：每个节点向邻居"收消息"、聚合、更新自身表示。第 k 层：h_v⁽ᵏ⁾ = UPDATE(h_v⁽ᵏ⁻¹⁾, AGGREGATE({h_u⁽ᵏ⁻¹⁾ : u ∈ N(v)}))——AGGREGATE 必须对邻居集合置换不变（sum/mean/max/attention），因为图没有顺序。k 层后每个节点的表示融合了 k 跳邻域信息（k 跳感受野），再按任务接读出头：节点分类逐节点接 MLP，图分类做全局池化（graph readout），边预测对两端表示做点积/拼接。表达能力上限是 Weisfeiler-Lehman 图同构测试：标准消息传递 GNN 区分图结构的能力不超过 1-WL——两个 1-WL 等价的图（如两个三角形 vs 六元环）GNN 分不开，这是 GIN 论文的核心结论，也解释了为什么 AGGREGATE 用 sum（单射性最好）优于 mean/max。
+
+\`\`\`python
+import torch
+from torch_geometric.nn import GCNConv
+class GNN(torch.nn.Module):
+    def __init__(self, in_dim, hid, out_dim):
+        super().__init__()
+        self.c1, self.c2 = GCNConv(in_dim, hid), GCNConv(hid, out_dim)
+    def forward(self, x, edge_index):
+        x = torch.relu(self.c1(x, edge_index))  # 第 1 层：聚合 1 跳
+        return self.c2(x, edge_index)           # 第 2 层：感受野扩到 2 跳
+# 节点分类损失
+loss = F.cross_entropy(out[train_mask], y[train_mask])
+\`\`\`
+
+实际案例：Pinterest 的 PinSage 用 GraphSAGE 在 30 亿节点 pin 图上生成 embedding，推荐 CTR +25%；阿里电商图召回用 GNN 聚合用户-商品二部图，相比 ItemCF 覆盖率 +18%；支付风控用 GNN 聚合设备-账户-银行卡关系网，团伙欺诈召回率 +30%。
+
+踩坑与 tradeoff：层数不能堆——2-4 层是甜区，再深过平滑（所有节点表示趋同）；聚合函数 mean 会丢邻居数量信息（度归一化后 100 个邻居和 3 个邻居输出同量级），度差异大的图用 sum 或 attention；有向边/边特征（转账金额）要专门设计（R-GCN/edge features），直接当无向会损失语义；消息传递是局部操作，长程依赖（图两端节点交互）需要虚拟节点或 Graph Transformer；异构图（用户/商品/店铺不同节点类型）不能混着聚合，要按边类型分别聚合再合并。`,
+    keyPoints: ["聚合必须置换不变，k 层=k 跳感受野", "表达能力上限 1-WL，sum 聚合单射性最好", "2-4 层甜区，过深过平滑"],
+    followUps: ["GIN 如何逼近 1-WL 表达上限？", "虚拟节点（virtual node）如何缓解长程依赖问题？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-315",
+    nodeId: "ai-gnn",
+    question: "GCN 原理？谱域卷积如何近似为一阶邻居聚合？",
+    answer: `结论：GCN 有两条推导路线，面试要能从谱图理论讲到空间形式。谱域路线：图傅里叶变换建立在拉普拉斯矩阵 L=I-D^(-1/2)AD^(-1/2) 的特征基上，图卷积=特征空间里逐特征值滤波 g_θ(Λ)；直接算特征分解 O(N³) 不可行，用 K 阶 Chebyshev 多项式逼近滤波器（Kipf & Welling 再简化到 K=1 一阶近似）：卷积退化为 h' = σ(D̂^(-1/2)ÃD̂^(-1/2) X W)，其中 Ã=A+I 是自环邻接矩阵（不加自环节点会丢自身信息），D̂ 做对称归一化防高度节点数值爆炸。一句话：一层 GCN = "邻居表示的对称归一化加权平均 + 线性变换 + 非线性"，谱域的"一阶局部化"恰好等价空间域的"一阶邻居聚合"——这是谱与空间两视角会师的地方，也是面试最想要的回答。
+
+\`\`\`python
+import torch
+def gcn_layer(X, A, W):
+    A_hat = A + torch.eye(A.size(0))          # Ã = A + I（自环）
+    D_inv_sqrt = torch.diag(A_hat.sum(1).pow(-0.5))
+    agg = D_inv_sqrt @ A_hat @ D_inv_sqrt @ X # 对称归一化聚合
+    return torch.relu(agg @ W)
+# 等价 PyG 调用：GCNConv(in_dim, out_dim)
+\`\`\`
+
+实际案例：半监督节点分类是 GCN 成名战——Cora 引用网络只用 5% 标注就 81.5% 准确率（当年 SOTA）；某内容社区用 GCN 做账号 embedding，下游虚假注册识别 AUC +0.04；学术图谱分类、分子性质预测（图即分子式）都是标准落地。
+
+踩坑与 tradeoff：GCN 是直推式（transductive）——聚合矩阵固定，新节点加入要重训全图，工业动态图基本用 GraphSAGE 替代；对称归一化把高度节点权重压扁（D^(-1/2) 两侧各除一次），hub 节点多的图（社交网络大 V）信息损失明显；自环权重和邻居权重绑死无法分别学习，GAT/GIN 解耦了这一点；两层 GCN 感受野只有 2 跳，深层堆叠触发过平滑+参数量爆炸；谱 GCN 对图结构扰动敏感（对抗攻击加几条边就能翻转预测），风控场景要做图净化或鲁棒聚合。`,
+    keyPoints: ["Chebyshev 多项式逼近谱滤波，一阶近似=邻居聚合", "Ã=A+I 自环保自身信息，D^(-1/2) 对称归一化防数值爆炸", "直推式限制：新节点要重训，工业用 GraphSAGE"],
+    followUps: ["为什么 Chebyshev 逼近能避免 O(N³) 特征分解？", "GCN 对图对抗攻击为什么脆弱？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-316",
+    nodeId: "ai-gnn",
+    question: "GraphSAGE 与 GCN 的核心区别？归纳式学习如何做到？",
+    answer: `结论：两个本质区别。①归纳式 vs 直推式：GCN 的传播矩阵 D̂^(-1/2)ÃD̂^(-1/2) 依赖全图结构，训练时见过全部节点，新节点加入必须重训；GraphSAGE 学的是"聚合函数本身"——给任意节点的邻居集合就能算表示，新节点带上自己的邻居即可零成本推理（inductive），这是工业动态图选 GraphSAGE 的根本原因。②采样+自环解耦：GCN 用全邻居，GraphSAGE 每层固定采样 k 个邻居（如 25/10），把单节点计算量从 O(度) 压到常数，大图可 mini-batch 训练；同时自身表示和邻居聚合结果走 concat 而非绑死加权（h_v = σ(W·[h_v || AGG(h_u)])），自身信息和邻域信息分别学习。聚合器三选：mean、LSTM（打乱顺序训练置换鲁棒）、max-pooling。
+
+\`\`\`python
+from torch_geometric.nn import SAGEConv
+from torch_geometric.loader import NeighborLoader
+# 每层采样 [25, 10] 个邻居 → mini-batch 大图训练
+loader = NeighborLoader(data, num_neighbors=[25, 10],
+                        batch_size=1024, input_nodes=train_idx)
+class SAGE(torch.nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.c1, self.c2 = SAGEConv(d, 256), SAGEConv(256, 128)
+    def forward(self, x, edge_index):
+        return self.c2(torch.relu(self.c1(x, edge_index)), edge_index)
+# 推理新节点：只需取其邻居子图前向一次，无需重训
+\`\`\`
+
+实际案例：Pinterest PinSage 是 GraphSAGE 工业标杆——30 亿节点 180 亿边，邻居采样+MapReduce 批量生成 embedding，线上 A/B 相关 pin 点击 +25%；某支付风控用 GraphSAGE 对新注册账户即时产出风险 embedding（GCN 做不到新节点零重训），欺诈拦截时效从 T+1 到分钟级。
+
+踩坑与 tradeoff：采样引入方差——k 太小（如 5）训练不稳，k 太大失去省算力意义，常用 25/10 或 10/10；邻居数指数膨胀（k₁×k₂=250 个二跳节点）在 hub 节点上仍会爆，重要性采样/历史嵌入缓存（VR-GCN、GraphFM）可缓解；mean 聚合对高度节点友好但对稀疏节点噪声大；LSTM 聚合器理论上违反置换不变，靠随机打乱硬学，实践中常不如 mean 稳；无监督训练用"邻居应相近"的对比损失（random walk 共现），有标签时直接任务损失即可，别硬套原论文。`,
+    keyPoints: ["学聚合函数而非传播矩阵 ⇒ 新节点零重训（归纳式）", "固定邻居采样把单节点算力压到 O(1)，大图可 mini-batch", "自身与邻域表示 concat 解耦，比 GCN 绑定加权更灵活"],
+    followUps: ["邻居采样的方差怎么控制？VR-GCN 的思路？", "PinSage 的重要性采样（random walk 计数）相比均匀采样好在哪？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-317",
+    nodeId: "ai-gnn",
+    question: "GAT 图注意力网络原理？相比 GCN 的优势与代价？",
+    answer: `结论：GAT 把 Transformer 的注意力搬到图上：邻居聚合权重不再由度归一化固定（GCN），而是由内容可学习地计算。对每条边 (v,u)：e_vu = LeakyReLU(aᵀ[Wh_v || Wh_u])，再对邻居做 softmax 得注意力系数 α_vu，更新 h_v' = σ(Σ α_vu Wh_u)。多头：K 个独立注意力头，中间层 concat、输出层平均。优势：①权重内容自适应——噪声邻居（误连边、羊毛党混入的正常设备）自动降权，GCN 只能按度均摊；②自环与邻居权重自然解耦（自己也是注意力候选）；③注意力系数可解释，风控场景能审计"模型看了哪些关联账户"；④归纳式成立（注意力函数对任意子图可算）。代价：每条边都要算注意力，计算/显存开销约为 GCN 2-3 倍，边数亿级时训练成本高。
+
+\`\`\`python
+from torch_geometric.nn import GATConv
+class GAT(torch.nn.Module):
+    def __init__(self, in_dim, hid, out_dim, heads=8):
+        super().__init__()
+        self.c1 = GATConv(in_dim, hid, heads=heads)             # concat → hid*8
+        self.c2 = GATConv(hid*heads, out_dim, heads=1, concat=False)
+    def forward(self, x, edge_index):
+        x = torch.elu(self.c1(x, edge_index))
+        return self.c2(x, edge_index)
+# 取注意力权重做可解释审计
+out, (ei, alpha) = self.c1(x, edge_index, return_attention_weights=True)
+\`\`\`
+
+实际案例：某支付风控把 GCN 换成 GAT，误连的家庭宽带 IP 不再污染正常用户表示，团伙召回率 +8%，且注意力权重直接进了风控审计报告；学术引用网络节点分类 GAT 比 GCN 高 1.5 个点；分子性质预测中注意力能定位关键化学键。
+
+踩坑与 tradeoff：注意力不是免费的——图大边密时 e_vu 计算成为瓶颈，Sparse 实现（PyG 的 GATConv）必须配合邻居采样；注意力容易"注意力坍缩"（所有头学出相似分布），多头+不同初始化缓解；图上注意力是局部 softmax，邻居数量级差大时（3 vs 3000 邻居）系数不可比；GAT 对特征质量更敏感——邻居特征噪声大时注意力学不出区分度，反而不如 GCN 的固定归一化稳；后续 GATv2 指出原 GAT 的 aᵀ[Wx||Wy] 其实是"静态注意力"（排序与 query 无关），修正为 aᵀLeakyReLU(W[x||y]) 才是真正的动态注意力。`,
+    keyPoints: ["边权重由内容注意力学习，替代 GCN 固定度归一化", "抗噪邻居+可解释+归纳式，代价是 2-3 倍边计算", "GATv2：原版是静态注意力，动态版更表达"],
+    followUps: ["图 Transformer（全局注意力）与 GAT 局部注意力的取舍？", "注意力系数如何做风控审计落地？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-318",
+    nodeId: "ai-gnn",
+    question: "大规模图训练怎么做？邻居采样、ClusterGCN、GraphSAINT 对比？",
+    answer: `结论：全图训练（GCN 原版）显存随节点数线性涨、单步要扫全图，亿级节点根本放不进 GPU。三条主流路线：①邻居采样（GraphSAGE 系）：以目标节点为根按层采样 k 个邻居构成小计算图，mini-batch 训练——优点是归纳式天然支持，缺点是层数深时邻居数指数膨胀（25×10=250 个二跳），hub 节点依旧爆炸；②图聚类（ClusterGCN）：先用 METIS 把图切成稠密子图块，每 batch 只在块内训练——块内边密度高所以近似误差小，复杂度 O(块大小)，但切图破坏跨块边（结构信息有损）；③子图采样（GraphSAINT）：不采邻居而采子图（按节点/边/random walk 采样器），在采出子图上做全量 GCN，并用归一化系数校正采样偏差——层间不再指数膨胀，方差可控。工业再加两板斧：特征与图结构分离存储（特征放 CPU/分布式 KV，采样后按 id gather）、历史嵌入缓存（GAS/VR-GCN 用上一 epoch 的旧嵌入代替实时聚合，省 80% 计算）。
+
+\`\`\`python
+from torch_geometric.loader import NeighborLoader, GraphSAINTRandomWalkSampler
+# 路线 1：邻居采样（最常用）
+nbr_loader = NeighborLoader(data, num_neighbors=[15, 10], batch_size=512)
+# 路线 3：GraphSAINT 子图采样
+saint_loader = GraphSAINTRandomWalkSampler(data, batch_size=2048,
+                                           walk_length=3, num_steps=5)
+for batch in saint_loader:   # batch 自带 node_norm/edge_norm 校正系数
+    out = model(batch.x, batch.edge_index)
+    loss = F.cross_entropy(out[batch.train_mask], batch.y[batch.train_mask],
+                           reduction="none") * batch.node_norm[batch.train_mask]
+\`\`\`
+
+实际案例：PinSage（30 亿节点）= 邻居采样 + random walk 重要性采样 + MapReduce 离线推理；微信看一看用异构大图+邻居采样训练，十亿级边日更；某银行风控用 GraphSAINT 在 2 亿节点关联图上训练，相比全图 GCN 显存从 800GB 压到 40GB，欺诈召回持平。
+
+踩坑与 tradeoff：采样方差与效率的权衡——k 太小 loss 抖动大（尤其稀疏标签），用重要性采样（按度或 random walk 频率）降方差；ClusterGCN 的跨块边丢失对社区结构强的图伤害大，可把块间边按概率回填（ClusterGCN 的多簇合并）；历史嵌入缓存引入 staleness，缓存超过 1 个 epoch 精度掉得快，需混入一定比例实时聚合；分布式训练时图切分要按边均衡而非节点均衡（度分布幂律，按节点切会负载倾斜）；评估时要全邻居精确推理（不能再采样），离线批量推理用"逐层全图聚合"避免邻居爆炸。`,
+    keyPoints: ["邻居采样简单但深层指数膨胀，GraphSAINT 采子图+偏差校正", "ClusterGCN 切稠密块省显存，牺牲跨块边", "工业组合拳：特征外存+历史嵌入缓存+离线逐层推理"],
+    followUps: ["历史嵌入缓存（GAS）的一致性如何保证？", "为什么评估阶段要全邻居精确推理而不是继续采样？"],
+    favorited: false,
+    bigTech: true,
+  },
+
+  {
+    id: "ai-319",
+    nodeId: "ai-gnn",
+    question: "异构图与知识图谱嵌入怎么做？R-GCN 与 TransE 系列？",
+    answer: `结论：同构图假设只有一种节点一种边，现实业务全是异构：电商图有用户/商品/店铺节点和点击/购买/收藏边。两种建模范式：①异构 GNN——R-GCN 按关系类型各学一套变换矩阵，聚合时按边类型分别变换再求和：h_v' = Σ_r Σ_{u∈N_r(v)} (1/c) W_r h_u + W_0 h_v；参数量随关系数爆炸，用基分解（basis decomposition：W_r = Σ a_rb V_b 共享基矩阵）或块对角分解压缩；HAN 用"元路径"（如 用户-购买-商品-被购买-用户）把异构转同构子图再分层注意力。②知识图谱嵌入（KGE）——不做消息传递，直接给每个实体/关系学向量，用打分函数衡量三元组 (h,r,t) 合理性：TransE 要求 h+r≈t（关系=平移）；DistMult 双线性打分 h∘r·t（只能建模对称关系）；ComplEx 复数扩展解决非对称；RotatE 把关系建模为复数空间旋转，能同时处理对称/反对称/逆关系/组合关系，是工业常用默认。
+
+\`\`\`python
+import torch
+# TransE 打分：距离越小越合理
+def transe_score(h, r, t):
+    return -torch.norm(h + r - t, p=1, dim=-1)
+# 负采样对比损失（KG 训练标准做法）
+pos = transe_score(h, r, t)                    # 真实三元组
+neg = transe_score(h_neg, r, t)                # 头实体替换的负样本
+loss = -torch.logsigmoid(pos).mean() - torch.logsigmoid(-neg).mean()
+# R-GCN：PyG 一行
+from torch_geometric.nn import RGCNConv
+conv = RGCNConv(in_dim, out_dim, num_relations=6, num_bases=4)  # 基分解压缩参数
+\`\`\`
+
+实际案例：阿里电商知识图谱（商品-类目-品牌-属性三元组十亿级）用 KGE 生成实体向量喂推荐召回，新品冷启动曝光 +15%；美团大脑用 RotatE 做商户-菜品-场景关联，搜索相关性 NDCG +3%；某金融反洗钱团队用 R-GCN 在账户-交易异构图上识别洗钱路径，可疑交易召回 +22%。
+
+踩坑与 tradeoff：关系数上千时 R-GCN 基分解的基数量是敏感超参（太少欠拟合，太多过拟合），通常 4-8 起步调；TransE 处理不了 1-N/N-1/N-N 关系（h+r≈t 会让多个尾实体挤成同一点），这类关系必须 RotatE/ComplEx；元路径需要领域专家设计，选错元路径（如把"用户-同为粉丝-用户"用在兴趣建模）引入噪声；KGE 只做链接预测/实体表示，不利用节点丰富特征（用户画像），工业上常 KGE 向量当初始化再喂 GNN 精调；知识图谱 schema 漂移（新增关系类型）要支持增量训练，全量重训十亿三元组成本高。`,
+    keyPoints: ["R-GCN 按关系分变换+基分解压参数，HAN 走元路径", "RotatE 复数旋转统一对称/反对称/逆/组合关系", "KGE 与 GNN 互补：KGE 出结构向量，GNN 融节点特征"],
+    followUps: ["基分解为什么能防 R-GCN 过拟合？", "RotatE 如何同时建模对称与反对称关系？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-320",
+    nodeId: "ai-gnn",
+    question: "GNN 过平滑（oversmoothing）是什么？为什么层数做不深，如何缓解？",
+    answer: `结论：过平滑指 GNN 层数加深后所有节点表示趋于相同、下游任务精度反而下降的现象。机理：每层消息传递本质是邻域上的扩散/低通滤波——对称归一化传播矩阵 P=D̂^(-1/2)ÃD̂^(-1/2) 的最大特征值为 1，反复乘 P 会把节点信号推向 P 的主特征向量方向（与度 √d 成比例的"平滑信号"），节点间差异（高频分量）被指数级抹平；数学上 k 层后任意两节点表示距离以 λ₂ᵏ 速率衰减（λ₂ 是 P 的次大特征值），图越连通（λ₂ 越大）塌缩越快。这和 CNN 能堆 100 层形成鲜明对比——CNN 的卷积核逐层学新变换，GCN 的传播矩阵每层固定，深度只放大平滑。缓解手段：①残差/跳跃连接（JK-Net：每层输出 concat 到最后，浅层局部信息不衰减）；②DropEdge 训练时随机删边，既是正则又打断图连通性（λ₂ 变小）；③归一化层（PairNorm 保持节点对间距离，LayerNorm 也常用）；④降低层数+扩大单层感受野（用大聚合半径替代深层堆叠）；⑤初始残差（GCNII：每层显式混入 h⁽⁰⁾）——GCNII 是少数能稳定做到 32/64 层的方案。
+
+\`\`\`python
+# 经验验证：节点表示两两距离随层数塌缩
+def pair_dist(x):
+    return torch.pdist(F.normalize(x, dim=-1)).mean()
+x = data.x
+for k in range(8):
+    x = torch.relu(gcn_layer(x, A, W[k]))
+    print(k, pair_dist(x).item())   # 距离单调下降 → 过平滑
+# 缓解：初始残差（GCNII 思想），每层混回输入
+x = alpha * x0 + (1 - alpha) * propagate(x)
+\`\`\`
+
+实际案例：Cora 上 GCN 层数从 2 加到 8，准确率从 81% 掉到 70% 以下——教科书级过平滑曲线；某社交推荐团队盲目堆 6 层 GraphSAGE 导致所有用户 embedding 余弦相似度 0.99+，推荐结果千人一面，改 JK 连接+3 层后多样性指标恢复。
+
+踩坑与 tradeoff：过平滑≠过拟合——训练 loss 也在涨，是结构性塌缩不是记忆噪声；缓解手段多为"保浅层信息"，代价是深层变换能力被稀释（GCNII 的 64 层增益在非连部结构任务上也就 1-2 个点）；DropEdge 在稀疏图上可能切断关键路径（小图的桥边），drop rate 别超 0.3；批归一化类方法对节点分类有效，图分类任务收益不一致；实务口诀：先 2-4 层把 pipeline 跑通，过平滑是"想堆深"时才需要面对的问题，多数工业图 2 跳信息已够。`,
+    keyPoints: ["固定传播矩阵反复低通滤波，节点表示指数级趋同", "λ₂（次大特征值）决定塌缩速率，图越连通塌越快", "JK 残差/DropEdge/GCNII 初始残差是三大缓解法"],
+    followUps: ["PairNorm 为什么能保持节点间距离？", "为什么 CNN 能堆百层而 GCN 不行？本质差异在哪？"],
+    favorited: false,
+  },
+
+  {
+    id: "ai-321",
+    nodeId: "ai-gnn",
+    question: "GNN 在风控团伙挖掘与推荐图召回中如何落地？",
+    answer: `结论：两个最值钱的 GNN 工业场景。风控团伙挖掘：欺诈是"群体性作案"——黑产共享设备/WiFi/收款卡/收货地址，单点特征（某账户行为）看不出异常，图上却形成稠密可疑子图。落地范式：建异构图（账户-设备-银行卡-手机号-地址，边=登录/绑定/转账）→ GNN（R-GCN 或 GAT，边类型区分关系）学节点表示 → 下游两用：节点分类判单个账户欺诈概率、社区发现（Louvain/连通分量+embedding 聚类）挖团伙整体。关键设计：高度节点（公共 WiFi、公司 NAT）会制造虚假稠密，要按"稀有度"给边加权或过滤；团伙演化快，图要小时级增量更新。推荐图召回：用户-物品二部图上跑 GNN，聚合多跳共现信号（user→item→user→item），产出 embedding 做向量近邻召回——比 ItemCF 多走了高跳路径，比双塔多了结构信息；PinSage（Pin 图）、阿里 EGES（商品图+side information 补冷启动）是标杆。
+
+\`\`\`python
+# 风控：异构图 + 边稀有度过滤 + R-GCN 节点分类
+edges = [e for e in raw_edges if rarity(e) > 0.01]  # 滤公共 WiFi 等虚假稠密
+h = rgcn(x, edge_index, edge_type)                   # (账户数, 128)
+fraud_prob = classifier(h[account_nodes])
+# 团伙挖掘：高欺诈分账户子图上跑连通分量
+gangs = connected_components(subgraph(high_risk_nodes))
+# 推荐：二部图 GraphSAGE 无监督训练（共现边对比损失）
+loss = -log_sigmoid((z_u * z_i).sum()) - log_sigmoid(-(z_u * z_neg).sum())
+\`\`\`
+
+实际案例：某支付平台上线图风控后，团伙欺诈（养号+集中提现）召回率从 61% 提到 89%，单月止损数千万；Pinterest PinSage 召回相关 pin，首页点击 +25%；某短视频用用户-视频二部图 GNN 召回补充双塔，长尾视频曝光占比 +12%（双塔对冷门视频 embedding 学不好，图上靠邻居救回来）。
+
+踩坑与 tradeoff：图构建比模型重要——边定义错（如把"同 IP 段"当强关联）满图假稠密，模型直接学废；风控标签极少（万分之一），要用 PU learning 或把规则命中当弱标签；GNN 给召回的增益常不如特征工程（EGES 论文自己都承认 side information 贡献大于图结构），先确认双塔/ItemCF 已榨干再上 GNN；线上 serving 需要离线批量算好 embedding 灌入向量库，实时子图推理成本高（毫秒级预算放不下 2 跳聚合）；对抗性强——黑产会故意连接正常账户"洗图"，需要鲁棒聚合（中位数聚合/注意力降权）。`,
+    keyPoints: ["风控靠图：团伙=稠密可疑子图，高度节点要稀有度加权", "推荐图召回=高跳共现+结构信息，补双塔长尾短板", "图构建质量>模型选型，先榨干简单基线再上 GNN"],
+    followUps: ["PU learning 如何处理风控『只有正样本和未标注』问题？", "EGES 的 side information 加权聚合怎么设计？"],
+    favorited: false,
+    bigTech: true,
+  },
+
 ];
