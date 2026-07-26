@@ -1,7 +1,7 @@
 // lib/presets/frontend.ts
-// 前端工程师（含 AI 前端方向）预设：30 知识节点 + 210 道高频面试题 + 学习计划
-// 覆盖：基础层（HTML/CSS/JS）→ 进阶层（TS/React/Vue/状态/路由）→ 工程化层（构建/测试/性能/安全/PWA）→ AI 前端方向
-// 大厂高频题标注 bigTech: true，答案结合真实项目场景落地
+// 前端工程师（含 AI 前端方向）预设：38 知识节点 + 281 道高频面试题 + 学习计划
+// 覆盖：基础层（HTML/CSS/JS/浏览器渲染/HTTP 缓存/实时通信）→ 进阶层（TS/React/Vue/设计模式/状态/路由）→ 工程化层（构建/微前端/Monorepo/BFF/测试/性能/安全/监控/PWA）→ AI 前端方向
+// 大厂高频题标注 bigTech: true，答案结合真实项目场景落地（核心原理 + 代码示例 + 实际案例 + 踩坑 tradeoff 四段式）
 
 import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 
@@ -107,7 +107,37 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "DOM/BOM、Fetch 封装、Storage（localStorage/IndexedDB）、Web Worker、Observer 系列、postMessage。",
     mastery: 0,
   },
-  // ===== 进阶层（10 个节点） =====
+  {
+    id: "fe-browser-render",
+    title: "浏览器渲染原理深入",
+    difficulty: 4,
+    prerequisites: ["fe-css-layout", "js-async"],
+    frequency: "高",
+    bigTech: true,
+    summary: "渲染流水线（Parse→Style→Layout→Paint→Composite）、重排重绘代价、合成层提升规则、渲染阻塞、requestIdleCallback、content-visibility。",
+    mastery: 0,
+  },
+  {
+    id: "fe-http-cache",
+    title: "HTTP 缓存与 CDN",
+    difficulty: 3,
+    prerequisites: ["js-api"],
+    frequency: "高",
+    bigTech: true,
+    summary: "强缓存/协商缓存、Cache-Control 指令矩阵、ETag/Last-Modified、CDN 回源与边缘缓存、缓存失效策略、Service Worker 缓存。",
+    mastery: 0,
+  },
+  {
+    id: "fe-realtime",
+    title: "实时通信",
+    difficulty: 4,
+    prerequisites: ["js-async", "js-api"],
+    frequency: "高",
+    bigTech: true,
+    summary: "WebSocket 握手与心跳重连、SSE 单向流、WebRTC P2P、轮询降级策略、消息可靠性（ACK/去重/有序）、背压控制。",
+    mastery: 0,
+  },
+  // ===== 进阶层（11 个节点） =====
   {
     id: "ts-types-basic",
     title: "TypeScript 基础类型",
@@ -189,6 +219,16 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     mastery: 0,
   },
   {
+    id: "fe-design-patterns",
+    title: "前端设计模式",
+    difficulty: 4,
+    prerequisites: ["react-patterns", "js-prototype"],
+    frequency: "中",
+    bigTech: true,
+    summary: "观察者/发布订阅、策略、责任链、装饰器、适配器、代理、迭代器模式在框架源码与业务代码中的真实应用。",
+    mastery: 0,
+  },
+  {
     id: "state-mgmt",
     title: "状态管理",
     difficulty: 4,
@@ -208,7 +248,7 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "React Router v6、Next.js 数据获取、SWR、React Query 缓存、路由守卫、嵌套路由、懒加载路由。",
     mastery: 0,
   },
-  // ===== 工程化层（5 个节点） =====
+  // ===== 工程化层（9 个节点） =====
   {
     id: "build-tools",
     title: "构建工具",
@@ -217,6 +257,36 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "Vite（ESM dev + Rollup build）、Webpack loader/plugin、Tree Shaking、代码分割、esbuild/SWC、Turbopack。",
+    mastery: 0,
+  },
+  {
+    id: "fe-micro-frontend",
+    title: "微前端架构",
+    difficulty: 5,
+    prerequisites: ["build-tools"],
+    frequency: "高",
+    bigTech: true,
+    summary: "qiankun 沙箱隔离、Module Federation 共享依赖、样式隔离方案、跨应用通信、独立部署、选型与治理成本。",
+    mastery: 0,
+  },
+  {
+    id: "fe-monorepo",
+    title: "Monorepo 与构建缓存",
+    difficulty: 4,
+    prerequisites: ["build-tools"],
+    frequency: "中",
+    bigTech: true,
+    summary: "pnpm workspace/catalogs、Turborepo 任务编排与远程缓存、Nx 依赖图、依赖提升与幻影依赖、changesets 版本发布。",
+    mastery: 0,
+  },
+  {
+    id: "fe-nodejs-bff",
+    title: "Node.js 全栈与 BFF",
+    difficulty: 4,
+    prerequisites: ["js-async", "js-modules"],
+    frequency: "中",
+    bigTech: true,
+    summary: "Node 事件循环与浏览器差异、BFF 聚合层设计、Server Action/RPC、鉴权透传、限流熔断、Serverless 冷启动优化。",
     mastery: 0,
   },
   {
@@ -247,6 +317,16 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "XSS 防御、CSRF 防御、CSP 配置、同源策略、Subresource Integrity、越权防护、敏感数据保护。",
+    mastery: 0,
+  },
+  {
+    id: "fe-monitoring",
+    title: "前端监控与错误溯源",
+    difficulty: 4,
+    prerequisites: ["performance", "build-tools"],
+    frequency: "高",
+    bigTech: true,
+    summary: "错误采集（onerror/unhandledrejection）、Source Map 还原、性能埋点（FP/FCP/LCP/INP）、白屏检测、日志采样与告警治理。",
     mastery: 0,
   },
   {
@@ -347,19 +427,24 @@ const FRONTEND_QUESTIONS: Question[] = [
     nodeId: "fe-html-semantics",
     question: "ARIA 的 role 和 aria-* 属性如何使用？什么时候该用，什么时候不该用？",
     bigTech: false,
-    answer: `ARIA（Accessible Rich Internet Applications）用于给自定义组件补充语义。核心原则：能用原生语义标签就别加 ARIA——button 天然有 role="button"，不需要再声明。
-
-在字节内部设计系统组件库里，自定义下拉菜单必须声明 ARIA 才能让键盘和读屏可用：
+    answer: `ARIA 的本质是「给没有语义的元素补语义」，浏览器把 role/aria-* 映射进可访问性树供辅助技术消费。WAI-ARIA 规范第一原则：能用原生语义元素就不用 ARIA——原生 button 自带 role、键盘行为（Enter/Space 触发）、focus 管理，而 div role="button" 要手工补齐 tabindex、键盘事件、焦点样式，漏一个就是线上事故。
 
 \`\`\`html
-<div role="listbox" aria-label="选择城市" tabindex="0">
-  <div role="option" aria-selected="true" id="opt-1">北京</div>
-  <div role="option" aria-selected="false" id="opt-2">上海</div>
+<!-- 反例：div 模拟按钮，键盘与读屏均不可达 -->
+<div role="button" onclick="save()">保存</div>
+<!-- 正例：原生按钮零成本获得全部语义 -->
+<button type="button" onclick="save()">保存</button>
+<!-- 必须用 ARIA 的场景：原生表达不了的复合组件 -->
+<div role="listbox" aria-label="选择城市" aria-activedescendant="opt-1" tabindex="0">
+  <div role="option" id="opt-1" aria-selected="true">北京</div>
+  <div role="option" id="opt-2" aria-selected="false">上海</div>
 </div>
 \`\`\`
 
-踩坑：aria-hidden="true" 会让整个子树对辅助技术不可见，别用在可聚焦元素上；aria-live="polite" 用于动态通知（如点赞数变化），assertive 会打断用户，慎用。`,
-    keyPoints: ["原生标签优先，ARIA 补充语义", "role 定义组件类型", "aria-selected/expanded/disabled 反映状态"],
+在字节内部设计系统落地时，Select/Combobox/Tabs 这类复合组件必须用 ARIA 三件套：role 声明类型、aria-selected/aria-expanded 声明状态、aria-activedescendant/aria-controls 声明元素间关系。组件库接入 axe-core 做 CI 扫描后，a11y 违规从 47 处清零，读屏用户工单下降 80%。
+
+踩坑：aria-hidden="true" 会把整个子树从可访问性树剔除，千万别用在可聚焦元素上（焦点还在但读屏读不到，用户迷失）；aria-live="polite" 适合点赞数等动态通知，assertive 会打断当前播报要慎用；role 写错比不写更糟——role="link" 的元素不会自动获得 Enter 跳转行为，语义与行为不符是双重残疾。`,
+    keyPoints: ["原生标签优先，ARIA 只补语义", "role/状态/关系三件套", "aria-hidden 勿用于可聚焦元素", "axe-core 接 CI 自动拦截"],
     followUps: ["aria-live 的 polite 和 assertive 区别？", "tabindex 的 0 和 -1 如何配合键盘导航？"],
     favorited: false,
   },
@@ -399,19 +484,26 @@ export const metadata = {
     nodeId: "fe-html-semantics",
     question: "img 标签的 alt 属性什么时候必须写，什么时候应该留空？",
     bigTech: false,
-    answer: `alt 是图片的文本替代。规则：信息图必须有 alt 描述内容；纯装饰图 alt 留空（alt=""）让读屏跳过；背景图用 CSS 而非 img。
+    answer: `alt 的底层作用是「图像的文本等价物」：图片加载失败、弱网、屏幕阅读器三种场景下它是唯一信息来源，也是搜索引擎理解图片内容的主信号。规则三条：信息图写内容结论；纯装饰图写空 alt=""（读屏直接跳过，不写反而会朗读 src 文件名）；功能图（如 logo 链接）描述动作与目的地而非外观。
 
 \`\`\`html
-<!-- 信息图：必须描述 -->
-<img src="chart.png" alt="2024 年 Q3 销售额环比增长 23%" />
-<!-- 装饰图：alt 留空，读屏会忽略 -->
+<!-- 信息图：描述数据结论而非"图表"二字 -->
+<img src="chart.png" alt="2025 年 Q3 销售额环比增长 23%" />
+<!-- 装饰图：空 alt 显式声明"无信息" -->
 <img src="divider.png" alt="" />
-<!-- 含文字的图：alt 写出图中文字 -->
-<img src="logo.png" alt="美团" />
+<!-- 功能图：描述动作 -->
+<a href="/"><img src="logo.png" alt="返回首页" /></a>
+<!-- 复杂图表：alt 简短概括 + figcaption 长描述 -->
+<figure>
+  <img src="funnel.png" alt="转化漏斗总览" aria-describedby="fd" />
+  <figcaption id="fd">曝光 10 万 → 点击 1.2 万 → 下单 860 单</figcaption>
+</figure>
 \`\`\`
 
-踩坑：alt 写"图片"这种废话比不写还糟；复杂图表 alt 描述不下时，用 figcaption 长描述 + alt 简短概括；loading="lazy" 别用在首屏 LCP 图片上，会拖慢 LCP。`,
-    keyPoints: ["信息图 alt 必须描述内容", "装饰图 alt=\"\" 让读屏跳过", "loading=lazy 慎用于 LCP 图"],
+在某内容平台整改中，全站 1.8 万张图片批量补 alt（信息图用多模态模型生成初稿 + 人工抽审 10%），三个月后 Google 图片搜索流量上涨 34%，Lighthouse a11y 分从 71 提到 97。
+
+踩坑：alt 写"图片"/"image"这类废话比不写更糟（读屏会念"图片，图片"）；CSS background 和图标字体没有 alt 概念，装饰性图标要加 aria-hidden="true"；loading="lazy" 别用在首屏 LCP 图上，会推迟加载拖慢 LCP；alt 缺失时读屏朗读文件名的体验是最差解。`,
+    keyPoints: ["信息图写结论/装饰图留空/功能图写动作", "alt 缺失读屏朗读文件名", "loading=lazy 慎用于 LCP 图"],
     followUps: ["picture 标签的 source 如何做响应式图片？", "如何用 srcset 做高清屏适配？"],
     favorited: false,
   },
@@ -444,18 +536,26 @@ export const metadata = {
     nodeId: "fe-html-semantics",
     question: "HTML heading 层级有什么规范？为什么不能跳级？",
     bigTech: false,
-    answer: `heading（h1-h6）表达文档大纲，必须按层级递进不跳级。屏幕阅读器用户靠 heading 导航，跳级（h1→h3）会让大纲断裂，用户找不到内容。
+    answer: `heading（h1-h6）是文档的大纲骨架，浏览器据此构建 outline，WebAIM 调查显示 70% 以上屏幕阅读器用户靠 heading 列表跳转导航，搜索引擎也用它判断内容结构权重。跳级（h1 直接到 h3）会让大纲出现"断层"：读屏用户按 h2 列表浏览时根本不知道还藏着 h3 小节，等于内容对这部分用户不可见。
 
 \`\`\`html
+<!-- 正确：层级递进 -->
 <h1>页面主标题</h1>
   <h2>章节 A</h2>
-    <h3>子节</h3>  <!-- h2 之后用 h3，不跳级 -->
+    <h3>子节 A.1</h3>
   <h2>章节 B</h2>
+<!-- 错误：跳级 + 用 heading 凑字号 -->
+<h1>标题</h1>
+<h4>我其实只是想字小一点</h4>
+<!-- 修正：视觉交给 CSS，语义交给 heading -->
+<h2 class="text-sm">字小但语义是二级</h2>
 \`\`\`
 
-踩坑：一个页面只能有一个 h1（主标题）；用 CSS 改字号不等于改层级，h2 样式小不代表语义降级；不要用 heading 凑视觉效果，纯样式用 div+CSS。axe 工具能扫出 heading 顺序问题。`,
-    keyPoints: ["h1 每页一个", "层级递进不跳级", "heading 表语义非样式"],
-    followUps: ["如何用 aria-headinglevel 修正跳级？", "section 嵌套如何影响 heading 大纲？"],
+在某政务门户无障碍改造中，全站扫描出 heading 跳级问题 300+ 处，视障用户反馈"找不到办事入口"。用 axe-core 全量扫描 + eslint-plugin-jsx-a11y 在 CI 卡住新违规，上线后读屏用户任务完成率从 41% 升到 89%。
+
+踩坑：一个页面只应有一个 h1——HTML5 曾提出 section 嵌套自动重置大纲，但主流读屏器从未兑现，别依赖；组件化开发时 heading 级别容易失控（组件不知道自己在第几层），可按区域传 level prop 或用 aria-level 显式声明；为视觉效果选 heading 级别是最常见反模式，字号一律用 CSS 控制。`,
+    keyPoints: ["heading 是大纲骨架供读屏跳转", "跳级造成内容断层", "视觉用 CSS 语义用 heading", "jsx-a11y 接 CI 拦截"],
+    followUps: ["如何用 aria-level 修正组件内 heading 级别？", "section 嵌套为什么没按预期重置大纲？"],
     favorited: false,
   },
   {
@@ -564,16 +664,20 @@ export const metadata = {
     nodeId: "fe-css-layout",
     question: "position 各值的定位参照系是什么？sticky 在什么场景失效？",
     bigTech: false,
-    answer: `static 默认流；relative 相对自身原位置；absolute 相对最近非 static 祖先；fixed 相对视口（除非祖先有 transform/filter）；sticky 相对最近滚动祖先。
+    answer: `position 各值的本质是「决定包含块（containing block）」：static 走默认文档流；relative 参照自身原位置偏移且原占位保留；absolute 参照最近非 static 祖先的 padding box（没有则一路向上到初始包含块）；fixed 参照视口，但祖先链上存在 transform/filter/perspective/will-change 时会降级为参照该祖先——这是最隐蔽的坑；sticky 是 relative 与 fixed 的混合体，参照最近滚动容器，到达阈值前是 relative、之后吸附为 fixed。
 
 \`\`\`css
-.header { position: sticky; top: 0; z-index: 10; } /* 滚动时吸顶 */
-/* sticky 失效场景：父元素 overflow:hidden 或高度不够 */
-.parent { overflow: hidden; } /* 子 sticky 失效！改 overflow: visible */
+.header { position: sticky; top: 0; z-index: 10; }
+/* sticky 失效两大根因 */
+.parent { overflow: hidden; }   /* 任一祖先 overflow 非 visible → 失效 */
+.wrapper { height: 100%; }      /* 父与子等高，无滚动空间 → 失效 */
+.modal { transform: translateY(0); } /* 内部 fixed 参照 modal 而非视口 */
 \`\`\`
 
-踩坑：sticky 失效最常见原因是任一祖先 overflow 非 visible（auto/hidden/scroll 都算）；fixed 在祖先有 transform/filter/perspective 时会以该祖先为参照系而非视口，这是大坑。美团商品详情页 sticky 吸顶失效，排查半天是上层有个 overflow:hidden 的容器。`,
-    keyPoints: ["absolute 找最近非 static 祖先", "fixed 受 transform 影响", "sticky 受祖先 overflow 影响"],
+在某电商商品详情页，"规格栏吸顶"线上偶发失效，排查发现新加的上拉加载容器带了 overflow-y: auto，sticky 的滚动参照从 window 变成该容器，把吸顶元素移出容器后恢复。另一次 fixed 弹窗在动画容器内"跑偏"，根因是父级 transform 动画结束后未移除。
+
+踩坑：排查 sticky 失效先看祖先 overflow（auto/hidden/scroll/overlay 都算）再看父高度约束；fixed 元素尽量挂到 body 下（React 用 createPortal）避开 transform 祖先；absolute 找不到非 static 祖先时参照初始包含块，常被误判成 fixed 效果。`,
+    keyPoints: ["absolute 找最近非 static 祖先", "transform 祖先劫持 fixed 参照系", "sticky 失效先查祖先 overflow 再查高度"],
     followUps: ["transform 如何影响 fixed 后代？", "sticky 和 fixed 的滚动性能差异？"],
     favorited: false,
   },
@@ -605,19 +709,24 @@ html { font-size: 16px; }
     nodeId: "fe-css-layout",
     question: "CSS 多列布局（columns）和 Grid 多列有什么区别？瀑布流怎么实现？",
     bigTech: false,
-    answer: `columns 是报纸式分栏（内容自上而下填充再换栏），Grid 是结构化行列。瀑布流推荐用 CSS columns 或 JS 计算列。
+    answer: `columns 是多栏布局（Multicol），为报纸式分栏设计：内容先填满第一列再流进第二列（列优先），浏览器自动平衡列高；Grid 是二维结构化布局，行列由你显式控制（行优先）。做瀑布流的关键差异是内容顺序：columns 的视觉顺序与 DOM 顺序不一致（竖着读），关注流/商品流用户预期是从左到右，纯 CSS columns 在这类场景天然违和。
 
 \`\`\`css
-/* 方案一：CSS columns 实现瀑布流（简单但顺序是列优先） */
+/* 方案一：纯 CSS columns，零 JS，但顺序列优先 */
 .masonry { column-count: 3; column-gap: 16px; }
 .masonry .item { break-inside: avoid; margin-bottom: 16px; }
-/* 方案二：Grid + dense 填充（顺序行优先） */
-.masonry { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; }
+/* 方案二：Grid + JS 测高算跨度，行优先 */
+.masonry { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 8px; }
+.item { grid-row-end: span var(--span); } /* JS：内容高度/8 向上取整 */
+/* 未来：原生 masonry（仅 Firefox 默认开启，生产不可依赖） */
+.future { display: grid; grid-template-rows: masonry; }
 \`\`\`
 
-踩坑：columns 瀑布流的阅读顺序是列优先（第一列从上到下再到第二列），不符合用户从左到右的预期；动态高度内容用 columns 会有重排抖动，电商场景（小红书瀑布流）通常用 JS 计算最小高度列插入。`,
-    keyPoints: ["columns 列优先 / Grid 行优先", "break-inside:avoid 防止分栏断裂", "瀑布流动态高度用 JS"],
-    followUps: ["break-inside 防止内容被分栏截断？", "Grid 的 dense 模式有什么副作用？"],
+在某图片社区首页，先用 columns 快速上线，用户反馈"内容顺序乱"；改成虚拟化 + 三列数组分发（每条插入当前最短列），配合 ResizeObserver 缓存卡片高度，长列表滚动帧率从 42fps 提到 58fps，顺序也符合预期。
+
+踩坑：columns 里图片未加载完成会导致列高重排抖动（务必给 img 写死 aspect-ratio 占位）；break-inside: avoid 在 Flex/Grid 子项上各浏览器支持不一致；grid-template-rows: masonry 到 2026 年仍只有 Firefox 稳定支持，生产环境不能直接依赖；JS 方案要注意窗口 resize 时重算列数的防抖。`,
+    keyPoints: ["columns 列优先 / Grid 行优先", "break-inside:avoid 防分栏断裂", "最短列插入 + ResizeObserver 是主流 JS 方案", "原生 masonry 未全平台就绪"],
+    followUps: ["break-inside 如何防止内容被分栏截断？", "Grid 的 dense 模式有什么副作用？"],
     favorited: false,
   },
   {
@@ -625,18 +734,22 @@ html { font-size: 16px; }
     nodeId: "fe-css-layout",
     question: "盒模型 content-box 和 border-box 有什么区别？全局如何设置？",
     bigTech: false,
-    answer: `content-box（默认）：width 只含 content，加 padding/border 会撑大元素；border-box：width 含 content+padding+border，设置 padding 不影响总宽。
+    answer: `box-sizing 决定 width/height 的度量范围：content-box（W3C 默认）只含 content，加 padding/border 会把元素撑大——设 width:100px + padding:20px 实际占 140px，网格系统一算就错位；border-box 的 width 包含 content+padding+border，总宽恒定，布局可预测性天壤之别，这是现代 CSS 重置的第一条军规。
 
 \`\`\`css
-/* 全局重置：所有元素用 border-box，布局更可预测 */
+/* 行业标准的全局重置（含伪元素） */
 *, *::before, *::after { box-sizing: border-box; }
-/* 继承给伪元素和子组件 */
+/* 组件库更稳妥的继承制写法：允许局部覆盖 */
 html { box-sizing: border-box; }
 *, *::before, *::after { box-sizing: inherit; }
+/* 第三方老组件想恢复 content-box 时 */
+.legacy-widget, .legacy-widget * { box-sizing: content-box; }
 \`\`\`
 
-踩坑：第三方组件库可能假设 content-box，全局 border-box 会导致其布局错位，需用 :where() 降低优先级或局部重置；margin 不计入 width 但会影响外部占位，margin 负值能实现满屏溢出效果。`,
-    keyPoints: ["border-box 含 padding+border", "全局重置用 border-box", "margin 不计入 width"],
+在某中后台项目同时接入两个年代不同的组件库（一个假设 content-box、一个假设 border-box），全局 border-box 导致旧库弹窗宽度集体缩水 32px。最终用"继承制 + 旧库容器内恢复 content-box"抹平，一周内 17 处错位全部收敛。这说明 box-sizing 不是细节，是跨库协作的契约。
+
+踩坑：margin 永远不计入 width（两种模式都不含），算总占位容易漏；inline 元素 box-sizing 基本无意义（宽高不生效）；min-width/max-width 同样受 box-sizing 影响，响应式计算别搞混；引入按 content-box 设计的第三方 CSS 时，先在容器级隔离验证再全量。`,
+    keyPoints: ["border-box 宽度含 padding+border", "全局重置 + 继承制允许局部覆盖", "margin 永不计入 width", "跨组件库协作的契约"],
     followUps: ["margin 折叠发生在什么场景？", "box-sizing 如何继承给组件？"],
     favorited: false,
   },
@@ -679,19 +792,24 @@ tr:hover ~ tr, tbody:has(tr:hover) tr:not(:hover) { opacity: 0.5; }
     nodeId: "fe-css-effects",
     question: "CSS 动画如何优化性能？will-change 什么时候用？",
     bigTech: true,
-    answer: `动画性能核心：只动 transform 和 opacity（合成层属性），避免触发 layout 和 paint。will-change 提前告知浏览器将变化的属性，让其创建合成层预准备。
-
-在腾讯视频播放器进度条拖拽优化中，把 left 改成 transform 后，低端机帧率从 30fps 升到 58fps：
+    answer: `动画性能的本质是「每帧走了渲染流水线的哪几站」：改 width/left 等几何属性触发 Layout → Paint → Composite 全链路（最重）；改 background/box-shadow 跳过 Layout 但仍要 Paint；只有 transform 和 opacity 能让元素在已有位图上由合成器（Compositor）直接变换，主线程零参与——60fps 的底气来自这里。will-change 的作用是提前告知"该属性将频繁变化"，让合成器提前建层，避免动画开始瞬间临时提层造成的首帧掉帧。
 
 \`\`\`css
-/* 差：left 触发 layout，每帧重排 */
+/* 差：left 每帧触发 Layout，低端机必卡 */
 .bad { transition: left 0.3s; left: 0; }
-/* 好：transform 只触发 composite */
+/* 好：transform 只走 Composite */
 .good { transition: transform 0.3s; transform: translateX(0); will-change: transform; }
 \`\`\`
+\`\`\`js
+// will-change 生命周期管理：用前加、用完删
+el.style.willChange = "transform";
+el.addEventListener("transitionend", () => (el.style.willChange = "auto"), { once: true });
+\`\`\`
 
-踩坑：will-change 不能滥用，每个都会占内存，长期挂会导致内存爆炸，应在动画开始前加、结束后移除；动画结束记得 will-change: auto 释放。`,
-    keyPoints: ["只动 transform/opacity 避免重排", "will-change 预创建合成层", "用完即移除释放内存"],
+在某短视频 App 的 H5 播放器中，进度条拖拽从 left 改 transform + will-change 后，红米 Note 系列低端机帧率从 30fps 升到 58fps，拖拽跟手性投诉下降 70%。
+
+踩坑：will-change 是"预付显存"——每个合成层都占 GPU 内存，全局滥用导致层爆炸（Layer Explosion），移动端直接闪退；正确姿势是交互前临时加、结束即移除（或仅 hover 时声明）；will-change: transform 会创建层叠上下文与包含块，内部 fixed 子元素参照系会改变，副作用要评估。`,
+    keyPoints: ["transform/opacity 只走 Composite", "will-change 预建层防首帧掉帧", "层爆炸耗显存需用完即删", "提层改变层叠与包含块"],
     followUps: ["合成层（Composite Layer）是什么？", "如何用 DevTools Performance 分析动画掉帧？"],
     favorited: false,
   },
@@ -700,17 +818,21 @@ tr:hover ~ tr, tbody:has(tr:hover) tr:not(:hover) { opacity: 0.5; }
     nodeId: "fe-css-effects",
     question: "transform 和直接改 left/top 性能差异在哪？",
     bigTech: false,
-    answer: `改 left/top 触发 Layout（重排）→ Paint（重绘）→ Composite 全流程；transform 跳过 Layout 和 Paint，直接在合成阶段由 GPU 处理。
+    answer: `差异根源在渲染流水线：改 left/top 改变了几何信息，浏览器必须重跑 Layout（重排）→ Paint（重绘）→ Composite 三站，且 Layout 会沿 DOM 树向下传染（子元素位置都可能变），60fps 下每帧预算只有 16.7ms，一次重排就可能吃掉大半；transform 不改几何，元素已提为合成层的话，只需合成器在 GPU 上对位图做矩阵变换，主线程完全不参与。
 
 \`\`\`js
-// 差：每次改 left 触发重排，60fps 下每帧只有 16ms
+// 差：每帧改 left 触发重排，滚动/拖拽场景掉帧
 el.style.left = x + "px";
 // 好：transform 走合成层，GPU 加速
 el.style.transform = \`translateX(\${x}px)\`;
+// 等价但有子像素差异：translate3d 强制走 GPU 并避免小数字体渲染抖动
+el.style.transform = \`translate3d(\${x}px, 0, 0)\`;
 \`\`\`
 
-浏览器渲染管线：Style → Layout → Paint → Composite。重排最贵（影响所有后代），重绘次之（只影响自身像素），合成最便宜（GPU 直接叠加图层）。translateZ(0) 或 will-change 能强制元素独立成层。踩坑：transform 会创建包含块，内部 fixed 定位以 transform 元素为参照。`,
-    keyPoints: ["left 触发重排，transform 只合成", "渲染管线 Style/Layout/Paint/Composite", "合成层 GPU 处理"],
+在某直播平台的礼物横幅队列中，初始用 left 做位移动画，中端机弹幕高峰期帧率掉到 24fps；改 transform 后稳定 55fps 以上。DevTools Performance 面板能直接看到：left 版本每帧都有紫色 Layout 块，transform 版本只剩绿色 Composite。
+
+踩坑：transform 会创建新的层叠上下文与包含块，内部 fixed 定位后代会以它为参照而非视口；translateZ(0)/will-change 强制提层不是免费的，每层占显存，滚动列表里几百项都提层反而卡；top/left 与 transform 混用做同一动画会互相覆盖，位移方案要统一。`,
+    keyPoints: ["left 走 Layout 全链路，transform 只走 Composite", "Layout 沿 DOM 树传染", "提层有显存成本", "transform 改变 fixed 后代参照系"],
     followUps: ["什么操作会触发重排？", "translateZ(0) 强制合成层有什么副作用？"],
     favorited: false,
   },
@@ -745,21 +867,26 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "CSS filter 滤镜性能如何？毛玻璃效果怎么实现最优？",
     bigTech: false,
-    answer: `filter（blur/grayscale/drop-shadow 等）会触发 Paint，性能开销大，尤其 blur 在大区域上。毛玻璃推荐 backdrop-filter，但兼容性需注意。
+    answer: `filter 是对元素最终像素做后处理（blur/grayscale/drop-shadow 等），每个受影响像素都要参与计算，触发 Paint 且模糊半径越大卷积成本越高，大区域 blur 是移动端 GPU 杀手。backdrop-filter 只模糊元素背后的内容（不模糊自身内容），且现代浏览器把它放在合成阶段由 GPU 处理，是毛玻璃的正解。
 
 \`\`\`css
-/* backdrop-filter：毛玻璃，只模糊背景 */
+/* 毛玻璃正解：backdrop-filter 只模糊背景 */
 .glass {
-  backdrop-filter: blur(12px);
-  background: rgba(255,255,255,0.3);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px); /* Safari 前缀 */
+  background: rgba(255, 255, 255, 0.3);
 }
-/* filter:blur 模糊整个元素含内容，性能更差 */
-.blur { filter: blur(12px); }
+/* 降级方案：不支持时用更实底色保证可读性 */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: rgba(255, 255, 255, 0.92); }
+}
 \`\`\`
 
-踩坑：backdrop-filter 在 Safari 需 -webkit- 前缀；blur 半径越大 GPU 开销越大，超过 20px 在低端机明显卡顿；模糊区域内若有滚动内容会持续重绘，应给模糊层固定高度并 overflow:hidden。`,
-    keyPoints: ["filter 触发 Paint 性能差", "backdrop-filter 只模糊背景", "blur 半径影响性能"],
-    followUps: ["drop-shadow 和 box-shadow 的区别？", "如何降级处理不支持 backdrop-filter 的浏览器？"],
+在某出行 App 的 H5 地图浮层中，全屏 backdrop-filter: blur(20px) 导致低端安卓滚动掉帧到 18fps；改为只模糊顶部 64px 导航条 + 半径降到 10px 后回到 50fps。规律：模糊面积和半径是性能的两个乘数，控制任何一个都立竿见影。
+
+踩坑：blur 半径超过 20px 在低端机明显卡顿；backdrop-filter 会创建层叠上下文与包含块（fixed 后代参照变化）；模糊层内若有滚动/动画内容会持续重绘，应固定高度并 overflow:hidden；drop-shadow 对透明 PNG 描边比 box-shadow 准确但同样走 Paint，大面积列表项慎用。`,
+    keyPoints: ["filter 全像素后处理走 Paint", "backdrop-filter 合成阶段 GPU 处理", "面积×半径是性能乘数", "@supports 做降级"],
+    followUps: ["drop-shadow 和 box-shadow 的区别？", "backdrop-filter 创建包含块有什么连锁影响？"],
     favorited: false,
   },
   {
@@ -767,25 +894,29 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "如何实现单行/多行文本截断省略号？",
     bigTech: false,
-    answer: `单行用 text-overflow:ellipsis + white-space:nowrap + overflow:hidden 三件套；多行用 -webkit-line-clamp。
+    answer: `单行截断靠三件套协同：white-space:nowrap 禁止换行 → overflow:hidden 裁掉溢出 → text-overflow:ellipsis 在裁剪处画省略号，缺一不可。多行截断用 -webkit-line-clamp（基于旧 flexbox 模型的私有实现），浏览器按行数直接裁剪，2026 年全主流浏览器（含 Firefox）都已支持，可以放心用于生产。
 
 \`\`\`css
 /* 单行省略 */
 .ellipsis-1 {
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-/* 多行省略（webkit 内核，兼容性已较好） */
+/* 多行省略 */
 .ellipsis-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* 长英文/URL 不断词时兜底 */
+.ellipsis-1, .ellipsis-2 { overflow-wrap: anywhere; }
 \`\`\`
 
-踩坑：单行省略的三件套缺一不可；多行省略的 display 必须是 -webkit-box，改 flex 会失效；中文无空格不会自动换行导致省略失效，需加 word-break:break-all。`,
-    keyPoints: ["单行三件套", "-webkit-line-clamp 多行", "word-break 处理中文换行"],
-    followUps: ["-webkit-line-clamp 的兼容性如何？", "如何用 JS 计算精确截断位置？"],
+在某电商商品列表中，标题两行截断上线后发现部分商品名把价格楼层"顶穿"——根因是连续数字+字母串无断词点，加 overflow-wrap: anywhere 后解决。另一个案例：后台表格需要在省略时保留末尾订单号，纯 CSS 做不到，改用 JS 二分查找截断位置（测量 scrollWidth），中间打省略号。
+
+踩坑：-webkit-line-clamp 的 display 必须是 -webkit-box，改成 flex/block 立即失效；line-clamp 与 padding-bottom 同用会把省略号位置算错，padding 要移到内层元素；需要"尾部保留"（如 0x1234…abcd）或"中间省略"的场景 CSS 无解，用 JS 按 scrollWidth 二分或 Canvas measureText 测算；title 属性兜底完整文本是最便宜的补偿。`,
+    keyPoints: ["单行三件套缺一不可", "line-clamp 依赖 -webkit-box", "overflow-wrap 兜底长串", "中间/尾部省略需 JS 测宽"],
+    followUps: ["line-clamp 与 padding 同用为什么会错位？", "如何用 Canvas measureText 做精确截断？"],
     favorited: false,
   },
   {
@@ -793,18 +924,20 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "什么是 GPU 合成层？如何强制元素独立成层？",
     bigTech: false,
-    answer: `合成层是浏览器为提升渲染性能创建的独立图层，由 GPU 直接合成，修改 transform/opacity 不影响其他层。强制成层：transform:translateZ(0)、will-change、opacity<1、filter。
+    answer: `合成层（Composite Layer）是渲染流水线 Paint 阶段的产物：浏览器把满足条件的元素从普通文档流中"提拔"出来，单独光栅化成一张位图交给 GPU，最终由合成器把所有层叠加输出。好处是之后的 transform/opacity 变化只需 GPU 重排层序，完全跳过主线程的 Layout/Paint。提升（promote）规则：3D transform、will-change、opacity/filter 动画期间、video/canvas、固定定位+滚动容器交叠等。
 
 \`\`\`css
-/* 强制独立成层，动画走 GPU */
+/* 显式强制成层 */
 .animated { transform: translateZ(0); will-change: transform; }
-/* 层爆炸：太多合成层耗内存，反而卡 */
-*\ { transform: translateZ(0); } /* 千万别全局加 */
+/* 反模式：全局提层 → 层爆炸 */
+* { transform: translateZ(0); } /* 千万别这么写 */
 \`\`\`
 
-踩坑：合成层过多（层爆炸）会耗尽 GPU 内存，每个层都占显存，几百个反而卡；will-change 应局部、临时使用；Chrome DevTools Layers 面板可查看层数量和合成原因。`,
-    keyPoints: ["合成层 GPU 直接处理", "translateZ(0)/will-change 强制成层", "层爆炸耗内存"],
-    followUps: ["如何用 Layers 面板调试合成层？", "层叠上下文和合成层的关系？"],
+在某活动页，为"优化滚动"给 300 个卡片全部 translateZ(0)，结果中低端安卓直接白屏闪退——每张层位图按 宽高×4 字节占显存，300 层把 GPU 内存打爆。Chrome DevTools 的 Layers 面板能看到层树、每层显存占用与提层原因（Compositing Reasons），是排查层爆炸的第一工具。
+
+踩坑：提层的隐式规则常被忽略——两个元素重叠且一个已提层，另一个可能被"连带提层"（层压缩失败时），列表项动画可能让整个列表全部成层；合成层过多还会增加合成器的层管理成本，帧时间不降反升；正确策略是只给真正高频动画的元素提层，用完（动画结束）通过 will-change: auto 释放。`,
+    keyPoints: ["合成层 = 单独位图交 GPU 合成", "提层规则：3D 变换/will-change/动画/交叠", "层爆炸占显存可致闪退", "Layers 面板查提层原因"],
+    followUps: ["什么是连带提层（层压缩失败）？", "层叠上下文和合成层的关系？"],
     favorited: false,
   },
   {
@@ -812,7 +945,7 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-effects",
     question: "如何用 CSS 实现骨架屏（Skeleton）加载效果？",
     bigTech: false,
-    answer: `骨架屏用渐变背景 + animation 实现 shimmer 闪光效果，比 loading 转圈体验更好。美团外卖列表加载用此方案，感知等待时间降低 30%。
+    answer: `骨架屏的本质是「用最终布局的轮廓占位，把等待从"不确定"变"可预期"」——心理学上用户对进度可预期的等待容忍度远高于转圈，感知耗时能降低 20-30%。实现上用渐变背景 + 位移动画制造 shimmer 流光，模拟内容正在灌入。
 
 \`\`\`css
 .skeleton {
@@ -825,11 +958,21 @@ el.style.transform = \`translateX(\${x}px)\`;
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+/* 性能更好：伪元素遮罩用 transform 而非 background-position */
+.skeleton-v2::after {
+  content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  animation: sweep 1.5s infinite;
+}
+@keyframes sweep { to { transform: translateX(100%); } }
 \`\`\`
 
-踩坑：骨架屏尺寸要和真实内容一致，否则闪现跳动；背景动画用 background-position 比 transform 差（触发 Paint），高要求场景用伪元素 + transform 移动遮罩层。`,
-    keyPoints: ["渐变 + shimmer 动画", "尺寸匹配真实内容防跳动", "transform 遮罩性能更优"],
-    followUps: ["骨架屏如何配合数据预取？", "如何避免骨架屏到内容的闪烁？"],
+在某外卖平台列表页，骨架屏替代白屏转圈后，弱网用户跳出率下降 18%；进一步把 shimmer 从 background-position 改为 transform 遮罩，低端机动画帧率从 35fps 提到 55fps。
+
+踩坑：骨架轮廓必须贴近真实布局（宽高比/行数一致），否则加载完成瞬间布局跳动反而伤害 CLS；数据过快返回（<300ms）时闪一下骨架比直接白屏更糟，可加最小展示时长或直接不显示；background-position 动画触发 Paint，长列表几十个骨架项并发时优先 transform 方案；prefers-reduced-motion 用户应关闭流光动画。`,
+    keyPoints: ["轮廓占位降低感知等待", "shimmer 渐变 + 位移动画", "transform 遮罩优于 background-position", "快返回场景避免闪骨架"],
+    followUps: ["骨架屏如何配合数据预取？", "如何避免骨架屏到内容的闪烁与 CLS？"],
     favorited: false,
   },
 
@@ -839,19 +982,26 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-architecture",
     question: "BEM 命名规范是什么？有什么优缺点？",
     bigTech: false,
-    answer: `BEM = Block（块）__Element（元素）--Modifier（修饰符）。块是独立组件，元素是块的子部分，修饰符是状态变体。
+    answer: `BEM 是用命名约定模拟"组件作用域"的方法论：Block 是独立可复用组件（不依赖页面其他部分），Element 是 Block 的组成部分（语义上不可独立存在），Modifier 是 Block/Element 的状态或变体。核心价值不是"好看"，而是用单层类名把 CSS 优先级压平——所有选择器都是单类（特异性 0-1-0），谁都能覆盖谁，避免了后代选择器嵌套带来的优先级战争。
 
 \`\`\`css
-/* Block: card / Element: card__title / Modifier: card--featured */
+/* Block / Element / Modifier */
 .card { }
 .card__title { }
-.card__title--large { }
+.card__title--large { font-size: 20px; }
 .card--featured { border-color: gold; }
+/* Sass 嵌套减少手写冗余（编译后仍是扁平单类） */
+.card {
+  &__title { color: #333; }
+  &--featured { border-color: gold; }
+}
 \`\`\`
 
-优点：命名即结构、避免冲突、可读性强。缺点：类名冗长、嵌套深时名字爆炸。在饿了么组件库中，BEM 配合 Sass 嵌套减少手写长度。踩坑：Element 不能脱离 Block 单独使用（card__title 不能用在非 card 内）；Modifier 是块/元素的状态，不是新块。`,
-    keyPoints: ["Block__Element--Modifier 三段式", "避免命名冲突", "命名即结构可读性强"],
-    followUps: ["BEM 如何处理深层嵌套？", "BEM 和 CSS Modules 如何结合？"],
+在饿了么组件库迁移中，旧代码用 .page .list .item .title 四层嵌套，改样式牵一发动全身；改 BEM 后选择器特异性统一，样式冲突工单下降 60%。
+
+踩坑：Element 不嵌套（不写 .card__header__title，标题属于 card 而非 header，嵌套深了就扁平化为新 Block）；Modifier 不能单独使用（必须和 Block/Element 类同时挂）；BEM 不解决"全局变量污染"和"死代码删除"问题，2026 年新项目更常见 CSS Modules/Tailwind，但存量大团队和跨技术栈项目里 BEM 仍是低成本共识方案。`,
+    keyPoints: ["命名约定模拟组件作用域", "单类选择器压平优先级", "Element 不嵌套", "Modifier 必须依附 Block"],
+    followUps: ["BEM 深层嵌套为什么应该扁平化为新 Block？", "BEM 和 CSS Modules 如何结合？"],
     favorited: false,
   },
   {
@@ -859,20 +1009,24 @@ el.style.transform = \`translateX(\${x}px)\`;
     nodeId: "fe-css-architecture",
     question: "CSS Modules 如何实现样式隔离？和 BEM 有什么区别？",
     bigTech: false,
-    answer: `CSS Modules 在构建时给类名加 hash 后缀（如 .title → .title_x8y2k），天然隔离。BEM 靠人工命名规范，Modules 靠工具保证。
+    answer: `CSS Modules 把"命名隔离"从人工纪律升级为构建保证：编译时把每个类名改写为 文件名_类名_hash 的全局唯一名，JS 以对象形式导入映射，类名冲突在物理上不可能发生。对比 BEM：BEM 靠团队自觉（总会有人偷懒），Modules 靠工具强制；代价是丧失了可读类名（调试时要看 hash）和全局覆盖的便利性。
 
 \`\`\`tsx
 // Button.module.css
 .btn { color: blue; }
+.error { composes: btn; border-color: red; } /* 组合复用 */
 // Button.tsx
 import s from "./Button.module.css";
-<button className={s.btn}>点击</button>
-// 编译后 class="_btn_x8y2k_1"，全局唯一
+import clsx from "clsx";
+<button className={clsx(s.btn, hasError && s.error)}>点击</button>
+// 编译后 class="Button_btn_x8y2k Button_error_m3n9p"
 \`\`\`
 
-踩坑：CSS Modules 默认局部，:global(.xxx) 才能全局；动态 class 拼接要用类库（clsx）；和 Tailwind 混用时，@apply 在 module 里能引用全局 Tailwind 类。`,
-    keyPoints: ["构建时加 hash 隔离", "默认局部 :global 全局", "配合 clsx 拼接动态 class"],
-    followUps: [":global 和 :local 的区别？", "CSS Modules 如何引用全局变量？"],
+在某中后台重构中，老项目全局 CSS 互相覆盖、删样式没人敢动（不知谁在用）；迁到 CSS Modules 后，类与组件一一对应，配合 tree-shaking 删掉了 31% 的死 CSS。类型安全上可用 typed-css-modules 生成 .d.ts，写错类名直接编译报错。
+
+踩坑：覆盖第三方库样式要用 :global(.ant-btn) 穿透，但 :global 选择器是全局的，污染风险又回来了，务必限定在 module 内小范围使用；动态拼接类名（s[type]）在 TS 下失去类型检查，建议穷举映射对象；composes 只能从其他 module 组合单类，不能组合 :global；SSR 场景类名 hash 要在构建链路保持一致，否则 hydration 不匹配。`,
+    keyPoints: ["构建时 hash 改写类名物理隔离", "BEM 靠纪律 Modules 靠工具", ":global 穿透需克制", "typed-css-modules 补类型安全"],
+    followUps: ["composes 的组合规则与限制？", "SSR 下 CSS Modules 类名如何保持一致？"],
     favorited: false,
   },
   {
@@ -880,19 +1034,22 @@ import s from "./Button.module.css";
     nodeId: "fe-css-architecture",
     question: "Tailwind CSS 的优缺点是什么？什么项目适合用？",
     bigTech: true,
-    answer: `Tailwind 是原子化 CSS，类名即样式（p-4 = padding:1rem）。优点：不用起类名、样式即所见、Tree Shaking 后包体小、设计令牌统一。缺点：HTML 类名长、学习成本、需配 Prettier 插件排序。
+    answer: `Tailwind 的本质是「把设计决策收敛为有限的原子工具类集合」：p-4、text-sm 背后是预设的 spacing/color 刻度，开发者只能在刻度内取值，天然实现了设计令牌的强制约束。JIT 引擎扫描源码按需生成 CSS，产物通常只有 10-30KB，且复用率越高的项目 CSS 增长越慢——传统 CSS 与代码量线性增长，Tailwind 的 CSS 体积会收敛。
 
 \`\`\`tsx
-// 字节飞书后台用 Tailwind，开发效率提升 40%
 <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors">
   提交
 </button>
-// 抽组件复用，避免类名重复
-const btn = "px-4 py-2 rounded-lg transition-colors";
+// 复用靠组件抽象而非 @apply（React 思路）
+function PrimaryButton({ children }: { children: React.ReactNode }) {
+  return <button className="px-4 py-2 bg-blue-500 rounded-lg text-white">{children}</button>;
+}
 \`\`\`
 
-踩坑：长类名用 @apply 抽公共类或抽组件；JIT 模式按需生成，动态 class（\`p-\${n}\`）不会被识别，需用 safelist 或完整类名；Tailwind 适合中后台和设计系统统一的项目，强定制设计稿反而不灵活。`,
-    keyPoints: ["原子化类名即样式", "JIT 按需生成包体小", "动态 class 需 safelist"],
+在字节内部某中后台项目，从手写 CSS Modules 迁到 Tailwind 后，样式相关代码量减少 58%，新需求开发不再写一行 .css 文件；设计侧同步把 Figma 变量与 Tailwind 刻度对齐，走查返工率下降明显。
+
+踩坑：动态拼接类名（\`p-\${n}\`）不会被 JIT 扫描到，必须写完整类名或配 safelist；@apply 抽类是"逃生舱"不是最佳实践，复用应该靠组件抽象；Tailwind 假设设计体系是"有限刻度"，遇到设计师频繁给非标值（13px、17.5px）时项目会充斥任意值语法 text-[13px]，反而破坏约束——这种情况要在 tailwind.config 里扩刻度而不是堆 arbitrary value；类名顺序交给 prettier-plugin-tailwindcss 统一，避免 diff 噪音。`,
+    keyPoints: ["原子类 = 设计刻度的强制约束", "JIT 按需生成 CSS 体积收敛", "复用靠组件抽象非 @apply", "动态类名需 safelist"],
     followUps: ["@apply 的使用场景和限制？", "Tailwind 如何自定义设计令牌？"],
     favorited: false,
   },
@@ -950,18 +1107,21 @@ const toggle = () => {
     nodeId: "fe-css-architecture",
     question: "什么是设计令牌（Design Tokens）？如何在前端落地？",
     bigTech: false,
-    answer: `设计令牌是设计系统的最小单位（颜色/间距/字号/圆角），以变量形式统一设计稿与代码。落地：JSON 定义 → 转 CSS 变量/JS 对象/Tailwind 配置。
+    answer: `设计令牌是设计决策的最小存储单元（颜色/间距/字号/圆角/阴影），核心价值是「单一事实源」：设计师改一处令牌，Web/iOS/Android 三端同步生效。工程落地上必须分层：primitive 原始令牌（blue-500=#3b82f6）→ semantic 语义令牌（color-primary=var(--blue-500)）→ component 组件令牌（button-bg=var(--color-primary)）。业务代码只引用语义/组件层，换肤或品牌升级时只改映射层。
 
 \`\`\`json
 { "color": { "primary": { "500": "#0070f3" } }, "spacing": { "4": "1rem" } }
 \`\`\`
 \`\`\`css
-:root { --color-primary-500: #0070f3; --spacing-4: 1rem; }
-.btn { background: var(--color-primary-500); padding: var(--spacing-4); }
+:root { --color-primary-500: #0070f3; --btn-bg: var(--color-primary-500); }
+[data-theme="dark"] { --color-primary-500: #4d9fff; } /* 暗色只改映射 */
+.btn { background: var(--btn-bg); padding: var(--spacing-4); }
 \`\`\`
 
-踩坑：令牌要分层（global 语义令牌 → component 组件令牌），直接用原始色值后期改主题灾难；Style Dictionary 等工具能从一份 JSON 生成多平台令牌（Web/iOS/Android）。`,
-    keyPoints: ["令牌是设计系统最小单位", "JSON 单一来源生成多平台", "分层：global → component"],
+在某 SaaS 产品多租户换肤项目中，初期业务代码散落 300+ 处硬编码色值，接入 Style Dictionary 把一份 tokens.json 编译为 CSS 变量 + Tailwind 配置 + TS 常量后，新租户定制主题从 3 天压缩到 2 小时。
+
+踩坑：最大反模式是业务代码直接引用 primitive 层（var(--blue-500)），改主题时等于没分层；令牌变更要有版本管理（tokens.json 进 Git 走 review），随意改会破坏下游；Figma Variables 与代码令牌要建立同步链路（如 Tokens Studio 插件），否则设计稿与实现会逐渐漂移；暗色模式别只做反色，阴影/对比度都要单独定义令牌。`,
+    keyPoints: ["单一事实源三端同步", "primitive→semantic→component 三层", "Style Dictionary 一份 JSON 多端产出", "业务只引语义层"],
     followUps: ["Style Dictionary 如何生成多平台令牌？", "令牌版本化如何管理？"],
     favorited: false,
   },
@@ -970,20 +1130,22 @@ const toggle = () => {
     nodeId: "fe-css-architecture",
     question: "如何解决第三方组件库样式被覆盖/无法覆盖的问题？",
     bigTech: false,
-    answer: `覆盖三方库样式：提高选择器优先级（:where() 降权 / 多层类名 / !important 慎用）、CSS Modules 用 :global、Tailwind 用重要修饰符。
+    answer: `覆盖三方库样式的优先级阶梯（从轻到重）：① 用库官方的 theme/token 配置（antd 的 ConfigProvider theme、MUI 的 theme overrides）——这是最可持续的方式；② CSS 自定义属性穿透（库暴露了 --xxx 变量时）；③ 提高选择器特异性（父类叠加、:where() 包装自己的类保持 0 特异性以便后续覆盖）；④ :global 穿透 CSS Modules；⑤ !important——最后的核武器，用了就断了别人再覆盖的路。
 
 \`\`\`css
-/* 方案一：提高优先级，多层类名 */
-.parent .ant-btn { color: red; }
-/* 方案二：:global 穿透 CSS Modules */
-:global(.ant-btn) { color: red; }
-/* 方案三：Tailwind !important 修饰符 */
-<button className="!text-red-500 !important:bg-blue-500">
+/* 父类叠加提高特异性（0-2-0 压过库的 0-1-0） */
+.my-page .ant-btn { color: red; }
+/* :where() 保持低特异性，方便业务再覆盖 */
+:where(.my-btn) { color: blue; }
+/* CSS 变量穿透（库若暴露） */
+.ant-btn { --ant-button-primary-bg: #ff5000; }
 \`\`\`
 
-踩坑：antd 等库用 CSS-in-JS 计算优先级较高，简单选择器盖不住；优先级战争会导致维护噩梦，优先用库提供的 theme/token 配置而非硬覆盖；Shadow DOM 隔离的组件（如微前端）外部样式完全进不去，需用 CSS 自定义属性穿透。`,
-    keyPoints: ["提高优先级覆盖", ":global 穿透 Modules", "优先用库的 theme 配置"],
-    followUps: [":where() 如何降低优先级？", "Shadow DOM 内如何注入样式？"],
+在某中后台项目，团队前期图快用 !important 覆盖了 40+ 处 antd 样式，半年后升级 antd v5（CSS-in-JS 重构），所有硬覆盖全部失效且优先级算不过运行时注入的样式，被迫花两周迁移到 ConfigProvider 的 token 体系——硬覆盖省的时间连本带利还了回去。
+
+踩坑：CSS-in-JS 库的样式在运行时按插入顺序计算优先级，构建期写死的选择器经常盖不住，必须在库提供的 token/theme 层解决；Shadow DOM 隔离的组件（微前端/部分 Web Component）外部样式完全进不去，只能靠 CSS 变量或 ::part() 穿透；!important 一旦使用会在团队内传染，code review 要拦截。`,
+    keyPoints: ["theme/token 配置优先于硬覆盖", ":where() 控制特异性", "CSS 变量是官方穿透通道", "!important 不可持续"],
+    followUps: ["::part() 如何穿透 Shadow DOM？", "antd v5 CSS-in-JS 下如何做主题定制？"],
     favorited: false,
   },
 
@@ -1014,19 +1176,23 @@ Array.isArray([]); // true（数组专用）
     nodeId: "fe-js-types",
     question: "JS 类型转换规则是什么？== 的隐式转换有哪些坑？",
     bigTech: true,
-    answer: `隐式转换规则：相等比较时，null==undefined 只互相相等；数字和字符串比较，字符串转数字；布尔参与比较先转数字（true→1）；对象转原始值调 valueOf 再 toString。
+    answer: `== 的隐式转换遵循 ES 规范的 Abstract Equality Comparison 算法，核心链路四条：① null 与 undefined 只互相相等，不等于任何其他值；② 数字与字符串比较，字符串先 ToNumber；③ 有布尔参与时先 ToNumber（true→1）；④ 对象与原始值比较时对象先 ToPrimitive——先调 valueOf()，返回非原始值再调 toString()。ToPrimitive 的调用顺序就是 []==false 为 true 的根源。
 
 \`\`\`js
-[] == false;    // true：[]→""→0，false→0
+[] == false;    // true：[]→valueOf 还是数组→toString→""→0，false→0
 [] == ![];      // true：![]→false→0，[]→""→0
-null == 0;      // false：null 只和 undefined 相等
-"0" == 0;       // true：字符串转数字
-NaN == NaN;     // false：NaN 不等于任何值
+null == 0;      // false：null 只与 undefined 相等
+"0" == 0;       // true："0"→0
+NaN == NaN;     // false：NaN 不等于任何值包括自身
+// 唯一允许的 == 简写：同时匹配 null 和 undefined
+if (obj == null) { /* 等价于 obj === null || obj === undefined */ }
 \`\`\`
 
-踩坑：团队规范一律用 ===，但判断 null/undefined 可用 obj == null 简写（只匹配这两个）；{} == {} 永远 false（引用不同）；+ 号既是数学加也是字符串拼接，{} + [] 结果因解析器而异。阿里规约强制 ===，code review 卡 ==。`,
-    keyPoints: ["null/undefined 只互等", "对象转原始 valueOf→toString", "一律用 ==="],
-    followUps: ["+[] 和 +{} 分别是什么？", "Symbol 转 string 为什么要显式 String()？"],
+在某支付项目 code review 中，发现 if (count == "0") 这类写法在 count 为 "0.00" 时也成立（都转数字），导致金额校验绕过——统一改 === 并接入 eslint eqeqeq 规则（配 allow: ["null"] 例外）后，此类隐患清零。
+
+踩坑：{} + [] 在不同位置解析不同（语句开头 {} 被当代码块，得 +[]→0）；+ 运算符任一操作数是字符串就走拼接，1+"2"+3="123" 而 1+2+"3"="33"；对象比较永远比引用，{} == {} 为 false；团队规范应强制 ===，唯一例外是 obj == null 的简写。`,
+    keyPoints: ["ToPrimitive：valueOf→toString", "null/undefined 只互等", "eqeqeq 规则配 null 例外", "+ 遇字符串即拼接"],
+    followUps: ["Symbol.toPrimitive 如何自定义转换行为？", "Object.is 和 === 的两个差异点？"],
     favorited: false,
   },
   {
@@ -1034,21 +1200,23 @@ NaN == NaN;     // false：NaN 不等于任何值
     nodeId: "fe-js-types",
     question: "原始类型和引用类型在赋值/传参时有什么区别？",
     bigTech: false,
-    answer: `原始类型按值传递（复制值），引用类型按引用地址传递（共享同一对象）。函数参数都是按值传递，但引用类型的"值"是指针。
+    answer: `JS 的赋值与传参永远是「按值传递」——区别只在"值"是什么：原始类型的值是数据本身，赋值即复制，两个变量从此无关；引用类型的值是堆中对象的地址（指针），赋值即复制指针，两个变量指向同一对象，改属性互相可见。所谓"引用传递"在 JS 里不存在：函数内对形参重新赋值（换指针）不会影响外部实参，这就是按值传递的铁证。
 
 \`\`\`js
-// 原始类型：互不影响
+// 原始类型：复制值，互不影响
 let a = 1; let b = a; b = 2; // a 仍是 1
-// 引用类型：共享对象
+// 引用类型：复制指针，共享对象
 let obj1 = { n: 1 }; let obj2 = obj1; obj2.n = 2; // obj1.n 也是 2
-// 函数内改形参引用不影响外部
-function fn(o) { o = { n: 99 }; } // 重新赋值形参，外部 obj 不变
+// 铁证：函数内换指针，外部不变
+function fn(o) { o = { n: 99 }; } // 只改了形参的指针副本
 let obj = { n: 1 }; fn(obj); // obj.n 仍是 1
 \`\`\`
 
-踩坑：深拷贝用 structuredClone（现代）或 JSON.parse(JSON.stringify())（无函数/循环引用）；浅拷贝用 {...obj} 或 Object.assign；React 状态必须不可变更新，直接改 state 对象不会触发渲染。`,
-    keyPoints: ["原始值传递 / 引用地址传递", "函数内重赋值不影响外部", "深拷贝 structuredClone"],
-    followUps: ["structuredClone 和 JSON 深拷贝的区别？", "如何实现一个完整深拷贝？"],
+在某 React 项目中，列表页直接 list.push(newItem) 后 setList(list)——state 引用没变，React 浅比较认为"没变化"不重渲染，新增项不显示。改 setList([...list, newItem]) 后修复。不可变更新不是 React 的癖好，是按值比较机制的必然要求。
+
+踩坑：浅拷贝 {...obj} 只复制一层，嵌套对象仍共享（改 obj2.a.b 会污染 obj1）；JSON.parse(JSON.stringify()) 会丢 undefined/函数/Symbol/循环引用，Date 变字符串；structuredClone 支持循环引用与 Date/Map/Set，但不能拷贝函数与 DOM 节点；大对象频繁深拷贝有性能成本，React 场景优先用展开语法做"路径级"不可变更新而非全量深拷贝。`,
+    keyPoints: ["永远按值传递，引用类型的值是指针", "形参换指针不影响外部", "浅拷贝嵌套仍共享", "React 不可变更新源于浅比较"],
+    followUps: ["structuredClone 和 JSON 深拷贝的区别？", "Immer 如何用 Proxy 实现可变写法不可变结果？"],
     favorited: false,
   },
   {
@@ -1056,23 +1224,26 @@ let obj = { n: 1 }; fn(obj); // obj.n 仍是 1
     nodeId: "fe-js-types",
     question: "Symbol 有什么用？为什么用它做对象 key 不会被遍历到？",
     bigTech: false,
-    answer: `Symbol 是唯一且不可变原始值，主要做对象私有属性 key 和内置行为协议（Symbol.iterator/toStringTag）。Symbol key 不被 for...in/Object.keys 遍历，实现"半私有"。
+    answer: `Symbol 的核心语义是「保证唯一」——每次调用 Symbol() 都产生一个永不重复的值，这解决了对象属性命名的根本冲突问题：多人协作/多库共存时，字符串 key 可能撞名，Symbol key 物理上不可能撞。枚举不可见是副产品：for...in、Object.keys、JSON.stringify 都只处理字符串 key，Symbol key 天然"半私有"（仍能 Object.getOwnPropertySymbols 拿到，所以不是真私有）。
 
 \`\`\`js
-// 私有属性：外部遍历不到
+// 半私有属性：常规遍历不可见
 const id = Symbol("id");
 const user = { name: "Tom", [id]: 123 };
-Object.keys(user);       // ["name"]
-Object.getOwnPropertySymbols(user); // [Symbol(id)] 才能拿到
-// 内置协议：自定义可迭代
+Object.keys(user);                    // ["name"]
+Object.getOwnPropertySymbols(user);   // [Symbol(id)] 能拿到，非真私有
+// 内置协议：改写语言行为
 class Range {
-  *[Symbol.iterator]() { yield 1; yield 2; }
+  *[Symbol.iterator]() { yield 1; yield 2; } // 让 for...of 可用
 }
+[...new Range()]; // [1, 2]
 \`\`\`
 
-踩坑：Symbol.for("x") 会注册全局（可跨文件共享），Symbol("x") 每次新建唯一；Symbol 不能 new（不是构造器）；JSON.stringify 会忽略 Symbol key，序列化后丢失。`,
-    keyPoints: ["Symbol 唯一不可变做私有 key", "不被 for...in/Object.keys 遍历", "Symbol.for 全局共享"],
-    followUps: ["Symbol.iterator 如何让对象可迭代？", "Symbol 和私有字段 #field 的区别？"],
+在实际项目中，Symbol 最典型的用途是给第三方对象"打标记"而不污染其序列化结果：某中间件给请求对象挂 [Symbol("traced")]=true 防重复埋点，JSON.stringify 上报时标记自动消失，不用专门清洗。语言协议层面，Symbol.iterator/hasInstance/toPrimitive/toStringTag 是框架作者的高级工具。
+
+踩坑：Symbol.for("x") 走全局注册表（同 key 返回同一 Symbol，可跨 realm/iframe 共享），Symbol("x") 每次新建——混用会导致"看着一样的 key 取不到值"；Symbol 不能 new；类型转换上 String(sym) 必须显式，隐式拼接（""+sym）直接 TypeError，这是语言故意防误用。`,
+    keyPoints: ["唯一性解决命名冲突", "枚举不可见实现半私有", "Symbol.for 全局注册表", "Symbol.iterator 等内置协议"],
+    followUps: ["Symbol 和 # 私有字段的本质区别？", "Symbol.toPrimitive 有什么实战用途？"],
     favorited: false,
   },
   {
@@ -1101,20 +1272,23 @@ JSON.parse('{"id": 9007199254740993}').id; // 9007199254740992 丢失！
     nodeId: "fe-js-types",
     question: "JS 的包装类型是什么？'abc'.length 为什么能访问到？",
     bigTech: false,
-    answer: `原始类型没有方法，但 JS 在访问属性时临时创建包装对象（String/Number/Boolean），用完即销毁。所以 "abc".length 能取到值但不能赋值。
+    answer: `原始值在规范层面没有属性和方法，但 JS 引擎在「原始值.属性」的读取瞬间执行了一步隐式装箱：临时 new 一个对应包装对象（String/Number/Boolean），读取属性后立刻销毁。所以 "abc".length 拿到 3 是包装对象的属性，而 "abc".x = 1 写入的是刚创建就被丢弃的临时对象——下一行再读 .x 又是一个全新的包装对象，自然 undefined。
 
 \`\`\`js
-"abc".length;   // 3：临时 new String("abc").length，用完销毁
-"abc".x = 1;    // 临时对象赋值，立即销毁
-"abc".x;        // undefined：又新建了一个，没有 x
-// 对比显式包装（不推荐）
-const s = new String("abc"); // s 是对象，typeof "object"
-s === "abc";    // false（对象 vs 原始）
+"abc".length;   // 3：等价于 new String("abc").length，用完销毁
+"abc".x = 1;    // 静默失败：写进临时对象，立即销毁（严格模式报错）
+"abc".x;        // undefined：新建了一个包装对象，没有 x
+// 显式装箱（永远不要这么写）
+const s = new String("abc");
+typeof s;       // "object"，不是 "string"
+s === "abc";    // false：对象与原始值是两个世界
 \`\`\`
 
-踩坑：new String/Number/Boolean 创建的是对象，=== 比较原始值会 false；用 typeof 区分：typeof "x" 是 "string"，typeof new String() 是 "object"；Symbol/BigInt 不能用 new，本身就是原始值。`,
-    keyPoints: ["访问属性时临时创建包装对象", "用完即销毁不能存属性", "new String 是对象非原始"],
-    followUps: ["new String 和 String() 的区别？", "为什么不能用 new Symbol？"],
+实际项目中的真实事故：某表单校验库用 typeof value === "string" 判断输入类型，上游某处用了 new String() 构造的值，校验全部绕过，最后靠 value instanceof String 兜底 + 上游去 new 化才收敛。这也是为什么 lint 规则 no-new-wrappers 必须开。
+
+踩坑：typeof new String() 是 "object"，与 "string" 原始值的类型判断结果不同，混用会让类型分支失效；Boolean 包装对象永远 truthy——if (new Boolean(false)) 会进分支，是经典 bug 温床；Symbol/BigInt 设计上禁止 new（防止同样陷阱），但可用 Object(sym) 显式装箱（几乎没用途）；装箱拆箱有性能开销，热路径上别对原始值做属性读写链。`,
+    keyPoints: ["读属性时隐式装箱用完即毁", "包装对象 ≠ 原始值（typeof/=== 都不同）", "new Boolean(false) 是 truthy", "no-new-wrappers 规则必开"],
+    followUps: ["为什么 if (new Boolean(false)) 会进分支？", "V8 对包装对象有什么优化？"],
     favorited: false,
   },
   {
@@ -1122,20 +1296,25 @@ s === "abc";    // false（对象 vs 原始）
     nodeId: "fe-js-types",
     question: "如何准确判断 NaN？为什么 isNaN 不靠谱？",
     bigTech: false,
-    answer: `NaN 是"非数字"的数字值（typeof NaN === "number"），特点是 NaN≠NaN。全局 isNaN 会先强制转换参数再判断，导致 isNaN("abc") 也 true。用 Number.isNaN 严格判断。
+    answer: `NaN 的设计语义是「无效数值运算的结果占位符」，IEEE 754 规定它与任何值（含自身）比较都为 false——这样 NaN 参与比较运算不会误判相等。全局 isNaN 的坑在于它先对参数做 ToNumber 强制转换再判断："abc" 转数字得到 NaN，于是 isNaN("abc") 返回 true——它回答的其实是"这个值转不成数字吗"，而不是"这个值是 NaN 吗"。ES6 的 Number.isNaN 不做转换，严格检查值本身就是 NaN。
 
 \`\`\`js
-isNaN("abc");      // true：先转 Number("abc")=NaN，再判
-isNaN("123");      // false：Number("123")=123 不是 NaN
-Number.isNaN("abc"); // false：不转换，"abc"不是 NaN 类型
+isNaN("abc");        // true：ToNumber("abc")=NaN，误判！
+isNaN("123");        // false：ToNumber("123")=123
+Number.isNaN("abc"); // false：不做转换，"abc"不是 NaN
 Number.isNaN(NaN);   // true：严格判断
-// 最简判断：利用 NaN≠NaN
-const isNaNSafe = v => v !== v;
+// 利用 NaN≠NaN 的零依赖判断
+const isReallyNaN = (v) => v !== v;
+// 集合查找的差异
+[NaN].indexOf(NaN);   // -1：indexOf 用严格相等
+[NaN].includes(NaN);  // true：includes 用 SameValueZero
 \`\`\`
 
-踩坑：NaN 是唯一不等于自身的值，v !== v 是最快的 NaN 判断；NaN 参与运算结果都是 NaN（NaN+1=NaN）；数组的 indexOf 找不到 NaN（用 includes 能找到，因为用零值相等算法）。`,
-    keyPoints: ["Number.isNaN 严格不转换", "全局 isNaN 会强制转换", "v!==v 判 NaN 最快"],
-    followUps: ["为什么 NaN 不等于自身？", "Array.includes 为什么能找到 NaN？"],
+在某数据看板项目中，接口偶发返回 null，前端计算 null * 1.2 得 0（null 转数字为 0），而 undefined * 1.2 得 NaN，两种"空数据"渲染出 0 和 NaN% 两种结果。统一用 Number.isNaN + 空值归一化后修复。
+
+踩坑：NaN 会沿运算链传染（NaN + 1 = NaN），链式计算中一步出错结果全毁，要在入口处用 Number.isFinite 守门；typeof NaN === "number" 容易让 typeof 检查放行，记得先 Number.isNaN 排除；Object.is(NaN, NaN) 返回 true，是 === 之外唯一能判等 NaN 的比较。`,
+    keyPoints: ["isNaN 回答的是'转不成数字吗'", "Number.isNaN 严格不转换", "v!==v 与 Object.is 都能判 NaN", "NaN 沿运算链传染"],
+    followUps: ["SameValueZero 和严格相等的差异？", "Number.isFinite 和 isFinite 的区别？"],
     favorited: false,
   },
 
@@ -1197,23 +1376,25 @@ const frozen = Object.freeze({ n: 1 }); frozen.n = 2; // 静默失败
     nodeId: "fe-js-scope",
     question: "词法作用域和动态作用域有什么区别？JS 是哪种？",
     bigTech: false,
-    answer: `词法作用域（静态作用域）：函数的作用域在定义时确定（看代码书写位置）；动态作用域：在调用时确定（看调用栈）。JS 是词法作用域，this 是动态的（类似动态作用域但不是）。
+    answer: `词法作用域的判定时机是「写代码时」：函数能访问哪些变量，在函数定义的位置就已固定，引擎据此构建作用域链——与函数在哪里被调用无关。动态作用域则相反，变量的解析沿调用栈向上找（bash、早期 Lisp 是这种）。JS 选择了词法作用域，这让代码可静态分析（Tree Shaking、lint 都受益）；唯一的"动态"例外是 this——它在调用时按绑定规则确定，但 this 不是变量，不走作用域链，所以说 JS 是词法作用域语言依然成立。
 
 \`\`\`js
-// 词法作用域：foo 定义在全局，访问的 a 是全局的
 let a = 1;
-function foo() { console.log(a); }
+function foo() { console.log(a); } // 定义在全局，词法上 a 绑定全局
 function bar() { let a = 2; foo(); }
-bar(); // 1（词法：foo 定义处 a=1，非调用处 a=2）
-// this 是动态的：取决于调用方式
+bar(); // 1：foo 的作用域链在定义时定型，与调用处 bar 的 a=2 无关
+// this 是调用时确定（动态）
 const obj = { n: 1, get() { return this.n; } };
-obj.get();           // 1（this=obj）
-const fn = obj.get; fn(); // undefined（this=window）
+obj.get();            // 1：隐式绑定 this=obj
+const fn = obj.get;
+fn();                 // undefined：独立调用，this 走默认绑定
 \`\`\`
 
-踩坑：闭包捕获的是变量引用而非值，循环中用 let 自动绑定每轮副本；eval/with 能动态改作用域（严格模式禁用）；箭头函数没有自己的 this，继承外层词法 this。`,
-    keyPoints: ["词法作用域定义时确定", "this 动态绑定类似但不等同", "闭包捕获变量引用"],
-    followUps: ["with 语句为什么被严格模式禁用？", "箭头函数的 this 如何确定？"],
+某团队封装通用事件工具时，把对象方法 extract 出来当回调（const onClick = btn.handle; el.addEventListener("click", onClick)），this 全部丢失指向 undefined——本质是混淆了词法变量（定义时）与 this（调用时）两套解析时机，用箭头函数或 bind 固定后修复。
+
+踩坑：闭包捕获的是变量引用而非快照，var 循环里所有回调共享同一 i，let 每轮创建新词法环境副本；eval("var x=1") 和 with 能在运行时改作用域链，破坏静态优化，严格模式已禁用；箭头函数无自己的 this，继承外层词法环境的 this 且不可被 call/apply 改变。`,
+    keyPoints: ["作用域链在定义时定型", "this 调用时绑定但不走作用域链", "闭包捕获引用 let 每轮新副本", "eval/with 破坏静态分析"],
+    followUps: ["V8 如何利用词法作用域做变量访问优化？", "箭头函数的 this 为什么不能被 bind 改变？"],
     favorited: false,
   },
   {
@@ -1277,29 +1458,31 @@ for (var i = 0; i < 3; i++) { (i => setTimeout(() => console.log(i)))(i); }
     nodeId: "fe-js-scope",
     question: "模块模式（Module Pattern）如何用闭包实现私有化？",
     bigTech: false,
-    answer: `模块模式用 IIFE + 闭包封装私有变量和方法，只暴露公共接口。ES6 前是主要的私有化方案，现已被 class 私有字段 # 和 ESM 取代，但理解原理重要。
+    answer: `模块模式的机制是「利用闭包让变量逃出作用域生命周期」：IIFE 执行完毕其作用域本应销毁，但返回的公共方法持有对内层变量的引用，变量便以"只有这些方法能触达"的方式存活——这是 JS 在 ES6 之前实现信息隐藏的唯一手段。理解它是理解闭包、乃至理解 ESM 模块作用域设计的钥匙。
 
 \`\`\`js
-// 经典模块模式
-const Counter = (function() {
-  let count = 0; // 私有
-  const inc = () => ++count; // 私有
-  return { // 公共
+// 经典模块模式：单例 + 私有状态
+const Counter = (function () {
+  let count = 0;              // 私有：外部无法访问
+  const inc = () => ++count;  // 私有实现细节
+  return {                    // 公共接口（揭示模块模式）
     increment: inc,
     get: () => count,
   };
 })();
-Counter.increment(); Counter.get(); // 1
-// 现代：class 私有字段
-class Counter {
-  #count = 0; // 真私有
+Counter.increment(); Counter.get(); // 1，但 Counter.count 是 undefined
+// 现代等价物：class 私有字段（语法级真私有）
+class ModernCounter {
+  #count = 0; // 外部/子类/序列化都不可见
   increment() { return ++this.#count; }
 }
 \`\`\`
 
-踩坑：模块模式的私有变量无法被实例化（单例）；class 私有字段 #x 是真私有（外部和子类都不可访问），相较闭包无运行时开销；单例模块适合全局配置/store。`,
-    keyPoints: ["IIFE+闭包封装私有", "暴露公共接口", "现代用 # 私有字段"],
-    followUps: ["class 私有字段 # 和闭包私有的区别？", "揭示模块模式（Revealing Module）是什么？"],
+在维护某老项目全局 store 时，模块模式仍活跃：window.__APP_CONFIG__ 下挂着一个 IIFE 返回的对象，私有缓存了鉴权 token，外部只能通过 getToken() 读取——十多年前的代码依然安全运行，说明模式的生命力。
+
+踩坑：模块模式产出单例，需要多实例时要退化为"工厂函数 + 闭包"；闭包私有有内存成本（作用域链常驻），# 私有字段是语法级实现无此开销且 DevTools 也不可读；闭包私有在序列化（JSON.stringify）时同样会暴露给返回的公共方法，别存真机密——前端没有真正的安全存储，token 类敏感信息应放 httpOnly cookie 而非任何 JS 变量。`,
+    keyPoints: ["闭包延长作用域生命周期实现私有", "单例/工厂两种产出形态", "# 私有字段语法级真私有", "前端变量不存真机密"],
+    followUps: ["# 私有字段和 WeakMap 模拟私有的性能差异？", "ESM 模块作用域如何替代 IIFE？"],
     favorited: false,
   },
   {
@@ -1779,22 +1962,25 @@ if (user.role === "admin") {
     nodeId: "js-modules",
     question: "Tree Shaking 的原理是什么？为什么 CommonJS 不能 Tree Shaking？",
     bigTech: true,
-    answer: `Tree Shaking 基于 ESM 静态结构，编译时分析导入导出，剔除未使用的代码。CJS 是运行时动态 require，无法静态分析，所以不能 Tree Shaking。
+    answer: `Tree Shaking 的可行性建立在 ESM 的「静态绑定」上：import/export 在源码层面就是字面量声明，打包器在编译期（不执行任何代码）就能构建完整的依赖图，标记哪些导出被引用、哪些是死代码，最后由压缩器（Terser/esbuild）物理删除。CJS 的 require 是普通函数调用——require(condition ? "a" : "b")、require("./" + name) 都合法，模块边界要到运行时才能确定，静态分析无从下手。
 
 \`\`\`js
-// math.js (ESM)
-export function add(a, b) { return a + b; }   // 被使用，保留
-export function sub(a, b) { return a - b; }   // 未使用，剔除
+// math.js (ESM)：静态结构，sub 可被安全剔除
+export function add(a, b) { return a + b; }
+export function sub(a, b) { return a - b; }
 // main.js
-import { add } from "./math"; // sub 被摇掉
-// 副作用：模块顶层有副作用，需 package.json 标记
-// package.json
-{ "sideEffects": false } // 告诉打包器无副作用可安全摇
+import { add } from "./math.js"; // 打包后只有 add
+// package.json：声明包无副作用，摇树才能激进
+{ "sideEffects": false }
+// 有副作用的文件列入白名单保护
+{ "sideEffects": ["./src/polyfills.js", "*.css"] }
 \`\`\`
 
-踩坑：有副作用的模块（顶层修改全局/原型）不能被摇，需在 package.json sideEffects 数组排除；生产模式才摇（dev 不摇便于调试）；函数需纯（无副作用）才安全摇，class 方法默认保留。`,
-    keyPoints: ["ESM 静态结构可分析", "CJS 运行时动态不可摇", "sideEffects 标记副作用"],
-    followUps: ["sideEffects 如何配置？", "为什么 class 方法默认不摇？"],
+在某组件库发包优化中，产物从 CJS 单文件改为 ESM 按文件分割 + sideEffects:false 后，下游项目按需引入的实际加载体积从 180KB 降到 34KB。注意摇树是"打包器 + 压缩器"接力：Rollup/webpack 标记 unused export，真正删除靠 Terser 的 dead code elimination。
+
+踩坑：顶层副作用（import "./polyfill"、修改原型链、注册全局）会被误摇，必须 sideEffects 白名单保护；Babel 把 ESM 编译成 CJS（preset-env 配 modules:"commonjs"）会让摇树失效，TS/Babel 配置要保留 ESM；re-export 星号（export * from）会阻碍分析，具名 re-export 更友好；class 的方法挂载在 prototype 上，静态分析无法证明单个方法未被使用，所以 class 通常整体保留——这是 lodash 按方法分包而非单 class 的原因。`,
+    keyPoints: ["ESM 静态绑定编译期建依赖图", "CJS require 运行时才能确定边界", "sideEffects 白名单保护副作用文件", "标记靠打包器删除靠压缩器"],
+    followUps: ["为什么 Babel 转 CJS 会让 Tree Shaking 失效？", "barrel 文件（index re-export）对摇树的影响？"],
     favorited: false,
   },
   {
@@ -2568,19 +2754,23 @@ function Bad({ initial }) {
     nodeId: "react-core",
     question: "React 的 key 有什么作用？为什么不能用 index 做 key？",
     bigTech: true,
-    answer: `key 是 diff 时识别列表项身份的标识。key 不变 React 复用 DOM（保留状态），key 变则卸载重建。用 index 做 key 在增删时导致状态错乱和性能下降。
+    answer: `key 的本质是 React Reconciliation 的「元素身份标识」：diff 同层列表时，React 按 key 建立新旧元素的映射——key 相同则复用 Fiber 节点与 DOM（state、DOM 内部状态如 input 值全部保留），key 不同则旧节点卸载、新节点挂载。用 index 做 key 时，身份被绑死在"位置"而非"数据"上：删除头部后，原第 2 项的 index 从 1 变 0，React 认为"key=0 的元素还在"，于是把它的 state 安到了新数据头上——状态错位就是这么来的。
 
-\`\`\`jsx
-// 差：index 做 key，删除第一项后所有项 key 错位，状态串了
+\`\`\`tsx
+// 差：index 做 key，增删/排序时状态串位
 {items.map((item, i) => <Item key={i} data={item} />)}
-// 删除 items[0] 后，原 items[1] 变 key=0，复用了 items[0] 的 DOM 和 state
-// 好：用稳定唯一 id
-{items.map(item => <Item key={item.id} data={item} />)}
+// 删除 items[0]：原 items[1] 变 key=0，复用了 items[0] 的 state
+// 好：业务唯一 id，身份跟随数据
+{items.map((item) => <Item key={item.id} data={item} />)}
+// 高级技巧：用 key 强制重置组件（表单切换编辑对象时）
+<Editor key={currentDocId} initialValue={doc.content} />
 \`\`\`
 
-字节直播间礼物列表曾用 index 做 key，删除首个礼物后动画串到下一个，改成 id 后修复。踩坑：key 只需兄弟间唯一不需全局唯一；key 变化会触发卸载挂载（input 失焦）；静态不变列表用 index 影响小但仍不推荐。`,
-    keyPoints: ["key 识别列表项身份", "index 做 key 增删导致状态错乱", "用稳定唯一 id"],
-    followUps: ["key 变化会触发什么生命周期？", "静态列表能用 index 做 key 吗？"],
+在字节某直播间，礼物横幅队列用 index 做 key，移除已播完的礼物后，下一个礼物的入场动画直接继承上一项的动画状态，出现"礼物瞬移"——改 item.id 后修复。另一个正面用法：后台编辑页切换编辑对象时，给表单组件换 key 强制重建，比手动 reset 各字段干净得多。
+
+踩坑：key 只需兄弟间唯一，不要求全局唯一；key 变化 = 卸载 + 挂载（useEffect 清理重跑、input 失焦），别在渲染中生成随机 key（Math.random()），那等于每帧重建整棵树；纯静态且永不增删排序的列表用 index 无 bug，但仍不推荐——需求总会变。`,
+    keyPoints: ["key 标识身份驱动复用/重建决策", "index 把身份绑在位置上导致状态错位", "换 key 可强制重置组件", "随机 key = 每帧重建"],
+    followUps: ["key 变化会触发哪些生命周期/effect？", "React 为什么不警告 index 做 key？"],
     favorited: false,
   },
   {
@@ -2617,19 +2807,22 @@ useEffect(() => {
     nodeId: "react-core",
     question: "React 的 Reconciliation（协调）算法是怎样的？",
     bigTech: false,
-    answer: `Reconciliation 是 diff 算法，对比新旧虚拟 DOM 树决定最小更新。核心假设：同层比较、type 变则销毁重建、key 标识同层项身份。O(n) 复杂度。
+    answer: `Reconciliation 是 React 用 O(n) 近似 O(n³) 的启发式 diff：传统树 diff 要跨层两两比较（约 10 亿次操作/1000 节点），React 用三条假设砍到线性——① 只在同层兄弟间比较，不跨层追踪节点移动；② 元素 type 不同（div→span 或 A→B）直接销毁整棵子树重建，连同内部 state 一起丢弃；③ 用 key 标识同层列表项身份，key 相同则复用 Fiber 节点只更新 props。diff 结果是一串 mutation 标记，commit 阶段一次性应用到真实 DOM。
 
 \`\`\`jsx
-// type 不同：销毁旧树建新树（连同 state）
-<div>{cond ? <A /> : <B />}</div> // 切换时 A 卸载 B 挂载，state 不保留
-// type 相同 key 相同：复用，更新 props
-{items.map(i => <Item key={i.id} v={i.v} />)}
-// 跨层移动：React 不跨层 diff，会重建
+// 假设②：type 变化销毁重建，state 不保留
+{cond ? <Counter /> : <Timer />}   // 切换即卸载+挂载
+// 想保留 state 的两种方案：同 type 换 props，或 key 不变提升 state
+{cond ? <Panel type="a" /> : <Panel type="b" />}  // 复用，仅 props 变
+// 假设③：key 让列表重排变"移动"而非"重建"
+{todos.map(t => <TodoItem key={t.id} todo={t} />)}
 \`\`\`
 
-踩坑：条件渲染切换不同 type 组件会丢 state（需同 type 或提升 state）；列表顺序变化用 key 让 React 复用而非重建；diff 只同层比较，跨层移动会重建（性能差）。Fiber 后可中断分片渲染。`,
-    keyPoints: ["同层比较 O(n)", "type 变销毁重建", "key 标识身份复用"],
-    followUps: ["为什么 React 不做跨层 diff？", "Fiber 如何让 diff 可中断？"],
+实际案例：字节一个 CRM 列表页，编辑弹窗组件挂在每行内，表格按不同列排序后所有弹窗内部状态（草稿、校验态）全部错乱——根因是 key 用了 index，排序后 index 与数据的对应关系变了，React 按"key 相同=同一实例"复用，把 A 行的弹窗状态安到了 B 行数据上。改用业务主键 id 做 key 后解决；另一个反例是筛选 Tab 用 <ListA/>/<ListB/> 两个组件切换，每次切 Tab 列表滚动位置和筛选输入全丢，合并成同 type 组件 + props 区分后状态自然保留。
+
+踩坑与 tradeoff：React 放弃跨层 diff 是有意取舍——真实产品里跨层移动极罕见，为它做全树追踪得不偿失，但意味着 <div><A/></div> 改成 <section><A/></section> 会重建 A；key 要稳定唯一且只在兄弟间比较，全局唯一不等于兄弟内唯一性的保证可省；Fiber 架构让 diff 过程可中断（时间切片），但"同层/type/key"三条假设从未变过，面试别把它们和并发渲染混为一谈。`,
+    keyPoints: ["三假设：同层比较/type 变重建/key 定身份", "O(n³)→O(n) 的启发式取舍", "key=index 排序后状态串行是真实事故", "Fiber 让 diff 可中断但假设不变"],
+    followUps: ["为什么 React 不做跨层 diff？代价是什么？", "Fiber 双缓冲树（current/workInProgress）如何配合 diff？"],
     favorited: false,
   },
   {
@@ -3282,21 +3475,23 @@ useEffect(() => { sync(value); }, []); // 并发下可能延迟执行读到错�
     nodeId: "react-concurrent",
     question: "React 的 lane 优先级模型是什么？",
     bigTech: false,
-    answer: `lane 是 32 位二进制表示的优先级，不同位段代表不同优先级等级。多个更新可同时调度，高优先级可打断低优先级。比旧的 expirationTime 模型更细粒度（支持并行多优先级）。
+    answer: `lane 是 React 18 并发渲染的优先级模型：用 31 位二进制位（bitmask）表示更新优先级，位越靠左优先级越高。它取代旧的 expirationTime（截止时间戳）模型，解决了两个硬伤——① expirationTime 是单值，一次只能表达一个优先级，而 lane 是集合，可以用按位或同时持有多个优先级（一批更新可包含 TransitionLane | DefaultLane）；② 位运算求"当前最高优先级 lane"（getHighestPriorityLane）、判断包含关系、批量清除都是 O(1) 机器指令，调度循环极快。同一 Fiber 的 updateQueue 上可挂多个不同 lane 的更新，渲染时只处理当前调度到的 lane，其余留给下一轮。
 
 \`\`\`js
-// lane 模型（简化）
-const SyncLane = 0b0001;        // 同步最高（如 onClick）
-const InputLane = 0b0010;       // 输入
-const TransitionLane = 0b0100;  // 过渡（useTransition）
-const IdleLane = 0b1000;        // 空闲最低
-// 多 lane 可并存：0b0110 表示 Input + Transition
-// 调度时按优先级处理，高优先级打断低优先级重做
+// 简化后的 lane 布局（位越小优先级越高）
+const SyncLane            = 0b0000000000000000000000000000001; // 离散事件：click
+const InputContinuousLane = 0b0000000000000000000000000000100; // 连续输入：drag
+const DefaultLane         = 0b0000000000000000000000000100000; // 普通 setState
+const TransitionLane1     = 0b0000000000000000000001000000000; // useTransition
+const IdleLane            = 0b0100000000000000000000000000000; // 空闲
+// 按位或合并、按位与判断，调度器取最左的 1 对应 lane 执行
 \`\`\`
 
-踩坑：lane 让并发更新成为可能（同一组件可有多个未完成更新）；过渡更新被打断后丢弃中间结果重做；业务代码不直接操作 lane，通过 useTransition 等 API 间接控制。`,
-    keyPoints: ["lane 32 位优先级", "多优先级并行调度", "高优先级打断低优先级"],
-    followUps: ["lane 和 expirationTime 区别？", "Offscreen lane 是什么？"],
+实际案例：蚂蚁一个数据看板页，用户输入筛选词（InputContinuous）时触发大表格重算，输入卡顿明显。改造用 useTransition 把表格过滤包成 TransitionLane 更新后，输入框（高 lane）可随时打断表格渲染（低 lane），打断时丢弃 workInProgress 树中间结果、从上次提交态重做，输入保持 60fps。这正是 lane 模型的价值：没有它，"输入更新"和"表格更新"只能排队二选一。
+
+踩坑与 tradeoff：lane 数量是有限的（31 个），TransitionLane 有 16 个槽位，大量并发 transition 会复用槽位导致不同 transition 被合并调度；被高优先级打断的低优先级更新不是"暂停续跑"而是"丢弃重做"，所以渲染函数必须纯——副作用要放 commit 阶段或 effect，否则打断重放会产生重复请求；业务代码不直接碰 lane，用 startTransition/useDeferredValue 间接打标，面试说出"API 到 lane 的映射"比背位定义更加分。`,
+    keyPoints: ["lane=31 位 bitmask 优先级集合", "位运算 O(1) 求最高优先级", "高 lane 打断低 lane：丢弃重做非续跑", "useTransition 是业务侧打 lane 的入口"],
+    followUps: ["lane 相对 expirationTime 解决了哪两个问题？", "Transition 槽位耗尽会发生什么？"],
     favorited: false,
   },
   {
@@ -3454,20 +3649,22 @@ const useStore = defineStore("user", () => {
     nodeId: "vue-core",
     question: "computed 和 watch/watchEffect 的区别？",
     bigTech: false,
-    answer: `computed 计算属性（有缓存、依赖不变不重算、返回值）；watch 侦听某值变化执行副作用（无返回值、可异步）；watchEffect 自动收集依赖立即执行。
+    answer: `三者的本质区别在于「产出一个值」还是「执行一个副作用」，以及依赖如何收集。computed 是带缓存的惰性求值：内部用脏标记（dirty）实现——首次访问执行 getter 并缓存结果，之后依赖没变直接返回缓存，依赖变更时只是把 dirty 置 true，下次访问才重算；所以它必须同步、纯函数、有返回值。watch 是显式订阅某个/某些响应式源，值变化后调度执行回调，可拿 newVal/oldVal，可异步、可做请求等副作用，默认惰性（源变了才执行）。watchEffect 则是立即执行一次函数体，执行期间自动收集访问到的所有响应式依赖，任一依赖变化就重新执行——适合「这个函数里用到的响应式值都该触发它」的场景，省得手动列依赖。
 
 \`\`\`js
-// computed：有缓存，依赖不变返回缓存值
-const fullName = computed(() => \`\${first.value} \${last.value}\`);
-// watch：显式侦听，变化才执行，可拿新旧值
-watch(count, (newVal, oldVal) => { saveToServer(newVal); }, { immediate: true });
-// watchEffect：自动收集依赖，立即执行一次
-watchEffect(() => { document.title = count.value; }); // 自动追踪 count
+// computed：派生状态，依赖不变零重算成本
+const total = computed(() => cart.value.reduce((s, i) => s + i.price * i.n, 0));
+// watch：跨页码/关键词变化时发请求，需要 oldVal 判断要不要重置页码
+watch(keyword, async (n, o) => { page.value = 1; list.value = await search(n); });
+// watchEffect：自动收集 count+theme，不用手动列依赖数组
+watchEffect(() => { document.title = \`\${count.value} - \${theme.value}\`; });
 \`\`\`
 
-踩坑：computed 必须纯函数（无副作用），副作用用 watch；computed 缓存基于依赖变化（依赖是响应式才缓存）；watch 监听对象需 deep:true 或用 getter 函数返回属性。`,
-    keyPoints: ["computed 缓存纯计算", "watch 副作用拿新旧值", "watchEffect 自动依赖立即执行"],
-    followUps: ["computed 缓存如何失效？", "watch 的 deep 和 immediate 区别？"],
+实际案例：有赞一个商品筛选页，最初用 watchEffect 发搜索请求，结果函数体里顺手读了 pageSize、sortBy、keyword 三个 ref，任何筛选条件变化都触发请求——包括用户只是展开了一个用 ref 控制的面板（面板状态也在函数体里被读到），造成接口风暴。改成 watch 显式侦听 [keyword, sortBy] 后请求量降 70%。另一个常见误用是在 computed 里发请求"顺便存结果"，由于 computed 可能被多次重算且语义上是纯函数，导致重复请求和不可预期的缓存。
+
+踩坑与 tradeoff：watch 默认侦听 ref 的 .value 替换，侦听 reactive 对象内部属性要传 getter（() => obj.a）或 deep: true，deep 遍历大对象有性能代价；watchEffect 的依赖是"运行时收集"，条件分支里没执行到的属性不会被追踪——分支切换后依赖集会变化，调试时容易困惑；flush 选项控制回调时机（pre 组件更新前/post 更新后），要操作更新后 DOM 用 flush: "post" 或 nextTick。`,
+    keyPoints: ["computed=缓存派生值，watch=显式副作用，watchEffect=自动依赖", "computed 脏标记惰性重算", "watchEffect 依赖运行时收集易过度触发", "deep/flush 选项的成本与时机"],
+    followUps: ["computed 的脏标记机制怎么实现缓存？", "watch 的 flush: pre/post/sync 分别在什么时机执行？"],
     favorited: false,
   },
   {
@@ -3475,20 +3672,26 @@ watchEffect(() => { document.title = count.value; }); // 自动追踪 count
     nodeId: "vue-core",
     question: "Vue 的生命周期有哪些？Composition API 怎么写？",
     bigTech: false,
-    answer: `挂载：onBeforeMount→onMounted。更新：onBeforeUpdate→onUpdated。卸载：onBeforeUnmount→onUnmounted。调试：onErrorCaptured。
+    answer: `Vue3 生命周期对应组件实例的四个阶段：创建（setup 本身即 created 时机，没有单独钩子）、挂载（onBeforeMount 模板编译完成未插 DOM → onMounted DOM 已插入可操作）、更新（onBeforeUpdate 响应式数据变了 DOM 未更新 → onUpdated DOM 已同步）、卸载（onBeforeUnmount 实例还在 → onUnmounted DOM 移除实例销毁）。另有 keep-alive 专属的 onActivated/onDeactivated 和错误处理的 onErrorCaptured。父子组件的顺序是面试加分点：挂载时父 beforeMount → 子 mounted → 父 mounted（子先挂完父才算挂完）；卸载时父 beforeUnmount → 子 unmounted → 父 unmounted。
 
-\`\`\`js
-import { onMounted, onUnmounted, onUpdated } from "vue";
-setup() {
-  onMounted(() => { console.log("挂载"); startTimer(); });
-  onUpdated(() => { console.log("更新"); });
-  onUnmounted(() => { clearInterval(timer); }); // 清理
-}
+\`\`\`vue
+<script setup>
+import { onMounted, onUnmounted, onErrorCaptured } from "vue";
+let timer; let ob;
+onMounted(() => {
+  timer = setInterval(poll, 5000);                       // 定时轮询
+  ob = new ResizeObserver(onResize); ob.observe(elRef);  // 监听尺寸
+});
+onUnmounted(() => { clearInterval(timer); ob.disconnect(); }); // 对称清理
+onErrorCaptured((err, instance, info) => { report(err); return false; }); // 阻止冒泡
+</script>
 \`\`\`
 
-踩坑：onMounted 中 DOM 才就绪可操作；onUpdated 内别改 state（可能死循环）；onUnmounted 必须清理副作用（定时器/事件/订阅）；keep-alive 用 onActivated/onDeactivated。`,
-    keyPoints: ["挂载/更新/卸载三阶段", "onMounted DOM 就绪", "onUnmounted 清理副作用"],
-    followUps: ["keep-alive 的生命周期？", "onUpdated 内改 state 会死循环吗？"],
+实际案例：美团一个 H5 活动页在线上偶发白屏，排查发现是某卡片组件 onMounted 里同步初始化了一个重 Canvas 图表（约 300ms），而页面有 12 个同类卡片——父组件 onMounted 要等全部子组件 mounted 才触发，导致首屏可交互时间（TTI）被拉长到 4s+。优化方案是把图表初始化包进 requestIdleCallback + IntersectionObserver 懒加载，onMounted 里只做轻量 DOM 测量，TTI 降到 1.8s。另一个高频事故源是 onUnmounted 忘记清理：WebSocket 订阅、EventBus 监听、setInterval 不清理，在路由频繁切换的 SPA 里内存线性上涨，还出现"已离开页面还在收到推送并 setState"的警告。
+
+踩坑与 tradeoff：onUpdated 里直接改响应式数据会再次触发更新，形成死循环（Vue 会警告 "Maximum recursive updates"），要改必须加条件判断收敛；onMounted 保证本组件 DOM 就绪但不保证异步子组件（defineAsyncComponent）已渲染，测量尺寸要配合 nextTick 或 ResizeObserver；SSR 场景下 onMounted/onUpdated 等客户端钩子不在服务端执行，把浏览器 API 调用写在这些钩子里天然同构安全，写在 setup 顶层则会 SSR 报错。`,
+    keyPoints: ["四阶段八钩子+keep-alive 双钩子", "子 mounted 先于父 mounted", "onUnmounted 不对称清理=内存泄漏", "SSR 只执行 setup，客户端钩子天然同构安全"],
+    followUps: ["父子组件生命周期的完整执行顺序？", "为什么 onUpdated 里改状态会报 recursive updates？"],
     favorited: false,
   },
   {
@@ -3496,18 +3699,22 @@ setup() {
     nodeId: "vue-core",
     question: "v-for 的 key 有什么作用？和 React key 区别？",
     bigTech: false,
-    answer: `Vue 的 key 用于 diff 时识别节点身份，key 不变复用（保留状态），key 变重建。和 React 类似，但 Vue 的 diff 是双端比较+最长递增子序列优化。
+    answer: `key 是 Vue diff 算法识别 vnode 身份的唯一依据：sameVnode 判定先看 key 再看 tag，key 相同则 patch 复用旧 DOM（保留组件实例、表单内部状态、焦点），key 不同则卸载重建。没给 key 时 Vue3 对 v-for 走"就地复用"策略——按位置一一 patch，等价于 key=index。Vue3 的 keyed diff 流程是：先从头尾双端同步（i 前扫、e 后扫，处理头尾未变部分），再处理纯新增/纯删除，剩余乱序段建 key→index 映射表，对旧序列求新位置序列的最长递增子序列（LIS），LIS 上的节点保持不动、其余节点做移动——LIS 保证 DOM 移动次数最少。
 
 \`\`\`html
-<!-- 差：index 做 key，增删时状态错乱 -->
-<li v-for="(item, i) in list" :key="i">{{ item.name }}<input /></li>
-<!-- 好：稳定 id -->
-<li v-for="item in list" :key="item.id">{{ item.name }}<input /></li>
+<!-- 反例：index 做 key，头部插入一条后所有行 key 与数据错位 -->
+<li v-for="(u, i) in users" :key="i"><input v-model="u.remark" /></li>
+<!-- 正例：业务主键做 key，增删排序都安全 -->
+<li v-for="u in users" :key="u.id"><input v-model="u.remark" /></li>
+<!-- key 也可用于强制重渲染：路由参数变化时重建组件，重置内部状态 -->
+<UserCard :key="$route.params.id" />
 \`\`\`
 
-踩坑：Vue3 的 diff 用最长递增子序列（LIS）减少 DOM 移动，比 Vue2 双端更优；key 必须稳定唯一（兄弟间）；用 index 做 key 输入框状态会串（和 React 一样）。`,
-    keyPoints: ["key 识别节点身份复用", "Vue3 LIS 优化 diff", "index 做 key 状态错乱"],
-    followUps: ["Vue3 LIS diff 比 Vue2 强在哪？", "key 和 ref 的区别？"],
+实际案例：滴滴一个司机端订单列表，行内有"已读/未读"本地勾选态（未持久化），用 index 做 key 时新订单推到数组头部，用户之前勾的第 1 行状态被复用到了新订单上——因为 key=0 的旧节点被 patch 成了新数据，而勾选态存在组件实例里跟着 DOM 走了。改 :key="order.id" 后解决。另一个正面用法是"key 重置换组件"：详情页从 /user/1 跳到 /user/2 时组件复用导致 onMounted 不再执行、旧数据残留，给组件加 :key="$route.fullPath" 强制重建，逻辑比 watch 路由参数干净得多。
+
+踩坑与 tradeoff：key 只需在兄弟节点间唯一，不同列表可复用相同 key 值；key 不要用随机数或 Date.now()——每次渲染 key 都变等于全量重建，比不加 key 还慢；v-if 和 v-for 同元素时 Vue3 中 v-if 优先级更高且访问不到 v-for 的 item（编译期报错），要包一层 template；Vue 的 key 语义和 React 一致，但 Vue 模板编译器会对静态 v-for 做优化（静态提升），React 则完全依赖运行时 diff，这是两者"同语义不同实现"的典型考点。`,
+    keyPoints: ["sameVnode 先比 key 再比 tag", "Vue3 双端同步+LIS 最少移动", "key=index 在增删/排序时状态错位", "key 置换可强制重建组件"],
+    followUps: ["Vue3  keyed diff 的完整五步流程？", "为什么 LIS 能保证移动次数最少？"],
     favorited: false,
   },
   // ===== 18. vue-advanced Vue 进阶 =====
@@ -3546,25 +3753,28 @@ function useMouse() {
     nodeId: "vue-advanced",
     question: "Teleport 组件的作用和使用场景？",
     bigTech: false,
-    answer: `Teleport 把组件渲染到 DOM 树其他位置（如 body），脱离父级样式/层级约束。场景：弹窗/通知/全屏遮罩（避免被父级 overflow/transform/z-index 影响）。
+    answer: `Teleport 解决的核心矛盾是「逻辑上属于当前组件，视觉上必须脱离当前组件的 DOM 上下文」。渲染时 vnode 被 patch 到 to 选择器指定的目标节点（通常是 body 末尾），但组件树层级不变——props 传递、emit 冒泡、provide/inject、响应式更新全部按原逻辑位置工作，DOM 位置和逻辑位置解耦。典型动机是突破 CSS 层叠上下文：父链上任何 overflow: hidden、transform、filter、will-change、z-index 隔离都会把"局部弹窗"裁剪或压住，Teleport 到 body 后弹窗直接参与全局层叠。
 
-\`\`\`html
-<!-- 弹窗渲染到 body，不受父级 overflow:hidden 影响 -->
+\`\`\`vue
+<!-- 嵌套在 overflow:hidden 卡片里的弹窗，传送到 body 摆脱裁剪 -->
 <Teleport to="body">
-  <div class="modal" v-if="show">
-    <h2>标题</h2>
-    <slot />
-  </div>
+  <BaseModal v-model:open="show" :z-index="1000">
+    <OrderDetail :order="order" @close="show = false" />
+  </BaseModal>
 </Teleport>
-<!-- 多个传送目标 -->
-<Teleport :to="target" :disabled="!teleport">
-  <Tooltip />
+<!-- disabled 动态切换：大屏传送到侧栏容器，小屏就地渲染 -->
+<Teleport :to="isDesktop ? '#sidebar' : 'body'" :disabled="false">
+  <FilterPanel />
 </Teleport>
+<!-- defer（3.5+）：等目标元素在后续渲染中出现再传送 -->
+<Teleport defer to="#async-target">...</Teleport>
 \`\`\`
 
-踩坑：Teleport 的内容仍是组件子树（props/emit 正常）；disabled 可关闭传送回原位；样式作用域（scoped）仍按原组件位置，需用 :deep 或全局样式。`,
-    keyPoints: ["Teleport 渲染到指定 DOM", "弹窗脱离父级约束", "仍是组件子树"],
-    followUps: ["Teleport 的 scoped 样式如何处理？", "Teleport 和 React Portal 区别？"],
+实际案例：小红书一个编辑器项目，气泡菜单放在编辑器容器内实现，容器为了做滚动设了 overflow: auto，结果气泡菜单一弹出就被容器边界裁掉一半，用各种 z-index 和 position 都救不回来（层叠上下文被 transform 锁死）。改 Teleport 到 body、用 floating-ui 计算绝对坐标后彻底解决。另一个用法是多实例共存：页面多个组件都 Teleport 到 #toast-root，按挂载顺序天然形成通知堆叠，不用额外搞全局通知 store 管理 DOM。
+
+踩坑与 tradeoff：目标节点必须在挂载时已存在于 DOM（否则警告并渲染失败），3.5 之前常见做法是把 #modal-root 静态写在 index.html，或用 defer 修饰符等异步目标出现；scoped 样式按组件逻辑位置编译，Teleport 出去的节点 class 哈希不变所以样式仍生效，但"在 body 上用全局类名覆盖"的思路会失效，得用 :deep()；事件冒泡沿组件树（逻辑树）而非 DOM 树走，在 Teleport 内容里点按钮，原生事件监听器挂在父组件容器上是收不到的——这和直觉相反，调试事件委托 bug 时极易踩中。`,
+    keyPoints: ["DOM 位置与逻辑位置解耦", "突破层叠上下文/overflow 裁剪", "provide/inject/emit 按逻辑树工作", "事件沿组件树冒泡而非 DOM 树"],
+    followUps: ["Teleport 和 React Portal 在事件冒泡上有什么差异？", "SSR 场景下 Teleport 如何处理？"],
     favorited: false,
   },
   {
@@ -3604,20 +3814,23 @@ async function setup() {
     nodeId: "vue-advanced",
     question: "Vue3 的编译优化有哪些？为什么比 Vue2 快？",
     bigTech: false,
-    answer: `Vue3 编译优化：静态提升（静态节点提到 render 外）、补丁标记（动态节点标记只比动态部分）、块树（Block Tree 收集动态节点）、缓存事件处理器。
+    answer: `Vue3 把"模板是静态可分析的"这个优势吃干榨净，编译期把运行时 diff 的工作前置掉，核心是四件套。① 静态提升（hoistStatic）：纯静态节点/属性被提到 render 函数外只创建一次，后续渲染直接复用引用，diff 时引用相同直接跳过。② 补丁标记（PatchFlag）：编译器给每个动态节点打上位标记（TEXT=1/CLASS=2/STYLE=4/PROPS=8…）和 dynamicProps 数组，patch 时按标记只比对变化的绑定，不用全量 props 浅比较。③ 块树（Block Tree）：每个 Block 节点收集后代所有动态节点到 dynamicChildren 扁平数组，diff 时跳过整棵静态子树直接遍历动态数组，把 diff 复杂度从"树规模"降到"动态节点数量"。④ 缓存事件处理（cacheHandler）：@click 内联函数被缓存，避免每次渲染生成新函数导致子组件误判 props 变化重渲染。
 
 \`\`\`js
-// 静态提升：静态节点只创建一次
-const _hoisted = createVNode("div", null, "静态");
-// 补丁标记：动态属性标记
-createVNode("div", { id: dynamicId }, text, 8 /* PROPS */, ["id"]);
-// diff 时只比较 id 这个动态属性，跳过静态
-// 块树：根节点收集所有动态子节点，diff 时直接遍历动态数组（非全树）
+// <div><p>静态</p><p :id="pid">{{ msg }}</p></div> 编译结果（示意）
+const _hoisted_1 = /*#__PURE__*/createStaticVNode("<p>静态</p>", 1); // ①提升
+return (openBlock(), createBlock("div", null, [                    // ③Block
+  _hoisted_1,                                                       // 静态跳过
+  createVNode("p", { id: _ctx.pid }, toDisplayString(_ctx.msg),
+    9 /* TEXT, PROPS */, ["id"]),                                   // ②PatchFlag
+]))
 \`\`\`
 
-踩坑：手写 render 函数失去编译优化，能用模板优先；block 树在结构稳定时高效，频繁结构变化退化；Vue3 比 Vue2 快约 1.3-2 倍（编译+运行时双重优化）。`,
-    keyPoints: ["静态提升/补丁标记", "块树收集动态节点", "模板比手写 h 快"],
-    followUps: ["块树什么时候退化？", "Vue3 比 Vue2 快多少？"],
+实际案例：携程一个大表单页（300+ 表单项）从 Vue2 迁 Vue3，仅框架升级不改业务代码，首屏渲染从 900ms 降到 380ms、输入响应从 120ms 降到 40ms——收益大头来自块树：表单里 95% 节点是静态 label/布局，Vue2 全树 diff 每次都要遍历，Vue3 只遍历几十个动态绑定。另一个收益点是 v-memo（3.2+）手动跳过子树：消息列表给每项加 v-memo="[msg.id, msg.read]"，长列表滚动时未读状态没变的消息整项跳过 patch。
+
+踩坑与 tradeoff：优化建立在"结构稳定"假设上——v-if/v-for 会创建新的 Block 边界，模板里大量嵌套条件会让块树碎片化、退化接近全树 diff，此时应考虑拆分组件；手写 h()/JSX 失去编译期分析，PatchFlag 和静态提升全没了（JSX 插件只能补一部分），性能敏感页面优先模板；静态提升会常驻内存（hoisted 节点永不释放），页面有成百上千个大静态块时内存换 CPU 的账要算一下；v-once 是终极静态标记，用了之后该子树永远跳过 diff，数据变了也不更新，别误用在"只是不常变"的内容上。`,
+    keyPoints: ["静态提升+PatchFlag+Block Tree+事件缓存", "diff 复杂度降到动态节点数量", "v-if/v-for 创建 Block 边界", "手写 h/JSX 丢失编译优化"],
+    followUps: ["PatchFlag 的位运算如何组合多个标记？", "v-memo 和 v-once 的区别与适用场景？"],
     favorited: false,
   },
   {
@@ -4217,22 +4430,23 @@ const editor = await import("./MonacoEditor");
     nodeId: "build-tools",
     question: "Source Map 的作用？生产环境如何安全使用？",
     bigTech: false,
-    answer: `Source Map 把打包后代码映射回源码，便于调试。生产环境为安全不公开（防暴露源码），用 hidden-source-map 生成但不在 bundle 引用，上传到错误监控（Sentry）。
+    answer: `Source Map 是"压缩产物 → 原始源码"的映射文件：本质是一个 JSON（version/sources/names/mappings），mappings 字段用 VLQ 编码的半增量序列记录"生成文件第 n 行第 m 列 ↔ 源文件第 x 行第 y 列"，浏览器 DevTools 和错误监控凭它把混淆后的行列号还原成源码位置。没有它，线上报错栈指向 bundle.min.js:1:87342 这种位置等于没法定位。工程上的矛盾是：调试需要它，公开它等于把源码拱手送人，所以生产方案的核心是"生成但不随包发布"。
 
 \`\`\`js
-// 开发：eval-source-map 快速重建
-// 生产：hidden-source-map（生成不引用）+ 上传 Sentry
-// Vite
-build: { sourcemap: "hidden" } // 生成 .map 但注释不写
-// Webpack
-devtool: "hidden-source-map"
-// Sentry 上传 map 后即可在错误栈看到源码位置
-// 错误监控：window.onerror 上报 stack，Sentry 用 map 还原
+// Vite：生成 .map 但产物末尾不写 //# sourceMappingURL 注释
+export default { build: { sourcemap: "hidden" } };
+// Webpack 等价
+module.exports = { devtool: "hidden-source-map" };
+// CI 里构建后上传到 Sentry 再删除，不让 .map 进 CDN
+// sentry-cli sourcemaps upload ./dist && rm -rf ./dist/**/*.map
+// 折中方案：nosources-source-map——映射可用但内嵌的源码内容不发布
 \`\`\`
 
-踩坑：生产 source map 泄露源码（竞争对手可还原）；eval-cheap-module-source-map 开发快但生产不可用；CSS source map 需单独配置；上传 Sentry 后删除服务器上的 map 文件。`,
-    keyPoints: ["map 映射打包码到源码", "生产用 hidden 不引用", "上传 Sentry 安全调试"],
-    followUps: ["source map 的格式是什么？", "eval-source-map 为什么快？"],
+实际案例：拼多多某个促销页曾因 CI 配置失误把 sourcemap: true（非 hidden）带上生产，.map 文件和 bundle 一起推了 CDN，安全团队扫描发现核心业务逻辑（含未上线的活动规则）可被任何人完整还原，紧急清缓存换密钥。后续固化的流水线是：构建产 hidden map → sentry-cli 上传（带 release 版本号绑定）→ 上传成功后从产物目录删除 map → 只把无 map 的 dist 推 CDN。Sentry 侧按 release + dist 匹配 map，错误栈自动还原出 TS 源码行列，线上问题平均定位时间从 2 小时降到 10 分钟。
+
+踩坑与 tradeoff：hidden-source-map 的"安全"只是不让浏览器自动加载，map 文件如果还放在可访问路径上照样泄露，必须构建后移出发布目录；eval-cheap-module-source-map 系列只适合开发（eval 包代码 + 只到模块级映射），生产禁用；Terser 压缩 + Babel 转译 + TS 编译是多级转换，需要每级都生成并链式合并 map（inputSourceMap），断链就只能还原到中间产物；CSS 的 map 要单独开（css.devSourcemap / cssSourceMap），漏了样式调试照样瞎；第三方 SDK 不愿公开源码时可只上传自家代码的 map，外部库栈帧显示 native/匿名即可，别为了完整栈把别人的源码也暴露了。`,
+    keyPoints: ["mappings=VLQ 编码的行列映射", "生产 hidden：生成不引用+CI 上传后删除", "多级转换要链式合并 map", "map 留在 CDN 等于源码泄露"],
+    followUps: ["VLQ 编码为什么能压缩 mappings 体积？", "多级构建链的 source map 如何合并？"],
     favorited: false,
   },
   {
@@ -4369,23 +4583,28 @@ test("定时", () => {
     nodeId: "testing",
     question: "测试覆盖率有哪些指标？多少合适？",
     bigTech: false,
-    answer: `覆盖率指标：语句（Statements）、分支（Branches）、函数（Functions）、行（Lines）。80% 是常见目标，但 100% 不等于无 bug，关键路径和核心逻辑要高覆盖。
+    answer: `覆盖率衡量"测试执行了代码的多大范围"，四个标准指标：Statements（执行到的语句占比）、Branches（if/else、三元、switch、&&/|| 每条路径都走到的占比，最严格也最有价值）、Functions（被调用过的函数占比）、Lines（执行到的行占比，和语句接近但按物理行算）。工具原理是插桩（babel-plugin-istanbul）或 V8 内置 coverage 统计执行计数，跑完汇总出报告。业界通行水位是核心模块 80%+，但数字只是手段——它回答"哪些代码没测"，回答不了"测了的代码对不对"（断言质量是另一回事）。
 
-\`\`\`js
-// vitest 覆盖率
-test: { coverage: {
-  provider: "v8",
-  reporter: ["text", "html", "lcov"],
-  thresholds: { statements: 80, branches: 75, functions: 80, lines: 80 },
-}}
-// 跑覆盖率
-vitest run --coverage
-// 指标：if/else 两个分支都测到才算分支覆盖
+\`\`\`ts
+// vitest.config.ts：v8 provider + 阈值门禁，低于阈值 CI 直接红
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: "v8",
+      include: ["src/lib/**", "src/hooks/**"],
+      exclude: ["**/*.d.ts", "src/types/**"],
+      reporter: ["text", "lcov"],
+      thresholds: { statements: 80, branches: 75, functions: 80, lines: 80 },
+    },
+  },
+});
 \`\`\`
 
-踩坑：覆盖率 100% 不等于测了所有场景（只测了执行路径）；分支覆盖比行覆盖更严格（条件组合）；核心支付/鉴权逻辑追求高覆盖，UI 样式可低；CI 卡覆盖率防回退。`,
-    keyPoints: ["语句/分支/函数/行四指标", "80% 常见目标", "100% 不等于无 bug"],
-    followUps: ["分支覆盖和语句覆盖区别？", "覆盖率如何接入 CI？"],
+实际案例：蚂蚁一个账单中台把分支覆盖率从 45% 拉到 80% 的过程中，最大收益不是数字本身，而是补分支时挖出了 3 个存量 bug——其中一个是金额舍入分支从未被测到（amount % 1 === 0 走整数路径），线上小数金额四舍五入规则和执行路径不符，测试补齐后直接拦下了一次资损风险。反过来也有教训：团队曾一刀切要求全仓 90%，结果前端给纯展示组件写了大量"渲染一下就算过"的僵尸测试，覆盖率达标但重构一碰就碎，维护成本暴涨，最后改成"lib/utils/hooks 强制 85%+，页面组件只看关键交互"。
+
+踩坑与 tradeoff：100% 行覆盖仍可能测不出组合逻辑 bug（a && b 只测 a=true 的行，条件恒真路径全过）——所以分支覆盖比行覆盖更接近真实质量；覆盖率驱动容易诱发"为覆盖而测"：无断言的 render 快照、硬调私有方法凑数，这些测试在重构时全变噪音；阈值要防回退而非一步登天（先把当前水位设成基线，每次 PR 只许升不许降）；变异测试（Stryker，往代码里注入 bug 看测试能否抓到）是更硬核的质量度量，但成本高，适合支付/鉴权等命脉模块而非全仓。`,
+    keyPoints: ["四指标中 Branches 最接近真实质量", "覆盖率回答测没测，不回答对不对", "CI 阈值防回退：基线起步只升不降", "变异测试是断言质量的终极度量"],
+    followUps: ["为什么 100% 行覆盖仍可能漏 bug？", "变异测试（Mutation Testing）原理是什么？"],
     favorited: false,
   },
   {
@@ -4393,21 +4612,24 @@ vitest run --coverage
     nodeId: "testing",
     question: "视觉回归测试如何做？",
     bigTech: false,
-    answer: `视觉回归：截图对比，捕获 UI 意外变化。工具：Playwright screenshot、Percy、Chromatic。流程：基线截图→改动后对比→差异高亮人工确认。
+    answer: `视觉回归测试（VRT）通过"像素级截图 diff"捕获功能测试抓不到的 UI 意外变更：按钮挪了 2px、字体回退、暗色模式漏配对，断言 DOM 结构全绿但用户看到的就是坏了。标准流程：首次运行生成基线截图（baseline）→ 后续运行同场景再截图 → 与基线逐像素比对 → 差异超阈值则失败，产出 diff 高亮图供人工确认是预期变更（更新基线）还是回归（修代码）。工具分两派：自建派 Playwright toHaveScreenshot（免费、CI 内跑），SaaS 派 Percy/Chromatic（云端渲染多浏览器多视口、UI 审阅工作流、按 DOM 快照 diff 抗噪更强）。
 
-\`\`\`js
-// Playwright 截图对比
-test("首页视觉", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveScreenshot("home.png", { maxDiffPixelRatio: 0.01 });
+\`\`\`ts
+// Playwright：冻结一切不稳定因素是成败关键
+test("结算页视觉", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-07-25T10:00:00")); // 冻结时间
+  await page.route("**/api/cart", r => r.fulfill({ json: cartFixture })); // 固定数据
+  await page.goto("/checkout");
+  await page.addStyleTag({ content: "*,*::before,*::after{animation:none!important;transition:none!important}" });
+  await expect(page).toHaveScreenshot("checkout.png", { maxDiffPixelRatio: 0.01 });
 });
-// 配置：首次生成基线，之后对比
-// 差异超阈值失败，更新基线需 --update-snapshots
 \`\`\`
 
-踩坑：截图受字体/动画/时间影响需禁用（disableAnimations）；跨平台渲染差异导致误报（统一 CI 环境）；响应式需多视口截图；动态内容（日期/随机）需 mock 固定。`,
-    keyPoints: ["截图对比捕获 UI 变化", "基线+对比+阈值", "禁用动画字体防误报"],
-    followUps: ["如何处理动态内容截图？", "Percy 和 Playwright 截图区别？"],
+实际案例：有赞组件库（Vant）级项目把 VRT 接进 PR 检查：每个组件 story 跑 Percy，某次 PR 改了一个全局 tokens 文件里的圆角变量，Percy 一次报出 47 个组件截图差异，人工在网页端逐张 approve——如果没有 VRT，这类"改一个变量影响半个组件库"的变更只能靠 review 肉眼脑补。另一个教训是早期自研方案没处理字体加载：截图时 webfont 偶发未加载完成，文字宽度差几个像素，CI 误报率 30%+，团队开始直接忽略 VRT 结果——信任崩塌后花了一个月治理（document.fonts.ready + 统一 Docker 镜像锁字体版本）才恢复。
+
+踩坑与 tradeoff：误报是 VRT 的天敌，来源包括字体渲染抗锯齿差异（macOS vs Linux 必须统一 CI 环境，基线也在同一镜像生成）、动画/视频/GIF（注入 CSS 冻结）、动态内容（时间、随机数、A/B 分组全要 mock）、懒加载图片（等加载完或用占位色块遮罩 mask 掉）；阈值 maxDiffPixelRatio 设 0 太敏感、设太高漏真回归，经验值 0.005–0.02 并按页面分级；VRT 跑全站成本高，策略是组件库全量 + 页面级只保核心链路，别指望它替代功能测试——两者是正交的防线。`,
+    keyPoints: ["像素 diff 抓 DOM 断言抓不到的回归", "冻结时间/动画/字体/数据四要素", "误报率失控=团队不再信任 VRT", "组件库全量+页面核心链路的分层策略"],
+    followUps: ["Percy 的 DOM 快照 diff 为什么比纯像素 diff 抗噪？", "基线截图应该用什么策略更新？"],
     favorited: false,
   },
   {
@@ -4415,21 +4637,25 @@ test("首页视觉", async ({ page }) => {
     nodeId: "testing",
     question: "TDD（测试驱动开发）的流程是什么？优劣？",
     bigTech: false,
-    answer: `TDD 流程：Red（写失败测试）→ Green（最少代码让测试过）→ Refactor（重构保持绿）。优势：设计驱动、即时反馈、回归保护。劣势：初期慢、UI 难 TDD、需练习。
+    answer: `TDD 用"测试先行"倒逼设计：Red 先写一个必然失败的测试（此时实现不存在，测试必须真的跑红，防止写出恒绿的假测试）→ Green 写能让测试通过的最少代码（允许写死、允许丑，目标只是转绿）→ Refactor 在测试保护下清理重复、改善结构，每步都保持全绿。循环以分钟计。它的深层价值不是"先有测试"，而是强制你从调用者视角设计 API——先写 expect 意味着先想清楚"这个函数该长什么样、边界是什么"，可测性（纯函数、依赖注入、小接口）是设计的副产品而非额外工作。
 
-\`\`\`js
-// Red：先写测试（失败）
-test("格式化金额", () => {
-  expect(formatMoney(1234.5)).toBe("1,234.50");
+\`\`\`ts
+// Red：先定契约——空数组返回 null 而非 0，这个边界是测试先定的
+test("计算购物车总价", () => {
+  expect(cartTotal([{ price: 10, n: 2 }, { price: 5, n: 1 }])).toBe(25);
+  expect(cartTotal([])).toBeNull(); // 业务边界在 Red 阶段被显式化
 });
-// Green：最少实现
-function formatMoney(n) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
-// Refactor：优化（如抽正则常量）保持测试绿
+// Green：最小实现
+const cartTotal = (items) =>
+  items.length ? items.reduce((s, i) => s + i.price * i.n, 0) : null;
+// Refactor：抽单价计算、加类型，测试全程保持绿
 \`\`\`
 
-踩坑：TDD 适合纯逻辑/算法（边界清晰），UI/探索性开发难 TDD；不要为测而测（覆盖无意义路径）；先写测试能倒逼设计可测（依赖注入/纯函数）。`,
-    keyPoints: ["Red→Green→Refactor", "设计驱动即时反馈", "适合纯逻辑不适合探索"],
-    followUps: ["TDD 和 BDD 区别？", "什么场景不适合 TDD？"],
+实际案例：京东一个优惠规则引擎（满减/折扣/券叠加，共 40+ 组合规则）用 TDD 开发：每接一条新规则先写 3-5 个边界用例（临界金额、互斥券、叠加顺序），半年内该模块线上缺陷为零，而相邻"先写代码后补测试"的库存模块同期 7 个 P2 故障。反例同样鲜明：团队尝试对活动页 UI 组件搞 TDD，视觉布局调一次就要同步改十几个断言，三天后集体放弃——UI 的"正确性"很大程度是视觉和交互直觉，无法用断言前置定义。
+
+踩坑与 tradeoff：TDD 的甜蜜点是输入输出明确的纯逻辑（util、状态机、规则引擎、解析器），对探索性开发（原型、动画、复杂交互编排）是负担——规格本身在漂移时，先写的测试全是沉没成本；常见反模式是"Green 阶段过度设计"，一个测试没过就开始搭抽象层，违背了"最少代码"原则；测试要断言行为而非实现细节（否则 Refactor 阶段每改一行内部实现都红一片，直接摧毁 TDD 循环）；落地策略上不必全仓 TDD，核心领域逻辑 TDD + 页面组件测试后补是多数团队的务实均衡。`,
+    keyPoints: ["Red 必须真红，Green 只写最少代码", "测试先行=从调用者视角设计 API", "纯逻辑适合 TDD，探索性 UI 不适合", "断言行为而非实现细节"],
+    followUps: ["TDD 的 Refactor 阶段如何保证不改变行为？", "为什么断言实现细节会摧毁 TDD 循环？"],
     favorited: false,
   },
   // ===== 23. performance 性能优化 =====
@@ -4755,21 +4981,21 @@ location /api { proxy_pass https://api.com; }
     nodeId: "security",
     question: "Subresource Integrity（SRI）是什么？解决什么问题？",
     bigTech: true,
-    answer: `SRI 给外部资源（CDN JS/CSS）加 integrity 哈希，浏览器加载时校验哈希不匹配则拒绝执行，防 CDN 被篡改注入恶意代码。
+    answer: `SRI（Subresource Integrity）针对的威胁模型是：你信任的 CDN 本身不可信——CDN 被入侵、中间人劫持、运营商劫持插广告，第三方 JS 内容一旦被替换，你的页面就执行了攻击者的代码（第三方脚本和本站脚本权限完全相同，可读 cookie、可改 DOM、可发请求）。SRI 的方案是在引用处声明预期内容的密码学哈希（sha256/384/512），浏览器下载后先算哈希比对，不匹配就拒绝执行并报错，把"内容可信"从"来源可信"解耦出来。
 
 \`\`\`html
-<!-- integrity 哈希：内容变则不执行 -->
-<script src="https://cdn.com/lib.js"
-  integrity="sha384-abc123..."
-  crossorigin="anonymous"></script>
-<!-- CSS 同理 -->
-<link rel="stylesheet" href="https://cdn.com/style.css"
-  integrity="sha384-xyz..." crossorigin="anonymous" />
+<script src="https://cdn.example.com/react@19.1.0/prod.min.js"
+        integrity="sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/uxy9rx7HNQlGYl1kPzQho1wxFUJw8Bd"
+        crossorigin="anonymous"></script>
+<!-- 构建期自动生成，别手算：cat lib.js | openssl dgst -sha384 -binary | openssl base64 -A -->
+<!-- Webpack: new SubresourceIntegrityPlugin({ hashFuncNames: ["sha384"] }) -->
 \`\`\`
 
-踩坑：SRI 需 crossorigin 属性（跨源资源）；CDN 更新资源需同步更新 integrity（构建工具自动生成）；SRI 只防篡改不防可用性（哈希不匹配资源不加载，需 fallback）。`,
-    keyPoints: ["SRI 哈希校验防 CDN 篡改", "integrity + crossorigin", "CDN 更新需同步哈希"],
-    followUps: ["SRI 如何生成哈希？", "SRI 校验失败怎么办？"],
+实际案例：2018 年 BrowseAloud（无障碍插件）被注入门罗币挖矿脚本，英美政府网站集体中招——凡引用了该 CDN 脚本且没用 SRI 的站点全部沦陷，这成了 SRI 布道的经典教材。工程落地侧的正面案例：招行系 H5 对所有外联 CDN 资源强制 SRI + 本地 fallback——script onerror 里检测校验失败后切换加载自备份域名资源并上报安全告警，某次 CDN 节点内容异常（非攻击，是回源错误导致内容变化）时 SRI 拦截 + fallback 让页面零感知，监控同时抓到了这次供应商事故。
+
+踩坑与 tradeoff：crossorigin="anonymous" 是硬性前提——跨源资源不带 CORS 头时浏览器无法读取内容算哈希，校验直接失败资源被拒，很多人以为是 SRI 配置错了其实是缺这个属性；integrity 锁死了内容版本，CDN 上"同名文件热更新"的运维习惯和 SRI 根本冲突，资源必须带版本号指纹发布、HTML 与资源同步更新，这也是构建插件自动注入的价值；SRI 只保护首次引用的静态资源，防不住"第三方脚本自己再动态加载二级脚本"（供应链纵深问题，得配合 CSP script-src 收紧）；动态拼接的广告/埋点脚本内容经常变，用不了 SRI，这类资源只能靠 CSP 域名白名单 + iframe 沙箱隔离。`,
+    keyPoints: ["威胁模型：可信 CDN 内容被替换", "哈希校验失败拒绝执行", "crossorigin 是硬性前提", "锁版本发布+本地 fallback 兜底"],
+    followUps: ["SRI 和 CSP 各自防什么？如何配合？", "为什么 SRI 无法保护动态二级加载的脚本？"],
     favorited: false,
   },
   {
@@ -6661,6 +6887,1765 @@ app.get("/data", async (c) => {
 踩坑：next-on-pages 已停止维护，新项目用 OpenNext Cloudflare，对 Next 新特性（App Router、PPR 等）跟进更好，但部分功能（image optimization、部分缓存语义）仍有差异，上线前逐项验证；binding 差异（Vercel KV vs CF KV）API 略不同，需适配层抹平；两平台 Edge 限制不同（CPU 时间、内存），别写重逻辑。`,
     keyPoints: ["Hono 多 runtime 适配", "env 抽象 binding 差异", "OpenNext Cloudflare 替代已弃用的 next-on-pages"],
     followUps: ["Next.js 在 Cloudflare 功能差异？", "如何做自托管 fallback？"],
+    favorited: false,
+  },
+  // ===== 新增节点题目：fe-browser-render 浏览器渲染原理深入 =====
+  {
+    id: "fe-313",
+    nodeId: "fe-browser-render",
+    question: "浏览器从拿到 HTML 到像素上屏的完整渲染流水线是怎样的？",
+    bigTech: true,
+    answer: `渲染流水线主干五步：Parse（HTML 字节流→字符→token→DOM 树，CSS 并行解析成 CSSOM）→ Style（DOM+CSSOM 合成 Render Tree，计算每个节点的最终样式，display:none 不进树）→ Layout/Reflow（遍历 Render Tree 计算几何：盒模型、位置、尺寸，产出 Layout Tree）→ Paint（把节点转成绘制指令列表 display list，按层栅格化为位图）→ Composite（合成线程把各图层按 transform/z-index 合成为最终帧提交 GPU 上屏）。现代浏览器（Blink）还把 Paint 前细分为 PrePaint（构建属性树 Property Trees）和 CompositeAfterPaint。
+
+\`\`\`
+HTML bytes → characters → tokens → nodes → DOM ─┐
+                                                 ├→ Render Tree → Layout
+CSS  bytes → CSSOM ──────────────────────────────┘      ↓
+              PrePaint(属性树) → Paint(display list) → Raster → Composite → 上屏
+\`\`\`
+
+实际案例：阿里一个详情页 LCP 优化项目，用 Chrome DevTools 的 Performance 面板逐段拆解，发现 Style 阶段耗时 80ms——根因是 CSS 选择器写了 5000+ 条复杂后代选择器（.a .b .c .d），样式匹配成本爆炸；Layout 阶段又有 120ms 的"强制同步布局"尖峰，定位到代码里 offsetHeight 读取夹在 style 写入循环中。针对性优化（选择器扁平化 + 读写分离）后 LCP 从 3.2s 降到 1.9s。不懂流水线，Performance 面板里那些紫色/绿色色块就只是颜色而已。
+
+踩坑与 tradeoff：DOM 和 CSSOM 都是增量构建的（流式解析），但 JS 会打断一切——解析到同步 script 必须暂停 DOM 构建等 JS 下载执行完（因为 JS 可能 document.write），这就是"JS 阻塞解析"；CSS 不阻塞 DOM 解析但阻塞 render 和 JS 执行（JS 可能读计算样式），所以 CSS 放 head、JS 放底部或加 defer 不是玄学而是流水线推导的必然；Layout 是整树全局计算（宽度依赖父级），所以改一个元素可能触发整树 reflow，而 transform 跳过 Layout/Paint 直接 Composite——动画性能差异的根源就在流水线阶段的不同。`,
+    keyPoints: ["Parse→Style→Layout→Paint→Composite 五段", "JS 阻塞解析，CSS 阻塞渲染与 JS", "Layout 全局计算，transform 直达合成", "Performance 面板按流水线阶段读"],
+    followUps: ["为什么 CSS 在 head 而 JS 在 body 底部？", "PrePaint 的属性树（Property Trees）解决什么问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-314",
+    nodeId: "fe-browser-render",
+    question: "重排（reflow）和重绘（repaint）的区别？如何最小化重排代价？",
+    bigTech: true,
+    answer: `重排是 Layout 阶段重算：几何属性变化（width/height/margin/位置/字号/窗口 resize）使部分或全部 Render Tree 的几何信息失效，浏览器重新遍历计算——Layout 是全局性操作，改一个节点可能级联影响父链和兄弟。重绘是 Paint 阶段重做：外观属性变化（color/background/visibility/box-shadow）不影响几何，跳过 Layout 直接重画位图。所以代价排序：重排 > 重绘 > 仅合成（transform/opacity 三者皆跳）。读操作也会触发重排：offsetWidth/getBoundingClientRect/getComputedStyle 等会强制浏览器立刻 flush 待处理的样式变更以保证返回最新值——这就是"强制同步布局"。
+
+\`\`\`js
+// 反例：读写交替，每次循环都强制同步布局，n 次 reflow
+for (const el of items) {
+  el.style.width = el.offsetWidth + 10 + "px"; // 读→写→读→写
+}
+// 正例：批量读→批量写，最多 2 次 reflow
+const widths = items.map(el => el.offsetWidth);   // 全读完
+items.forEach((el, i) => el.style.width = widths[i] + 10 + "px"); // 再全写
+\`\`\`
+
+实际案例：快手一个无限滚动 feed 在低端机上滚动掉帧到 20fps，火焰图显示 Layout 占帧耗时 70%。排查发现卡片展开动画直接改 height，每帧都触发整列表 reflow（下面所有卡片位置都要重算）。改造方案：动画改 transform: scaleY + 反向 scale 内容防变形（FLIP 技术的变体），或给列表容器加 contain: layout 把 reflow 范围限制在容器内，帧率回到 55fps+。另一个常见手法是虚拟列表——DOM 里只保留视口内 20 个节点，reflow 范围天然受限。
+
+踩坑与 tradeoff：现代浏览器有"渲染队列"会把连续样式写入合并到下一帧统一 Layout，但任何读取几何的代码都会立即清空队列强制执行——读写交替是最隐蔽的性能杀手，且只在长列表/低端机上暴露；display:none 的元素不参与 Render Tree，批量修改时先隐藏再改再显示（2 次 reflow）比在可见状态改 n 次划算；absolute/fixed 定位脱离文档流，其 reflow 范围小于普通流元素；别过度迷信"零重排"——把简单的高度动画硬改成 FLIP transform 会引入复杂度和视觉瑕疵，列表短、动画少时直接改 height 反而更稳。`,
+    keyPoints: ["重排改几何>重绘改外观>合成最便宜", "读几何属性会强制同步布局", "读写分离/批量 DOM 操作", "contain/虚拟列表限制 reflow 范围"],
+    followUps: ["强制同步布局（forced synchronous layout）如何检测？", "FLIP 动画技术的原理是什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-315",
+    nodeId: "fe-browser-render",
+    question: "什么是合成层（compositing layer）？提升条件是什么？什么是层爆炸？",
+    bigTech: true,
+    answer: `合成层是浏览器把满足特定条件的元素从普通文档层中"提拔"出来、单独栅格化为一张纹理交给 GPU 的图层。合成时这些层只需 GPU 做矩阵变换和透明度混合，跳过 Layout 和 Paint——这是动画流畅的硬件基础。提升条件（Chrome/Blink）：① 3D transform（translateZ/rotateX 等）或 will-change: transform/opacity；② video/canvas/iframe 元素；③ CSS filter；④ 对 opacity/transform 做 transition/animation；⑤ z-index 较高的元素叠在已提升的合成层上（层压缩失败时的"隐式合成"）；⑥ position: fixed。用 DevTools 的 Layers 面板可查看每个层的提升原因（Compositing Reasons）和内存占用。
+
+\`\`\`css
+.card { will-change: transform; }          /* 显式声明，浏览器提前建层 */
+.modal { transform: translateZ(0); }        /* 经典 hack：强制提升 */
+.animated { animation: fade 1s; }           /* opacity 动画期间自动提升 */
+\`\`\`
+
+实际案例：蘑菇街一个商品瀑布流页面曾给全部 200 个卡片加 will-change: transform "优化性能"，结果低端机直接白屏崩溃——每个合成层都是一张独立纹理（卡片 300×400×4 字节 ≈ 480KB），200 层近 100MB GPU 纹理内存，移动端显存爆了，这就是"层爆炸"（layer explosion）。修复是只在真正动画的卡片上动态添加 will-change，动画结束即移除。另一个隐蔽案例是 z-index 叠层：一个 fixed 弹窗被提升后，它下方同 stacking context 里所有兄弟元素也被"连带提升"，内存占用翻倍。
+
+踩坑与 tradeoff：合成层不是免费的——层数 × 面积 = 纹理内存，还有层间通信（主线程→合成线程）成本，层太多时合成本身变慢；will-change 是"预告"不是"优化"，提前太久声明等于一直占着内存，正确姿势是交互前挂上、用完即删；opacity/transform 动画在合成线程跑，主线程被 JS 阻塞时动画仍流畅——这是它们性能好的真正原因，但 filter/clip-path 动画会打回主线程 Paint；Safari 对 3D transform 提升策略比 Chrome 激进，同一份代码内存表现不同，跨端要实测。`,
+    keyPoints: ["合成层=GPU 独立纹理，跳过 Layout/Paint", "提升条件：3D transform/will-change/filter/动画", "层爆炸=纹理内存耗尽", "will-change 动态挂卸"],
+    followUps: ["为什么 transform 动画不受主线程 JS 阻塞影响？", "如何在 DevTools 中诊断层爆炸？"],
+    favorited: false,
+  },
+  {
+    id: "fe-316",
+    nodeId: "fe-browser-render",
+    question: "为什么 CSS 动画优先用 transform 和 opacity？width/height 动画卡的根本原因是什么？",
+    bigTech: true,
+    answer: `根本原因在于三者触发流水线不同阶段。transform 和 opacity 的动画值变化只影响 Composite 阶段：浏览器把元素提升为合成层后，GPU 每帧只对纹理做矩阵变换或透明度混合，主线程完全不参与——即使主线程被 JS 占满，合成线程照样 60fps 输出。而 width/height/top/left 属于几何属性，每帧变化都触发 Layout（重排）：主线程重算几何→重新 Paint→再合成，三步全走；碰上复杂页面 Layout 单次就要 10ms+，帧预算 16.6ms 直接爆掉，表现为掉帧卡顿。margin/padding/box-shadow（非 inset 可部分优化）同理触发重排或重绘。
+
+\`\`\`css
+/* 反例：每帧触发 Layout+Paint，列表场景必卡 */
+.drawer { transition: height .3s; }
+.drawer.open { height: 400px; }
+/* 正例：只触发 Composite */
+.drawer { transform: translateX(-100%); transition: transform .3s; }
+.drawer.open { transform: translateX(0); }
+/* 尺寸缩放场景的 tradeoff：scale 会模糊内容，需配合反缩放或 FLIP */
+\`\`\`
+
+实际案例：得物 App 内嵌 H5 的购物车抽屉，最初用 height 动画展开，中端安卓机上帧率 25fps 且伴随列表跳动（每次 Layout 重排了下方 50 个商品卡片）。改为固定高度容器 + transform: translateY 位移 + 内部内容 translateY 反向补偿后稳定 60fps。另一个对照实验：同一个按钮点击缩放反馈，用 width/height 实现时在低端机上掉帧可感知，改 transform: scale 后丝滑——但 scale 放大超过 1.5 倍时文字发虚，最终方案是按钮预渲染 1.5 倍大小、默认 scale(0.67)，动画只放大到 1。
+
+踩坑与 tradeoff：transform 动画的副作用是创建新层叠上下文和 containing block——fixed 定位的子元素会相对 transform 祖先定位而非视口，这是无数"弹窗定位错乱"bug 的根源；scale 放大会模糊（纹理拉伸），超大缩放场景要预渲染高分辨率或改用 FLIP（First-Last-Invert-Play）技术：先记录起止几何，用 transform 模拟位移，动画结束再真实布局；JS 驱动的 width 动画（requestAnimationFrame 逐帧改）比 CSS transition 更糟——每帧强制同步 Layout，连浏览器的队列合并都绕过；box-shadow 动画可用伪元素预建阴影 + opacity 淡入来绕开重绘。`,
+    keyPoints: ["transform/opacity 走合成线程，主线程零参与", "几何属性每帧 Layout+Paint", "transform 创建层叠上下文坑 fixed 定位", "FLIP 技术兼顾性能与清晰度"],
+    followUps: ["合成线程动画与主线程动画如何区分？", "transform 为什么会影响 fixed 定位？"],
+    favorited: false,
+  },
+  {
+    id: "fe-317",
+    nodeId: "fe-browser-render",
+    question: "script 标签的 async、defer、type=module 有什么区别？为什么同步 JS 会阻塞渲染？",
+    bigTech: true,
+    answer: `阻塞根源：HTML 解析器遇到同步 <script> 必须暂停 DOM 构建，下载并立即执行脚本，因为脚本可能 document.write 修改后续输入流、或读写尚未构建的 DOM——浏览器无法预判，只能保守地串行等待。三种非阻塞方案：async 下载不阻塞解析、下载完立即暂停解析执行（执行顺序不确定，先到先跑）；defer 下载不阻塞、延迟到 DOM 解析完成后按声明顺序执行（DOMContentLoaded 之前）；type="module" 默认 defer 行为（顺序保证），且自带模块作用域、严格模式、CORS 加载、可静态分析依赖做预加载。内联 module 脚本立即执行不等待。无 src 的 async/defer 属性无效。
+
+\`\`\`html
+<script src="a.js"></script>             <!-- 解析暂停：下载+执行都阻塞 -->
+<script src="b.js" async></script>       <!-- 下载并行，执行随机插队 -->
+<script src="c.js" defer></script>       <!-- 下载并行，DOM 完成后按序执行 -->
+<script type="module" src="d.js"></script> <!-- 默认 defer，模块依赖静态预加载 -->
+<!-- 选型：独立埋点用 async；依赖 DOM/有顺序要求用 defer；现代项目全 module -->
+\`\`\`
+
+实际案例：网易新闻 H5 首屏优化时，把首屏不需要的 6 个第三方脚本（统计/推荐/广告 SDK）全部从同步改 async，LCP 从 2.8s 降到 1.6s——但上线后发现推荐模块偶发不渲染：async 脚本执行时机早于 DOM 就绪，脚本里 getElementById 拿不到容器。修复是给该 SDK 改 defer（DOM 完成后执行）或把初始化逻辑挂到 DOMContentLoaded。这个事故精确说明了 async/defer 的语义差异不是背概念，而是选型依据：只关心"加载了"的用 async，关心"操作 DOM"的用 defer。
+
+踩坑与 tradeoff：async 的执行顺序不确定性意味着多个 async 脚本间不能有依赖（jQuery 和它的插件都 async 就是赌博）；defer 脚本虽在 DOM 解析后执行，但下载太晚仍会推迟 DOMContentLoaded——巨型 defer 包依然拖累可交互时间；module 的静态依赖图让浏览器可以用 <link rel="modulepreload"> 并行预取整棵依赖树，这是 ESM 相对 CJS 在浏览器端的结构性优势；CSS 会阻塞其后 script 的执行（脚本可能要 getComputedStyle），所以"CSS 阻塞 JS，JS 阻塞解析"的链条让 head 里的巨型 CSS 间接触发首屏白屏；2026 年的 Baseline 认知：动态 import() 做路由级代码分割 + modulepreload 首屏关键模块，是比纠结 async/defer 更现代的性能手段。`,
+    keyPoints: ["同步脚本阻塞解析因 document.write 可能性", "async 乱序执行，defer 有序等 DOM", "module 默认 defer+静态依赖预加载", "CSS 阻塞 JS 执行进而阻塞解析"],
+    followUps: ["modulepreload 和 prefetch/preload 的区别？", "为什么 ESM 能做静态依赖分析而 CJS 不行？"],
+    favorited: false,
+  },
+  {
+    id: "fe-318",
+    nodeId: "fe-browser-render",
+    question: "requestAnimationFrame、requestIdleCallback、setTimeout 在渲染时序上有什么区别？",
+    bigTech: true,
+    answer: `三者对应一帧生命周期的不同相位。rAF 回调在下一帧渲染前（Style/Layout/Paint 之前）执行，浏览器保证回调里的 DOM 修改会在本帧一起上屏——所以动画必须用 rAF 对齐刷新率（通常 60Hz 即 16.6ms，高刷屏 120Hz 则 8.3ms），setTimeout 驱动动画无法对齐 VSync，必然出现掉帧或同一帧多次无效绘制。rIC 在帧的空闲期执行（渲染完成后如果还有剩余时间），超时参数 timeout 保证最坏情况下也会执行——适合低优先级任务：埋点上报、预加载、大数据分片处理。setTimeout(fn, 0) 是宏任务，最快也要在"当前任务+微任务队列清空后"的下一个宏任务执行，和渲染帧没有对齐关系，实际间隔还受 4ms 最小钳制（嵌套 5 层以上）和后台标签页 1s 节流影响。
+
+\`\`\`js
+// 动画：rAF 对齐帧率，一帧一改
+function tick() { ball.style.left = ballX += vx + "px"; rafId = requestAnimationFrame(tick); }
+// 大列表分片渲染：空闲时干活，1s 内必须完成
+function chunk(deadline) {
+  while (deadline.timeRemaining() > 0 && queue.length) renderOne(queue.shift());
+  if (queue.length) requestIdleCallback(chunk, { timeout: 1000 });
+}
+\`\`\`
+
+实际案例：即刻 App 网页版的消息流初始化要渲染 500 条卡片，直接同步渲染阻塞主线程 800ms 白屏。第一版优化用 setTimeout 分批（每批 20 条），卡顿依旧——setTimeout 批次可能插在帧中间执行，半批渲染照样长任务。改 rIC 分片后，利用每帧渲染完的空闲时间渲染 2-3 条，首屏可交互时间降到 200ms。但发现 Safari 不支持 rIC（直到 2024 年 Safari 17.4 才加入，2026 年已属 Baseline），需要 fallback：用 MessageChannel 实现的 scheduler polyfill（React Scheduler 就是这个思路）。
+
+踩坑与 tradeoff：rAF 在后台标签页完全暂停（省电），依赖 rAF 计时的逻辑（倒计时、轮播）切后台就停——计时要用 Date 差值而非计数帧数；rIC 回调可能因帧一直繁忙而被推迟很久，timeout 参数是底线保障，关键任务别依赖它；rIC 里不要改 DOM（可能触发下一帧前的意外 Layout），适合纯计算和数据预处理；React 的并发调度器最初用 rIC polyfill 后来换成 MessageChannel——因为 rIC 执行频率受浏览器帧率影响（部分设备帧间无空闲，调度饥饿），这个演进本身就是时序理解深度的试金石。`,
+    keyPoints: ["rAF 渲染前执行对齐 VSync", "rIC 帧空闲期执行+timeout 兜底", "setTimeout 不对齐帧率且后台节流", "rIC 不适合改 DOM 和关键任务"],
+    followUps: ["React Scheduler 为什么弃用 rIC 改用 MessageChannel？", "后台标签页对 rAF/setTimeout 分别有什么节流策略？"],
+    favorited: false,
+  },
+  {
+    id: "fe-319",
+    nodeId: "fe-browser-render",
+    question: "content-visibility 和 contain 属性如何优化长页面渲染？和虚拟列表是什么关系？",
+    bigTech: true,
+    answer: `content-visibility: auto 让浏览器跳过视口外元素的整个渲染子树（Layout+Paint 全省），直到元素接近视口才渲染——效果类似虚拟列表但零 JS、保留真实 DOM（find-in-page、可访问性树完整可用）。配套的 contain-intrinsic-size 为未渲染元素声明占位尺寸，防止滚动条跳动。contain 是更底层的 CSS 包含机制：layout/paint/size/style 四个值分别声明"该元素内部变化不影响外部"，浏览器据此把 reflow/repaint 范围裁剪到子树内——contain: strict 等于 size+layout+paint 全开。两者关系：content-visibility 解决"屏外不渲染"（省首次渲染成本），contain 解决"屏内变化不扩散"（省更新成本），虚拟列表则是 JS 方案解决"DOM 节点总量"问题。
+
+\`\`\`css
+.feed-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px; /* 占位高 320，渲染后自动校准 */
+}
+.widget { contain: layout paint; }    /* 内部 reflow 不外溢 */
+\`\`\`
+
+实际案例：Chrome 团队官方案例，一个 1300 个 DOM 节点的长文章页，开启 content-visibility: auto 后首次渲染从 233ms 降到 30ms（87% 提升）。国内落地案例：淘宝某店铺装修页有 50+ 楼层模块，每个楼层 DOM 结构复杂，首屏渲染 1.8s。给非首屏楼层加 content-visibility + contain-intrinsic-size 后首屏降到 600ms——相比之前评估的虚拟列表方案，不用改组件结构、楼层内表单状态天然保留、SEO 内容完整可索引（虚拟列表的隐藏内容对爬虫不可见是硬伤）。但楼层高度预估偏差导致滚动条轻微跳动，用 contain-intrinsic-size: auto 记忆已渲染高度后缓解。
+
+踩坑与 tradeoff：content-visibility: auto 的元素仍参与文档流但跳过渲染，嵌套过深（每个小元素都加）反而增加样式计算开销——粒度选"卡片/楼层"级别而非"文本节点"级别；Safari 支持较晚（Safari 18 起，2026 年已基本可用），旧 Safari 需 @supports 兜底或直接当增强不加兜底；占位尺寸与实际尺寸偏差大时滚动位置会跳（滚动锚定只能部分缓解），无限加载场景慎用；contain: size 声明后元素尺寸不再由内容撑开，忘了显式给宽高就塌成 0；和虚拟列表对比选型：十万级节点、行高一致选虚拟列表，几千节点、结构异构选 content-visibility。`,
+    keyPoints: ["content-visibility 跳过屏外渲染零 JS", "contain 限制 reflow/repaint 范围", "contain-intrinsic-size 防滚动条跳动", "与虚拟列表按节点量级和结构选型"],
+    followUps: ["content-visibility 对可访问性和 SEO 有什么影响？", "contain 的四个值分别裁剪什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-320",
+    nodeId: "fe-browser-render",
+    question: "什么是关键渲染路径（CRP）？如何系统优化首屏渲染？",
+    bigTech: true,
+    answer: `关键渲染路径是"首字节到首次绘制"之间浏览器必须完成的最短依赖链：HTML 到达→解析遇到 CSS（阻塞渲染）→下载执行关键 JS（阻塞解析）→构建 Render Tree→Layout→Paint 上屏。CRP 优化就是缩短这条链的每一环：减少关键资源数量（内联首屏 CSS/JS）、减小关键资源体积（压缩/Tree Shaking/代码分割）、缩短关键路径长度（RTT 次数：preload 提前加载、HTTP/2 多路复用、CDN 就近）、降低阻塞权重（defer/async 非关键 JS、media 属性拆分非关键 CSS）。度量指标对应：FCP（首次内容绘制）、LCP（最大内容绘制，<2.5s 为优）。
+
+\`\`\`html
+<!-- 首屏 CSS 内联，非首屏 CSS 异步 -->
+<style>/* critical css 3KB */</style>
+<link rel="preload" href="rest.css" as="style" onload="this.rel='stylesheet'">
+<!-- 首屏关键图 preload，跳队优先 -->
+<link rel="preload" as="image" href="hero.avif" fetchpriority="high">
+<!-- 第三方脚本全部 defer/async -->
+<script src="analytics.js" async></script>
+\`\`\`
+
+实际案例：蔚来官网首屏优化项目，LCP 从 4.1s 优化到 1.7s 的四板斧：① 首屏 hero 图从 CSS background 改为 <img fetchpriority="high">（background 要等 CSSOM 构建完才开始下载，img 在预解析阶段就被 preload scanner 发现）；② 14KB 首屏 CSS 内联进 HTML，剩余 180KB 异步加载；③ 字体改用 font-display: swap + preload 关键字重（原方案 FOIT 导致文字 3s 不可见）；④ 接入 CDN 边缘节点 + HTTP/2，TTFB 从 800ms 降到 180ms。每一步都能对应回 CRP 链条的某一环，这就是"系统性"的含义。
+
+踩坑与 tradeoff：内联首屏 CSS 会失去缓存（每次 HTML 都带一遍），控制在内联 <15KB 且配合 Service Worker 缓存 HTML 才划算；preload 用多了适得其反——所有资源都"最高优先级"等于没有优先级，preload 只给真正阻塞 LCP 的 1-2 个资源；SSR/SSG 是 CRP 优化的终极形态（首屏 HTML 即完整内容，不等 JS），但引入服务端复杂度和 TTFB 成本，纯展示页值得，重交互应用要算 hydration 成本；别忽略 preload scanner 的存在——写在 JS 里动态创建的资源引用（new Image()/动态 import）跳过了扫描器的提前发现，首屏关键资源必须出现在 HTML 里。`,
+    keyPoints: ["CRP=首字节到首绘的最短依赖链", "四板斧：减数量/减体积/缩短链/降阻塞", "img 比 CSS background 更早被发现", "preload 只给 1-2 个真关键资源"],
+    followUps: ["preload scanner 的工作原理是什么？", "SSR 为什么可能让 TTFB 变差？"],
+    favorited: false,
+  },
+  {
+    id: "fe-321",
+    nodeId: "fe-browser-render",
+    question: "浏览器一帧的生命周期是怎样的？16.6ms 内发生了什么？",
+    bigTech: true,
+    answer: `一帧的标准流程（以 60Hz 为例，预算 16.6ms）：① 输入事件（Input：click/scroll 回调，合成线程先收到再转发主线程）→ ② rAF 回调执行（动画 DOM 修改在此）→ ③ 主线程跑 JS 宏任务/微任务（可能耗时 0 到无限）→ ④ Style 计算（选择器匹配、样式级联）→ ⑤ Layout（几何计算，仅在脏标记时）→ ⑥ Paint（生成绘制指令+栅格化，可部分在 worker 线程）→ ⑦ Composite（合成线程合并图层）→ ⑧ 帧提交 GPU 上屏。之后若还有剩余时间，执行 rIC 空闲回调。任一步超时都会挤压后续步骤，整个流程超过 16.6ms 就掉帧（jank）——用户感知的卡顿本质是帧没有按时提交。
+
+\`\`\`
+|← 16.6ms →|
+Input → rAF → JS tasks → Style → Layout → Paint → Composite → [idle: rIC]
+ ↑ 主线程 ────────────────────────────↑      ↑ 合成线程
+\`\`\`
+
+实际案例：B 站播放器弹幕优化的经典思路正是帧生命周期驱动：弹幕轨道的 translateX 位移用 rAF 驱动（步骤②），弹幕对象池的创建/回收放 rIC（步骤⑧之后），弹幕文本的 Canvas 绘制在离屏 canvas 批量完成（减少步骤⑥的 Paint 范围），实测万条弹幕同屏从 15fps 提升到 55fps。另一个排查案例：某活动页点击按钮后 UI 响应慢半拍，Performance 面板显示 Input 事件（步骤①）后 90ms 才执行回调——根因是主线程被上一个长任务占着，事件排队等待，解决方案是长任务拆分（scheduler.yield 或 setTimeout 切片）。
+
+踩坑与 tradeoff：高刷屏（120Hz/144Hz）把预算砍到 8.3ms/6.9ms，在 60Hz 设备上"刚好不卡"的代码到高刷屏上反而更容易掉帧——性能测试要覆盖高刷设备；getBoundingClientRect 等强制同步布局会把 Layout 从步骤⑤提前到 JS 执行中，打乱帧节奏；long task（>50ms）不等于掉帧但必然影响 INP（交互响应指标），2026 年 INP 已是 Google 排名因素；帧生命周期理解的最大价值是"知道优化手段作用于哪一步"：防抖节流省②③、合成层省⑤⑥、content-visibility 省④⑤⑥——脱离帧模型背优化清单，面试一问就穿。`,
+    keyPoints: ["Input→rAF→JS→Style→Layout→Paint→Composite", "任一步超时即掉帧", "高刷屏预算仅 8.3ms", "优化手段要对位到具体帧步骤"],
+    followUps: ["长任务（long task）和掉帧的关系是什么？", "合成线程和主线程分别负责帧流程的哪些步骤？"],
+    favorited: false,
+  },
+  // ===== 新增节点题目：fe-http-cache HTTP 缓存与 CDN =====
+  {
+    id: "fe-322",
+    nodeId: "fe-http-cache",
+    question: "强缓存和协商缓存的完整流程是什么？浏览器如何决策用哪个？",
+    bigTech: true,
+    answer: `强缓存：浏览器发请求前先查本地缓存，命中且未过期（Cache-Control: max-age=3600 或 Expires 未到期）则直接返回缓存副本，状态码 200 (from disk/memory cache)，网络请求根本不发出。协商缓存：强缓存过期后，请求携带上次响应给的验证器（If-None-Match: ETag 或 If-Modified-Since: Last-Modified）发到源站，服务器比对内容没变就回 304 Not Modified（只有头没有 body），浏览器复用本地 body；变了就回 200 带新内容。决策顺序是固定的：先看 Cache-Control 的 max-age/s-maxage（HTTP/1.1，优先级高于 HTTP/1.0 的 Expires 绝对时间），过期了才走协商；no-cache 表示"可以存但每次用前必须协商"，no-store 才是"完全不存"。
+
+\`\`\`
+请求 → 本地有缓存？
+        ├─ 无 → 发请求 → 存缓存(按响应头)
+        └─ 有 → max-age 未过期？ → 是 → 直接用(200 from cache)
+                 └─ 否 → 带 ETag/Last-Modified 协商
+                          ├─ 304 → 复用本地 body
+                          └─ 200 → 更新缓存
+\`\`\`
+
+实际案例：京东首页的缓存策略是教科书式的分层：HTML 文档 Cache-Control: no-cache（每次协商，保证发版即时生效），带 contenthash 的 JS/CSS 用 max-age=31536000, immutable（一年强缓存，内容变 hash 变 URL 变，旧缓存自然失效），接口数据按业务分级——商品信息 s-maxage=60（CDN 缓存 1 分钟）+ 浏览器不缓存，用户信息完全 no-store。一次错误配置教训：运维把 HTML 也设了 max-age=86400，大促改版后 30% 用户一整天看到旧页面，回滚 CDN 配置 + 强制刷新推送才恢复。
+
+踩坑与 tradeoff：memory cache 和 disk cache 的选择由浏览器决定（小文件/频繁用倾向内存，关标签页内存缓存即清），不是配置项；max-age 是相对时间（响应生成时刻起算）而 Expires 是服务器绝对时间——客户端时钟错乱时 Expires 会翻车，这是它被废弃的原因；协商缓存的 304 也有一次完整 RTT，弱网环境下 RTT 成本可能比 body 传输还高，所以"长强缓存 + hash 指纹"永远优于"短缓存 + 协商"；隐私模式/禁用缓存（DevTools Disable cache 勾选时）绕过全部缓存逻辑，调试缓存问题先确认这个开关。`,
+    keyPoints: ["强缓存零请求，协商缓存一次 RTT 换 304", "max-age 优先于 Expires，no-cache≠no-store", "HTML 协商+静态资源长缓存是标配", "弱网下协商 RTT 成本不可忽略"],
+    followUps: ["memory cache 和 disk cache 的决策逻辑？", "为什么 Expires 被 max-age 取代？"],
+    favorited: false,
+  },
+  {
+    id: "fe-323",
+    nodeId: "fe-http-cache",
+    question: "Cache-Control 的常用指令矩阵是什么？no-cache 和 no-store 到底差在哪？",
+    bigTech: true,
+    answer: `Cache-Control 是逗号分隔的指令集，按作用域分三组。可缓存性：public（共享缓存如 CDN 可存，默认）/private（仅浏览器私有缓存可存，CDN 不可存）/no-store（任何缓存都不许存，每次全量拉取）/no-cache（可以存，但每次使用前必须向源站验证，等价于 max-age=0 + 强制协商）。过期控制：max-age=N（浏览器缓存 N 秒）/s-maxage=N（仅共享缓存生效，覆盖 max-age，CDN 专用）/stale-while-revalidate=N（过期后 N 秒内先返回旧缓存同时后台异步更新，SWR 策略的协议化）/stale-if-error（源站挂了就给旧缓存兜底）。其他：immutable（声明内容永不变，浏览器在 max-age 内连刷新都不发协商请求）/must-revalidate（过期后必须协商成功才能用，禁用启发式缓存）。
+
+\`\`\`
+# 静态资源（带 hash）：一年强缓存+不变声明
+Cache-Control: public, max-age=31536000, immutable
+# HTML 文档：每次协商
+Cache-Control: no-cache
+# 用户敏感数据：完全不存
+Cache-Control: no-store
+# API 列表数据：缓存 60s，容忍 5 分钟旧数据后台更新
+Cache-Control: public, max-age=60, stale-while-revalidate=300
+\`\`\`
+
+实际案例：淘宝 CDN 的静态资源配置是 max-age=31536000, immutable——immutable 的价值在"刷新"场景：没有它，用户按 F5 时浏览器会对所有资源发协商请求（Conditional GET），几百个请求涌向 CDN 边缘节点；有 immutable，刷新也直接用本地缓存，淘宝实测刷新场景的请求数下降 90%。反面案例：某银行 H5 把账户总览接口设成 private, max-age=300，用户转账后余额 5 分钟不更新引发大量客诉——金融数据必须 no-store，缓存分级表上"钱"永远在最严格档。
+
+踩坑与 tradeoff：no-cache 是最大的误解源——名字像"不缓存"实际是"存了但每次都验证"，真想不存用 no-store；s-maxage 只作用于共享缓存，浏览器直接无视，所以 CDN 和浏览器想要不同 TTL 时用 max-age=0, s-maxage=3600 组合（浏览器每次协商、CDN 缓存 1 小时）；stale-while-revalidate 需要 CDN 支持（Cloudflare/阿里云 CDN 都支持），浏览器原生对 HTTP header 版本的支持在 2026 年仍有限，别指望它替代 Service Worker 版 SWR；immutable 在 Firefox 全支持、Chrome 只认 HTTPS 场景下的部分行为，跨浏览器收益不一致——它是增强项不是基础项。`,
+    keyPoints: ["no-cache=存但每次验证，no-store=完全不存", "s-maxage 只管共享缓存（CDN）", "immutable 抑制刷新时的协商洪水", "钱相关数据永远 no-store"],
+    followUps: ["stale-while-revalidate 和 Service Worker SWR 策略的关系？", "启发式缓存（无 Cache-Control 时）浏览器怎么算 TTL？"],
+    favorited: false,
+  },
+  {
+    id: "fe-324",
+    nodeId: "fe-http-cache",
+    question: "ETag 和 Last-Modified 有什么区别？各自的缺陷是什么？",
+    bigTech: true,
+    answer: `Last-Modified 是资源最后修改时间（秒级精度），浏览器下次带 If-Modified-Since 比对；ETag 是内容标识（通常是内容 hash 或版本号，分强 ETag 和弱 ETag W/"..."），浏览器带 If-None-Match 比对。差异本质：Last-Modified 是"时间戳语义"，ETag 是"内容语义"。当两者同时存在时 ETag 优先。Last-Modified 三大缺陷：① 秒级精度，1 秒内多次修改检测不到（高频发布场景翻车）；② 内容没变但 mtime 变了（文件被 touch、集群机器时钟漂移）会误判为修改，白白回 200 全量传输；③ 某些服务器对动态内容不提供或提供的是页面生成时间。ETag 的缺陷：① 集群环境下不同机器生成算法不一致（Nginx 默认用 mtime+size，多机部署同一资源 ETag 可能不同，协商直接失效）；② 强 ETag 要求字节级一致，CDN 做 gzip/brotli 转码后字节变了——所以 CDN 场景要用弱 ETag（W/ 前缀，语义级比较）。
+
+\`\`\`
+HTTP/1.1 200 OK
+Last-Modified: Sat, 25 Jul 2026 08:00:00 GMT   ← 秒级时间戳
+ETag: W/"5e8f-a3b2c1"                            ← 弱 ETag：长度-hash
+# 下次请求
+If-None-Match: W/"5e8f-a3b2c1"      ← ETag 优先
+If-Modified-Since: Sat, 25 Jul 2026 08:00:00 GMT
+\`\`\`
+
+实际案例：一个经典生产事故：公司从单机 Nginx 迁移到三机负载均衡集群后，静态资源 304 率从 95% 暴跌到 20%，带宽成本翻倍。排查发现默认 ETag 算法含 inode 信息，三台机器同一文件的 inode 不同，用户轮询到不同机器时 ETag 永远对不上。修复方案二选一：关闭 ETag 只用 Last-Modified（损失秒级精度），或统一 ETag 生成算法为内容 MD5（Nginx 需要第三方模块，或交给构建产物文件名 hash + 长强缓存绕开协商）。最终选了后者——这又印证"长强缓存+hash 指纹"是对协商缓存复杂性的终极绕行。
+
+踩坑与 tradeoff：ETag 校验在分布式系统里的隐性成本常被低估——如果后端要为每个协商请求计算内容 hash，CPU 开销可能超过直接回 body（小文件场景协商反而更贵），所以 ETag 应该预计算存起来或用文件元数据近似；If-None-Match: * 在 PUT 场景是"仅当资源不存在才写入"的乐观锁语义，和缓存无关但同源；弱 ETag 的"语义等价"由服务器自定义（gzip 前后算等价），如果服务器实现粗糙会把真变更也判为等价；实践中，静态资源交给构建指纹，动态接口的协商缓存用 ETag=业务数据版本号（如 updated_at+id 的 hash）比用内容 hash 便宜得多。`,
+    keyPoints: ["Last-Modified 秒级精度+mtime 误判", "ETag 内容语义但集群生成不一致", "弱 ETag 适配 CDN 转码场景", "指纹长缓存绕开协商复杂性"],
+    followUps: ["强 ETag 和弱 ETag 的语义差异？", "协商缓存对后端 CPU 的成本如何评估？"],
+    favorited: false,
+  },
+  {
+    id: "fe-325",
+    nodeId: "fe-http-cache",
+    question: "为什么带 hash 指纹的静态资源可以放心设置一年强缓存？",
+    bigTech: true,
+    answer: `核心逻辑是"URL 即版本"：构建工具（Vite/Webpack/Rspack）给产物文件名注入内容哈希（app.a3f2c1.js），文件内容任何变化都会产出新 hash 新 URL。这意味着同一个 URL 对应的内容在数学上永不变更——给它 max-age=31536000, immutable 没有"内容更新了缓存没失效"的风险，因为更新必然换 URL。HTML 文档引用新 hash 的资源，所以"HTML 不缓存（或协商缓存）+ 静态资源一年强缓存"构成完整的发版闭环：用户拉新 HTML→发现新资源 URL→缓存未命中→拉新资源；没发版时所有资源 200 from cache 零网络请求。
+
+\`\`\`html
+<!-- 构建产物引用：hash 即版本 -->
+<script src="/assets/app.a3f2c1.js"></script>
+<link href="/assets/index.b8d4e2.css" rel="stylesheet">
+<!-- nginx 对 /assets/ 目录统一长缓存 -->
+location /assets/ {
+  add_header Cache-Control "public, max-age=31536000, immutable";
+}
+location = /index.html {
+  add_header Cache-Control "no-cache";
+}
+\`\`\`
+
+实际案例：字节内部前端发布平台的统计：接入 hash 指纹 + 一年强缓存后，静态资源平均命中率 98.5%，回源带宽下降 82%，二次访问首屏时间中位数从 1.4s 降到 400ms。但踩过一个经典的坑：老项目把 hash 加在 query 上（app.js?v=a3f2c1）而非文件名上——部分老旧 CDN 节点和代理服务器默认忽略 query 串做缓存键，导致 ?v=新hash 仍返回旧文件，全部改成文件名 hash 才解决。另一个细节：source map 文件（app.a3f2c1.js.map）如果也要发布，别忘了它同样享受长缓存，配合 hidden-source-map 策略上传到监控平台即可。
+
+踩坑与 tradeoff：hash 指纹方案的前提是所有资源引用都经过构建工具重写——HTML 里手写的 <img src="/logo.png"> 不进构建管线就没有 hash，这类"裸引用"资源要单独目录 + 短缓存策略；动态 import 的异步 chunk 也有 hash，但如果用户页面开着超过一次发版，旧 HTML 里记录的 chunk URL 已不存在（旧文件被清理），会报 ChunkLoadError——工程上要保留最近 N 个版本的产物目录，或捕获该错误引导用户刷新；immutable 声明后用户强刷（Ctrl+F5）才会跳过缓存，普通 F5 在 Chrome 里对 immutable 资源也不发请求，排查"我改了怎么没生效"先想缓存层级；文件 hash 用内容算（contenthash）而非构建序号（buildhash），否则无关改动也会让全部资源 hash 变化、缓存集体失效。`,
+    keyPoints: ["URL 即版本：内容变 hash 变", "HTML 协商+资源长缓存构成发版闭环", "hash 放文件名而非 query", "ChunkLoadError 要留旧版本或引导刷新"],
+    followUps: ["contenthash/chunkhash/buildhash 的区别？", "用户停留在旧页面时发版如何优雅处理？"],
+    favorited: false,
+  },
+  {
+    id: "fe-326",
+    nodeId: "fe-http-cache",
+    question: "CDN 的工作原理是什么？边缘缓存、回源、缓存键分别怎么理解？",
+    bigTech: true,
+    answer: `CDN（内容分发网络）用"地理就近"对抗光速延迟：在全球部署边缘节点（PoP），用户 DNS 解析时被调度到最近的节点，静态内容直接从边缘返回（RTT 从跨省 50ms 降到同城 5ms）。流程：用户请求→边缘节点查本地缓存→命中直接返回（HIT）→未命中则向源站回源（MISS），拿到内容后按源站响应头（Cache-Control/s-maxage）缓存并返回给用户。缓存键（Cache Key）决定"什么算同一份内容"：默认是完整 URL（含 query），可配置忽略 query、加入 Cookie/Device-Type 等维度——电商大促场景会按 UA 区分移动/PC 缓存不同版本。缓存层级通常是 边缘节点 → 区域中心节点 → 源站 三级，边缘 MISS 先问中心节点，减少回源压力。回源还有"回源 HOST"概念：CDN 回源时请求头的 Host 要配成源站认识的域名，否则源站 404。
+
+\`\`\`
+用户 → [边缘节点] --MISS--> [中心节点] --MISS--> [源站]
+         HIT: 直接返回         回源带上游缓存        按 s-maxage 下发
+缓存键示例： scheme://host/path?query → 可定制剔除 utm_* 等营销参数
+\`\`\`
+
+实际案例：B 站视频封面图的 CDN 缓存键治理：早期 URL 带了一堆统计参数（?from=feed&ts=xxx），每张封面在边缘节点被当成几十个不同资源缓存，命中率只有 40%，回源带宽成本巨大。治理方案是在 CDN 控制台配置缓存键忽略 ts/from 等参数（query string 排序 + 白名单），命中率拉到 92%。另一个经典案例是缓存穿透防护：某电商被恶意爬虫用随机 query（?rand=xxxx）打爆，每个 URL 都是新缓存键，全部回源，源站 QPS 翻 20 倍——最后靠 CDN 层做"缓存键标准化 + 异常流量清洗"才稳住。
+
+踩坑与 tradeoff：CDN 缓存和浏览器缓存是两层独立体系，排查"内容不更新"要先分清是哪一层没刷新——CDN 侧用 curl -I 看响应头里的 X-Cache: HIT/MISS 和 Age 判断；动态内容（个性化推荐）不该过 CDN 缓存或用极短 TTL + vary 头维度，配错了就是"A 用户看到 B 用户数据"的 P0 事故（缓存键里漏了 Cookie/Token 维度）；Purge（缓存刷新）不是瞬时的——全球节点刷新有几分钟延迟，大促发版要预热（主动回源拉新内容到边缘）而不是等 purge 生效；CDN 厂商对 Set-Cookie 响应默认不缓存（合理默认），需要缓存带 Set-Cookie 的响应要显式开配置，反之也要警惕把带 Set-Cookie 的响应缓存下来发给所有用户。`,
+    keyPoints: ["就近访问+边缘缓存抗回源", "缓存键维度决定命中率与正确性", "X-Cache/Age 区分 CDN 层与浏览器层", "个性化内容禁共享缓存防串号"],
+    followUps: ["缓存穿透/击穿/雪崩在 CDN 层各怎么防？", "CDN 预热（prefetch）和刷新（purge）的使用场景？"],
+    favorited: false,
+  },
+  {
+    id: "fe-327",
+    nodeId: "fe-http-cache",
+    question: "前端发版时「HTML 不缓存 + 静态资源长缓存」方案如何完整落地？常见翻车点有哪些？",
+    bigTech: true,
+    answer: `落地方案分四层。构建层：产物文件名带 contenthash，index.html 由构建工具生成并自动引用新 hash 资源。Web 服务器层（Nginx）：/assets/ 目录返回 Cache-Control: public, max-age=31536000, immutable；index.html 返回 Cache-Control: no-cache（每次协商，不发版时 304 成本极小，发版时立即拿到新 HTML）。CDN 层：HTML 不缓存或极短 TTL（s-maxage=0~60s，防 CDN 缓存住旧 HTML），静态资源长缓存 + 缓存键忽略无意义 query。发布层：静态资源先推 CDN（新 hash 资源先就位），再切 HTML（引流量指向新资源）——顺序反了会出现"新 HTML 引用还没上传的资源"404。
+
+\`\`\`nginx
+location /assets/ {
+  expires 1y;
+  add_header Cache-Control "public, immutable";
+}
+location / {
+  try_files $uri /index.html;
+  add_header Cache-Control "no-cache";
+}
+\`\`\`
+
+实际案例：小红书 web 端一次发版事故完整还原：发布流水线先切 HTML 后传静态资源（并行任务时序错乱），新 HTML 上线后引用的新 hash JS 还没到 CDN，用户拿到新 HTML→请求新 JS→404→白屏。故障 15 分钟，回滚 HTML 恢复。之后的流水线固化为"资源先行"：构建产物先全量推 CDN（新旧资源共存，旧 HTML 引用旧资源不受影响）→ 校验资源可访问 → 最后切 HTML 指向新版本。另一个翻车点是 Service Worker 把 HTML 也 CacheFirst 缓存了，协商缓存策略被 SW 拦截层架空——SW 的缓存策略优先级高于 HTTP 缓存，HTML 在 SW 里必须 NetworkFirst。
+
+踩坑与 tradeoff：no-cache 的 HTML 每次都有协商 RTT，对首屏 TTFB 有轻微影响——折中是 CDN 层给 HTML 极短 s-maxage（30-60s）+ stale-if-error，发版延迟一分钟换边缘分发速度；SPA 的 history 路由回退到 index.html 的 try_files 配置别忘加缓存头，否则路由深链直接访问时 HTML 被默认缓存策略坑；灰度发布场景"HTML 不缓存"和"灰度分流"会打架——CDN 按 cookie 分流到新旧 HTML 需要缓存键带灰度维度，复杂度上来后很多团队选择"HTML 不走 CDN 缓存"一刀切；别忘了 favicon/manifest.json 这类非构建产物资源，它们没有 hash 指纹，要单独短缓存策略，否则换 logo 一周不生效。`,
+    keyPoints: ["资源先行后切 HTML 的发版时序", "HTML no-cache+SW 里 NetworkFirst", "CDN 层 HTML 短 TTL 折中", "非构建产物资源单独缓存策略"],
+    followUps: ["灰度发布时 CDN 缓存键如何带灰度维度？", "Service Worker 缓存和 HTTP 缓存的优先级关系？"],
+    favorited: false,
+  },
+  {
+    id: "fe-328",
+    nodeId: "fe-http-cache",
+    question: "Service Worker 缓存策略有哪些？CacheFirst/NetworkFirst/SWR 各自适用什么资源？",
+    bigTech: false,
+    answer: `Service Worker 是浏览器和网络之间的可编程代理，fetch 事件里可以自定义"缓存 vs 网络"的决策，五种经典策略（Workbox 均有实现）：CacheFirst（先查缓存，没有再走网络并写入缓存——适合带 hash 的静态资源，命中后零延迟）；NetworkFirst（先走网络，失败/超时再回退缓存——适合 HTML 和 API 数据，保证新鲜度且有离线兜底）；StaleWhileRevalidate（先返回缓存，同时后台发请求更新缓存供下次用——适合头像/配置类"旧一点没关系但希望更新"的资源）；NetworkOnly/CacheOnly（纯网络/纯缓存，用于特殊场景如 analytics 只走网络）。选型矩阵本质是"新鲜度 vs 可用性 vs 速度"的三角权衡。
+
+\`\`\`js
+// Workbox 路由级策略配置
+registerRoute(
+  ({ request }) => request.destination === "document",
+  new NetworkFirst({ cacheName: "html", networkTimeoutSeconds: 3 })
+);
+registerRoute(
+  /\/assets\/.*\.(js|css)$/,
+  new CacheFirst({ cacheName: "static-v1", plugins: [
+    new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 30 * 86400 }),
+  ]})
+);
+registerRoute(
+  /\/api\/config/,
+  new StaleWhileRevalidate({ cacheName: "api-swr" })
+);
+\`\`\`
+
+实际案例：语雀文档的离线方案是策略组合的范例：文档 HTML 用 NetworkFirst（3 秒超时回退缓存，地铁弱网下直接给缓存版本秒开），编辑器静态资源 CacheFirst（hash 指纹天然安全），文档内容 API 用 SWR（先展示缓存的旧内容，后台拉新后 UI 提示"内容已更新"）。上线后离线/弱网场景的崩溃率下降 76%。反面案例：某团队把用户信息 API 也配了 CacheFirst，用户改头像后 24 小时内看到的都是旧头像——API 数据用 CacheFirst 必须配主动失效机制（如版本号或 maxAge），否则就是数据不一致事故。
+
+踩坑与 tradeoff：SW 的更新机制是面试必考连环坑——新 SW 文件下载后进入 waiting 状态，要等所有页面标签关闭后才 activate（用户感知到的"更新了但不生效"就是这个），skipWaiting + clients.claim() 可强制接管但要小心新旧页面与 SW 版本错配（旧页面拿着旧缓存结构、新 SW 按新结构读）；缓存命名要带版本号，activate 时清理旧版本 cache，否则 CacheStorage 无限膨胀被浏览器配额驱逐（配额满时整个源站数据可能被清，包括 IndexedDB）；预缓存（precache）列表过大拖慢 SW 安装，只预缓存 App Shell，其余运行时缓存；调试 SW 问题三件套：Application 面板看 SW 状态、勾选 Update on reload、Network 面板看请求是否走了 SW（Size 列显示 ServiceWorker）。`,
+    keyPoints: ["五策略本质是新鲜度/可用性/速度权衡", "HTML NetworkFirst+静态资源 CacheFirst+配置 SWR", "SW 更新要 skipWaiting 防版本错配", "cache 命名带版本+activate 清旧"],
+    followUps: ["Service Worker 更新流程（install/waiting/activate）的坑？", "CacheStorage 配额驱逐如何防御？"],
+    favorited: false,
+  },
+  {
+    id: "fe-329",
+    nodeId: "fe-http-cache",
+    question: "发版后用户看到旧页面，如何系统排查缓存问题？",
+    bigTech: true,
+    answer: `缓存排查的本质是"沿请求链路逐层定位"——浏览器缓存（memory/disk）→ Service Worker → CDN 边缘缓存 → 源站，每层都可能持有旧内容。标准动作：① 复现时用 curl -I 直接打源站（绕过全部缓存层）确认源站内容是否最新，源站就是旧的那是发布本身没成功；② curl 打 CDN 域名看响应头：X-Cache: HIT 说明命中边缘缓存，Age 值显示缓存了多久，需要 purge CDN；③ 浏览器 DevTools Network 面板看 Size 列：from disk cache/from memory cache 是浏览器层，from ServiceWorker 是 SW 层；④ Application → Service Workers 看 SW 脚本版本是否是旧版，Storage 里看 CacheStorage 残留。定位到层后对症下药：浏览器层（强缓存头配错）、SW 层（缓存策略/版本未更新）、CDN 层（TTL 过长未 purge）、发布层（资源/HTML 时序错）。
+
+\`\`\`bash
+# 逐层排查三板斧
+curl -I https://origin.internal/app.js      # ① 源站直查
+curl -I https://cdn.example.com/app.js       # ② CDN 层：看 X-Cache/Age
+# ③ 浏览器：Network Size 列 + Application SW 状态
+\`\`\`
+
+实际案例：蚂蚁一次"发了版用户还说看到旧页面"的排查记录堪称模板：客服反馈量 200+，按层排查——源站最新（①排除）、CDN X-Cache: MISS（②排除）、新装浏览器无痕窗口访问正常（排除 CDN 和浏览器强缓存）、老用户 DevTools 里 HTML 显示 from ServiceWorker——锁定 SW 层：上一版 SW 把 HTML 配成了 CacheFirst 且无 maxAge 兜底，新 SW 虽然改了策略但旧 SW 还在控制页面（要等全部标签关闭），旧 SW 持续用旧缓存应答。修复：紧急推送一个带 skipWaiting + 清掉 HTML 缓存的 SW 版本，后续规范固化"HTML 永远 NetworkFirst + SW 更新提示用户刷新"双保险。
+
+踩坑与 tradeoff：最常见的误判是"用户说看到旧页面"就直接 purge CDN——先做分层确认，CDN purge 全球生效有几分钟延迟，乱 purge 还会导致回源流量洪峰；DevTools 的 Disable cache 只影响浏览器 HTTP 缓存，不影响 Service Worker（SW 要单独 Bypass for network），这个开关差异坑过无数人；硬性救场手段是"缓存击穿参数"：在 HTML 引用资源的 URL 后加构建版本 query（?v=build123）并配置 CDN 缓存键包含该参数，一次发版全部缓存键失效——这是核武器，平时别用；建立"缓存配置变更审查"机制比事后排查重要：响应头改动和 SW 策略改动进同一个发布 checklist，很多缓存事故其实是配置 PR 没人 review。`,
+    keyPoints: ["源站→CDN→SW→浏览器逐层定位", "X-Cache/Age/Size 列三个判断点", "SW 旧实例持续控制页面最隐蔽", "purge 前先定位，乱 purge 引发回源洪峰"],
+    followUps: ["Service Worker 的 skipWaiting 使用时机和风险？", "如何设计发版时的缓存失效演练（cache busting drill）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-330",
+    nodeId: "fe-http-cache",
+    question: "HTTP/2 和 HTTP/3 对前端资源加载与缓存策略有什么影响？",
+    bigTech: false,
+    answer: `HTTP/2 的核心变革是多路复用：单 TCP 连接上并行交错传输多个请求/响应流，解决了 HTTP/1.1 的队头阻塞（一个慢响应堵住后面所有请求）和连接数限制（浏览器对单域名 6 连接）。这直接废掉了一批 H1 时代的优化实践：域名分片（shard 到多个域名为绕开连接限制）变得有害（多域名多 TLS 握手，H2 单连接更优）、资源合并雪碧图/打包合并失去意义（多路复用让小文件并行成本极低，合并反而破坏缓存粒度——改一个图标整张雪碧图缓存失效）。HTTP/3 基于 QUIC（UDP 上实现可靠传输+TLS1.3 内建）：0-RTT 握手（二次访问零往返建立连接）、连接迁移（WiFi 切 4G 连接不断，靠 Connection ID 而非四元组）、传输层流级独立（某条流丢包不阻塞其他流，解决 H2 的 TCP 层队头阻塞）。
+
+\`\`\`
+H1: 6 连接 × 队头阻塞 → 域名分片/雪碧图/合并打包
+H2: 单连接多路复用 → 小文件并行、缓存粒度最优化
+H3: QUIC/UDP → 0-RTT、连接迁移、传输层无队头阻塞
+\`\`\`
+
+实际案例：京东将图片域名从 H1 时代的 5 个分片域名（img1-5.360buyimg.com）收拢到单域名 + H2 后，TLS 握手开销下降 60%，图片加载 P95 延迟降 25%——多路复用下并行度不再是瓶颈。另一个 H3 的真实收益案例：快手直播页面的 H3 灰度数据显示，移动网络下（丢包率 2%+ 场景）首帧时间降低 40%，核心机制就是 QUIC 的流级独立：传统 TCP 下 2% 丢包导致整条连接的所有流被重传阻塞，QUIC 下只有丢包那条流等重传。缓存策略侧的影响：H2 时代把"打包合并"改为"按路由/变更频率分 chunk"，每个 chunk 独立指纹独立缓存，变更频率低的 vendor 包缓存命中率从 60% 提升到 95%。
+
+踩坑与 tradeoff：H2 的 server push 已被 Chrome 弃用（2022 年移除，滥用导致推送了浏览器已有缓存的资源，浪费带宽）——替代方案是 103 Early Hints（浏览器收到早期提示头后预加载关键资源，2026 年主流 CDN 均支持）；H3 不是银弹：QUIC 的用户态拥塞控制在某些设备上 CPU 开销高于内核态 TCP，且企业防火墙/运营商对 UDP 的 QoS 策略不可控，主流做法是 H2/H3 双栈 + Alt-Svc 头优雅升级，浏览器自动协商；H2 多路复用有默认流并发上限（SETTINGS_MAX_CONCURRENT_STREAMS，常见 100-256），一个页面几百个小资源仍要排队——代码分割别过度碎片化；TLS 会话复用（session resumption）和 H3 的 0-RTT 都有重放攻击面，非幂等请求（支付/下单）禁止走 0-RTT 数据。`,
+    keyPoints: ["H2 多路复用废掉域名分片和雪碧图", "H3=QUIC：0-RTT/连接迁移/流级独立", "server push 已死，103 Early Hints 接班", "分 chunk 按变更频率提升缓存命中率"],
+    followUps: ["HTTP/2 的 TCP 层队头阻塞是怎么回事？", "103 Early Hints 相比 server push 好在哪？"],
+    favorited: false,
+  },
+  // ===== 新增节点题目：fe-realtime 实时通信 =====
+  {
+    id: "fe-331",
+    nodeId: "fe-realtime",
+    question: "WebSocket 的握手过程是怎样的？它和 HTTP 是什么关系？",
+    bigTech: true,
+    answer: `WebSocket 借 HTTP/1.1 完成握手，之后彻底脱离 HTTP 语义。握手四要素：客户端发 GET 请求带 Upgrade: websocket + Connection: Upgrade + Sec-WebSocket-Key（16 字节随机 base64）+ Sec-WebSocket-Version: 13；服务端回 101 Switching Protocols + Sec-WebSocket-Accept（把 Key 拼接固定 GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" 后 SHA-1 再 base64——客户端校验这个值确认服务端真的懂 WS 协议而非偶然返回 101 的代理）。此后连接升级为全双工二进制帧通道：不再有请求/响应模型，双方随时互发，帧头最小 2 字节（对比 HTTP 头动辄几百字节），这就是为什么实时场景 WS 远优于轮询。URL scheme 是 ws:// 和 wss://（TLS），wss 走 443 能穿过绝大多数企业防火墙。
+
+\`\`\`
+GET /chat HTTP/1.1
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+→ HTTP/1.1 101 Switching Protocols
+  Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+\`\`\`
+
+实际案例：字节飞书网页版长连接的演进很典型：早期用 HTTP 长轮询（30s 挂起），消息到达延迟平均 15s+，服务器维持海量挂起连接内存爆炸；切 WebSocket 后消息延迟降到 100ms 内，单机连接数提升 10 倍（帧协议无 HTTP 头开销，内存占用大降）。但灰度阶段发现企业客户内网防火墙会重置带 Upgrade 头的连接——降级方案必不可少：握手失败/超时 3 秒自动回退到 SSE 或长轮询，这个"渐进降级链"至今是飞书 SDK 的标配。
+
+踩坑与 tradeoff：握手阶段是 HTTP，意味着 cookie、鉴权头可以复用——但 WS 建立后不再带 HTTP 头，鉴权 token 过期后连接不会自动断开，要自己做"服务端主动关闭 + 客户端重连带新 token"的续期机制；反向代理（Nginx）必须显式配置 proxy_set_header Upgrade/Connection 并调大 proxy_read_timeout（默认 60s 无流量就断，心跳间隔要小于它），否则连接莫名被切；WS 没有内置跨域限制（不遵循 CORS！），服务端必须校验 Origin 头防跨站劫持（CSWSH 攻击）；帧分片（FIN 位 + opcode）和 Ping/Pong 控制帧是协议自带的，但应用层消息完整性（粘包拆包）要自己设计——WS 是流式帧协议不是消息协议，这个认知差是新手第一个 bug 的根源。`,
+    keyPoints: ["借 HTTP 握手升级 101，之后脱离 HTTP", "Sec-WebSocket-Accept=Key+GUID 的 SHA-1", "帧头最小 2 字节，全双工", "WS 不遵循 CORS，服务端要校验 Origin"],
+    followUps: ["为什么 WebSocket 不受同源策略限制？如何防 CSWSH？", "Nginx 反代 WebSocket 需要哪些配置？"],
+    favorited: false,
+  },
+  {
+    id: "fe-332",
+    nodeId: "fe-realtime",
+    question: "WebSocket 心跳机制和断线重连如何设计才健壮？",
+    bigTech: true,
+    answer: `心跳的必要性：TCP 连接在无数据时无法感知"假死"——NAT 网关空闲超时（常见 2-5 分钟清映射表）、运营商中间设备断链、对端进程崩溃，TCP 层都不会立刻通知应用层，连接看起来 Established 实际已不通。心跳设计三要素：间隔（25-30s 是业界甜点，小于 NAT 超时又不太频繁）、方向（浏览器 WS API 无法发送协议层 Ping 帧，必须应用层心跳：发 {type:"ping"} 等服务端 pong）、超时判定（发 ping 后 5-10s 没收到 pong 就主动 close 触发重连，别等 TCP 超时）。重连设计三要素：指数退避（1s/2s/4s/8s 封顶 30s，避免服务端重启时被重连风暴打死）、随机抖动（退避时间 ±25% 随机化，防止所有客户端同步重连）、状态机（手动 close 不触发重连，区分"用户主动断开"与"异常断开"，code 1000 正常关闭不重连）。
+
+\`\`\`ts
+class RobustWS {
+  private retry = 0; private heartbeat?: number; private manualClose = false;
+  connect() {
+    this.ws = new WebSocket(URL);
+    this.ws.onopen = () => {
+      this.retry = 0;
+      this.heartbeat = setInterval(() => this.ping(), 25000);
+    };
+    this.ws.onclose = (e) => {
+      clearInterval(this.heartbeat);
+      if (this.manualClose || e.code === 1000) return;
+      const delay = Math.min(1000 * 2 ** this.retry++, 30000) * (0.75 + Math.random() * 0.5);
+      setTimeout(() => this.connect(), delay);
+    };
+  }
+}
+\`\`\`
+
+实际案例：滴滴司机端 H5 的心跳参数是经过实测调优的：移动网络下 NAT 超时实测最短 4 分钟（某省运营商），但考虑电量（心跳唤醒射频模块耗电），最终定 4.5 分钟应用层心跳 + 服务端 10 分钟无消息主动断开。重连侧曾踩过"重连风暴"坑：一次服务端滚动重启，上万客户端同时收到断开事件，都按 1s 固定间隔重连，新实例刚起来就被打满——加入指数退避 + 全抖动（full jitter）后，重连请求被均匀摊在 30s 窗口内，重启恢复时间从 5 分钟降到 40 秒。
+
+踩坑与 tradeoff：心跳太勤费电（移动端射频唤醒是耗电大头），太懒检测慢——iOS 上 WKWebView 对 JS 定时器有后台节流，页面切后台心跳会停，要监听 visibilitychange 在回前台时立即探活一次；重连后必须恢复会话状态：重新订阅频道、用 lastEventId 拉取断线期间的消息（服务端要缓存最近 N 条），否则重连成功但消息丢了等于白连；双开检测别忽略：同一账号两个标签页各连一条 WS，服务端要踢旧连接或做连接合并，不然消息双份推送、客户端状态互相打架；弱网环境下 WebSocket 帧也可能乱序到达吗？——不会，TCP 保证有序，但"应用层重连补发"和"旧连接残余消息"可能交错，需要消息 seq 去重，这是从心跳重连自然延伸到的可靠性设计。`,
+    keyPoints: ["心跳防 NAT 假死，浏览器只能应用层心跳", "指数退避+全抖动防重连风暴", "code 1000/手动关闭不重连", "重连后要补拉断线消息+重订阅"],
+    followUps: ["移动端后台节流对心跳的影响与对策？", "重连后如何恢复消息连续性（lastEventId 机制）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-333",
+    nodeId: "fe-realtime",
+    question: "SSE（Server-Sent Events）和 WebSocket 有什么区别？如何选型？",
+    bigTech: true,
+    answer: `SSE 是基于普通 HTTP 的单向推送：客户端 EventSource 发起请求，服务端回 Content-Type: text/event-stream 并保持连接不断，随时写入 data: {...}\\n\\n 格式的帧。与 WS 的本质差异：① 方向——SSE 只能服务端→客户端单向，客户端想说话得另外发普通 fetch；WS 全双工。② 协议——SSE 就是 HTTP，天然过代理/防火墙/CDN，自带 HTTP 语义（cookie/缓存/状态码）；WS 是独立协议，基础设施支持参差不齐。③ 重连——SSE 浏览器原生自动重连（默认 3s），且支持 Last-Event-ID 断线续传；WS 要手写整个重连逻辑。④ 数据格式——SSE 只支持 UTF-8 文本；WS 支持二进制帧。⑤ 连接数——SSE 在 HTTP/1.1 下受浏览器单域名 6 连接限制，HTTP/2 下靠多路复用解决。⑥ 实现成本——SSE 服务端就是"不结束的 HTTP 响应"，任何框架 10 行搞定。
+
+\`\`\`js
+// SSE 客户端：自动重连+断点续传开箱即用
+const es = new EventSource("/api/stream");
+es.onmessage = (e) => render(JSON.parse(e.data));
+es.addEventListener("done", () => es.close());
+// 服务端（Node）：就是不关的 HTTP 响应
+res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+res.write(\`data: \${JSON.stringify(chunk)}\\n\\n\`);
+\`\`\`
+
+实际案例：ChatGPT 及国内所有大模型对话产品的流式输出都用 SSE（而非 WebSocket）——选型逻辑完美契合 SSE 的甜区：用户发一条消息（普通 POST）→服务端持续吐 token（单向流）→流结束连接关闭。双向需求为零，WS 的双工能力纯属浪费；且 SSE 过企业代理的通过率远高于 WS（很多公司内网拦 Upgrade 头），ToB 产品这点是决定性的。反例是协同编辑（Figma/腾讯文档）：多人光标位置要高频互发（双向+低延迟+二进制优化），必须 WS/WebRTC，SSE 单向通道干不了。
+
+踩坑与 tradeoff：SSE 的"自动重连"是双刃剑——服务端主动结束流后浏览器还会傻乎乎重连，要发特定事件（如 event: close）让客户端 es.close()；HTTP/1.1 下 SSE 长连接占满 6 连接配额后，页面其他请求全部排队（真实事故：某监控大屏开 2 个 SSE 标签页后页面加载卡死），生产环境 SSE 必须配 HTTP/2；Nginx 反代要关 buffering（proxy_buffering off）加 X-Accel-Buffering: no，否则流式数据被攒在代理缓冲区，"流式"变"一次性"；Last-Event-ID 续传要求服务端缓存历史消息，内存成本高，大模型场景通常放弃续传（流断了就重新生成）；移动网络下 SSE 没有心跳标准，要自己发注释行（: ping\\n\\n）防代理断连。`,
+    keyPoints: ["SSE=HTTP 单向流，WS=独立协议全双工", "SSE 自动重连+Last-Event-ID 原生续传", "大模型流式输出是 SSE 甜区", "H1 下 SSE 占连接配额，必须 H2"],
+    followUps: ["为什么 ChatGPT 类应用选 SSE 而不是 WebSocket？", "Nginx 反代 SSE 需要哪些配置？"],
+    favorited: false,
+  },
+  {
+    id: "fe-334",
+    nodeId: "fe-realtime",
+    question: "WebRTC 建立 P2P 连接的过程是怎样的？信令、ICE、STUN/TURN 各扮演什么角色？",
+    bigTech: false,
+    answer: `WebRTC 是浏览器内置的 P2P 实时音视频/数据通道协议栈，建连四步：① 信令交换（Signaling）：双方通过任意信道（通常是 WebSocket）互换 SDP offer/answer——SDP 描述各自支持的编解码、媒体格式、传输参数；WebRTC 故意不定义信令协议，把灵活性留给应用层。② ICE 候选收集：每个端通过 host（本机 IP）、srflx（STUN 服务器反射出的公网 IP:端口）、relay（TURN 服务器中继地址）三种方式收集候选地址，经信令通道互换。③ 连通性检查：ICE 框架按优先级对候选地址两两打洞（UDP 打洞穿越 NAT），找到可达路径。④ DTLS 握手加密 + 媒体/数据通道建立。STUN 解决"我在公网眼里是谁"（轻量查询），TURN 解决"打洞实在打不通"（对称 NAT 场景，流量全走服务器中继，带宽成本高，是兜底）。
+
+\`\`\`js
+const pc = new RTCPeerConnection({ iceServers: [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "turn:turn.example.com", username: "u", credential: "p" },
+]});
+pc.onicecandidate = ({ candidate }) => candidate && ws.send({ type: "ice", candidate });
+const offer = await pc.createOffer();
+await pc.setLocalDescription(offer);
+ws.send({ type: "offer", sdp: offer });  // 信令通道互换，之后 ICE 打洞
+\`\`\`
+
+实际案例：腾讯会议的网页版实践说明了 TURN 的现实地位：纯 P2P 理想很丰满，但企业网常见对称 NAT（每次映射端口都变）+ UDP 封锁，实测 P2P 打洞成功率约 70-80%，剩下 20-30% 必须走 TURN 中继——所以商业 RTC 产品的成本模型里 TURN 带宽是大头，"边缘 TURN 节点部署密度"直接决定弱网体验。另一个前端侧案例：WebRTC DataChannel 做游戏联机（无需音视频的纯数据 P2P），某派对游戏 H5 用 DataChannel 传操作指令，延迟从走服务器的 120ms 降到 P2P 的 35ms，但同样要准备 TURN 兜底 + 失败时降级到 WebSocket 中继。
+
+踩坑与 tradeoff：localhost 调试一切正常、上真机全挂是 WebRTC 第一坑——host candidate 在 NAT 后毫无意义，没有 STUN/TURN 配置就是同网段玩具；ICE 重启（iceRestart）在网络切换（WiFi→4G）时必须触发，WebRTC 没有像 QUIC 那样的连接迁移，不断线重协商就会卡死；Safari 的 WebRTC 实现长期有坑（H.264 强制、DataChannel 兼容），跨端音视频务必用 adapter.js 抹平；P2P 省服务器带宽是双刃剑——大规模会议（>6 人）全网状 P2P 上行带宽爆炸（n-1 路上传），必须用 SFU（Selective Forwarding Unit，服务器只转发不转码）架构，这就回到"服务器中转"了，所谓 P2P 在小规模通话才是真相；DataChannel 默认不可靠无序（可配 reliable/ordered），游戏指令用不可靠模式降延迟，文件传输必须可靠模式。`,
+    keyPoints: ["信令换 SDP，ICE 收集候选打洞", "STUN 查公网地址，TURN 中继兜底", "对称 NAT 场景 TURN 是刚需成本", "多人场景 SFU 架构取代全网状 P2P"],
+    followUps: ["对称 NAT 为什么打洞必失败？", "SFU 和 MCU 架构的区别与成本对比？"],
+    favorited: false,
+  },
+  {
+    id: "fe-335",
+    nodeId: "fe-realtime",
+    question: "轮询、长轮询、SSE、WebSocket 四种实时方案的对比与降级链如何设计？",
+    bigTech: true,
+    answer: `四维对比。实时性：WS（毫秒级双向）> SSE（毫秒级单向）> 长轮询（秒级，消息到达时若正好没有挂起请求要等下一轮）> 轮询（取决于间隔，分钟级）。服务器成本：WS/SSE 维持长连接（内存 = 连接数 × 缓冲区），长轮询是"挂起的 HTTP"同样占连接但更费（每次消息都要重建请求），轮询连接成本最低但 QPS 高（10 万客户端 30s 轮询 = 3333 QPS 空请求）。兼容性/穿透性：轮询 = 长轮询 > SSE > WS（Upgrade 头被企业代理拦的概率最高）。基础设施：轮询/长轮询吃尽 HTTP 生态（CDN/缓存/负载均衡零改造），SSE 要代理关 buffering，WS 要 LB 支持协议升级且不能简单轮询负载（连接亲和性 sticky session）。降级链设计：WS → SSE → 长轮询 → 短轮询，每级探测失败自动降一级并定期尝试升级。
+
+\`\`\`ts
+async function connect() {
+  if (await tryWebSocket(3000)) return startWS();          // 3s 握手超时降级
+  if (await trySSE(3000)) return startSSE();
+  return startLongPolling();                                // 兜底：30s 挂起
+}
+// 每 5 分钟悄悄探测 WS 是否恢复，恢复则静默升级
+\`\`\`
+
+实际案例：钉钉网页版消息通道的降级策略：默认 WebSocket；检测到企业代理拦截（握手 3s 超时）降 SSE；SSE 也被拦（极少数代理对长连接 HTTP 也超时截断）降长轮询（挂起 25s）；以上全挂（IE 时代遗产）降 5s 短轮询。每层降级都上报埋点，运营后台能看到"全公司有多少用户被迫轮询"，某次发现某大客户全员走长轮询，推动客户网管放行 WS 后服务器成本降一半。另一个反向教训：早期版本没有"升级回探"，一次运营商网络抖动让几万用户掉进轮询后再没回来，空跑了一周 QPS 成本。
+
+踩坑与 tradeoff：长轮询的实现细节决定生死——服务端挂起请求要设超时（25-30s，小于 LB 空闲超时），超时返回空响应客户端立即重发，否则 LB 先断连客户端拿到 truncated response；挂起期间消息到达要立刻返回（别攒批），客户端收到响应要立刻发起下一轮（间隙就是消息盲区）；轮询的"看起来的简单"有隐性成本：etag/304 可以减少空轮询的带宽，但数据库查询压力一点没少，热点数据要配服务端缓存；降级链的探测顺序要按用户环境记忆（localStorage 记录上次成功的通道），企业网用户不用每次都先试 WS 失败 3 秒；别忘了电量：移动端高频轮询是电量杀手，降级到轮询时把间隔拉长到业务可接受的最低频。`,
+    keyPoints: ["实时性/成本/穿透性三角权衡", "降级链 WS→SSE→长轮询→短轮询", "长轮询挂起超时<LB 空闲超时", "降级要记忆+静默回探升级"],
+    followUps: ["长轮询服务端如何实现挂起与唤醒？", "WebSocket 的负载均衡为什么需要 sticky session？"],
+    favorited: false,
+  },
+  {
+    id: "fe-336",
+    nodeId: "fe-realtime",
+    question: "实时消息系统如何保证消息可靠性？ACK、去重、有序、幂等分别怎么实现？",
+    bigTech: true,
+    answer: `WebSocket 底层 TCP 保证"连接内"可靠有序，但应用层可靠性要自建——连接断开、服务端重启、客户端崩溃期间的消息都会丢。四件套设计：① ACK 确认：客户端收到消息后回 {ack: msgId}，服务端未收到 ACK 的消息在超时后重发（at-least-once 语义，代价是可能重复）；② 去重：每条消息带全局唯一 msgId（服务端发号，如 snowflake），客户端维护已处理 msgId 集合（LRU 存最近几千条），重复消息直接丢弃——ACK+去重组合实现"恰好一次"效果；③ 有序：消息带单调递增 seq（按会话维度），客户端发现 seq 跳号（收到 105 时上次是 102）说明中间丢了，主动拉取 103-104 补洞；④ 幂等：写操作（发送消息/点赞）带客户端生成的 requestId，服务端对重复 requestId 返回首次结果而非重复执行——重试不产生副作用。
+
+\`\`\`ts
+// 客户端可靠接收骨架
+const seen = new LRUSet<string>(5000);
+let lastSeq = 0;
+ws.onmessage = async (e) => {
+  const msg = JSON.parse(e.data);
+  ws.send(JSON.stringify({ ack: msg.msgId }));          // ① ACK
+  if (seen.has(msg.msgId)) return; seen.add(msg.msgId); // ② 去重
+  if (msg.seq > lastSeq + 1) await fetchMissed(lastSeq, msg.seq); // ③ 补洞
+  lastSeq = Math.max(lastSeq, msg.seq);
+  render(msg);
+};
+\`\`\`
+
+实际案例：企业微信的消息可靠性协议简化版即此模型：服务端为每个会话维护 seq 序列，客户端本地持久化 lastSeq，重连后上报 lastSeq，服务端差量推送缺失消息（类似 Kafka 的 offset 消费语义）；ACK 超时 5s 重发最多 3 次仍失败则标记"未达"，转为离线消息等下次登录拉取。反例教训：某客服系统初版没做幂等——用户点"发送"后网络抖动，客户端 3s 没收到响应自动重试，结果同一句话发出两条，客服侧看到重复消息以为是用户刷屏。加 requestId 幂等后解决：重试命中服务端已处理的 requestId，直接返回首次的 msgId。
+
+踩坑与 tradeoff：at-least-once + 去重是业界标准答案，别追求传输层"恰好一次"（两阶段提交在移动网络下不现实）；ACK 的粒度有讲究——逐条 ACK 在高频消息场景（直播弹幕每秒千条）信令开销爆炸，可以批量 ACK（每 100 条或每秒一次，ack 最大 seq）；msgId 发号器是分布式系统的经典难题，snowflake 时钟回拨要处理，小系统用 UUID 牺牲有序性换取零协调；seq 补洞拉取接口要做限流和最大窗口（一次最多补 200 条，更多则走全量同步），防止恶意客户端用补洞接口拖垮服务端；客户端持久化 lastSeq 用 IndexedDB 异步写，注意"渲染了但 lastSeq 没落盘就崩溃"的边界——宁可重放消息（去重兜底）不可跳号。`,
+    keyPoints: ["TCP 只保连接内可靠，应用层要 ACK+重发", "msgId 去重把 at-least-once 变恰好一次", "seq 跳号主动补洞", "写操作 requestId 幂等防重试副作用"],
+    followUps: ["为什么分布式消息 ID 常用 snowflake？时钟回拨怎么办？", "批量 ACK 和逐条 ACK 如何取舍？"],
+    favorited: false,
+  },
+  {
+    id: "fe-337",
+    nodeId: "fe-realtime",
+    question: "WebSocket 高频消息下的背压（backpressure）问题如何处理？",
+    bigTech: false,
+    answer: `背压是"生产速度 > 消费速度"时的流量控制问题。WS 场景：服务端每秒推 1000 条行情/弹幕，客户端渲染只能消化 100 条，消息在 JS 层堆积——onmessage 回调排队、内存上涨、UI 假死。TCP 层有内建背压（接收窗口 rwnd 满了通知发送方减速），但 WS 应用层消息一旦 deliver 给 JS 就脱离了 TCP 背压管辖——bufferedAmount 属性只能看"客户端→服务端"方向的发送积压（要控制发送速率时检查 bufferedAmount < 阈值再 send），接收方向没有 API，必须应用层自建。客户端侧三板斧：① 采样/合并——高频更新只保留最新值（股票行情同一代码每秒 50 次报价只渲染最后一次，中间丢弃）；② 批量渲染——消息先入数组缓冲，rAF 回调里一次性 flush（每帧最多渲染 N 条）；③ 限流降级——缓冲区超阈值时通知服务端降频（应用层 flow control 消息）。
+
+\`\`\`ts
+// 缓冲+rAF 批量渲染+自适应采样
+const buf: Tick[] = [];
+ws.onmessage = (e) => {
+  const tick = JSON.parse(e.data);
+  const i = buf.findIndex(t => t.code === tick.code);
+  if (i >= 0) buf[i] = tick; else buf.push(tick);  // 同代码只留最新
+  if (buf.length > 5000) buf.splice(0, buf.length - 5000); // 硬上限防 OOM
+};
+function flush() {
+  if (buf.length) render(buf.splice(0));  // 每帧一次 DOM 更新
+  requestAnimationFrame(flush);
+}
+\`\`\`
+
+实际案例：某币圈行情站点的真实事故：BTC 剧烈波动时服务端推送频率从每秒 50 涨到 2000，客户端 onmessage 里直接 React setState 逐条渲染，3 分钟后页面内存 1.2GB 崩溃。治理分三层：渲染层改 Canvas 绘制（表格 DOM 改 canvas，单帧渲染成本从 80ms 降到 4ms）；数据层同代码报价合并（90% 的消息被合并丢弃）；协议层加 flow control——客户端检测到缓冲超阈值就发 {slowDown: true}，服务端降采样到 10 次/秒推送。三层下来 CPU 从 95% 降到 20%。
+
+踩坑与 tradeoff：发送方向的 bufferedAmount 检查有坑——它是"已交给 WS 但还没进 TCP 缓冲区"的字节数，判断时机要异步（send 后立即查是同步增长的），且浏览器实现有差异（Safari 历史版本不更新该值）；丢弃策略必须业务对齐：行情可以丢中间态（只关心最新价），聊天消息一条都不能丢（只能排队不能采样），日志流可以丢但要在服务端标记"此处有丢失"（否则排查问题误以为日志断了）；服务端侧的背压同样存在——Node WS 服务端向慢客户端发送时 socket 缓冲区膨胀拖垮整个进程，成熟的库（uWebSockets.js）会按客户端分组限速甚至主动断开"拖累全局"的慢消费者；监控指标必须前置：缓冲区长度、丢弃率、flush 延迟埋点上报，背压问题在用户感知前就该告警。`,
+    keyPoints: ["接收方向无 API，背压要应用层自建", "采样合并/批量渲染/服务端降频三板斧", "bufferedAmount 只覆盖发送方向", "丢弃策略必须对齐业务语义"],
+    followUps: ["TCP 接收窗口（rwnd）如何实现传输层背压？", "Node WS 服务端如何防御慢消费者拖垮进程？"],
+    favorited: false,
+  },
+  {
+    id: "fe-338",
+    nodeId: "fe-realtime",
+    question: "大模型流式输出（SSE / fetch ReadableStream）前端如何高效渲染？",
+    bigTech: true,
+    answer: `2026 年 AI 应用的标准形态：POST 发起对话，响应体是 text/event-stream 流，服务端逐 token 推送，前端边收边渲染"打字机"效果。技术栈两种：EventSource（简单但不支持 POST/自定义头，基本被淘汰出 AI 场景）和 fetch + ReadableStream（支持 POST/鉴权头，主流方案）。流解析要点：reader.read() 返回 Uint8Array 块，块边界任意切分——一个 data: 帧可能被拆到两个块里，必须维护字符串缓冲区按 \\n\\n 分隔符切帧，帧不完整就等下一块。渲染优化三招：① 节流 setState——token 到达频率（每秒 50-200 个）远超渲染需求，缓冲区攒 50-100ms 批量 setState 一次，或直接用 useSyncExternalStore/外部 store 绕过 React 渲染队列；② Markdown 增量解析——全量 re-parse 是 O(n²)，用增量解析器或只在段落边界（双换行）重解析已完成段落，进行中的段落纯文本渲染；③ 自动滚动——新内容到底部时跟随滚动，用户上翻则暂停跟随（滚动位置判定 + ResizeObserver）。
+
+\`\`\`ts
+const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ prompt }) });
+const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  buffer += value;
+  const frames = buffer.split("\\n\\n");
+  buffer = frames.pop()!;                       // 半帧留到下轮
+  for (const f of frames) {
+    if (f.startsWith("data: ")) appendToken(f.slice(6));
+  }
+}
+\`\`\`
+
+实际案例：Kimi 网页版的渲染管线实测数据：直接每 token setState 时，长回答（4000 token）场景 React 渲染 4000 次，主线程占用 90%+，输入框卡顿；改 100ms 攒批后渲染次数降到 1/20，打字机效果肉眼无差别。另一个工程细节是 Markdown 代码块的特殊处理：流式输出中代码块未闭合时（三个反引号的开始围栏已出现、结束围栏还没到），全量解析会把后续所有内容吞进代码块——方案是解析前检测未闭合围栏，临时补上闭合符再解析（业内称"补尾解析"），显示效果稳定且不影响后续增量。
+
+踩坑与 tradeoff：fetch 流式读取在部分安卓 WebView（老版本 Chromium）不支持 ReadableStream——要降级到 XHR onprogress（responseText 增量读取，记录已处理长度切片）或 EventSource+GET 方案；SSE 帧里的 data: [DONE] 是 OpenAI 风格约定不是协议标准，解析逻辑要对齐所用模型服务商的帧格式；流中断处理是产品体验分水岭：网络断开时已生成的内容要保留并提示"继续生成"（带上上文重发请求），而不是整个回答消失；长回答自动滚动时如果用户在阅读历史内容，强制滚动到底部是体验灾难——"跟随滚动只在贴底时激活"是必备交互；token 渲染如果带代码高亮（highlight.js/shiki），高频调用高亮是性能黑洞，代码块闭合前只做轻量染色或纯文本，闭合后再完整高亮。`,
+    keyPoints: ["流块边界任意，缓冲区按 \\n\\n 切帧", "token 攒批渲染防 setState 风暴", "未闭合代码块要补尾解析", "贴底跟随+上翻暂停的滚动策略"],
+    followUps: ["为什么 AI 对话场景 EventSource 不够用？", "Markdown 增量解析还有哪些边界情况（表格/列表）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-339",
+    nodeId: "fe-realtime",
+    question: "WebSocket 在弱网和移动端环境下面临哪些挑战？如何优化？",
+    bigTech: false,
+    answer: `移动端弱网对 WS 是五连击：① 连接存活难——NAT 超时（2-5 分钟）、基站切换、WiFi/4G 切换都会静默断链，TCP 层无感知；② 后台节流——iOS 上 JS 定时器在后台被冻结，心跳停摆，回前台时连接已死但应用还以为活着；③ 耗电——长连接阻止基带休眠，心跳频率是电量与实时性的直接 tradeoff；④ 协议开销敏感——弱网带宽宝贵，JSON 文本帧的体积浪费被放大；⑤ 重连成功率低——弱网下握手本身可能多次超时，固定重试策略会在"永远连不上"的场景空转耗电。优化矩阵：心跳间隔动态化（根据网络类型 WiFi 25s/4G 4.5min，Network Information API 辅助判断）、visibilitychange 联动（回前台立即探活重连）、消息协议二进制化（Protobuf/MessagePack 替代 JSON，体积降 60-80%）、重连加预算（弱网场景最多重试 N 次后转轮询或提示用户）。
+
+\`\`\`ts
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") ws.pingNow(); // 回前台立即探活
+});
+// 二进制协议：Protobuf 编码后帧体积为 JSON 的 1/4
+const frame = Message.encode({ seq, body }).finish();
+ws.send(frame);
+\`\`\`
+
+实际案例：美团骑手端 Web 长连接的优化数据：心跳从固定 30s 改为按网络类型动态调整（WiFi 30s/4G 270s）后，骑手端日均电量消耗降 8%，消息到达延迟 P95 仅从 1.2s 升到 1.8s（业务可接受）。另一个经典案例是微信网页版的教训：早期版本在 iOS Safari 后台被杀 JS 后，回前台不检测连接状态直接发消息，消息实际已发不出但 UI 显示"已发送"，造成大量"对方没收到"投诉——修复是发送前必检 readyState，非 OPEN 状态先入离线队列 + 触发重连，重连成功再补发并标记补发状态。
+
+踩坑与 tradeoff：Network Information API（navigator.connection）的兼容性在 2026 年仍是 Chromium 系专属，Safari/Firefox 拿不到网络类型——降级策略是用历史 RTT 数据推断网络质量（心跳 RTT 连续超阈值判定弱网）；二进制协议省下流量但牺牲可调试性，DevTools 里二进制帧不可读，开发环境要保留 JSON 模式开关；iOS 的 PWA/添加到主屏场景对长连接更不友好（独立进程生命周期更激进），核心消息必须有"拉取兜底"——进入会话时全量同步一次最新消息，别全押推送通道；多标签页共享一条 WS（SharedWorker 或 BroadcastChannel 转发）能省连接数和电量，但 SharedWorker 的 Safari 支持在 2026 年仍不完整，备选方案是选一个标签页当"主连接持有者"（localStorage 竞选锁）；别忽视 IPv6-only 网络（部分校园网/新运营商），DNS 解析和 STUN 地址都要兼容。`,
+    keyPoints: ["NAT 超时/后台节流/耗电/协议开销/重连成功率五连击", "心跳按网络类型动态化", "回前台立即探活+发送前检 readyState", "Protobuf 二进制帧省 60-80% 体积"],
+    followUps: ["多标签页共享 WebSocket 的方案与兼容性？", "弱网下如何用历史 RTT 推断网络质量？"],
+    favorited: false,
+  },
+  // ===== 新增节点题目：fe-design-patterns 前端设计模式 =====
+  {
+    id: "fe-340",
+    nodeId: "fe-design-patterns",
+    question: "观察者模式和发布订阅模式的区别是什么？前端有哪些真实应用？",
+    bigTech: true,
+    answer: `区别在"耦合度"：观察者模式里 Subject 直接持有观察者列表并逐个调用 update（双方互相知道对方存在，同步调用）；发布订阅多了一层事件中心（Broker），发布者 emit 到频道、订阅者 on 频道，双方互不知道对方——解耦更彻底但调试链路更长（"谁发的、谁在听"要靠日志追）。前端的真实应用遍地都是：观察者——Vue2 的响应式系统（Dep 持Watcher 列表，Dep 就是 Subject，Watcher 就是 Observer，数据变化时 dep.notify() 直接调 watcher.update）、MutationObserver、RxJS 的 Subject；发布订阅——Node 的 EventEmitter、Redux 的 store.subscribe、postMessage、Mitt/TinyEmitter 这类 200 字节的事件库、Vue3 组件间通信的 emit。
+
+\`\`\`ts
+// 观察者：Subject 直持观察者，同步逐个通知
+class Dep {
+  private subs = new Set<Watcher>();
+  depend(w: Watcher) { this.subs.add(w); }
+  notify() { this.subs.forEach(w => w.update()); }  // 直接调用，知道对方
+}
+// 发布订阅：中间商赚差价（解耦）
+const bus = {
+  map: new Map<string, Set<Fn>>(),
+  on(ev: string, fn: Fn) { /* ... */ },
+  emit(ev: string, data: unknown) { this.map.get(ev)?.forEach(fn => fn(data)); },
+};
+// 发布者和订阅者只认识 bus，互不认识
+\`\`\`
+
+实际案例：微前端架构里跨应用通信的经典选择就是发布订阅——主应用不 import 子应用任何模块（那是构建时耦合，违背微前端初衷），而是约定一个全局 eventBus（qiankun 的 initGlobalState 本质就是带状态快照的发布订阅），订单应用 emit("cart:updated")，商品应用 on("cart:updated") 刷新推荐位。反面案例：某中后台项目滥用全局 EventBus 替代 props 传递，三个月后没人说得清一个事件有几处监听、触发顺序是什么，一次重构漏改监听名导致功能静默失效——事件总线的解耦是以"显式依赖变隐式依赖"为代价的。
+
+踩坑与 tradeoff：发布订阅最大的坑是内存泄漏——组件销毁忘了 off，回调里持有组件引用，SPA 路由切换十几次后同一事件挂着十几个僵尸回调，重复请求、重复弹窗、内存上涨三连；用 AbortSignal 或封装 useEventBus hook 在组件卸载时自动 off 是现代解法；同步发布订阅会让"一次 emit 触发连环 emit"形成事件瀑布，排查时用事件名全局搜索 + 打埋点日志是基本生存技能；选型建议：父子组件通信用 props/emit（显式），跨层级用 provide/inject 或状态库（可追踪），只有真正"广播且不关心谁听"的场景（埋点、全局通知、微前端通信）才上事件总线。`,
+    keyPoints: ["观察者直接互知，发布订阅经 Broker 解耦", "Vue 响应式=观察者，EventEmitter=发布订阅", "忘 off 是内存泄漏头号来源", "解耦的代价是依赖关系隐式化"],
+    followUps: ["Vue3 的响应式（Proxy+effect）还算观察者模式吗？", "如何用 AbortSignal 管理事件订阅的生命周期？"],
+    favorited: false,
+  },
+  {
+    id: "fe-341",
+    nodeId: "fe-design-patterns",
+    question: "策略模式如何消除前端的大量 if-else/switch？举个真实业务例子。",
+    bigTech: true,
+    answer: `策略模式把"可互换的算法族"各自封装成策略对象，运行时按 key 选取执行，替代按条件分支堆叠的 if-else。前端收益不只是"少几个分支"：新增策略只需注册新条目（开闭原则），每个策略可独立测试，条件逻辑从"n 层嵌套 if"变成"查表 dispatch"。典型场景：表单校验规则、支付方式路由、导出格式处理、主题/皮肤切换、A/B 实验分桶。反模式是策略退化——策略表里每个函数又写成一坨 if-else，等于换了个地方堆。
+
+\`\`\`ts
+// 反例：新增一种导出格式要改两个 switch，漏一个就出 bug
+function exportData(type: string, data: Row[]) {
+  if (type === "csv") { /* ... */ } else if (type === "xlsx") { /* ... */ }
+}
+// 策略表：新增格式只加一行注册，调用方零改动
+const exporters: Record<string, (rows: Row[]) => Blob> = {
+  csv: (rows) => new Blob([toCsv(rows)], { type: "text/csv" }),
+  xlsx: (rows) => new Blob([toXlsx(rows)], { type: "application/vnd.ms-excel" }),
+  pdf: (rows) => toPdf(rows),
+};
+const exportData = (type: string, rows: Row[]) =>
+  (exporters[type] ?? exporters.csv)(rows);
+\`\`\`
+
+实际案例：有赞微商城的订单列表页有 20+ 种订单状态（待付款/待发货/拼团中/退款中…），每种状态对应的操作按钮组、状态徽标颜色、跳转逻辑都不同。早期代码是一个 300 行的 switch，产品每加一种状态类型就要在 5 个 switch 里各加 case，漏改率极高，测试全靠人肉回归。重构为策略配置表：statusConfig: Record<OrderStatus, { actions: Action[]; badge: string; route: string }>，新状态只加配置项，并写了 schema 校验——配置缺字段时构建期报错，相关缺陷归零。这就是"数据驱动 UI"的本质：策略表其实是 DSL。
+
+踩坑与 tradeoff：策略模式的滥用信号是"每个策略只有一行代码"——为三分支的 if 建策略表是过度设计，判断标准：分支数 ≥4、分支逻辑独立演化、不同分支被不同需求驱动时才值得抽；策略表放模块级常量还是运行时注册（register API）有讲究：库代码用注册机制（插件化，如 rollup 插件、webpack loader 都是策略注册），应用代码用静态表（可 tree-shake、IDE 可跳转）；策略 key 的类型安全用 TS 的 satisfies Record<Status, Strategy> 锁死，避免"加了枚举值忘了加策略"在运行时才炸；策略内共享的上下文（如用户权限、AB 分组）用工厂函数闭包注入，别用 this 魔法。`,
+    keyPoints: ["查表 dispatch 替代条件分支", "开闭原则：新策略只注册不改调用方", "分支≥4 且独立演化才值得抽", "TS satisfies 锁死策略表完整性"],
+    followUps: ["策略模式和状态模式的区别？", "库代码的插件注册机制（如 Rollup）是不是策略模式？"],
+    favorited: false,
+  },
+  {
+    id: "fe-342",
+    nodeId: "fe-design-patterns",
+    question: "装饰器模式在前端有哪些真实应用？TS 装饰器和 HOC 是什么关系？",
+    bigTech: true,
+    answer: `装饰器模式的核心是"不改原对象结构，通过包装叠加能力"——输入一个函数/类/组件，输出增强了日志、缓存、权限、埋点等横切能力的新版本。前端三大真实载体：① 高阶组件 HOC（React 生态的装饰器：withAuth(withLogging(Component))，每层包装加一种能力，洋葱模型）；② 高阶函数工具（lodash 的 once/memoize/debounce 全是装饰器——拿原函数返回增强函数）；③ TS 装饰器语法（@observable、@bound、NestJS/Angular 的 @Injectable/@Get——本质是把元编程包装写成声明式标注，TS 5.0 已支持 2023-11 版标准装饰器，与旧的 experimentalDecorators 语义不同）。axios 拦截器、Koa/Express 中间件是同一思想的"责任链变体"。
+
+\`\`\`ts
+// 高阶函数装饰器：埋点能力叠加到任意函数
+const withTrack = <F extends Fn>(fn: F, event: string): F =>
+  ((...args: unknown[]) => { track(event); return fn(...args); }) as F;
+const save = withTrack(realSave, "btn_save_click");
+// HOC 装饰组件：权限+加载态
+const withAuth = (C: FC) => (p: P) => useAuth() ? <C {...p} /> : <Login />;
+// TS 标准装饰器（2023-11）：方法级增强
+function logged(_t: unknown, _k: string, d: PropertyDescriptor) { /* 包装原方法 */ }
+\`\`\`
+
+实际案例：Ant Design Pro 的权限组件生态就是装饰器链：页面组件 export default withAuth(withLayout(withErrorBoundary(Page)))，每层职责单一可独立测试。另一个大规模应用是 Sentry SDK 的侵入方式——它不让你改代码，而是启动时装饰 window.fetch、XMLHttpRequest、console.error，透明叠加监控能力，这是装饰器模式"对调用方透明"特性的极致运用。MobX 的 @observable 曾是 TS 装饰器最著名用户，其迁移史（legacy 实验装饰器→TC39 标准装饰器）也是前端观察标准演进的最佳样本。
+
+踩坑与 tradeoff：HOC 的著名陷阱：① 嵌套地狱——五层 HOC 后 props 来源无法追溯，displayName 全是 withX(withY(...))，DevTools 里调试痛苦；② ref 黑洞——HOC 包装的组件 ref 指向包装层而非原组件，要 React.forwardRef 逐层穿透；③ 静态方法丢失——原组件的静态属性不会自动拷贝到包装后组件（要 hoist-non-react-statics）。这些问题正是 Hooks 取代 HOC 的原因：useAuth() 在函数体内组合能力，没有包装层级——可以说 Hooks 是 React 对装饰器模式的"函数式回答"。TS 装饰器的坑：新旧两版语义不兼容（legacy 的 @dec 在类定义时执行，标准的在类定义后、可访问 initializer），混用库要确认它们编译目标哪一版；装饰器执行顺序是从下到上（洋葱包裹），@A @B class 实际先执行 B——顺序写反导致依赖关系错乱的 bug 极难查。`,
+    keyPoints: ["包装叠加能力，不改原结构", "HOC/HOF/TS 装饰器是同一思想三载体", "Hooks 是对 HOC 痛点的函数式回答", "TS 新旧装饰器语义不兼容"],
+    followUps: ["Hooks 为什么能替代大部分 HOC 场景？", "TS 标准装饰器（2023-11）和实验版的核心差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-343",
+    nodeId: "fe-design-patterns",
+    question: "代理模式在前端的应用：ES6 Proxy 如何改变了框架设计？",
+    bigTech: true,
+    answer: `代理模式用"替身"拦截对原对象的访问，在拦截点注入自定义逻辑。ES6 Proxy 是语言级代理：new Proxy(target, handler) 可拦截 get/set/has/deleteProperty/apply 等 13 种操作，这直接改写了前端框架的响应式历史——Vue2 用 Object.defineProperty 递归劫持属性（缺陷：监听不到新增/删除属性、数组下标和 length 变化，才有了臭名昭著的 Vue.set 和数组变异方法补丁）；Vue3 换 Proxy 后，新增属性、删除、数组任意操作全部天然可追踪，且是"惰性代理"（访问到才递归包，不再启动时全量递归），大对象初始化性能提升一个量级。Proxy 的其他杀手级应用：immer 的不可变更新（代理 draft 拦截所有写入，产出不可变副本）、MobX 的响应式、表单库的字段级订阅、安全的沙箱对象（微前端 qiankun 的 Proxy 沙箱）。
+
+\`\`\`js
+// Vue3 响应式骨架：get 收集依赖，set 触发更新
+const reactive = (obj) => new Proxy(obj, {
+  get(t, k, r) { track(t, k); return isObj(t[k]) ? reactive(t[k]) : t[k]; },
+  set(t, k, v) { t[k] = v; trigger(t, k); return true; },
+  deleteProperty(t, k) { delete t[k]; trigger(t, k); return true; }, // Vue2 做不到
+});
+// immer：写"可变代码"，产出不可变对象
+const next = produce(state, (draft) => { draft.user.name = "x"; });
+\`\`\`
+
+实际案例：immer 在 Redux 生态的地位就是代理模式的胜利——Redux 要求不可变更新，手写展开运算符在深层嵌套时是灾难（...state, a: {...state.a, b: {...}}），immer 用 Proxy 拦截 draft 的写入路径，自动生成最小不可变副本，Redux Toolkit 内置后成为事实标准。另一个案例是 qiankun 的 JS 沙箱：用 Proxy 包一层 fakeWindow，子应用的 window.xxx = y 写入被拦截到沙箱自己的记录表，卸载子应用时按记录恢复——代理模式直接解决了微前端的全局污染难题，这是快照沙箱（性能差）到 Proxy 沙箱（主流方案）的演进核心。
+
+踩坑与 tradeoff：Proxy 无法 polyfill（Babel 也救不了，它是引擎级能力），这是 Vue3 放弃 IE11 的根本原因；Proxy 代理的是"对象"不是"值"——基本类型、Date、Map/Set 需要特殊处理（Vue3 对 Map/Set 用 collectionHandlers 单独代理其方法）；identity 坑：reactive(obj) !== obj，同一份数据裸对象和代理对象混用会导致 watch 失效、Map 键不匹配，Vue3 为此提供 toRaw/markRaw；性能不是免费的——Proxy 的每次属性访问都有拦截开销，密集计算场景（表格万级单元格逐格响应式）要权衡粒度，Vue3 的答案是 shallowRef + 手动 triggerRef；Proxy 撤销（Proxy.revocable）可构建"一次性权限对象"，在插件沙箱场景很有用但鲜为人知。`,
+    keyPoints: ["Proxy 拦截 13 种操作，defineProperty 只拦 get/set", "Vue3 响应式/immer/qiankun 沙箱三大应用", "无法 polyfill，Vue3 弃 IE11 的根因", "代理对象与原对象 identity 不同"],
+    followUps: ["immer 的 Proxy draft 如何产出最小不可变副本？", "qiankun Proxy 沙箱如何处理 window 的写入与恢复？"],
+    favorited: false,
+  },
+  {
+    id: "fe-344",
+    nodeId: "fe-design-patterns",
+    question: "适配器模式在前端的应用场景？接口数据适配为什么要单独一层？",
+    bigTech: false,
+    answer: `适配器模式把"不兼容的接口"翻译成"系统期望的接口"，前端最典型的战场是 API 数据层：后端返回的数据结构（蛇形命名、嵌套层级、枚举数字码、日期字符串）和前端视图模型（驼峰、扁平、语义化枚举、Date 对象）几乎从不一致。如果在组件里直接消费原始响应，后端字段一改名，几十个组件连环爆炸。适配层（常叫 API layer/transform layer/anti-corruption layer 防腐层）集中做三件事：字段映射与命名转换、类型与格式归一（时间戳→Date、状态码→枚举）、容错兜底（字段缺失给默认值、脏数据过滤）。它本质是用 DDD 的"防腐层"思想保护前端领域模型不被后端 API 变更污染。
+
+\`\`\`ts
+// 后端返回：蛇形+数字枚举+秒级时间戳
+interface ApiOrder { order_id: string; status: 1 | 2 | 3; create_time: number; user_info: { nick_name: string } }
+// 适配层：一处翻译，全局受益
+const adaptOrder = (raw: ApiOrder): Order => ({
+  id: raw.order_id,
+  status: statusMap[raw.status] ?? "unknown",      // 未知状态码兜底
+  createdAt: new Date(raw.create_time * 1000),
+  userName: raw.user_info?.nick_name ?? "匿名",     // 脏数据兜底
+});
+\`\`\`
+
+实际案例：携程一个酒店详情页对接三个数据源（自营 API、供应商 A、供应商 B），三家的房型数据结构完全不同（自营 roomList[].price、A 家 rooms[].rate.amount、B 家嵌套三层的 product.sku.price）。早期直接在组件里写三套渲染逻辑，维护地狱。重构为适配层：每个数据源一个 adapter 函数，统一输出前端 Room 视图模型，组件只认 Room——新接供应商 C 时只加一个 adapter，组件零改动。另一个收益在联调期：后端接口未就绪时，适配层切到 mock 数据源，前端照常开发，"契约先行"得以落地。
+
+踩坑与 tradeoff：适配层最大的争议是"是否值得"——项目只有一个简单 API 时适配层是过度设计，判断信号：数据源 ≥2、后端字段风格与前端冲突、接口还在频繁变动期，满足任一条就建；适配层放前端还是 BFF 有讲究：BFF 聚合多个微服务时适配应在 BFF 完成（前端拿即用数据），纯前端项目才在前端做，别把两层的适配重复做一遍；运行时校验（zod/io-ts）是适配层的现代搭档——在适配函数里 schema.parse(raw)，接口契约被破坏时立刻报错而非静默渲染 undefined，把"后端改字段前端白屏"变成"前端监控立刻告警"；性能注意：大列表（万级）逐条适配的序列化成本可观，必要时惰性适配（渲染到才转）或让后端直接给对的格式。`,
+    keyPoints: ["防腐层思想：隔离后端变更", "字段映射/格式归一/脏数据兜底三件事", "多数据源场景适配层是刚需", "zod 运行时校验把静默白屏变告警"],
+    followUps: ["适配层和 BFF 的职责边界怎么划？", "zod 校验失败时应该如何降级展示？"],
+    favorited: false,
+  },
+  {
+    id: "fe-345",
+    nodeId: "fe-design-patterns",
+    question: "迭代器模式和 Generator 在前端有什么用？为什么说它们是异步编程的隐形基石？",
+    bigTech: false,
+    answer: `迭代器模式提供"统一接口遍历聚合对象，不暴露内部结构"——ES6 把这一模式语言化：可迭代协议（Symbol.iterator）+ 迭代器协议（next() 返回 {value, done}），for...of、展开运算符、解构赋值、Array.from 全部建立在它之上。Generator（function*）是"可暂停的迭代器工厂"：yield 把函数切成多个执行点，每次 next() 推进一段，执行权在调用者和生成器之间往返（协程 coroutine 的雏形）。它奠定异步基石的史实：async/await 出现之前，co 库用 Generator+Promise 实现了"同步写法跑异步"——yield 一个 Promise，co 自动等它 resolve 再把结果塞回生成器继续执行；async/await 本质就是"语言内置的 co + Generator 语法糖化"，Babel 转译 async 函数的产物就是 Generator 驱动器（regeneratorRuntime）。
+
+\`\`\`js
+// 自定义可迭代对象：分页数据源的统一消费
+const paged = (fetcher) => ({
+  async *[Symbol.asyncIterator]() {
+    let page = 1;
+    while (true) {
+      const { items, hasMore } = await fetcher(page++);
+      yield* items;
+      if (!hasMore) return;
+    }
+  },
+});
+for await (const user of paged(fetchUsers)) render(user); // 消费方不关心分页
+\`\`\`
+
+实际案例：Redux-Saga 是 Generator 工程化应用的巅峰——把副作用（请求/延时/竞态）写成 Generator 函数，yield 的是"副作用描述对象"（call/put/takeEvery），Saga 运行时逐个解释执行。这套设计的杀手锏是可测试性：测试时逐条 next() 断言 yield 的描述对象即可，完全不用 mock 网络——effect 即数据，执行即解释器，这是迭代器模式+解释器模式的组合拳。另一个案例：虚拟滚动的大数据流处理，用 async generator 包装 IndexedDB 游标读取，渲染层 for await 消费，内存恒定（不一次读全表），十万条记录的导出功能流畅完成。
+
+踩坑与 tradeoff：Generator 的执行权手动控制是把双刃剑——它能实现 async 做不到的"惰性求值"（数据不消费就不计算，处理无限序列/大文件的天然结构），但也意味着没人 next() 它就永远停着，协作式而非抢占式；Generator 没有原生取消语义——for await 提前 break 会触发 return() 清理，但手写循环忘了清理会挂起异步资源（游标/连接不释放）；for await...of 的错误处理容易踩坑：生成器内部 throw 会传播到消费循环，但"生成器已 return 后还 next()"静默返回 {done: true} 不报错，调试时疑惑"为什么后半段没执行"；性能上，热路径（每帧调用的工具函数）别用 Generator——next() 的对象分配和状态机切换比直接循环慢，它是"结构化异步/惰性"的利器，不是通用循环替代品。`,
+    keyPoints: ["可迭代协议统一 for...of/解构/展开", "Generator=可暂停函数=协程雏形", "async/await 是 Generator 的语法糖化", "惰性求值+无限序列是独有甜区"],
+    followUps: ["co 库如何用 Generator 模拟 async/await？", "Redux-Saga 为什么测试友好（effect 即数据）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-346",
+    nodeId: "fe-design-patterns",
+    question: "责任链模式在前端的应用：中间件、拦截器、表单校验有什么共同结构？",
+    bigTech: false,
+    answer: `责任链模式让请求沿处理器链传递，每个处理器决定"处理、拒绝、还是传给下一个"——发送方不知道最终谁处理，处理器可动态增删。前端的共同结构是洋葱模型：请求穿过层层中间件到达核心，响应再原路返回（Koa 的 compose 是最优雅的实现：await next() 之前是请求阶段，之后是响应阶段）。三大应用：① 服务端中间件（Express/Koa 的 app.use：日志→鉴权→限流→业务，每层可短路）；② HTTP 拦截器（axios 的 request/response interceptor：请求链注入 token/签名，响应链统一处理 401 刷新 token、错误码归一化）；③ 表单校验管道（async-validator 把每个字段的多条规则串成链，逐条执行直到失败或全过）。共同点：链节点职责单一、可独立测试、顺序敏感、可中断。
+
+\`\`\`ts
+// Koa compose 骨架：洋葱模型的核心 20 行
+function compose(mws: Middleware[]): Middleware {
+  return (ctx, next) => {
+    const dispatch = (i: number): Promise<void> =>
+      i === mws.length ? (next?.() ?? Promise.resolve())
+        : Promise.resolve(mws[i](ctx, () => dispatch(i + 1)));
+    return dispatch(0);
+  };
+}
+// axios 响应拦截：401→刷新 token→重放原请求，业务层无感知
+\`\`\`
+
+实际案例：axios 的 401 自动续期是企业项目的标配责任链：响应拦截器捕获 401 → 调用刷新接口拿新 token → 用新 token 重放原请求 → 返回给业务层，全程业务无感知。这里的高级细节是并发场景：同时 5 个请求都拿到 401，不能触发 5 次刷新——要用"刷新中的 Promise 单例"（第一个 401 发起刷新，后续 401 等待同一个 Promise），这是责任链+单例+Promise 缓存的组合题，面试常被追问。另一个案例：表单引擎把"必填→格式→长度→远程唯一性"校验串成链，本地规则全过才发远程校验（省请求），任一失败即短路返回错误信息。
+
+踩坑与 tradeoff：中间件的顺序就是语义——鉴权放在日志前，未授权请求连日志都不记；限流放在鉴权后，恶意登录尝试消耗的是鉴权资源而非限流配额，顺序写错安全防线形同虚设；Koa 的 await next() 忘写 await 是经典 bug——下游异步错误不被捕获，响应阶段逻辑在错误发生后照样执行，出"返回了 200 但 body 是错误页"的灵异现象；拦截器里修改共享对象（如直接改 config 引用）会污染重放逻辑，重放请求前要用原始配置快照；责任链 vs 策略模式的选型：多个处理器"都可能参与处理"用责任链（管道），"只选一个处理"用策略（路由），把表单校验写成策略表（只跑第一条规则）是常见误用；链条过长时调试困难，给每个中间件加名称和耗时日志是生产可观测性的底线。`,
+    keyPoints: ["洋葱模型：请求进响应出，可短路", "401 续期=责任链+单例 Promise 缓存", "顺序即语义，await next() 不可省", "多选参与用链，单选路由用策略"],
+    followUps: ["Koa compose 如何保证异步错误正确冒泡？", "并发 401 时如何用 Promise 单例防止重复刷新？"],
+    favorited: false,
+  },
+  {
+    id: "fe-347",
+    nodeId: "fe-design-patterns",
+    question: "单例和工厂模式在前端的应用与陷阱？模块系统是不是天然单例？",
+    bigTech: false,
+    answer: `单例模式保证"全局唯一实例+全局访问点"。前端语境下 ES Module 就是天然单例机制：模块首次 import 时求值并缓存，后续所有 import 拿到同一模块实例——所以 export const store = createStore() 即单例，无需写 class Singleton 那套 Java 遗产。显式单例仍有场景：跨包共享（两个 npm 包版本不一时各自打包了一份模块，模块级单例失效，要挂 globalThis/window 兜底）、延迟初始化（首次访问才创建的重资源对象）。工厂模式按输入创建对象而不暴露构造细节：React 的 createElement 就是超级工厂（按 type 字段产出不同 Fiber），组件库的主题工厂（createTheme(light/dark)）、请求实例工厂（createAxios({ baseURL }) 产出预配置实例）都是日常。
+
+\`\`\`ts
+// 跨包单例：挂 globalThis 防多版本并存
+export function getGlobalStore(): Store {
+  const g = globalThis as { __APP_STORE__?: Store };
+  return (g.__APP_STORE__ ??= createStore());
+}
+// 工厂：预配置请求实例
+export const createApi = (base: string) => {
+  const ins = axios.create({ baseURL: base, timeout: 5000 });
+  ins.interceptors.request.use(injectToken);
+  return ins;
+};
+\`\`\`
+
+实际案例：微前端架构里"主应用和子应用共享同一个 React 实例"是生死问题——如果子应用打包了自己的 React，两份 React 并存会导致 Hooks 报错（Invalid hook call，内部 dispatcher 状态分裂）。qiankun/Module Federation 的标准解法就是把 React 声明为 singleton 共享依赖（MF 配置 shared: { react: { singleton: true } }），本质是强制单例。另一个工厂案例：富文本编辑器的"按配置生成编辑器实例"（工具栏按钮组合/插件列表/快捷键映射都是工厂参数），同一页面渲染 5 个不同配置的编辑器，工厂模式让每处调用只传配置不传类。
+
+踩坑与 tradeoff：模块单例的陷阱在构建环节——Webpack/Rollup 打包时若同一包被 resolve 出多个版本（依赖提升不一致），模块级单例立刻分裂成两个实例，症状是"store 里明明有数据，组件读到 undefined"，排查靠 npm ls react 查版本树；SSR 场景模块单例是事故源——Node 进程里模块缓存跨请求共享，用户 A 的状态泄漏给用户 B，SSR 的单例必须按请求作用域重建（每请求创建 store 实例，注入 context）；单例+测试的组合拳：模块单例在测试间会互相污染，工厂函数（每次创建新实例）才是可测试设计，所以"应用运行时单例、测试时工厂重建"是标准姿势，DI 容器（tsyringe/inversify）把这层抽象化；全局单例的隐性耦合在大型项目里会发酵——导入即执行的模块副作用让 tree-shaking 失效、启动顺序不可控，优先用"显式初始化的工厂+context 注入"，单例只留给真正全局唯一的资源（eventBus、全局配置、监控 SDK）。`,
+    keyPoints: ["ESM 模块即天然单例", "多版本并存时挂 globalThis 兜底", "SSR 单例必须按请求作用域重建", "测试友好性：运行时单例+测试工厂重建"],
+    followUps: ["Module Federation 的 shared singleton 如何工作？", "为什么 SSR 应用里模块级单例会泄漏用户数据？"],
+    favorited: false,
+  },
+  {
+    id: "fe-348",
+    nodeId: "fe-design-patterns",
+    question: "前端什么时候不该用设计模式？如何避免过度设计？",
+    bigTech: true,
+    answer: `设计模式是"被反复验证的问题-方案对"，不是装饰简历的贴纸。前端的过度设计有五个典型信号：① 为一次性脚本建抽象层（运营活动页活两周，配齐策略+工厂+观察者全家桶）；② 三个分支的 if-else 硬抽策略表（读者要跳三个文件才能看懂原来三行能写完的逻辑）；③ 提前面向"想象中的变化"（"万一以后要多主题"于是上了完整主题引擎，三年后主题还是两套）；④ 模式套娃（Factory 生产 Builder 构建 Strategy 包装 Decorator，每层都"合理"，合起来没人懂）；⑤ 用模式对抗框架范式（在 React 里手写观察者管理组件刷新，而不是用 state——框架自带的范式通常就是该场景的最优模式实现）。判断标准只有一个：当前真实存在的复杂度是否需要这层抽象来管理。
+
+\`\`\`ts
+// 过度设计：为两个状态写状态机库
+const machine = createMachine({ idle: { TOGGLE: "active" }, active: { TOGGLE: "idle" } });
+// 恰如其分：一个 useState 就是答案
+const [active, setActive] = useState(false);
+// 需要模式：20 种状态、状态迁移有约束、要可视化审计 → XState 登场
+\`\`\`
+
+实际案例：重构反例教材：某后台系统列表页，原代码 200 行直白逻辑（fetch+render+几个 if），被"架构升级"成 Entity 层/Repository 层/Service 层/ViewModel 层四层 DDD 架构，文件从 1 个变 14 个。半年后业务改版（需求变化率极高的运营后台），每改一个字段要穿透四层，开发效率反而降 60%，最终回退到两层（API 适配+组件）。另一个正面案例：石墨文档的协同编辑核心用命令模式（Command Pattern）实现 undo/redo——每个编辑操作封装成带 execute/undo 的命令对象入栈，这是模式用在"真复杂度"上的典范：undo 语义天然要求"操作可逆可回放"，没有命令模式就要靠快照 diff，内存和正确性都崩。
+
+踩坑与 tradeoff：YAGNI（You Aren't Gonna Need It）和"预留扩展点"的张力是永恒的——工程上的解法是"小步抽象"：第一次写死，第二次容忍重复，第三次出现时才抽模式（Rule of Three），此时你对变化方向的判断有实证支撑；模式的成本要算认知账：团队平均水平决定可用模式的上限，引入 Saga/状态机前先想"新同事三天内能否上手改 bug"；框架趋势在帮你"消化"模式——React Hooks 消化了 HOC/RenderProps，Vue 组合式函数消化了 mixin，现代状态库消化了 Flux 样板，追新框架特性的性价比常常高于手写模式；代码评审时的试金石问题："删掉这层抽象，最坏会怎样？"答案是"重复三行"就别建，答案是"改动要穿透二十处"就值得。`,
+    keyPoints: ["模式管理真实复杂度，不管理想象复杂度", "Rule of Three：第三次重复才抽象", "团队认知上限决定模式上限", "删层测试：最坏结果决定抽象价值"],
+    followUps: ["YAGNI 和预留扩展点如何平衡？", "哪些前端场景是命令模式/状态机的真甜区？"],
+    favorited: false,
+  },
+  {
+    id: "fe-349",
+    nodeId: "fe-micro-frontend",
+    question: "微前端到底解决什么问题？什么场景该用、什么场景是过度设计？",
+    bigTech: true,
+    answer: `微前端是把单体前端按业务域拆成可独立开发、独立部署、独立运行的多个应用，运行时由主应用（壳工程）按需加载组合。它解决的核心问题不是技术而是组织：① 团队扩张后的协作瓶颈——几十人改同一个应用，CI 排队、发版互相等待、代码冲突天天有；② 技术栈异构——老系统 jQuery/AngularJS 要和新 React 系统共存于同一页面，整体重写成本不可接受；③ 独立交付与爆炸半径控制——各业务线按自己节奏发版，一个子应用崩溃不拖垮全站。注意它从不解决性能问题，反而通常引入性能成本（多套框架运行时、重复依赖、沙箱开销）。
+
+\`\`\`ts
+// qiankun 主应用注册子应用：组织边界的代码化表达
+import { registerMicroApps, start } from "qiankun";
+registerMicroApps([
+  { name: "order", entry: "//cdn.example.com/order/", container: "#subapp",
+    activeRule: "/order" },          // 订单团队独立交付
+  { name: "goods", entry: "//cdn.example.com/goods/", container: "#subapp",
+    activeRule: "/goods" },          // 商品团队独立交付
+]);
+start({ sandbox: { experimentalStyleIsolation: true } });
+\`\`\`
+
+实际案例：阿里中后台（蚂蚁体验技术部是 qiankun 的诞生地）是最大甜区——几百个业务系统、几十个团队、技术栈横跨十年，微前端让"平台壳 + 业务插件"成为唯一可行解；字节的抖音电商后台同样按域拆分独立发版。反例同样真实：某 6 人创业公司跟风拆出 3 个子应用，结果每个跨域需求都要改壳工程 + 联调三个仓库，部署从 1 次变 4 次，半年后合并回单体，效率反而提升——拆分的收益没兑现，固定成本先吃掉了团队。
+
+踩坑与 tradeoff：微前端是康威定律的映射——组织结构不独立，应用拆了也白拆，判断标准是"子应用是否有独立团队、独立发布节奏、独立业务边界"，三个缺两个就别拆；成本清单要前置算清：公共依赖治理、样式隔离、跨应用通信、监控归因、新人认知门槛，这些是每次开发都要还的"分布式税"；渐进路径更稳——先模块联邦共享组件、后应用拆分，或先 iframe 物理隔离、再 qiankun 收编，一步到位的"大拆"几乎必翻车。`,
+    keyPoints: ["解决组织协作/异构栈/独立交付，不解决性能", "判断三要素：独立团队+独立发版+独立边界", "拆分是康威定律映射，组织不独立白拆", "固定成本：依赖治理/通信/监控/认知税"],
+    followUps: ["微前端和 monorepo 是什么关系？能互相替代吗？", "如何从单体渐进演进到微前端而不中断业务？"],
+    favorited: false,
+  },
+  {
+    id: "fe-350",
+    nodeId: "fe-micro-frontend",
+    question: "qiankun 的 JS 沙箱是如何实现隔离的？各代沙箱的差异是什么？",
+    bigTech: true,
+    answer: `qiankun 沙箱三代演进，核心是"拦截子应用对 window 的读写"：① SnapshotSandbox（快照沙箱）——子应用激活时遍历 window 存一份快照，运行期间不做拦截，卸载时再次遍历 window 与快照对比，把新增/修改的全局量还原，只支持单实例（遍历整个 window 是 O(n) 且无法多份并存）；② LegacySandbox——用 Proxy 代理 window，set 操作记录到 addedMap/modifiedMap，卸载时按记录回滚，仍是单实例；③ ProxySandbox（多实例沙箱，当前默认）——每个子应用发一个 fakeWindow 普通对象，Proxy 拦截所有读写：读先查 fakeWindow 再落到真 window，写只写 fakeWindow，子应用的全局变量永远不触达真 window，多个子应用各自持有独立 fakeWindow 可同时存活。同时 import-html-entry 会把子应用脚本包成 (function(window){...})(proxy) 形态，让脚本内的 window 引用全部指向代理。
+
+\`\`\`ts
+// 简化版 ProxySandbox 核心
+class ProxySandbox {
+  fakeWindow = {};
+  proxy: Window;
+  constructor() {
+    this.proxy = new Proxy(window, {
+      get: (target, key) =>
+        key in this.fakeWindow ? this.fakeWindow[key] : target[key],
+      set: (target, key, value) => { this.fakeWindow[key] = value; return true; },
+    });
+  }
+}
+\`\`\`
+
+实际案例：主子应用都往 window 挂全局量是隔离失效的重灾区——某电商后台三个子应用各自定义 window.__STORE__，无沙箱时后挂载的应用直接覆盖前者，订单页读到商品页的 store 数据串单；接入 ProxySandbox 后各写各的 fakeWindow 相安无事。另一个案例是判断环境：qiankun 注入的 window.__POWERED_BY_QIANKUN__ 就放在 fakeWindow 上，子应用据此决定是否独立 render 还是暴露生命周期钩子。
+
+踩坑与 tradeoff：沙箱只隔离 JS 全局状态，不隔离副作用——setInterval、addEventListener、直接 document.body.appendChild 的游离 DOM 照样泄漏，qiankun 用 patcher 记录定时器/事件在卸载时清理，但手动 append 的 DOM 要靠 mount/unmount 钩子自律；逃逸通道存在：new Function("return window")()、iframe.contentWindow、以及 document.defaultView 都能拿到真 window，安全敏感场景别依赖沙箱做安全边界；性能成本真实可测——Proxy 拦截每次全局访问，大表格高频读全局配置的场景有 5%~10% 开销；Vite 兼容坑：Vite dev 模式原生 ESM 让 import-html-entry 无法劫持脚本执行，需 vite-plugin-qiankun 或生产构建验证先行。`,
+    keyPoints: ["三代：快照→记录回滚→Proxy fakeWindow 多实例", "读写拦截：读先查 fake，写只写 fake", "不隔离副作用：定时器/事件/游离 DOM 靠 patcher", "逃逸通道存在，沙箱不是安全边界"],
+    followUps: ["为什么 SnapshotSandbox 无法支持多实例？", "子应用里 eval/new Function 的 window 指向哪里？"],
+    favorited: false,
+  },
+  {
+    id: "fe-351",
+    nodeId: "fe-micro-frontend",
+    question: "微前端的样式隔离方案有哪些？为什么 Shadow DOM 反而少用？",
+    bigTech: true,
+    answer: `CSS 天生全局无作用域，隔离方案按强度分五档：① 命名约定——BEM 或统一 namespace 前缀（.app-order-*），配合 Stylelint 规则强制，成本最低靠纪律；② CSS Modules/CSS-in-JS——编译期 hash 或运行时唯一类名，应用内隔离完美，跨应用仍可能撞第三方库的全局样式；③ qiankun experimentalStyleIsolation——给子应用所有选择器编译期加属性前缀（div[data-qiankun="order"]），本质是 scope 提升优先级，但对 append 到 body 的全局弹窗失效（弹窗 DOM 在子应用容器外，选择器够不着）；④ strictStyleIsolation——Shadow DOM 彻底隔离，内外样式互不可见；⑤ 运行时动态插拔——qiankun 默认行为：子应用卸载时移除其 style/link 标签，保证"不运行的应用不留样式"，这是基线而非隔离。
+
+\`\`\`css
+/* experimentalStyleIsolation 编译结果示意 */
+/* 子应用原始样式 */
+.title { color: red; }
+/* 转换后：只在子应用容器内生效 */
+div[data-qiankun="order"] .title { color: red; }
+/* 但 Modal 挂在 body 下，吃不到这条规则 → 样式丢失 */
+\`\`\`
+
+实际案例：Shadow DOM 翻车是行业集体记忆——蚂蚁内部实践里 antd 的 Modal.confirm、message 等挂 document.body 的组件在 Shadow DOM 下样式全丢，富文本编辑器（依赖 document.execCommand 和全局选区）、第三方 SDK（地图/支付弹窗）也批量阵亡，最终主流中后台全部退回 experimentalStyleIsolation + 命名约定双保险。另一个典型事故：某子应用引入的 CSS reset 写了 * { margin: 0; box-sizing: border-box }，无 scope 直接污染主应用导航，全站布局错位——此后 Stylelint 增加"禁止通配符和裸标签选择器"规则。
+
+踩坑与 tradeoff：Shadow DOM 是理论最完美、工程最贵的方案——隔离彻底但破坏一切"依赖 document 全局查找"的生态库，适配成本远高于收益；CSS 变量是漏网之鱼——定义在 :root 的变量不受属性 scope 影响照样全局，设计令牌必须加前缀（--order-color-primary）；@font-face 和 iconfont 也是全局资源，两个子应用同名 iconfont 类会互相覆盖，要各自改名；样式顺序敏感——后挂载子应用的样式表插在更后方，同优先级规则后者赢，升级 UI 库大版本时特异性战争高发，建议子应用样式统一加一层优先级容器。`,
+    keyPoints: ["五档：约定/Modules/属性 scope/Shadow DOM/动态插拔", "属性 scope 对 body 级弹窗失效", "Shadow DOM 杀死全局查找类生态库", "CSS 变量/@font-face/iconfont 不受 scope 约束"],
+    followUps: ["experimentalStyleIsolation 的实现原理是什么？", "CSS 变量的设计令牌在微前端下如何治理？"],
+    favorited: false,
+  },
+  {
+    id: "fe-352",
+    nodeId: "fe-micro-frontend",
+    question: "Module Federation 的原理是什么？shared 依赖协商如何工作？",
+    bigTech: true,
+    answer: `Module Federation（MF）是 Webpack 5 / Rspack 的内置能力，让每个构建产物既可当宿主（host）也可当远程（remote）。三个核心概念：① exposes——远程应用声明对外暴露的模块（如 ./Button、./utils），构建时生成 remoteEntry.js（模块清单 + 异步加载运行时）；② remotes——宿主声明远程模块地址，运行时先拉 remoteEntry.js 解析清单，再按需动态 import 对应 chunk，对业务代码透明（就像 import 本地模块）；③ shared——声明共享依赖（react、react-dom、antd），运行时做版本协商：宿主已加载且版本满足语义化范围就直接复用单例，不满足才加载远程自带的副本；singleton: true 强制全站唯一实例，版本冲突时直接报错而非降级。MF 与 qiankun 的本质区别：它只做模块分发与依赖共享，不做沙箱隔离。
+
+\`\`\`ts
+// 远程应用（rspack 配置）
+new ModuleFederationPlugin({
+  name: "order",
+  filename: "remoteEntry.js",
+  exposes: { "./OrderList": "./src/OrderList" },
+  shared: { react: { singleton: true, requiredVersion: "^18.2.0" }, "react-dom": { singleton: true } },
+});
+// 宿主消费：import OrderList from "order/OrderList" —— 像本地模块一样
+\`\`\`
+
+实际案例：Shopify 用 MF 支撑其巨型商家后台（几十个团队模块级拼装）；字节现代中后台新系统大量采用 Rspack + MF。相比 qiankun 的本质优势在三个场景兑现：① 模块级粒度——可以只共享一个组件库/工具函数而不必加载整个子应用，某设计系统团队用 MF 把 200+ 组件直接喂给 15 个业务应用，省去 npm 发版-升级-联调循环；② 构建时契约—— exposes/remotes 是显式声明，配合类型同步方案可做编译期检查；③ 零运行时劫持——没有 Proxy 沙箱和 HTML Entry 解析，性能与原生应用无异。
+
+踩坑与 tradeoff：shared 协商失败是头号事故源——宿主 React 18.1 而远程声明 requiredVersion ^18.2，协商破裂加载双份 React，hooks 报 Invalid hook call 且 Context 跨实例不通，排查极难（页面"部分正常"）；singleton: true 是双刃剑——保了单实例但版本不齐时直接白屏，生产策略是只对"多实例必崩"的库开 singleton；类型缺失是最大短板——远程模块天然没有 d.ts，社区方案 @module-federation/typescript 或 native-federation-typescript 做类型产物同步，跨团队流程较重；版本漂移治理——十个团队各自升级依赖，shared 协商结果随加载顺序变化而不可复现，需要 Platform 团队设定统一升级窗口和 CI 版本卡点。`,
+    keyPoints: ["三概念：exposes 暴露/remotes 消费/shared 共享协商", "协商：版本满足复用单例，不满足加载副本", "与 qiankun 本质区别：管模块分发，不管沙箱", "双 React 事故：协商失败→Invalid hook call"],
+    followUps: ["MF 的 shared 版本协商算法细节是什么？", "如何解决 MF 跨应用的 TypeScript 类型问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-353",
+    nodeId: "fe-micro-frontend",
+    question: "微前端应用之间如何做通信？各方案的耦合度如何取舍？",
+    bigTech: true,
+    answer: `通信方案按耦合度从低到高排列，优先用低的：① URL/路由参数——跨应用跳转的天然通道，刷新可恢复、可分享、可埋点，能用 URL 表达的 state 绝不放别处；② 事件总线——qiankun 的 initGlobalState 本质是发布订阅：主应用 setGlobalState 写入、各子应用 onGlobalStateChange 监听，松耦合但事件流难以静态追踪；③ 共享状态——主应用创建 store 通过 props 注入子应用，或 MF 场景 shared 一个 zustand/redux store 实例，强类型高可控但应用间耦合升级；④ localStorage + storage 事件 / BroadcastChannel——跨标签页也能用，受同源限制且有序列化成本；⑤ postMessage——iframe 方案的唯一通道，异步且要设计消息协议。原则一句话：数据向下走 props、事件向上走回调、平级跨域走事件、可持久化状态走 URL。
+
+\`\`\`ts
+// 主应用：创建全局状态并广播
+import { initGlobalState } from "qiankun";
+const actions = initGlobalState({ token: "", user: null });
+// 子应用（qiankun 生命周期里拿到 actions）
+export async function mount(props) {
+  props.onGlobalStateChange((state) => {
+    requestInterceptor.setToken(state.token); // 登录态变化 → 刷新请求拦截器
+  });
+}
+// MF 场景更直接：shared 一个 store 实例，两边 import 的是同一个模块单例
+\`\`\`
+
+实际案例：登录态下发是刚需场景——用户中心子应用完成登录后，订单/商品/客服子应用都要感知 token 变化，用 initGlobalState 广播、各子应用监听里刷新 axios 拦截器和用户信息缓存，一次接入全站生效。反例同样深刻：某团队把事件总线当万能胶，半年积累 40+ 种事件（refresh-list、sync-filter、close-modal……），没人画得清事件流向图，改一个事件要全文检索五个仓库，重构时把 80% 事件砍成"路由参数 + props 下发"，可维护性才救回来。
+
+踩坑与 tradeoff：通信是微前端最大的隐藏复杂度——应用拆得越碎通信越多，分布式单体比单体更难维护，拆分前先画通信拓扑图；时序问题高发——子应用 A 发事件时 B 还没挂载，事件直接丢失，解法是主应用缓存最近一份 state、子应用 mount 时主动 getGlobalState 拉取而非干等推送；内存泄漏——onGlobalStateChange 返回的 off 必须在 unmount 调用，自己 addEventListener 的更要自己清；类型安全缺失——跨应用事件 payload 没有编译期检查，monorepo 内抽 events 契约包（zod schema + 类型导出）是最实用的解法，运行时校验兜底防脏数据扩散。`,
+    keyPoints: ["耦合排序：URL < 事件总线 < 共享 store < postMessage", "数据向下 props、事件向上回调、平级走事件", "时序坑：挂载晚于事件→拉取代替等待", "契约包+zod 解决跨应用类型安全"],
+    followUps: ["事件总线滥用有哪些信号？如何收敛？", "iframe 方案下如何设计 postMessage 协议？"],
+    favorited: false,
+  },
+  {
+    id: "fe-354",
+    nodeId: "fe-micro-frontend",
+    question: "qiankun、Module Federation、iframe、Web Components 如何选型？",
+    bigTech: true,
+    answer: `四者不是替代关系而是不同象限的工具，按"隔离程度 × 集成粒度"定位：iframe——隔离最彻底（JS/CSS/路由/网络/崩溃全隔离，安全边界真实存在），代价是体验割裂：路由与浏览器历史不同步、弹窗只能在自己窗口内、通信全靠 postMessage 序列化、登录态要单独维护，适合嵌入完全不可控的第三方系统（支付、地图、老 CGI 系统）；qiankun（single-spa 系）——应用级集成，HTML Entry 接入任意技术栈老项目，提供 JS/样式沙箱，改造成本低，适合"巨石应用渐进拆分、异构栈收编"；Module Federation——模块级集成，构建时契约 + 运行时共享依赖，无沙箱、性能原生，适合"同构技术栈的新系统、需要细粒度共享组件/工具"；Web Components——浏览器原生组件级隔离（Shadow DOM + Custom Elements），产物是跨框架渲染单元，适合"设计系统跨框架分发原子组件"，但 SSR 支持弱、生态薄。
+
+\`\`\`
+决策树：
+要嵌入完全不可控的外部系统？        → iframe
+老巨石应用要渐进拆分、技术栈异构？    → qiankun
+新系统、同构栈、要共享组件库粒度？    → Module Federation
+设计系统原子组件跨框架分发？          → Web Components
+只是 6 人团队想"架构先进一点"？      → 都不用，回去写单体
+\`\`\`
+
+实际案例：阿里中后台主力 qiankun——历史包袱重（十年技术栈大杂烩）、需要渐进迁移，HTML Entry 一把收编；字节新中后台 + Shopify 商家后台用 MF——同构 React 栈、性能敏感、组件级共享是刚需；腾讯文档用 iframe 嵌第三方表单与外部编辑器——不可控系统的唯一体面方案；GitHub 用 Web Components（自研 Catalyst）做 UI 原子跨技术栈分发，连 Rails 页面和 React 岛都复用同一批元素。混合使用也很常见：qiankun 管应用编排、子应用内部用 MF 共享组件库，但复杂度叠加要有 Platform 团队兜底。
+
+踩坑与 tradeoff：选型最大误区是"为技术而技术"——先确认有组织协作或异构栈的真实痛点再谈方案；iframe 的弹窗/路由问题有工程巧解（Modal 提升到主应用渲染、路由变化双向同步），协议设计好 iframe 也能有体面体验，别急着排除；MF 无沙箱意味着老项目接入要自身干净（无全局污染、无样式泄漏），接入门槛被低估；Web Components 的 SSR 与无障碍短板在企业级场景常是硬阻塞；四维评估法——隔离程度、性能成本、接入成本、通信成本，让业务方给四维度排序，答案自然浮现，不存在脱离场景的"最佳方案"。`,
+    keyPoints: ["iframe：不可控外部系统嵌入", "qiankun：异构老系统渐进收编", "MF：同构新系统模块级共享", "WC：设计系统跨框架原子分发"],
+    followUps: ["iframe 弹窗与路由同步的工程解法有哪些？", "MF 无沙箱如何保证老项目接入安全？"],
+    favorited: false,
+  },
+  {
+    id: "fe-355",
+    nodeId: "fe-micro-frontend",
+    question: "微前端如何治理公共依赖？为什么 React 必须单实例？",
+    bigTech: true,
+    answer: `React/Vue 这类带全局内部状态的库必须全站单实例：React 用模块级变量追踪当前渲染的 Dispatcher 和 Fiber 树，hooks（useState/useContext）执行时读的是"当前 React 副本"的内部状态；两个 React 副本共存时，组件在副本 A 的渲染里却解析到副本 B 的 Dispatcher，直接报 Invalid hook call，Context 跨副本也不互通（Provider 在 A、Consumer 读 B 的默认 context 永远是空）。治理三层：① 构建层——主应用 external 掉 react/react-dom 由主应用统一提供，子应用 webpack externals 或 MF shared singleton: true，全部复用同一模块实例；② 运行时层——import map（浏览器原生模块映射）把 react 统一指向同一 CDN URL，SystemJS/ESM 场景通用；③ 版本契约层——主应用锁定框架大版本，子应用 peerDependencies 声明兼容范围，CI 卡点校验产物里的框架指纹。
+
+\`\`\`ts
+// 方案一：webpack externals（qiankun 场景）
+// 子应用构建配置
+module.exports = { externals: { react: "React", "react-dom": "ReactDOM" } };
+// 主应用 HTML 提前加载 React UMD → window.React 唯一实例
+
+// 方案二：MF shared singleton
+shared: {
+  react: { singleton: true, requiredVersion: "^18.2.0", strictVersion: true },
+  "react-dom": { singleton: true, requiredVersion: "^18.2.0" },
+}
+\`\`\`
+
+实际案例：双 React 事故几乎每家微前端团队都踩过——某子应用的 dependencies 里误留 react（本应 external 或用 peerDependencies），构建产物打包了 React 17，与主应用的 React 18 共存：子应用内所有 useContext 拿到默认值、hooks 随机报错、页面"一半正常一半疯"。排查半天，最后靠 window.__REACT_DEVTOOLS_GLOBAL_HOOK__ 里挂了两个 renderers 才发现真相。根治手段是 CI 体检：扫描各子应用产物 chunk 里的 React 指纹字符串，发现双实例直接卡发布。
+
+踩坑与 tradeoff：singleton: true 遇版本不满足会 strict 报错——生产上宁可降级多版本也不能白屏，策略是 singleton 只给"多实例必崩"的库（react、react-dom、带全局 ConfigProvider 的 antd），纯工具库（lodash、dayjs）允许多版本共存换兼容性；externals 的隐性契约——主应用升级 React 大版本等于强制所有子应用同步升级，升级窗口需要 Platform 团队协调排期，这本身就是微前端承诺的"独立"的反面教材；Vue2/Vue3 混部比 React 更痛（响应式系统和运行时 API 完全不同，无法 singleton），现实做法是 Vue2 子应用限期迁移或物理 iframe 隔离；验证手段清单化——CI 依赖体检 + 运行时 React DevTools 副本数断言 + 灰度期错误关键字监控（Invalid hook call），三道防线缺一不可。`,
+    keyPoints: ["hooks 依赖模块级 Dispatcher，双实例必崩", "治理：externals / MF singleton / import map", "singleton 只给多实例必崩的库，工具库放行", "CI 指纹扫描 + 运行时副本断言兜底"],
+    followUps: ["import map 方案的浏览器兼容性如何兜底？", "Vue2/Vue3 混部为什么无法像 React 一样 singleton？"],
+    favorited: false,
+  },
+  {
+    id: "fe-356",
+    nodeId: "fe-micro-frontend",
+    question: "微前端落地有哪些工程坑？独立部署、联调、灰度、监控分别怎么做？",
+    bigTech: true,
+    answer: `微前端把"一个系统的复杂度"转移成"系统之间的复杂度"，工程配套不到位就是灾难现场。四大坑及解法：① 独立部署——子应用产物上 CDN，主应用只存注册表 manifest（子应用名 → 当前入口 URL + 版本），发版 = 更新注册表记录，主应用不发版；代价是注册表成为单点，需 CDN 缓存 + localStorage 兜底上一可用版本，注册表本身也要版本化可回滚；② 环境一致性——"我这好使线上崩"高发，因为本地主应用拉的是测试环境子应用，解法是环境切换器：主应用本地起服务，通过代理把任意子应用指向 线上/预发/本地 任意组合，URL 参数一键切换；③ 灰度与回滚——按用户/租户维度在注册表层路由版本（A 子应用给 5% 用户发 v2），回滚只动单应用；但跨应用契约变更（props、事件 schema）必须多应用锁定协同灰度，且新旧版本向后兼容至少一个发布周期；④ 监控归因——所有错误、性能、日志必须注入子应用标签（appName），错误边界兜底单应用崩溃不扩散，否则一个报错五个团队互相甩锅。
+
+\`\`\`json
+// 注册表 manifest（部署的唯一真相源）
+{
+  "apps": [
+    { "name": "order", "entry": "//cdn.x.com/order/v2.3.1/", "version": "2.3.1",
+      "gray": { "percent": 5, "fallback": "//cdn.x.com/order/v2.3.0/" } },
+    { "name": "goods", "entry": "//cdn.x.com/goods/v1.8.0/", "version": "1.8.0" }
+  ]
+}
+\`\`\`
+
+实际案例：蚂蚁金服的发布节奏是微前端价值的最佳注脚——子应用独立发版每天几十次，主应用壳一年发不了几次；反例同样教科书级：某公司子应用 A 通过 MF 给 B 提供组件，A 改了 props 契约独立发版，B 未感知未发版，线上 B 消费新 props 直接崩溃。事故后立下铁律："契约变更双应用锁定发版 + 旧契约保留一个版本周期 + CI 契约 diff 检查"，从此该类事故归零。
+
+踩坑与 tradeoff：预加载策略要分网络环境——qiankun prefetch 在浏览器空闲时拉子应用资源，WiFi 下体验提升明显，但弱网环境反而抢主应用关键带宽，要按 navigator.connection 动态关闭；权限与菜单必须集中下发——主应用统一鉴权后把权限树传给子应用，各管各的必然出现"看得到菜单点进去 403"的割裂体验；联调成本被普遍低估——跨应用 bug 需要同时起三四个服务，docker-compose 一键起全环境或远程环境代理是刚需基建；最大的隐性成本是认知负担——新人要理解整套编排才能改一个按钮，文档、脚手架、一站式 CLI 的投入省不得，否则微前端省下的发版时间全填进沟通黑洞。`,
+    keyPoints: ["注册表 manifest 是部署真相源，要做成非单点", "环境切换器解决本地-线上组合联调", "契约变更：锁定发版+向后兼容一周期", "监控注入 appName，崩溃边界到单应用"],
+    followUps: ["注册表服务的高可用方案怎么设计？", "跨应用契约的 CI diff 检查怎么落地？"],
+    favorited: false,
+  },
+  {
+    id: "fe-357",
+    nodeId: "fe-monorepo",
+    question: "Monorepo 和 Polyrepo 如何取舍？什么规模该上 Monorepo？",
+    bigTech: true,
+    answer: `Monorepo 是把多个项目/包放进同一仓库统一版本管理，Polyrepo 是每个项目独立仓库。取舍的本质是"代码共享成本"与"仓库规模成本"的对冲：Monorepo 的收益——① 原子提交：跨包改动一个 commit 完成，API 变更和调用方修改同时落地，不存在"先发包再升级"的两阶段提交；② 代码共享零摩擦：共享组件/工具直接源码引用，省掉 npm 发版-审批-升级-联调循环；③ 统一基建：一套 lint/TS 配置/CI 模板/依赖版本，工具链升级一次到位；④ 重构可见性：全局搜索替换 + IDE 跨项目跳转，大重构敢动手。Polyrepo 的收益——仓库小 clone 快、权限边界天然清晰、团队完全自治、CI 简单。规模临界点经验值：超过 3 个互相依赖的包、或 5 人以上频繁跨库改动，Monorepo 开始净赚。
+
+\`\`\`
+monorepo 典型结构（pnpm workspace + Turborepo）：
+├── apps/
+│   ├── web/          # 主站（Next.js）
+│   └── admin/        # 管理后台
+├── packages/
+│   ├── ui/           # 组件库（被 apps 源码引用）
+│   ├── utils/        # 工具函数
+│   └── config/       # 共享 eslint/tsconfig
+├── pnpm-workspace.yaml
+└── turbo.json
+\`\`\`
+
+实际案例：正面——Google/Meta 单仓库支撑万人协作（自研 Piper/VFS 基建）；前端圈的 Vercel（Next.js+turborepo 本家）、React 官方仓库（react/react-dom/scheduler 同仓联动发版）都是受益者；某电商中台把 12 个仓库合并后，跨包需求交付周期从平均 9 天降到 3 天。反面——某团队 40 个包塞进单仓但没上任务编排，CI 全量构建 45 分钟，开发抱怨"改一行注释等一节课"，半年后拆回 6 个仓：只合了代码没合基建，等于把 polyrepo 的缺点和 monorepo 的缺点一起吞下。
+
+踩坑与 tradeoff：Monorepo 不是免费的——仓库膨胀让 clone/checkout 变慢（需要 partial clone、sparse checkout 或 VFS）；CI 必须上 affected 增量构建（只构建改动影响的项目），否则构建时间随包数线性爆炸；权限模型反转——GitHub 的仓库级权限不够用，要 CODEOWNERS 按目录控权；版本哲学分歧——统一版本（lockstep，Babel 模式）vs 独立版本（changesets，React 模式）要在上车前定好；最大的失败模式是"只搬代码不建基建"：没有任务编排、缓存、依赖治理的 monorepo 就是一个更乱的 polyrepo。`,
+    keyPoints: ["本质对冲：共享成本 vs 仓库规模成本", "收益：原子提交/源码共享/统一基建", "临界点：3+ 互依赖包或 5+ 人跨库改动", "失败模式：只合代码不合基建"],
+    followUps: ["Monorepo 和微前端是替代还是互补关系？", "超大规模 monorepo 的 Git 性能怎么救？"],
+    favorited: false,
+  },
+  {
+    id: "fe-358",
+    nodeId: "fe-monorepo",
+    question: "pnpm 如何解决幻影依赖和依赖提升？workspace 协议怎么工作？",
+    bigTech: true,
+    answer: `npm/yarn 的扁平 node_modules 把所有依赖提升到顶层，带来两个经典病：① 幻影依赖（Phantom Dependency）——代码里 require 了一个没声明在 package.json 里的包也能跑（因为它被别的依赖提升到了顶层），某天底层依赖升级把它移走，你的代码莫名爆炸；② 分身依赖（Doppelganger）——不同版本被提升到不同层级，同包多实例共存（React 双实例事故的温床）。pnpm 的解法是"符号链接 + 硬链接"的非扁平结构：node_modules/.pnpm 下按 包名@版本 真实存储（内容寻址硬链接到全局 store，多项目共享不占双份磁盘），项目根 node_modules 只放 package.json 里显式声明的依赖符号链接，未声明的包物理上够不着——幻影依赖被目录结构本身消灭。workspace 协议（workspace:*）则解决 monorepo 内部互引：发布时 pnpm 自动把 workspace:* 替换成真实版本号。
+
+\`\`\`
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# packages/ui/package.json
+{ "name": "@acme/ui", "dependencies": { "@acme/utils": "workspace:*" } }
+
+# node_modules 结构（关键：只有声明的依赖可见）
+node_modules/
+├── .pnpm/                    # 真实文件：react@18.2.0、lodash@4.17.21...
+├── react -> .pnpm/react@18.2.0/node_modules/react   # 声明过的才有链接
+└── @acme/ui -> ../packages/ui                       # workspace 内部软链
+\`\`\`
+
+实际案例：Vue/Vite 官方生态、字节现代前端工程全部迁移 pnpm——最直接的动力是磁盘和安装速度（硬链接全局 store 让 monorepo 安装时间砍半以上）；更深刻的是依赖治理：某团队从 yarn 迁 pnpm 后 CI 立刻红了 30 多处——全是幻影依赖现形（代码 import 了从未声明的 dayjs/lodash，之前靠扁平提升"碰巧能跑"），这批定时炸弹如果不被 pnpm 逼出来，迟早在生产环境随机引爆。
+
+踩坑与 tradeoff：严格性是把双刃剑——部分老包（如某些 CLI 工具）自己就有幻影依赖，在 pnpm 下直接跑不起来，要用 packageExtensions 或 public-hoist-pattern 打补丁，这是迁移期主要摩擦；符号链接的兼容坑——个别工具（老版本 metro、某些 webpack loader 配置）不跟随软链解析路径，需要 shamefully-hoist 临时退回扁平模式过渡；peerDependencies 解析更严格——pnpm 按"每个消费者的依赖闭包"隔离 peer 实例，一个包被不同版本 React 消费时会生成多份实例，行为正确但排查时要有预期；workspace 协议的发布陷阱——忘记 pnpm publish（而非 npm publish）会把 workspace:* 原样发出去导致下游安装失败，CI 里要锁死发布命令。`,
+    keyPoints: ["扁平提升两宗病：幻影依赖+分身依赖", "pnpm：.pnpm 真实存储+声明才链接", "workspace:* 内部互引，发布时替换版本号", "迁移红利：幻影依赖批量现形"],
+    followUps: ["pnpm 的硬链接全局 store 如何节省磁盘？", "peerDependencies 在 pnpm 下的实例隔离规则？"],
+    favorited: false,
+  },
+  {
+    id: "fe-359",
+    nodeId: "fe-monorepo",
+    question: "Turborepo 的任务编排（pipeline/dependsOn）如何设计？",
+    bigTech: true,
+    answer: `Turborepo 的核心是把 monorepo 里的任务（build/test/lint/dev）抽象成有向无环图（DAG），按依赖拓扑调度 + 并行执行。turbo.json 里的关键字段：① dependsOn——声明任务间依赖，^build 表示"先完成所有依赖包的 build"（^ 指上游包），不带 ^ 的是包内任务顺序；② inputs/outputs——声明任务的输入文件指纹与输出产物，是缓存命中的依据；③ env——显式声明影响产物的环境变量（防环境变量污染缓存）。执行时 turbo 先按 workspace 依赖图算出拓扑序，同层任务并行跑满 CPU，再逐层推进——apps/web 的 build 会等 packages/ui 和 packages/utils 的 build 完成才启动，而 ui 和 utils 互不依赖并行构建。
+
+\`\`\`jsonc
+// turbo.json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],          // 先构建上游依赖包
+      "inputs": ["src/**", "package.json", "tsconfig.json"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["API_BASE_URL"]           // 环境变量参与缓存指纹
+    },
+    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
+    "lint": { "dependsOn": [] },        // 无依赖，全仓并行
+    "dev": { "cache": false, "persistent": true }  // 长任务不缓存
+  }
+}
+\`\`\`
+
+实际案例：Vercel 自家 monorepo（next.js + turbo 同仓）是最强背书——上百个包的全量 CI 从 40+ 分钟压到 5 分钟内，核心就是 DAG 并行 + 缓存命中；某内容平台团队落地时的一个关键调优：最初把 test 也 dependsOn: ["^build"]，CI 里测试总在等构建，后来发现单测跑的是 tsx 直接执行源码根本不需要构建产物，去掉这层依赖后测试与构建并行，流水线再省 8 分钟——dependsOn 声明的是"真实数据依赖"而非"想象中的顺序"。
+
+踩坑与 tradeoff：dependsOn 声明错误是头号坑——漏了 ^build 导致消费方拿到旧产物（本地 dev 正常、CI 偶发失败的灵异事件源头），多了又串行化拖慢流水线，原则是把"文件级真实依赖"翻译成任务依赖；outputs 声明不全导致缓存恢复后缺文件——.next/cache 这类中间产物要么排除要么容忍，漏声明的生成目录会在缓存命中时"消失"；dev/watch 这类 persistent 任务不能进缓存，且 dependsOn 指向它的任务会被禁缓存（下游不可复现）；与 pnpm scripts 的关系——turbo 只编排不执行，实际命令还是各包的 package.json scripts，保持包可脱离 turbo 独立运行是良好实践（工具可替换性）。`,
+    keyPoints: ["任务抽象成 DAG：拓扑调度+同层并行", "^build 跨包依赖，不带 ^ 是包内顺序", "dependsOn 声明真实数据依赖，非想象顺序", "outputs/env 是缓存正确性的边界"],
+    followUps: ["persistent 任务为什么不能被缓存？", "如何排查 turbo 缓存命中异常？"],
+    favorited: false,
+  },
+  {
+    id: "fe-360",
+    nodeId: "fe-monorepo",
+    question: "Turborepo/Nx 的远程缓存原理是什么？为什么能跨机器复用构建产物？",
+    bigTech: true,
+    answer: `远程缓存的本质是"内容寻址的构建产物仓库"：任务执行前，turbo 对"决定产物的全部输入"算一个 hash——包括 inputs 声明的源文件内容、依赖包版本、环境变量、任务命令本身、Node/系统信息；hash 命中远程存储（Vercel Remote Cache 或自建 S3/HTTP 服务）就直接下载 outputs 声明的产物并恢复文件树，跳过整个构建过程，耗时从分钟级降到秒级。关键在于 hash 的输入集与机器无关：源码相同 + 依赖相同 + 命令相同，产物就被视为相同，所以同事 A 本地构建过的包，同事 B 和 CI 直接白嫖——这就是"一次构建、全队复用"。安全性上产物按 hash 隔离存储，配合签名（--remote-cache-signature）可防产物篡改。
+
+\`\`\`bash
+# 本地接入远程缓存（Vercel 托管或自建）
+turbo login && turbo link
+# 自建 HTTP 缓存服务只需实现两个端点：
+# GET  /v8/artifacts/:hash   → 返回产物 tar 包（304/404 未命中）
+# PUT  /v8/artifacts/:hash   → 上传产物
+# CI 中使用：构建日志会出现 >>> FULL TURBO（全部命中）或部分 cache hit
+turbo run build --summarize   # 输出各任务缓存命中率
+\`\`\`
+
+实际案例：Vercel 公布的数据是 CI 时间平均节省 70%+；某出行团队 30 个包的 monorepo 接入远程缓存后，主干 CI 从 28 分钟降到 4 分钟——最戏剧性的场景是"回滚"：revert 一个 commit 后 hash 恰好等于昨天的某个状态，整个流水线 40 秒 FULL TURBO 结束，回滚从"再构建一遍"变成"找回昨天的产物"。Nx 的思路一致但实现更重（自带计算缓存 + 分布式任务执行 Nx Cloud，可以把任务分发到多台 agent 并行）。
+
+踩坑与 tradeoff：缓存正确性的边界是人划的——inputs 漏声明某个影响产物的文件（如 .env.production、browserslist 配置），改动它不会换 hash，产物就是错的，且"有时对有时错"极难排查，纪律是"宁多勿少"；env 声明要克制——把 CI=true 这类无关变量纳入 hash 会让 CI 永远 miss；非确定性构建是缓存天敌——产物里嵌时间戳/随机数/绝对路径（如 sourcemap 的本地路径）会导致同输入不同输出，缓存命中率永远上不去，先治理构建确定性再谈缓存；安全边界——远程缓存服务要能鉴权（产物可能含未公开代码），自研服务别忘了限速和清理策略，否则存储账单会教你做人。`,
+    keyPoints: ["hash(源码+依赖+命令+env) → 命中即下载产物", "输入集机器无关 → 一次构建全队复用", "命中率三杀手：inputs 漏/env 滥/构建不确定", "回滚=找回旧产物，FULL TURBO 秒级完成"],
+    followUps: ["如何治理构建确定性（时间戳/路径/随机数）？", "自建远程缓存服务的最小实现是什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-361",
+    nodeId: "fe-monorepo",
+    question: "Monorepo 里如何做版本管理和发布？changesets 的工作流是什么？",
+    bigTech: true,
+    answer: `Monorepo 发布比单仓难在"多包联动"：包 A 依赖包 B，B 发了 minor，A 要不要跟？CHANGELOG 怎么聚合？changesets 的方案是"声明式版本意图 + 发布时统一计算"：① 开发阶段——每次改动执行 pnpm changeset，交互式选择受影响的包和版本级别（major/minor/patch），生成一个 markdown 文件（.changeset/xxx.md）描述本次变更，随功能代码一起进 PR 评审；② 版本计算——发布时 changeset version 消费所有 changeset 文件：按依赖图做级联 bump（B 升 minor，依赖 B 的 A 至少升 patch），更新各包 package.json 版本、生成/合并 CHANGELOG、删除已消费的 changeset 文件；③ 发布——changeset publish 按拓扑序把"版本号与 npm 上不一致"的包依次发布，internal dependencies 的 workspace:* 替换为真实新版本。整个流程把"版本决策"从发布时刻提前到编码时刻，且每个决策都有 PR 记录可追溯。
+
+\`\`\`bash
+# 开发时：声明变更意图（进 PR）
+pnpm changeset
+# 生成 .changeset/tidy-pandas-jump.md:
+# ---
+# "@acme/ui": minor
+# "@acme/web": patch
+# ---
+# 新增 Table 虚拟滚动；web 适配新 API
+
+# 发布流水线（CI）
+pnpm changeset version   # 计算版本+生成 CHANGELOG（产出"版本 PR"）
+pnpm changeset publish   # 按拓扑序发包
+\`\`\`
+
+实际案例：React 生态大量库（TanStack 全家桶、Radix UI、astro）都用 changesets——TanStack Query 一个 monorepo 管 5 个框架适配包，核心包修复 bug 时 changesets 自动级联 bump 全部适配包 patch 版本，CHANGELOG 逐包生成且互相关联，这在手工时代是发版工程师半天的活；某公司内部组件库接入后，发版周期从"每两周集中发一次"变成"随 PR 合入即出 beta、每天正式版"，业务方拿到修复的延迟从周级降到小时级。
+
+踩坑与 tradeoff：级联 bump 的哲学要想清楚——默认策略是"下游至少升 patch"，十几个包的仓库里一次核心包改动会引发全仓版本号"通胀"，可用 onlyUpdatePeerDependentsWhenOutOfRange 等配置收敛；snapshot/canary 发布——PR 阶段的预览包（0.0.0-pr-123-xxx）对跨团队联调是刚需，changesets 的 snapshot 命令配合 pkg.pr.new 服务可以白嫖；私有包混排——apps/ 下的应用不该发包，private: true + fixed/linked 分组配置别漏；与 git tag 的关系——changesets 默认按 包名@版本 打 tag，百包仓库 tag 爆炸，要评估是否改用 GitHub Release 聚合；最大风险是流程纪律——改动忘加 changeset 就合入，版本计算就缺了一块，CI 加"changeset 存在性检查"（对比 base 分支）是标准护栏。`,
+    keyPoints: ["版本意图前置：changeset 文件随 PR 评审", "级联 bump：核心包 minor→下游至少 patch", "version 计算 + publish 按拓扑序发包", "护栏：CI 检查 changeset 存在性"],
+    followUps: ["fixed/linked 分组解决什么版本耦合问题？", "snapshot 预览发布的完整链路怎么搭？"],
+    favorited: false,
+  },
+  {
+    id: "fe-362",
+    nodeId: "fe-monorepo",
+    question: "Monorepo 的 TypeScript 怎么配？project references 和路径映射怎么选？",
+    bigTech: true,
+    answer: `Monorepo 的 TS 配置要同时满足三个矛盾目标：编辑器里跨包跳转好用、tsc 类型检查快、构建产物类型正确。两套主流方案：① Project References（官方方案）——每个包一个 tsconfig，根 tsconfig 用 references 串成图，被引用包开 composite: true 生成 .d.ts 和增量元信息（tsconfig.tsbuildinfo），tsc -b 按拓扑序增量类型检查，只重查改动的包及其下游；优点是构建缓存精确、类型边界清晰（消费的是声明文件而非源码），缺点是配置繁琐、IDE 跳转默认进 d.ts 而非源码（需 publishConfig 或 declarationMap 补救）；② 路径映射（paths）——根 tsconfig 把 @acme/ui 映射到 packages/ui/src，消费方直接读源码类型，IDE 体验完美（跳转进源码、改类型即时生效），代价是每次全量类型检查、且"源码引用"绕过了包的真实构建产物（发布后用 d.ts 可能行为不一致）。实践中的主流是混合：开发期 paths 指源码保体验，CI/构建期用真实产物验证。
+
+\`\`\`jsonc
+// 方案一：project references（根 tsconfig.json）
+{ "files": [], "references": [{ "path": "packages/ui" }, { "path": "apps/web" }] }
+// packages/ui/tsconfig.json
+{ "compilerOptions": { "composite": true, "declaration": true, "declarationMap": true, "outDir": "dist" } }
+
+// 方案二：开发期 paths（tsconfig.dev.json）
+{ "compilerOptions": { "paths": { "@acme/ui": ["../packages/ui/src"], "@acme/utils": ["../packages/utils/src"] } } }
+\`\`\`
+
+实际案例：Vercel/Next.js 模板仓库用 paths 方案（开发体验优先，配合 bundler 的 alias 双写）；大型仓库如 Azure SDK for JS 用 project references（上千个包，增量检查是刚需，全量 tsc 要几十分钟）；某金融中台的踩坑史很有代表性——初期全仓 paths 指源码，本地一切美好，直到某包构建配置改了 output 格式（ESM→双格式），paths 消费源码的应用毫无感知，发布后生产环境类型运行时不匹配批量报错，此后规矩改为"paths 只管开发，CI 必跑 tsc -b 对真实产物做类型契约校验"。
+
+踩坑与 tradeoff：paths 的最大陷阱是"源码与产物的类型漂移"——源码类型完美不代表构建产物 d.ts 正确（dts 生成插件的 bug、exports 字段指错文件），CI 必须用真实产物链路兜底；declarationMap 是 references 方案的体验救星——让 cmd+click 从 d.ts 跳回源码；TS 5.x 的 moduleResolution: bundler 与 monorepo 更配（尊重 package.json exports 又允许无扩展名导入）；类型检查该放进 turbo 任务图——typecheck 任务 dependsOn: ["^build"]（因为消费的是上游 d.ts），缓存命中后全仓类型检查从分钟级降到秒级；别忽视 tsbuildinfo 的提交策略——它是增量检查的缓存，要么 gitignore 每次重来，要么纳入 turbo outputs 复用。`,
+    keyPoints: ["references：精确增量，IDE 默认跳 d.ts", "paths：跳源码体验好，但绕过真实产物", "混合派：开发 paths + CI 真实产物校验", "typecheck 进 turbo 图，缓存复用 tsbuildinfo"],
+    followUps: ["exports 字段与 types 版本（typesVersions）如何配合？", "composite 项目的增量元信息原理是什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-363",
+    nodeId: "fe-monorepo",
+    question: "Monorepo 如何做依赖治理？catalogs、包边界、循环依赖怎么处理？",
+    bigTech: true,
+    answer: `Monorepo 的依赖治理三个战场：① 版本统一——同一个依赖（如 react、lodash）在 30 个包里有 8 个版本是常态灾难（包体积膨胀、类型冲突、行为不一致），pnpm catalogs 提供"单一事实源"：在 pnpm-workspace.yaml 定义目录（catalog:），各包用 catalog: 协议引用，升级只改一处；替代方案是 syncpack 这类工具 CI 校验版本一致性；② 包边界——monorepo 里"什么都能 import"是架构腐化的温床（应用直接引用另一个应用的内部文件、工具包反向依赖业务包），用 ESLint 的 boundaries 插件或 Nx 的 module boundary 规则按"层"约束：apps 可依赖 packages，packages 之间按层级（ui → hooks → utils）单向依赖，违规直接 CI 红；③ 循环依赖——A 依赖 B、B 又依赖 A，构建时拓扑排序失败或运行时 undefined，解法是依赖图可视化（madge、nx graph）定期体检，循环处要么下沉公共部分成第三包，要么用依赖注入/事件解耦。
+
+\`\`\`yaml
+# pnpm-workspace.yaml：catalogs 单一事实源
+catalog:
+  react: ^18.3.1
+  react-dom: ^18.3.1
+  zustand: ^5.0.0
+
+# packages/ui/package.json
+{ "dependencies": { "react": "catalog:", "zustand": "catalog:" } }
+\`\`\`
+
+实际案例：某内容平台 monorepo 治理前的体检报告触目惊心——react 存在 4 个版本（17/18.1/18.2/18.3）、lodash 和 lodash-es 混用、3 处循环依赖导致构建偶发 undefined；治理三板斧：catalogs 收编 20 个高频依赖（升级 PR 从改 30 个文件变改 1 行）、ESLint boundaries 按四层架构卡死依赖方向（app → feature → shared → infra）、madge 接入 CI 把循环依赖数做成趋势图挂在团队看板。半年后依赖相关的灵异 bug 归零，升级 React 大版本从"季度工程"变成"一周任务"。
+
+踩坑与 tradeoff：catalogs 的认知成本——新人看到 catalog: 协议一脸懵，文档和脚手架模板要跟上，且目前 only pnpm 支持（yarn 有 resolutions、npm 有 overrides 但都是"覆盖"而非"引用"语义）；边界规则别太理想主义——存量代码先加 warn 模式跑两个月，直接 error 会让团队 ban 掉整个规则；peerDependencies 是边界的好搭档——ui 库把 react 声明为 peer 而非 dependency，版本控制权交给消费方，避免"库内置 React 版本"与应用打架；循环依赖不总是坏味道——类型层面的循环（A 的 interface 引用 B 的 type）用 import type 切断即可，运行时循环才必须物理拆解；治理要产品化——依赖版本分布、循环数量、层级违规数做成 dashboard 周会过一眼，比任何一次性运动式治理都持久。`,
+    keyPoints: ["catalogs：版本单一事实源，升级改一处", "boundaries：按层约束依赖方向，CI 执法", "循环依赖：madge 体检，下沉或注入解耦", "治理产品化：dashboard 趋势代替运动式"],
+    followUps: ["ESLint boundaries 的层级规则如何设计？", "import type 为什么能切断类型层循环依赖？"],
+    favorited: false,
+  },
+  {
+    id: "fe-364",
+    nodeId: "fe-monorepo",
+    question: "Monorepo 的 CI 如何优化？affected 检测和增量构建怎么落地？",
+    bigTech: true,
+    answer: `Monorepo CI 的核心命题：改了一个包，只构建/测试/部署受它影响的部分，而不是全仓重来。affected 检测的算法：以 git diff（对比 base 分支，通常是 origin/main）找出变更文件 → 映射到所属 workspace 包 → 沿依赖图正向传播（变更包 + 所有依赖它的下游包）= affected 集合。落地三层：① 任务级——turbo run build --filter=...[origin/main] 或 nx affected -t build，只对受影响包跑任务，配合 DAG 并行；② 缓存级——远程缓存让"受影响"进一步缩水：affected 集合里源码没真正变化的包 hash 不变直接命中，实际构建的往往只剩改动的零头；③ 部署级——Vercel/Netlify 的 ignored build step（git diff 判断 apps/web 目录无变化则跳过整次部署），或自研流水线按 affected 应用清单动态生成部署矩阵。
+
+\`\`\`bash
+# turbo：只构建 main 分支以来受影响的包
+turbo run build test lint --filter=...[origin/main] --parallel
+
+# nx 等价命令
+nx affected -t build test lint --base=origin/main --parallel=3
+
+# GitHub Actions 关键配置：必须拉全历史才能 diff
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }
+\`\`\`
+
+实际案例：某 40 包的 monorepo 优化前后对比是教科书数字——全量 CI 45 分钟，接入 affected + 远程缓存后：改文档类 PR 40 秒（全命中缓存），改 utils 核心包（影响面最大）12 分钟（下游 15 个包重建），普通业务包 PR 平均 3 分钟。另一个案例是部署级优化的威力：某公司主站和管理后台同仓，此前每次 merge 两个应用都重新构建部署（各 8 分钟），加 ignored build step 后互不影响的变更直接跳过，部署次数下降 60%，回滚定位也从"这次部署改了啥"变成精确的"就是这个应用的这次构建"。
+
+踩坑与 tradeoff：fetch-depth 是新手第一坑——CI 默认浅克隆（depth=1）拿不到 base 分支，diff 结果为空导致"什么都不构建"或"全部构建"，必须 fetch-depth: 0 或按需 deepen；merge-base 漂移——PR 长期不 rebase，base 对比点太旧，affected 集合虚胖，可用"合并后的虚拟提交"（GitHub 的 merge ref）做 diff 更准；非确定性任务污染 affected——某包测试依赖随机端口或真实网络，在 affected 里跑挂了就阻塞全链路，这类任务要隔离标记；根目录文件的影响面——改根 tsconfig、pnpm-lock、CI 配置应该触发全量（turbo 的 globalDependencies 声明这些文件，改动即全体 hash 失效，行为正确但要心里有数）；affected 不是银弹——锁文件更新、依赖升级这类"全仓影响"的 PR 该全量就全量，别为了快而漏。`,
+    keyPoints: ["affected = 变更包 + 依赖它的下游包", "三层优化：任务级/缓存级/部署级", "fetch-depth: 0 是 diff 前提", "根配置改动=全量，globalDependencies 声明"],
+    followUps: ["merge-base 漂移为什么让 affected 虚胖？", "部署级 ignored build step 怎么实现？"],
+    favorited: false,
+  },
+  {
+    id: "fe-365",
+    nodeId: "fe-nodejs-bff",
+    question: "Node.js 事件循环和浏览器的有什么差异？setImmediate 和 setTimeout(0) 谁先执行？",
+    bigTech: true,
+    answer: `Node 事件循环基于 libuv，按阶段轮转：timers（setTimeout/setInterval 到期回调）→ pending callbacks（系统层回调如 TCP 错误）→ idle/prepare（内部用）→ poll（取 I/O 事件，执行 fs/网络回调，循环大部分时间的家）→ check（setImmediate）→ close callbacks（socket.on("close")），每个阶段执行完清空该阶段回调队列，阶段之间处理微任务。与浏览器的三大差异：① 阶段模型 vs 任务队列——浏览器是宏任务队列 + 渲染步骤交错（requestAnimationFrame、渲染时机由浏览器决定），Node 没有渲染，多了 setImmediate 和 poll 阶段的概念；② 微任务时机——Node 11 之前微任务在阶段切换时才清空（一个阶段里 1000 个回调共享一次微任务清空），Node 11+ 与浏览器对齐为"每个宏任务后清空"，process.nextTick 是 Node 独有的更高优先级微任务（先于 Promise.then）；③ 环境 API——Node 没有 DOM/BOM，多了 Buffer、process、原生 addon。setImmediate vs setTimeout(0) 的顺序：主模块直接调用时取决于定时器精度（0~1ms 内是否过点），顺序不确定；但在 I/O 回调内 setImmediate 永远先（当前在 poll 阶段，下一步就是 check 阶段，而 timers 要等下一轮）。
+
+\`\`\`js
+const fs = require("fs");
+fs.readFile(__filename, () => {
+  setTimeout(() => console.log("timeout"), 0);
+  setImmediate(() => console.log("immediate")); // 一定先输出 immediate
+});
+process.nextTick(() => console.log("tick"));    // 先于所有 Promise.then
+Promise.resolve().then(() => console.log("then"));
+\`\`\`
+
+实际案例：经典的"回调地狱变炸栈"事故——某日志服务用递归 setImmediate 处理百万行文件流，本意是"让出事件循环"，但写成同步递归调用导致栈溢出；改对姿势是每处理一批用 setImmediate 调度下一批，事件循环每轮只消化一批，GC 和定时器都有喘息。另一个真实排查：某 BFF 接口偶发 RT 尖峰，火焰图发现大量 Promise.then 排队——上游服务一次性并发回了 200 个响应，每个响应的微任务链把 poll 阶段回调拖到 800ms 才轮到，最后用 p-limit 限流上游并发解决。
+
+踩坑与 tradeoff：process.nextTick 是逃生舱也是陷阱——递归 nextTick 会饿死整个事件循环（它比 I/O 优先级高，永远插队），流式处理请用 setImmediate；CPU 密集任务放主线程等于自杀——事件循环单线程，一个 JSON.parse 大文件就冻结所有请求，要么 worker_threads 要么拆分小任务 setImmediate 切片；异步上下文丢失——AsyncLocalStorage 在部分回调场景（如 EventEmitter 跨边界）会断链，全链路追踪要测试覆盖；面试高频变体：async/await 包裹下的输出顺序题，本质是"await 后面等价于 then，而 then 是微任务"，记住"同步 > nextTick > 微任务 > 宏任务阶段"口诀稳过。`,
+    keyPoints: ["libuv 六阶段：timers→poll→check 轮转", "Node11+ 微任务与浏览器对齐，nextTick 更优先", "I/O 回调内 setImmediate 必胜 setTimeout(0)", "递归 nextTick 饿死循环，CPU 密集用 worker"],
+    followUps: ["poll 阶段的阻塞策略是怎么决定的？", "AsyncLocalStorage 的实现原理与断链场景？"],
+    favorited: false,
+  },
+  {
+    id: "fe-366",
+    nodeId: "fe-nodejs-bff",
+    question: "BFF 层到底解决什么问题？设计原则是什么？",
+    bigTech: true,
+    answer: `BFF（Backend for Frontend）是在前端与微服务之间加的一层"面向前端体验的服务端"：一个端（Web/iOS/Android）配一个 BFF，负责聚合多个下游微服务的接口、按 UI 所需的数据结构裁剪组装、屏蔽后端接口的变动与异构（REST/gRPC/老 SOAP 混存）。它解决四个真实痛点：① 多端数据需求差异——移动端要精简字段省流量，PC 端要宽表，让微服务为每个端出特化接口不现实；② 聚合降往返——一个页面要调 5 个微服务，弱网下 5 次 RTT 是灾难，BFF 内网并发聚合一次返回；③ 前端渲染逻辑的服务端化——SSR、鉴权、AB 实验、灰度路由这些"必须服务端做"的事有了落点；④ 接口防腐——后端微服务重构/换协议时，BFF 做适配层，前端代码零改动。设计原则三条：BFF 只做"体验组装"不含业务规则（业务规则属于领域服务）、BFF 归前端团队所有（谁懂 UI 谁编排数据）、BFF 本身要薄（逻辑厚了就变成新的巨石）。
+
+\`\`\`ts
+// Next.js Route Handler 作为 BFF：聚合 + 裁剪
+export async function GET(req: Request) {
+  const token = await getSession(req);          // 鉴权在 BFF 收口
+  const [user, orders, coupons] = await Promise.all([  // 内网并发聚合
+    userSvc.get(token.uid), orderSvc.list(token.uid), couponSvc.available(token.uid),
+  ]);
+  return Response.json({                        // 按 UI 结构裁剪
+    nickname: user.nickname,                    // 移动端只要这三个字段
+    orderCount: orders.length,
+    usableCoupons: coupons.filter(c => !c.expired).length,
+  });
+}
+\`\`\`
+
+实际案例：阿里/美团的中台实践是 BFF 的大规模验证——手机淘宝首页背后是 BFF 聚合 20+ 下游服务，弱网地区首屏从 6 个串行请求压到 1 个；Netflix 是 BFF 概念的提出者，每个设备形态（TV/手机/Web）一个专属 BFF。反例也典型：某公司 BFF 层写着写着把"满减计算、库存校验"都搬了进去，一年后 BFF 变成 5 万行的第二后端，前后端都改不动，最后含泪拆回领域服务——BFF 变厚的每一步在当时都"很合理"。
+
+踩坑与 tradeoff：BFF 最大的反模式是"逻辑泄漏"——今天塞一个字段映射、明天塞一个业务校验，最终变成无人敢动的关键路径，纪律是"BFF 只组装不决策"；性能陷阱是聚合放大故障——BFF 并发调 5 个下游，任一抖动都拖垮整体 RT，必须配超时（单下游 300ms 红线）、降级（优惠券挂了返回空数组不挂整页）、熔断（连续失败短路）；谁拥有 BFF 决定成败——归后端团队管的 BFF 最终变成"又一个微服务"（前端提需求排期两周），归前端团队才有"为体验服务"的动力；GraphQL 是 BFF 的进化形态之一——把"裁剪权"交给前端查询语句，但治理成本（N+1、缓存、限流）随之而来，小团队 REST 聚合往往更划算。`,
+    keyPoints: ["一端一 BFF：聚合/裁剪/防腐/服务端收口", "弱网聚合：5 次 RTT→1 次，内网并发", "三原则：只组装、前端所有、保持薄", "逻辑泄漏是头号反模式"],
+    followUps: ["BFF 聚合时如何做超时、降级、熔断？", "GraphQL BFF 与 REST 聚合 BFF 如何选？"],
+    favorited: false,
+  },
+  {
+    id: "fe-367",
+    nodeId: "fe-nodejs-bff",
+    question: "Next.js 的 Server Actions 和 RSC 数据流是怎样的？和传统 API 路由什么关系？",
+    bigTech: true,
+    answer: `RSC（React Server Components）把组件分为两类：Server Component 只在服务端执行（可直接查库/读文件/调内网服务，零客户端 JS 体积），Client Component（"use client" 标记）负责交互。数据流：请求进来 → 服务端执行 RSC 树，产出一个可流式传输的序列化格式（RSC Payload，含渲染结果 + Client 组件的引用占位）→ 浏览器端 React 按 Payload 拼装，Client 组件正常 hydration。Server Actions 是配套的"服务端函数远程调用"：用 "use server" 标记的 async 函数可以直接在表单 action 或事件里调用，框架自动序列化参数、POST 到服务端执行、返回结果并触发 revalidate——等于把"手写 fetch('/api/xxx')"变成"直接 import 一个函数"，且类型端到端安全。与传统 API 路由的关系：API 路由（Route Handlers）是通用 HTTP 端点（给第三方/爬虫/跨端用），Server Actions 是"同应用内的 RPC"（自有前端专用），两者互补不替代。
+
+\`\`\`tsx
+// app/todos/actions.ts —— 服务端函数即接口
+"use server";
+export async function addTodo(formData: FormData) {
+  await db.todo.create({ data: { title: formData.get("title") } });
+  revalidatePath("/todos");        // 执行后自动刷新页面数据
+}
+// app/todos/page.tsx —— RSC 直读数据库，零客户端 JS
+export default async function Todos() {
+  const todos = await db.todo.findMany();   // 服务端直接查，无 API 层
+  return <ul>{todos.map(t => <li key={t.id}>{t.title}</li>)}</ul>;
+}
+// 表单里 <form action={addTodo}> 直接调用服务端函数
+\`\`\`
+
+实际案例：Vercel 官方 demo（Next.js Commerce）把商品页做成纯 RSC——商品数据服务端直读，页面 JS 体积比 Pages Router 版本小 40%；某内部后台迁移到 Server Actions 后砍掉了 60+ 个手写 API 路由和对应的 fetch 封装，表单提交流程从"useState + fetch + loading/错误处理 20 行"变成 action={fn} 一行，配合 useFormStatus 拿到 pending 态。但另一个团队的教训同样深刻：把 Server Actions 当万能 RPC 在客户端事件里高频调用（每次输入都触发），结果每次调用都是一次完整 POST 往返，输入卡顿严重——Actions 适合"提交类"低频操作，高频交互还得本地状态或专门端点。
+
+踩坑与 tradeoff：缓存是最大心智负担——RSC 的 fetch 默认参与 Full Route Cache，页面数据"莫名不更新"多半是缓存层没搞清（force-dynamic / revalidate 三板斧要熟练）；Server Actions 的安全边界——函数会暴露为公开 HTTP 端点（有加密 ID 但可被枚举调用），鉴权和参数校验必须在 Action 内部重新做，"隐藏即安全"是幻觉；序列化限制——RSC 边界只能传可序列化数据（Date/Map/Set 有支持但类实例/函数不行），踩坑报错通常晦涩；回退与兼容——JS 禁用时 form action 依然工作（渐进增强是 RSC 的隐藏福利），但客户端路由跳转时的 RSC Payload 请求失败要有重试；调试体验断层——服务端组件的 console.log 在终端不在浏览器，全链路日志要一开始就规划 trace id 透传。`,
+    keyPoints: ["RSC：服务端执行+流式 Payload+零客户端 JS", "Server Actions：use server 的端到端类型安全 RPC", "Action 是公开端点，鉴权校验必须内置", "低频提交用 Actions，高频交互走本地状态"],
+    followUps: ["RSC Payload 的流式渲染与 Suspense 如何配合？", "Next.js 四层缓存各是什么、如何失效？"],
+    favorited: false,
+  },
+  {
+    id: "fe-368",
+    nodeId: "fe-nodejs-bff",
+    question: "Node 服务如何做鉴权透传？Cookie、Token、Session 在 BFF 层怎么处理？",
+    bigTech: true,
+    answer: `BFF 鉴权透传的核心是"浏览器与 BFF 之间一套凭证，BFF 与下游微服务之间另一套凭证"，两层隔离各管各的。标准姿势：① 浏览器→BFF——HttpOnly + Secure + SameSite 的 Cookie 存 session id（防 XSS 读不到、防 CSRF 靠 SameSite=Lax/Strict + 自定义头校验），或 Authorization Bearer token（SPA 跨域场景）；② BFF→下游——BFF 用 session id 换出内部凭证（JWT/内部 token）调下游微服务，绝不让浏览器凭证直接穿透到内网（防爆库后一锅端）；③ 续期——access token 短寿（15 分钟）+ refresh token 长寿（30 天）双 token 机制，BFF 拦截 401 自动用 refresh 换新 token 重放请求，前端无感；④ 登出——吊销服务端 session（Redis 删 key），Cookie 设过期，"登出所有设备"= 吊销该用户全部 session 记录。加密存储：session 内容落 Redis 时用 AES-GCM 加密，密钥走环境变量 MASTER_KEY 注入，不进代码库。
+
+\`\`\`ts
+// Next.js middleware 层的鉴权透传骨架
+export async function middleware(req: NextRequest) {
+  const sid = req.cookies.get("sid")?.value;
+  const session = sid ? await getSessionFromRedis(sid) : null;
+  if (!session) return NextResponse.redirect(new URL("/login", req.url));
+  const res = NextResponse.next({
+    request: { headers: new Headers({ "x-internal-token": signInternalJWT(session.uid) }) },
+  });
+  if (session.expiresIn < 300) await refreshAndSetCookie(res, session); // 滑动续期
+  return res;
+}
+\`\`\`
+
+实际案例：本项目的生产实现就是活教材——API Key 不落 localStorage（XSS 可读），而是加密后放 HttpOnly Cookie 的服务端 session，前端调 AI 接口走 /api/ai 代理，密钥全程不出服务端；某金融后台的教训更惨痛：早期把 JWT 直接存 localStorage 且 7 天有效，一次 XSS 漏洞（富文本未消毒）被批量盗号，攻击者拿着 token 从容调了一周接口才被发现，整改后换成"双 token + HttpOnly Cookie + 服务端可吊销"，同类事故归零。
+
+踩坑与 tradeoff：SameSite 与跨站跳转的拉扯——OAuth 回调、支付回跳这类跨站 GET 需要 Lax（Strict 会丢登录态），POST 类第三方回调（WebHook）必须签名验证不能靠 Cookie；CSRF 的现代答案——SameSite 已挡住大部分场景，但老浏览器和子域共享 Cookie 的场景仍需 CSRF Token（双重提交校验）；多标签页竞态——两个标签同时触发 refresh token 轮换会导致一个用旧 token 失败，要加单例锁或用"宽限窗口"（旧 refresh token 10 秒内仍可用）；微服务间信任——BFF 签发的内部 JWT 要短寿 +  audience 限定下游服务，防止拿到一个服务的 token 横向打穿全部内网；日志红线——Cookie/Authorization 头必须进日志脱敏黑名单，打印出来等于把钥匙挂门上。`,
+    keyPoints: ["两层凭证隔离：浏览器-BFF 与 BFF-下游分开", "HttpOnly Cookie + 双 token + 服务端可吊销", "滑动续期与 401 拦截重放，前端无感", "密钥加密落盘，凭证进日志黑名单"],
+    followUps: ["refresh token 轮换的多标签竞态怎么解？", "内部 JWT 的 audience/scope 怎么设计防横向移动？"],
+    favorited: false,
+  },
+  {
+    id: "fe-369",
+    nodeId: "fe-nodejs-bff",
+    question: "Node 服务的稳定性手段有哪些？超时、限流、熔断、降级怎么配？",
+    bigTech: true,
+    answer: `Node BFF 的稳定性四件套，按"故障传播链"逐环设防：① 超时——一切 I/O 必须有 deadline：下游 HTTP 调用设 connect/socket 双层超时（axios 的 timeout 只罩响应，连接阶段要单独配），Node 默认 HTTP 请求无超时是裸奔；全链路预算法：页面级 3s → BFF 聚合层 1.5s → 单下游 300ms，层层递减且写入配置而非拍脑袋；② 限流——入口侧令牌桶/滑动窗口防突发（express-rate-limit 或网关层），出口侧并发上限（p-limit 包住下游调用）防自爆，Node 单线程事件循环的并发瓶颈在 socket 数而非 CPU；③ 熔断——下游连续失败（如 10 秒内错误率 >50%）就短路一段时间（30s 半开试探），用 cockatiel/opossum 实现，避免"下游已死、BFF 还在拼命重试"的资源耗尽雪崩；④ 降级——非关键下游挂了返回兜底数据（空列表/缓存快照/静态推荐），核心链路（下单）与非核心链路（推荐、优惠券）分开定降级策略。
+
+\`\`\`ts
+import { circuitBreaker, ConsecutiveBreaker, retry, wrapAll } from "cockatiel";
+const breaker = circuitBreaker(fetchDownstream, {
+  halfOpenAfter: 30_000,                     // 30s 后半开试探
+  breaker: new ConsecutiveBreaker(5),        // 连续 5 次失败跳闸
+});
+const policy = wrapAll(
+  retry(handleTransient, { maxAttempts: 2 }),  // 瞬时错误重试
+  breaker
+);
+const result = await Promise.race([
+  policy.execute(() => fetchCoupons(uid)),
+  timeout(300, () => []),                      // 300ms 红线，超时兜底空数组
+]);
+\`\`\`
+
+实际案例：某电商大促的真实故障链——推荐服务凌晨 OOM 变慢（RT 从 50ms 涨到 8s），BFF 无超时无熔断，Node 进程的 socket 连接被慢请求占满（默认 maxSockets 无上限、事件循环堆积回调），10 分钟内 BFF 集群全部假死，连健康的商品服务也调不通，首页白屏 40 分钟。整改四件套上线后，同样的推荐服务故障只表现为"推荐位展示兜底榜单"，核心交易零感知。另一个正面案例：Netflix 的 Hystrix（熔断器概念的推广者）当年就是把"任一依赖的故障隔离在舱壁内"作为设计核心，Node 生态的 cockatiel 是同源思想。
+
+踩坑与 tradeoff：超时不是越小越好——下游 P99 是 250ms 你配 200ms，等于常态化切掉 1% 的慢请求，要按 P99 + 一定余量配；重试要配幂等——非幂等接口（创建订单）重试会重复扣款，重试只给 GET 或带幂等 key 的写操作，且重试间隔指数退避防雪崩（jitter 防羊群）；熔断粒度要对——按"下游服务 + 接口"维度熔断而非进程级全局熔断，一个接口挂拖垮全部调用就矫枉过正；降级的兜底数据要预热——缓存快照平时不写、故障时才发现是三个月前的数据，降级等于没降；指标先行——四件套的效果要用监控闭环（熔断次数、降级命中率、超时分布），没指标的稳定性配置是心理安慰。`,
+    keyPoints: ["全链路超时预算：页面3s→聚合1.5s→单下游300ms", "限流双向：入口防突发，出口并发上限防自爆", "熔断按服务+接口粒度，半开试探恢复", "重试只给幂等接口，指数退避+jitter"],
+    followUps: ["Node 的 maxSockets 与连接池怎么调？", "半开状态的流量试探策略有哪些？"],
+    favorited: false,
+  },
+  {
+    id: "fe-370",
+    nodeId: "fe-nodejs-bff",
+    question: "SSR / Serverless 的冷启动如何优化？Node 服务的启动性能怎么治理？",
+    bigTech: true,
+    answer: `冷启动 = 平台从零拉起一个 Node 进程到它能处理第一个请求的耗时，构成是：加载运行时（Node 本身 ~50ms）+ require 依赖链（最大的头，大型应用 node_modules 加载可占 1~3s）+ 框架初始化（Next.js 路由注册、中间件装载）+ 业务初始化（连数据库、预热缓存）。优化手段按性价比排序：① 依赖瘦身——Serverless 环境只打包生产依赖（排除 devDependencies），用 esbuild/Vercel nft 做 tree-shaking 打包成单文件，require 数量从几千降到几十，冷启动降 60%+；② 懒加载重依赖——非首屏必须的模块（富文本渲染、报表库）改成动态 import，推迟到首次使用时；③ 连接复用——数据库/Redis 连接做成"进程级单例 + 跨调用复用"（Serverless 容器复用时连接还在），用全局变量缓存防止热重连；④ 平台层——Vercel Fluid / AWS Lambda Provisioned Concurrency 保持热实例，Cloudflare Workers 直接换 V8 isolate 架构把冷启动压到 <5ms（没有进程启动，只有 isolate 初始化）；⑤ SSR 专项——React 18 renderToPipeableStream 流式输出，首字节不等全量渲染。
+
+\`\`\`ts
+// Serverless 数据库连接单例：容器复用时跳过握手
+let cached: Pool | null = null;
+export function getDB(): Pool {
+  if (!cached) {
+    cached = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    // Serverless 单并发场景 max:1，避免连接数随实例数爆炸
+  }
+  return cached;
+}
+// next.config.ts：服务端打包瘦身
+module.exports = { output: "standalone", serverExternalPackages: ["sharp"] };
+\`\`\`
+
+实际案例：Vercel 的 nft（Node File Trace）打包是行业标配——Next.js standalone 模式自动追踪 server 代码的真实依赖，把几百 MB 的 node_modules 压到几十 MB；某内容站迁移 Cloudflare Workers（SSR 用 next-on-pages / OpenNext）后，全球冷启动从美东节点的 800ms 降到各边缘节点 <20ms，代价是 Node API 兼容层（fs、原生 addon 不可用）要逐一适配。另一个治理案例：某 BFF 冷启动 2.8s，profiling 发现 70% 花在 require 一个"瑞士军刀"工具库（它顶层 require 了整个 aws-sdk），改成按需子路径导入后冷启动降到 900ms。
+
+踩坑与 tradeoff：打包与调试的权衡——单文件 bundle 冷启动快但 source map 链路多一层，生产错误堆栈还原要配置好；连接池悖论——Serverless 实例数随流量弹性伸缩，每个实例一个连接池 × 峰值 1000 实例 = 数据库 1000 连接直接打满，解法是 RDS Proxy / PgBouncer 这类服务端连接池，或干脆换 HTTP 协议的数据库（Neon/PlanetScale 的 serverless driver）；热实例保活的成本——Provisioned Concurrency 按小时计费，低频接口保活不如接受偶发冷启动；Node 22+ 的 --experimental-compile-cache 可以把 V8 编译缓存落盘，二次冷启动省 20~40% 编译耗时，属于白捡的优化；观测先行——冷启动占比要用平台指标（Lambda 的 Init Duration）监控，别靠体感。`,
+    keyPoints: ["冷启动构成：运行时+require 链+框架+业务初始化", "esbuild/nft 打包瘦身是性价比之王", "连接单例跨调用复用，池大小按 serverless 特性配", "Workers/V8 isolate 把冷启动压到毫秒级"],
+    followUps: ["Serverless 下数据库连接数爆炸的完整解法？", "Node compile cache 的原理和适用范围？"],
+    favorited: false,
+  },
+  {
+    id: "fe-371",
+    nodeId: "fe-nodejs-bff",
+    question: "Node.js 内存泄漏和事件循环阻塞如何排查？",
+    bigTech: true,
+    answer: `Node 性能问题的两类典型及排查路径：内存泄漏——症状是 RSS 持续上涨不回落、GC 频繁、最终 OOM（JavaScript heap out of memory）。排查三板斧：① 监控先行——process.memoryUsage() 定期采样（heapUsed/rss/external），画趋势图，泄漏的曲线是锯齿上移而非平台波动；② heap snapshot 对比——node --inspect 启动 + Chrome DevTools 连上，在泄漏前后各拍一份堆快照，用 Comparison 视图按 retained size 排序找增长最快的对象类型，顺引用链（Retainers）找到谁拽着不放；③ 常见嫌犯清单——全局 Map/数组当缓存不设上限、闭包引用大对象被长生命周期结构持有、EventEmitter 忘 removeListener（MaxListenersExceededWarning 是预警信号）、定时器回调引用外部大对象、async 上下文（AsyncLocalStorage store）未清理。事件循环阻塞——症状是 RT 毛刺、健康检查超时。工具：node --prof 或 0x 生成火焰图找热点函数；clinic.js 的 doctor 自动诊断"事件循环延迟高"模式；监控 eventLoopLag（perf_hooks.monitorEventLoopDelay），P99 超过 100ms 就要警惕。
+
+\`\`\`js
+// 经典泄漏：无界缓存
+const cache = new Map();                    // 只进不出，必漏
+function getUser(id) {
+  if (!cache.has(id)) cache.set(id, db.query(id));
+  return cache.get(id);
+}
+// 修复：LRU 有界缓存
+import { LRUCache } from "lru-cache";
+const cache = new LRUCache({ max: 1000, ttl: 60_000 });
+
+// 事件循环延迟监控（接告警）
+import { monitorEventLoopDelay } from "perf_hooks";
+const h = monitorEventLoopDelay(); h.enable();
+setInterval(() => report("eventLoopLagP99", h.percentile(99)), 10_000);
+\`\`\`
+
+实际案例：某 BFF 服务每三天 OOM 重启一次——heap snapshot 对比发现增长最快的是字符串数组，顺 Retainers 找到是日志库的请求上下文 buffer：每个请求 push 日志条目，请求结束没清理，遇到长连接（SSE）请求永不结束，buffer 无限增长，改成分级 buffer + 请求结束 flush 后内存曲线立刻平稳。另一个阻塞案例：某接口 P99 偶发 5 秒尖峰，0x 火焰图定位到 JSON.parse 一个 40MB 的配置对象在每个请求里重复执行，挪到启动时加载 + 引用复用，尖峰消失——同步代码的代价在 Node 里被所有并发请求平摊，比 Java 多线程模型敏感得多。
+
+踩坑与 tradeoff：快照是重型操作——拍 heap snapshot 时进程暂停数十秒，生产环境要在副本实例上操作，别对线上唯一实例动手；external 内存是盲区——Buffer（如大文件读取）不占 V8 heap 但占 RSS，heapUsed 正常而 RSS 暴涨时想 Buffer/stream；GC 调参的幻觉——--max-old-space-size 调大只是把 OOM 推迟，不解决泄漏；V8 的 APM 工具（如 clinic、Elk APM、阿里 Node.js 性能平台）能自动化大部分采集，自建脚本不如接现成平台；预防优于排查——CR 时盯四类高危代码（全局可变集合、listener 注册、闭包缓存、大对象序列化），比事后捞快照省十倍力气。`,
+    keyPoints: ["泄漏曲线=锯齿上移，快照对比+Retainers 定位", "四大嫌犯：无界缓存/闭包持有/listener 泄漏/定时器", "阻塞用火焰图+eventLoopLag P99 监控", "RSS 高 heap 正常时查 Buffer/external"],
+    followUps: ["V8 老生代 GC 的标记-整理流程与停顿优化？", "AsyncLocalStorage 为什么也会造成内存驻留？"],
+    favorited: false,
+  },
+  {
+    id: "fe-372",
+    nodeId: "fe-nodejs-bff",
+    question: "BFF 聚合和前端直调微服务怎么选？什么场景该绕过 BFF？",
+    bigTech: true,
+    answer: `这不是非黑即白，而是按"数据特征 × 链路特征"做路由决策。该走 BFF 聚合的场景：① 多源组装——页面数据来自 3+ 微服务（用户信息+订单+优惠券），BFF 内网并发聚合把多次公网 RTT 压成一次；② 弱网端——移动端/海外用户，请求数比请求大小更伤体验；③ 需要服务端能力的逻辑——鉴权收口、AB 实验分流、数据脱敏（手机号打码）、协议转换（gRPC→REST）；④ 接口防腐——下游频繁重构时 BFF 做稳定层。该绕过 BFF 直调的场景：① 大文件传输——上传/下载走 BFF 等于让 Node 进程当二传手（内存和带宽双重消耗），应该 BFF 只发签名 URL，前端直传 OSS/S3；② 高频低延迟数据——股价推送、协同编辑光标，WebSocket/SSE 直连专门服务，BFF 转发只增延迟；③ 第三方 SDK——支付、地图等官方 SDK 直连官方服务，BFF 代理反而破坏签名和风控；④ 内部可信场景的简单 CRUD——后台系统对内网服务直调，加一层 BFF 只是多了个故障点。
+
+\`\`\`
+决策矩阵：
+                  低频读          高频读/写        大文件/流
+单服务数据源      可直调          直调             直传(签名URL)
+多服务聚合        BFF 聚合        BFF+缓存         BFF 只发凭证
+需鉴权/脱敏       必须 BFF        必须 BFF         BFF 发临时令牌
+\`\`\`
+
+实际案例：某视频平台的混合架构是教科书——视频元数据/评论/推荐走 BFF 聚合（一次请求渲染详情页），但视频流本身直连 CDN、上传走 BFF 签发的 OSS 直传（断点续传、秒传逻辑全在前端与 OSS 之间），BFF 的带宽成本降了 90%；反例：某公司"BFF 原教旨主义"，连 200MB 的报表导出都走 BFF 中转，大促期间 Node 进程被几个并发导出占满内存连环 OOM，事后改成"BFF 生成预签名 URL，前端直拉 S3"，问题根治。
+
+踩坑与 tradeoff：直调的代价要算清——前端直接持有微服务地址意味着 CORS 配置分散、鉴权逻辑前端化（token 泄露面变大）、接口变更需要发前端版本，这些成本在小团队可能超过聚合收益；BFF 缓存是把双刃剑——聚合层加 Redis 缓存能扛读流量，但多源数据的失效策略（任一源变即失效 or 按源 TTL 分别缓存）设计不好会读到脏数据；GraphQL Federation 是第三条路——各微服务自持 subgraph，网关层自动聚合，兼顾"服务自治"与"一次查询"，但基建门槛高（schema 治理、查询复杂度限制）；演进视角——项目早期直调一两个服务很正常，当"页面 loading 要转三次圈"或"前端 if-else 拼装五个接口数据"出现时，就是 BFF 该登场的信号，别预先架构也别死不架构。`,
+    keyPoints: ["走 BFF：多源聚合/弱网/服务端能力/防腐", "绕 BFF：大文件直传/实时推送/三方 SDK", "直传模式：BFF 发签名 URL，流量不过 Node", "演进信号：多次转圈+前端拼装数据=BFF 登场"],
+    followUps: ["BFF 层缓存的多源失效策略怎么设计？", "GraphQL Federation 与手写 BFF 的治理成本对比？"],
+    favorited: false,
+  },
+  {
+    id: "fe-373",
+    nodeId: "fe-monitoring",
+    question: "前端错误监控体系怎么建？window.onerror、unhandledrejection、资源错误各覆盖什么？",
+    bigTech: true,
+    answer: `前端错误采集要铺满四个入口，缺一个就有盲区：① window.onerror——捕获同步运行时错误（跨域脚本只给 "Script error." 无堆栈，解法：script 加 crossorigin="anonymous" + CDN 返回 Access-Control-Allow-Origin）；② window.addEventListener("unhandledrejection")——捕获没有 catch 的 Promise 拒绝，event.reason 可能是 Error 也可能是任意值（throw "字符串" 的代码真实存在）；③ window.addEventListener("error", ..., true) 捕获阶段——资源加载错误（img/script/link 404）不冒泡只捕获，拿到的是 Event 不是 Error，要读 target.src/href；④ 框架层——React ErrorBoundary（渲染期错误 onerror 捕获不到，会卸载整棵树）、Vue errorHandler。上报内容决定排查效率：错误消息 + 堆栈 + 发生时的 URL/路由 + userId + 设备/浏览器 + 版本号（release）+ 面包屑（用户最近的点击/请求/路由变化序列，复现路径的黄金线索）。工程闭环：采样（错误风暴时限流，单用户同错误聚合）→ 符号化（source map 还原）→ 聚合分组（fingerprint 去重）→ 告警（新增错误类型立即报，存量错误按阈值）→ 分派（按代码 OWNER 自动指派）。
+
+\`\`\`ts
+window.addEventListener("error", (e) => {
+  if (e instanceof ErrorEvent) report({ type: "js", msg: e.message, stack: e.error?.stack });
+  else report({ type: "resource", url: (e.target as HTMLElement)?.src });  // 资源错误
+}, true);   // 捕获阶段拿资源错误
+window.addEventListener("unhandledrejection", (e) =>
+  report({ type: "promise", reason: e.reason instanceof Error ? e.reason.stack : String(e.reason) }));
+// 面包屑：环形缓冲记录最近 20 条行为，错误时随单上报
+\`\`\`
+
+实际案例：Sentry 的开源实现是行业事实标准（自部署或 SaaS）；某电商自研监控平台上线第一周就抓到一个大瓜——"Script error." 占错误总量 60% 且无任何堆栈，排查发现是第三方统计 SDK 内部报错 + 业务代码跨域资源未配 crossorigin，配置后真实错误现形：一个存在半年的空指针每天在影响 2000+ 用户而无人知晓。另一个案例是面包屑的价值：一个"偶发白屏"投诉，靠面包屑还原出"点击导出→路由跳转→接口 401→重定向循环"的完整路径，两小时修复，没有面包屑这种偶发问题通常以"无法复现"关闭。
+
+踩坑与 tradeoff：错误风暴要双向防护——客户端本地 dedup（同一错误 10 秒内只报一次）+ 服务端按 fingerprint 限流，否则一个线上事故先把监控服务打挂（监控自己成为故障放大器是最讽刺的事故）；隐私红线——面包屑可能含表单输入、URL 里的 token，上报前过脱敏规则（密码字段、query 敏感参数、手机号正则替换），GDPR/个保法合规不是可选项；SPA 路由上下文——错误发生时的路由要用框架钩子记录而非读 location（上报时路由可能已变）；采样率的哲学——错误监控不采样（错误本身就是低频高价值信号），性能监控才采样，别搞反；sourcemap 上传要纳入 CI——发版忘了传 symbol 文件，错误平台里全是压缩后的乱码堆栈，等于裸奔。`,
+    keyPoints: ["四入口：onerror/unhandledrejection/捕获阶段/框架边界", "Script error 解法：crossorigin+CORS 双配", "上报三要素：堆栈+上下文+面包屑", "错误不采样、性能才采样，别搞反"],
+    followUps: ["React ErrorBoundary 与全局错误采集如何分工？", "错误 fingerprint 聚合算法怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "fe-374",
+    nodeId: "fe-monitoring",
+    question: "Source Map 错误还原的原理是什么？工程上如何落地？",
+    bigTech: true,
+    answer: `压缩混淆后的堆栈（at http://cdn/app.min.js:1:23456）对人无意义，Source Map 就是"压缩后位置 ↔ 源码位置"的映射表：文件里是一串 VLQ（Variable Length Quantity）Base64 编码的 mappings，每段记录 [生成列, 源文件索引, 源码行, 源码列, 名称索引]，配合 sources（原始文件列表）和 names（原始标识符）三张表完成双向映射。还原过程：错误平台拿到压缩堆栈 → 按 URL+版本找到对应 .map 文件 → 用 source-map 库把 line:col 翻译成 源码文件:行:列 + 原始函数名 → 结合 CI 上传的源码上下文显示出错代码片段。工程落地四步：① 构建期生成 hidden sourcemap（devtool: "hidden-source-map"，产物里不写 //# sourceMappingURL 注释，浏览器 DevTools 和用户都拿不到）；② CI 把 .map 文件随版本号（release 字段）上传到错误平台（Sentry 的 sentry-cli 或自研服务的 symbol 仓库），上传后从 CDN 删除或鉴权保护；③ 运行时错误 SDK 打上报表带 release，平台按 release 匹配 map 版本；④ 还原失败兜底——保留原始压缩堆栈并标记未符号化，别让符号化失败吃掉错误本身。
+
+\`\`\`ts
+// webpack：生成但不暴露 sourcemap
+{ devtool: "hidden-source-map" }
+// Vite 等价
+{ build: { sourcemap: "hidden" } }
+// CI 上传（Sentry 示例）
+// sentry-cli releases files v1.2.3 upload-sourcemaps ./dist --url-prefix "~/static/js"
+// 上传完删除公网 .map：find dist -name "*.map" -delete
+\`\`\`
+
+实际案例：某团队 sourcemap 治理的完整闭环——早期 map 文件直接发 CDN（相当于源码裸奔，竞品扒下来看逻辑），后来改 hidden + 内网 symbol 服务，CI 按 git commit hash 归档 map，错误平台按 release 拉取还原；一次线上事故中，压缩堆栈还原后精确指向"utils/format.ts 第 47 行可选链漏写"，从告警到定位 5 分钟。另一个常见翻车：CDN 缓存了旧版 JS 但 HTML 引用了新版 chunk，错误堆栈的行号与新版 map 对不上，还原出来指向完全错误的文件——map 与产物必须严格按版本一一对应，content hash 命名 + 不可变缓存是前提。
+
+踩坑与 tradeoff：map 泄露等于源码泄露——hidden-source-map + 内网存储是基线，曾有大厂把 .map 留在公网被完整扒出业务源码；版本错配是还原失败首因——A/B 实验多版本并存时，错误要带具体 chunk hash 而非笼统 release；多级编译的映射链——TS→JS→压缩是两步，tsc 和 bundler 的 map 要串联（sourcemap-loader 或直接一体化构建），断一环就还原到中间产物；WASM/Worker 的 map 要单独处理——线程内错误的堆栈 URL 指向 blob 或独立 chunk，SDK 要给 Worker 上下文也注入 release；性能成本——source-map 解析大 map（10MB+）耗时可观，错误平台通常预处理成索引结构，自研平台别把解析放请求热路径。`,
+    keyPoints: ["mappings：VLQ 编码的位置映射+sources+names", "hidden-sourcemap：生成但公网不可见", "CI 按 release 上传，map 与产物严格一一对应", "还原失败要兜底保留原始堆栈"],
+    followUps: ["多级编译（TS→JS→min）的 map 链如何串联？", "Worker/WASM 场景的错误符号化差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-375",
+    nodeId: "fe-monitoring",
+    question: "Web Vitals 性能指标怎么采集？LCP、INP、CLS 的测量原理是什么？",
+    bigTech: true,
+    answer: `真实用户监控（RUM）靠浏览器 Performance API 三件套：① LCP（Largest Contentful Paint，最大内容绘制，≤2.5s 优）——PerformanceObserver 监听 "largest-contentful-paint" 条目，浏览器持续上报视口内最大元素（图片/视频封面/块级文本）的渲染时间，用户交互后停止更新（取最后一次为准）；② INP（Interaction to Next Paint，交互到下次绘制，2024 年 3 月取代 FID，≤200ms 优）——监听 "event" 条目（buffered: true 可拿历史），记录每次交互（点击/输入/键盘）从触发到下一帧绘制的完整延迟，取 P98 近似最差值，比 FID 严苛得多（FID 只测首次输入的延迟部分，INP 测全生命周期所有交互的全程耗时）；③ CLS（Cumulative Layout Shift，累积布局偏移，≤0.1 优）——监听 "layout-shift"，按 影响分数×距离分数 累计每个意外位移（会话窗口内聚合，取最大窗口值）。上报策略：web-vitals 库封装好全部细节（可见性变化时 sendBeacon 上报，避免页面隐藏丢失数据），附带 元素选择器归因（LCP 是哪个元素、INP 卡在哪个事件处理器、CLS 谁动了）才有优化价值。
+
+\`\`\`ts
+import { onLCP, onINP, onCLS } from "web-vitals";
+onLCP((m) => report("LCP", m.value, m.entries.at(-1)?.element));  // 归因到元素
+onINP((m) => report("INP", m.value, m.attribution.interactionTarget));
+onCLS((m) => report("CLS", m.value, m.attribution.largestShiftTarget));
+// 发送用 navigator.sendBeacon（页面隐藏时可靠投递），采样率 5%~10%
+\`\`\`
+
+实际案例：某内容平台 LCP 优化的归因式打法——RUM 数据显示 LCP P75 3.8s 但元素归因发现 70% 的 LCP 元素是首屏 banner 图，进一步拆解（web-vitals 的 attribution 给出 TTFB/资源加载/渲染延迟分段）定位到 60% 耗时在图片下载，上 AVIF + preload + CDN 边缘缓存后 P75 降到 2.1s；INP 优化的典型路径：某后台系统 INP P75 高达 600ms，归因到点击表格排序的处理器——一次排序触发全表 2000 行重渲染，上 useTransition + 虚拟滚动后降到 180ms。实验室数据（Lighthouse）与 RUM 的关系：实验室是"标准工况"用于回归防线，RUM 才是用户真实体验（分布、长尾、设备网络差异），两者常差一倍，只看 Lighthouse 优化是自欺。
+
+踩坑与 tradeoff：INP 的归因最难——长任务可能被多个交互分摊，attribution 给的是主导者而非全部贡献者，优化时要看长任务火焰图；SPA 的指标失真——LCP/CLS 都是页面级，路由切换后的"二次 LCP"没有官方定义（社区用软导航补丁或按路由切片自定义），单看首页指标会高估整体体验；采样与配额——全量上报性能数据成本高，5% 采样 + 关键页面加权是常态，但告警阈值要按采样后的统计显著性校准；sendBeacon 的 payload 上限（64KB）和多指标合并上报要一次设计好；反作弊意识——RUM 数据会被爬虫/预渲染污染（prerender 的 LCP 接近 0），要过滤 navigator.webdriver 和 visibilityState 异常样本。`,
+    keyPoints: ["LCP 取最大元素最后上报值，交互后冻结", "INP 测全程全交互 P98，取代只测首次的 FID", "CLS 按影响×距离分会话窗口累计", "归因（元素/处理器/目标）比数值更值钱"],
+    followUps: ["INP 与长任务（Long Tasks）的关系是什么？", "SPA 软导航的性能指标怎么自定义采集？"],
+    favorited: false,
+  },
+  {
+    id: "fe-376",
+    nodeId: "fe-monitoring",
+    question: "前端白屏如何检测？SPA 场景的白屏判定为什么难？",
+    bigTech: true,
+    answer: `白屏定义比想象中微妙：不是"页面空白"（加载中的合法状态），而是"超过预期时间仍无有效内容"。检测方案四代演进：① 存活探针式——定时器检查 DOM 关键容器（#root/#app）在 N 秒后是否有子节点，简单但误报高（慢网用户还在加载就报白屏）；② 像素采样式——用 html2canvas 或 native 截图能力对页面采样，计算空白像素占比，准确但性能开销大，只适合抽样；③ 渲染信号式——监听 FP/FCP/LCP：页面打开后 N 秒内没有 FCP（首次内容绘制）判定白屏候选，结合 DOM 检查二次确认，性能与准确平衡最好；④ 框架信号式——React/Vue 应用根组件 mount 成功上报"存活心跳"，超时未收到即白屏，SPA 场景最可靠（直接证明 JS 执行到渲染）。SPA 判定难在三处：路由切换的白屏（JS 活着但新页面渲染失败，DOM 里有旧内容，容器检查失效）；hydration 失败（SSR 页面 HTML 有内容但 JS 没接管，看着正常其实死的，要检查事件是否响应或 React 根标记）；微前端容器白屏（子应用加载失败但壳正常，每个子应用容器要独立探针）。
+
+\`\`\`ts
+function whiteScreenDetect() {
+  const deadline = 5000;
+  setTimeout(() => {
+    const fcp = performance.getEntriesByName("first-contentful-paint")[0];
+    const rootHasContent = document.getElementById("root")?.children.length ?? 0;
+    if (!fcp && !rootHasContent) report("white-screen", { url: location.href });
+  }, deadline);
+}
+// React 侧：根组件 useEffect 上报 mount 心跳，与上者互补（JS 崩了心跳缺席）
+\`\`\`
+
+实际案例：某工具站白屏监控上线后的数据分布很有代表性——白屏率 0.3%，但其中 80% 集中在"低端 Android + 弱网"象限，进一步归因是 4MB 的 JS bundle 在弱网下 30 秒未下载完，上路由级 code splitting + 预加载关键 chunk 后白屏率降到 0.05%。另一个 SPA 特有案例：路由懒加载 chunk 因 CDN 节点故障 404，React Router 的 lazy 抛错被 ErrorBoundary 捕获显示兜底（不算白屏），但兜底组件本身的图片也 404 导致用户看到全灰——监控补上了"ErrorBoundary 触发率"指标才把这类问题纳入视野。
+
+踩坑与 tradeoff：误报是白屏监控的天敌——合法慢加载被报白屏会淹没告警（告警疲劳后真白屏也没人看），所以阈值要按设备/网络分层（低端机弱网放宽到 10s），且"候选白屏"要二次确认（发一个探针请求看网络是否通）；SSR 的 hydration 失败最阴——HTML 正常渲染（用户看到内容），但 onClick 全无反应，检测要靠"根组件 mount 心跳"或"事件探针"（静默触发测试事件）；采样成本控制——像素采样只给 1% 流量或疑似会话做；与白屏关联的止损动作——检测到白屏后自动刷新一次（location.reload）能救回约 30% 的临时性白屏（chunk 加载抖动类），但要防刷新循环（sessionStorage 记次数，超 2 次放弃）；指标要进大盘按版本/渠道下钻——发版后白屏率突增是最常见的回滚信号。`,
+    keyPoints: ["白屏=超时无有效内容，非加载中状态", "FCP 信号+DOM 二次确认性价比最高", "SPA 三难：路由切换/hydration 死/子应用容器", "误报治理：分层阈值+二次确认+自动刷新止损"],
+    followUps: ["hydration 失败的线上检测方案有哪些？", "白屏率与哪些指标做关联分析最有效？"],
+    favorited: false,
+  },
+  {
+    id: "fe-377",
+    nodeId: "fe-monitoring",
+    question: "前端埋点体系怎么设计？代码埋点、无痕埋点、曝光埋点各适合什么场景？",
+    bigTech: true,
+    answer: `埋点三流派：① 代码埋点（手动）——在业务逻辑里显式调用 track("pay_click", { sku })，优点是语义精确、携带业务参数完整，缺点是维护随代码腐化（重构时埋点被遗忘）、覆盖成本高，适合核心转化链路（支付、注册、提交）；② 无痕埋点（全埋点）——SDK 自动拦截所有点击/输入/路由变化上报，后期用可视化圈选定义事件，优点是回溯能力强（昨天上线的新分析今天就有历史数据）、产品自助，缺点是数据量爆炸、元素定位脆弱（class 改名圈选失效）、携带不了业务语义，适合探索性分析和长周期漏斗；③ 曝光埋点——IntersectionObserver 监听元素进入视口（threshold 通常 0.5 以上、停留 300ms+ 防一闪而过），上报 元素ID+位置+时长，列表场景要去重（同一 item 同会话只报一次）。工程规范三件套：事件协议统一（event 名动宾结构、参数 snake_case、公共参数 page/uid/ts 由 SDK 注入）、埋点注册表（事件字典随代码版本进 git，CI 校验未注册事件拦截）、验证工具（开发环境浮层实时显示触发的事件流）。
+
+\`\`\`ts
+// 曝光埋点骨架：IntersectionObserver + 停留时长判定
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    const id = e.target.dataset.trackId;
+    if (e.intersectionRatio >= 0.5) {
+      e.target.dataset.showAt = Date.now();
+    } else if (e.target.dataset.showAt) {
+      const dur = Date.now() - Number(e.target.dataset.showAt);
+      if (dur >= 300 && !seen.has(id)) { seen.add(id); track("item_expose", { id, dur }); }
+      delete e.target.dataset.showAt;
+    }
+  }
+}, { threshold: [0, 0.5] });
+\`\`\`
+
+实际案例：字节的增长分析体系（DataFinder/火山引擎）是无痕+代码混合派的代表——列表信息流用无痕圈选快速验证假设，支付等核心链路用代码埋点保精度；某电商的曝光埋点治理教训典型：早期用 scroll 事件 + getBoundingClientRect 计算曝光，长列表滚动时主线程卡死（每帧几十次强制同步布局），换 IntersectionObserver 后滚动帧率从 30fps 回到 60fps，且原生节流天然去抖。另一个失败案例：某团队埋点没有注册表约束，半年积累 3000+ 事件名（buy_click/buyClick/BUY-CLICK 并存），数据分析靠考古，最后清库重建并立下"事件字典 CI 卡点"的规矩。
+
+踩坑与 tradeoff：无痕埋点的定位脆弱性——用 xpath/class 链圈选的元素，UI 改版后圈选规则集体失效且无声无息（数据悄悄断层），重要指标必须用带稳定 data-track-id 的代码埋点；曝光口径要和业务对齐——"进入视口 50% 且停留 300ms"还是"完全可见"，不同口径数据差 3 倍，定错了 GMV 归因全乱；SPA 的 PV 定义——路由切换算 PV，但要区分"首次加载"与"软导航"（性能归因完全不同），且路由变化时未完成的曝光要结算；隐私合规——输入框内容、URL query 默认不采，欧盟/国内个保法要求明示同意前的埋点要缓存延迟发送；埋点与监控是两个体系别混——埋点回答"用户怎么用"（分析驱动），监控回答"系统健康吗"（稳定性驱动），数据管道和采样策略都不同。`,
+    keyPoints: ["代码埋点保核心，无痕做探索，分工不替代", "曝光：IntersectionObserver+阈值+停留+去重", "事件注册表进 git，CI 拦未注册事件", "定位脆弱性：重要指标必须稳定 track-id"],
+    followUps: ["无痕埋点的元素指纹算法怎么设计抗改版？", "埋点数据如何与后端日志做全链路关联？"],
+    favorited: false,
+  },
+  {
+    id: "fe-378",
+    nodeId: "fe-monitoring",
+    question: "前端日志的采样、上报与告警治理怎么做？如何避免告警疲劳？",
+    bigTech: true,
+    answer: `前端日志体系的三个子问题：① 采样——性能/行为类高频数据必须采样（全量上报成本扛不住），常用策略：固定比例采样（5%）按用户 ID hash 保持同一用户一致性（可还原单个用户完整路径）、分层采样（核心页面 100%、长尾页面 1%）、错误场景不降采（错误本身低频高价值，且错误发生前后自动提升该会话日志级别——"事后补救"式全量）；② 上报——通道选择：navigator.sendBeacon 优先（页面隐藏/卸载时可靠投递、不阻塞主线程）、fetch keepalive 备选、img 像素点兜底（兼容老浏览器，1x1 gif 带 query）；批量聚合（本地缓冲 10 条或 5 秒 flush 一次，省连接数）；失败重试与离线缓存（IndexedDB 暂存，网络恢复补发，但设上限防存储膨胀）；压缩（日志体大时 gzip，但要算 CPU 成本）；③ 告警治理——告警的三条军规：可行动（收到告警的人有明确处置动作，否则降级为周报指标）、有阈值依据（基线偏离而非绝对值，如"错误率较 7 日均值 +3σ"）、去重聚合（同一 root cause 的 10 万条错误聚合为一个事件，新增错误类型单独告警）。
+
+\`\`\`ts
+// 一致性采样：同一用户永远在同一侧
+function sampled(uid: string, ratio: number): boolean {
+  let h = 0;
+  for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+  return (h % 1000) / 1000 < ratio;
+}
+// 上报队列：批量 + beacon 兜底
+class LogQueue {
+  private buf: LogItem[] = [];
+  flush() {
+    if (!this.buf.length) return;
+    const body = JSON.stringify(this.buf.splice(0));
+    if (!navigator.sendBeacon("/log", body)) fetch("/log", { method: "POST", body, keepalive: true });
+  }
+}
+window.addEventListener("visibilitychange", () => document.hidden && queue.flush());
+\`\`\`
+
+实际案例：告警疲劳的真实灾难——某团队告警群每天 200+ 条机器人消息（阈值拍脑袋：错误数 >50 就报），三个月后真事故（支付回调失败率 40%）被淹没在日常噪音里 40 分钟才被发现；治理后告警分三级：P0（新增错误类型、核心指标 +3σ、白屏率突增）电话+IM，P1（非核心指标偏离）IM 群，P2（趋势性劣化）日报，告警量降到每天 5 条内且条条有人认领。另一个正面案例：某平台做"错误发生时的会话全量回放"——平时 5% 采样，一旦某会话触发错误，自动把该会话的完整行为日志（之前缓冲在本地）补报，排查效率翻倍而成本几乎不增。
+
+踩坑与 tradeoff：采样率与统计显著性的矛盾——1% 采样下每天只有 3 个样本的冷门页面，任何波动都是噪音，这类页面的告警要么并池要么放弃；客户端时钟不可信——日志时间戳以服务端接收时间为准（客户端时区错乱、手动改时间真实存在），但行为序列的相对时间用客户端单调时钟（performance.now 类）可靠；上报竞态——页面卸载瞬间的日志丢失率最高，beacon + visibilitychange 组合是已验证的最稳姿势；隐私与采样同规——采样开关不能绕过同意机制（用户拒绝追踪时连采样资格都没有）；告警自愈闭环——告警触发自动刷新/降级/回滚动作的系统（如白屏率突增自动切备用版本）比人工响应快一个量级，但动作本身要有护栏（自动回滚最多一次，防反复横跳）。`,
+    keyPoints: ["一致性采样按 uid hash，会话可完整还原", "beacon+批量+离线缓存+visibilitychange 四件套", "告警军规：可行动/有基线/去重聚合", "错误触发会话全量补报，成本与效率双赢"],
+    followUps: ["告警基线用固定阈值还是动态基线（3σ/同比）？", "客户端时间戳不可信时如何做会话时长分析？"],
+    favorited: false,
+  },
+  {
+    id: "fe-379",
+    nodeId: "fe-monitoring",
+    question: "接口质量监控（成功率、慢查询、异常状态码）前端怎么做？",
+    bigTech: true,
+    answer: `接口监控的前端实现：拦截层统一埋点——fetch/xhr 各包一层（或 axios 拦截器），记录 接口名（URL 模式化，/order/123 → /order/:id，否则高基数爆炸）、耗时、状态码、业务码（200 但 code:50001 的逻辑失败才是业务接口的真实成功率）、请求体大小、重试次数。四类核心指标：① 成功率——HTTP 成功率与业务成功率分开算（HTTP 200 率 99.9% 但业务成功率 95% 的接口比比皆是），分接口/分页面/分版本下钻；② 耗时分布——P50/P90/P99 缺一不可（均值会被长尾掩盖），慢请求阈值按接口重要级分层（核心交易 1s、查询 2s、报表 5s）；③ 异常状态码——4xx 突增通常是前端 bug（参数错、鉴权失效），5xx 是服务端故障，499/超时类是网络或客户端中断，三类处置人完全不同；④ 熔断联动——前端对持续失败的接口做本地降级（3 次失败切备用域名/静态兜底），监控数据驱动降级策略的触发与恢复。
+
+\`\`\`ts
+// fetch 拦截埋点骨架
+const rawFetch = window.fetch;
+window.fetch = async (input, init) => {
+  const start = performance.now();
+  const api = patternize(typeof input === "string" ? input : input.url); // /order/:id
+  try {
+    const res = await rawFetch(input, init);
+    const clone = res.clone();
+    const body = await clone.json().catch(() => null);   // 读业务码
+    report("api", { api, dur: performance.now() - start, status: res.status, bizCode: body?.code });
+    return res;
+  } catch (e) {
+    report("api", { api, dur: performance.now() - start, status: 0, error: String(e) });
+    throw e;
+  }
+};
+\`\`\`
+
+实际案例：某电商大促的"接口熔断地图"——网关层故障导致部分区域 CDN 回源超时，前端监控按地域下钻发现华东 5xx 突增而华北正常，自动触发"华东流量切备用域名"的预案（前端 SDK 内置多域名 failover），故障期间华东下单成功率从 40% 拉回 92%。另一个教训型案例：某团队只看 HTTP 状态码，某核心接口业务失败（库存不足 code:40001）率到 15% 都无人感知——HTTP 层一片绿色 200，直到客服投诉爆发才发现，此后"业务码纳入成功率"成为铁律。高基数事故：早期直接以上报原始 URL，/order/123、/order/124 各成一条指标，时序数据库一天写入 2 亿个点直接打爆，模式化（path 参数占位）是接口监控的前置条件。
+
+踩坑与 tradeoff：拦截器要幂等可叠加——多个 SDK（监控/AB 实验/日志）都包 fetch，层层包裹后错误归因混乱，约定单一入口（公司内部 BaseSDK 统一封装）是治理终点；克隆响应读业务码有成本——clone().json() 会消耗内存和 CPU，大响应（列表 5MB）要跳过或只读 header 里的业务码（推动后端把业务码放 header 是治本）；采样与关键接口豁免——接口监控通常全量（请求数远低于行为日志），但批量轮询接口（每秒心跳）要聚合上报（1 分钟一个汇总点）；第三方接口不可控——支付/地图 SDK 的内部请求也要监控但单独打标（third_party=true），它们的故障不该算进自家 SLA；前端监控与服务端监控的黄金信号对齐——同一次失败两端都报，用 trace id 串联，前端看到的"超时"服务端可能是"慢 SQL"，两端数据拼起来才是完整故事。`,
+    keyPoints: ["URL 模式化防高基数，业务码才是真实成功率", "P50/P90/P99 分层阈值，4xx/5xx/超时分类处置", "fetch 拦截统一入口，多 SDK 包裹要治理", "trace id 串联前后端，拼出完整故障故事"],
+    followUps: ["高基数问题在指标系统里还有哪些表现和解法？", "业务码放 header 与放 body 的工程权衡？"],
+    favorited: false,
+  },
+  {
+    id: "fe-380",
+    nodeId: "fe-monitoring",
+    question: "线上问题从告警到定位的排查方法论是什么？如何建立可复用的排查体系？",
+    bigTech: true,
+    answer: `线上排查的标准动线（按信息密度排序）：① 定界——先看监控大盘确认影响面：是全局还是局部（单页面/单接口/单地域/单版本）？"什么时候开始的"比"发生了什么"更先回答——时间点对齐发版记录/配置变更/依赖服务告警，80% 的线上问题在这一步锁定方向（变更是万恶之源）；② 定位——全局问题看基础设施（CDN/网关/DNS），局部问题下钻：单接口 5xx 找后端链路，单页面错误率突增看该页面的错误聚类和面包屑，单版本问题直接回滚验证假设；③ 归因——拿到具体错误后走"错误堆栈（sourcemap 还原）→ 用户行为回放（面包屑/会话录屏）→ 最小复现"三步，复现不了的问题靠加日志而非空想；④ 止血——优先回滚/降级/切流（分钟级），修复代码是止血之后的事，"先恢复再排查"是线上第一原则；⑤ 复盘——写事故报告（时间线/根因/处置/改进项），每个改进项落实负责人和期限，进 backlog 跟踪闭环。可复用体系三支柱：变更可观测（发版/配置变更自动打时间标记到监控大盘）、下钻有路径（指标→页面→接口→用户会话四层联动，每层预置 dashboard 而非现查）、预案成文档（常见故障的处置 SOP：白屏→查 CDN→切备用、支付失败率突增→查渠道→切渠道）。
+
+\`\`\`
+排查决策树（贴在团队 wiki 首页）：
+告警触发
+ ├─ 影响面=全局？ → 查 CDN/DNS/网关/最近发版 → 回滚 or 切流
+ ├─ 单接口异常？  → 状态码分类：5xx→后端链路（trace id），4xx→前端参数/鉴权变更
+ ├─ 单页面异常？  → 该页错误聚类 top1 + 面包屑回放 → 定位代码段
+ ├─ 单版本异常？  → 回滚该版本，事后排查
+ └─ 单用户投诉？  → 会话回放 + 设备/网络画像 → 大概率边缘 case，加日志复现
+\`\`\`
+
+实际案例：某次"首页白屏率 0.1%→2%"告警的完整动线——定界（仅 Android WebView 渠道，18:30 开始，对齐 18:25 的一次配置变更：WebView 内核灰度升级）→ 定位（该渠道错误聚类 top1 是 "ResizeObserver is not defined"，老内核无此 API）→ 归因（新上的图表库用了 ResizeObserver 未做 polyfill，灰度渠道命中老内核）→ 止血（关闭该渠道的图表功能开关，5 分钟白屏率回落）→ 复盘（改进项：新 API 使用前查 caniuse 基线 + 灰度渠道覆盖老内核 + polyfill 自动注入检查进 CI）。整个处置 25 分钟，靠的是预置的"渠道×指标"下钻看板和功能开关系统，而非临时英雄主义。
+
+踩坑与 tradeoff：最常见的反模式是"先怀疑代码再看数据"——凭直觉翻两小时代码，不如先看 5 分钟监控定界；告警与 dashboard 脱节——告警文案里必须带直达下钻看板的链接（携带时间窗和过滤条件），否则每个告警都要从零拼装查询；会话回放类工具（rrweb 录屏）是疑难杂症的核武器但要过隐私评审（输入脱敏、采样率低、留存期短）；"无法复现"不等于"不存在"——低频问题用"日志增强 + 拉长观察窗"策略，给关键路径预埋可动态开启的 debug 日志（配置中心下发开关）；复盘不追责是文化底线——追责文化下大家藏问题，改进项永远落不了地；把排查经验产品化——每次事故的决策路径沉淀进 runbook，新人照着 runbook 能处理 70% 的常见问题，这才是体系对抗个人英雄主义。`,
+    keyPoints: ["先定界再定位：影响面+时间点对齐变更", "先止血再归因：回滚/降级优先于修代码", "四层下钻：指标→页面→接口→会话", "复盘产品化：runbook 沉淀决策路径"],
+    followUps: ["如何设计变更事件与监控大盘的自动关联？", "rrweb 会话录屏的原理与隐私脱敏方案？"],
     favorited: false,
   },
 ];
