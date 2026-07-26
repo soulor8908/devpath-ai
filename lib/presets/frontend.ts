@@ -373,6 +373,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "CI 流水线设计、contenthash 版本管理、CDN 缓存与失效、灰度发布/Feature Flag、秒级回滚、构建提速、多环境配置注入、质量门禁与包体积预算。",
     mastery: 0,
   },
+  // ===== 服务端与跨端层（2 个节点） =====
+  {
+    id: "node-bff",
+    title: "Node.js 与 BFF 层",
+    difficulty: 4,
+    prerequisites: ["js-async", "network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "Node 事件循环阶段、流与背压、BFF 聚合编排/限流熔断/超时预算、内存泄漏与事件循环阻塞排查、Node 安全（SSRF/ReDoS/原型链污染）、SSR 渲染缓存与降级。",
+    mastery: 0,
+  },
+  {
+    id: "cross-platform",
+    title: "跨端方案原理与选型",
+    difficulty: 4,
+    prerequisites: ["browser-rendering", "js-async"],
+    frequency: "中",
+    bigTech: true,
+    summary: "RN 新旧架构（Bridge→JSI/Fabric）、Flutter 自绘引擎、小程序双线程、JSBridge 双向通信、Taro 编译时 vs 运行时、Electron 进程模型、代码同构与平台抽象。",
+    mastery: 0,
+  },
   // ===== AI 前端方向（5 个节点，重点新增） =====
   {
     id: "ai-sdk-frontend",
@@ -10841,6 +10862,772 @@ module.exports = {
 真实案例：本项目（devpath-ai）就是这套体系的实践者——no-native-form-elements.test.ts 和 ui-design-system-guard.test.ts 两个守护测试把"统一组件库"和"暗色配对"两条规范固化进 CI，任何违反直接 CI red，规则从此不再依赖 review 时的肉眼。另一个经典案例：某公司用 dependency-cruiser 拦住了一次"新人从业务代码直接 import 数据库 SDK"的 PR（绕过了 BFF 层）——门禁的价值在拦截"少数人少数时刻的危险操作"，而不是给大多数人的日常添堵。度量门禁健康度的指标：拦截次数（太少=规则可能太松或没人写代码）、绕过次数（disable 增长趋势）、误报率（误报高的规则会被团队恨屋及乌，必须快速修）。`,
     keyPoints: ["三类门禁：自定义 lint 管写法 / dependency-cruiser 管模块边界 / size-limit 管产物体积", "存量落地：基线豁免+警告期+增量检查（军营规则），别指望一次清零历史违规", "防绕过：disable 要带理由、门禁配置 CODEOWNERS 保护、季度审计例外清单"],
     followUps: ["如何度量门禁的 ROI（拦截的缺陷 vs 增加的开发摩擦）？", "AI 编程助手时代的门禁设计有什么新变化（机器生成代码更需要护栏）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-302",
+    nodeId: "node-bff",
+    question: "Node.js 事件循环与浏览器事件循环的本质差异是什么？timers/poll/check 各阶段的执行顺序，以及 process.nextTick 与 setImmediate 的经典先后问题？为什么 Node 不适合 CPU 密集任务？",
+    bigTech: true,
+    answer: `结论：浏览器事件循环是"宏任务/微任务"两级模型，Node（基于 libuv）是"六阶段流水线"模型——timers（setTimeout/setInterval 回调）→ pending callbacks（系统级回调）→ idle/prepare（内部用）→ poll（取新 I/O 事件并执行回调，核心阶段）→ check（setImmediate）→ close callbacks（socket.on('close')）。微任务（Promise.then）在每个阶段之间清空，process.nextTick 优先级最高（当前阶段结束后立即执行，先于 Promise）。
+
+\`\`\`js
+// 经典顺序题（Node 11+ 与浏览器对齐后的行为）
+setTimeout(() => console.log("timeout"), 0);
+setImmediate(() => console.log("immediate"));
+// 主模块内执行：顺序不定！取决于事件循环进入时 poll 阶段是否已到 1ms
+// 但在 I/O 回调内：immediate 永远先于 timeout（poll 之后必进 check）
+
+const fs = require("fs");
+fs.readFile(__filename, () => {
+  setTimeout(() => console.log("timeout"), 0);
+  setImmediate(() => console.log("immediate"));
+  // 输出恒为：immediate → timeout（poll 阶段完成后下一站是 check）
+});
+
+// nextTick 是"插队王"：每阶段结束后最先清空
+setImmediate(() => console.log("immediate"));
+process.nextTick(() => console.log("nextTick"));
+Promise.resolve().then(() => console.log("promise"));
+// 输出：nextTick → promise → immediate
+\`\`\`
+
+Node 11 的重要变更：此前 setTimeout(fn, 0) 在一个 timers 阶段内只执行一次回调就去看微任务，11 之后改为与浏览器一致——每执行一个宏任务回调就清空微任务队列。这就是为什么老面经里"Node 和浏览器输出顺序不同"的题现在答案趋于一致，面试要说出版本语境。
+
+为什么 Node 不适合 CPU 密集：libuv 的线程池（默认 4 线程）只用于文件 I/O、DNS、crypto 等少数场景，JS 主线程只有一条——一段 while(true) 或 JSON.parse(超大对象) 会阻塞整个事件循环，所有在线请求全部卡住（p99 延迟爆炸但 CPU 只有一个核在烧）。解法三板斧：①cpu 密集任务扔 worker_threads（真线程，共享内存用 SharedArrayBuffer）；②计算下沉到原生 addon 或独立微服务（Go/Rust）；③必须主线程算的就切片（setImmediate 递归分片，让事件循环有机会处理请求）。真实案例：某 BFF 在请求链路里做全量日志的正则敏感词过滤，一个灾难性回溯正则把事件循环卡了 800ms，期间 4000 个并发请求全部超时——排查工具是 clinic doctor 的 event loop delay 曲线。教训：Node 服务的代码评审要把"主线程同步耗时"当作和"数据库慢查询"同级的事故隐患。`,
+    keyPoints: ["Node 六阶段流水线 vs 浏览器宏微任务两级；微任务每阶段间清空，nextTick 最优先", "I/O 回调内 setImmediate 恒先于 setTimeout(0)；主模块内顺序不定", "CPU 密集阻塞整个事件循环（所有请求受害），解法：worker_threads/下沉/分片"],
+    followUps: ["libuv 线程池处理哪些操作？UV_THREADPOOL_SIZE 调大的收益与代价？", "AsyncLocalStorage 在 BFF 链路追踪中的实现原理与性能损耗？"],
+    favorited: false,
+  },
+  {
+    id: "fe-303",
+    nodeId: "node-bff",
+    question: "BFF（Backend for Frontend）层的核心职责是什么？API 聚合、协议转换、鉴权透传、字段裁剪分别解决了前端的哪些具体痛点？什么情况下不该引入 BFF？",
+    bigTech: true,
+    answer: `结论：BFF 的本质是"为特定前端（Web/iOS/Android）定制的服务层"，把通用微服务的数据按前端需求组装好。它解决的核心矛盾：微服务架构下后端接口是"领域导向"的（用户服务/订单服务/商品服务），而前端页面是"场景导向"的（一个详情页要调 5 个服务的数据）——没有 BFF 时前端被迫做 N 次串行请求 + 自己拼装数据 + 处理 N 种错误形态，这在移动端弱网环境下是体验灾难。
+
+四大职责对应的痛点：①API 聚合——前端 1 次请求拿全页面数据，BFF 内部并行调用多个微服务（服务端间是内网低延迟，比客户端多次公网往返快一个量级），还省掉了移动端的 TCP/TLS 握手成本；②协议转换——后端给的是 gRPC/Thrift/内部 RPC，前端只能吃 HTTP+JSON；或者后端返回的是 Protobuf 二进制，BFF 转成 JSON 并按需降级字段精度；③鉴权透传与收敛——前端只和 BFF 鉴权（cookie/session），BFF 用服务间凭证（mTLS/内部 token）调下游，前端永远接触不到内部系统的鉴权细节，安全边界清晰；④字段裁剪——后端通用接口返回 200 个字段，列表页只要 5 个，BFF 裁剪后传输体积降 90%（弱网救命），顺带解决了"后端接口一发版前端就崩"的耦合（BFF 做了字段映射，后端加字段不影响前端）。
+
+\`\`\`ts
+// 典型 BFF 聚合端点（Node + 并行编排）
+app.get("/api/page/product-detail", async (req, res) => {
+  const { id } = req.query;
+  // 并行编排 + 独立容错：核心数据挂了整体失败，边缘数据挂了降级 null
+  const [product, price, stock, recommend, commentSummary] = await Promise.all([
+    productSvc.get(id),                          // 核心：必须成功
+    priceSvc.get(id),                            // 核心：必须成功
+    stockSvc.get(id).catch(() => ({ available: true })),  // 降级：默认有货
+    recommendSvc.list(id).catch(() => []),       // 降级：推荐为空
+    commentSvc.summary(id).catch(() => null),    // 降级：评论摘要为空
+  ]);
+  res.json({
+    // 字段裁剪：只输出页面需要的，且做 camelCase 转换与脱敏
+    title: product.name,
+    price: formatPrice(price.amount),
+    inStock: stock.available,
+    recommends: recommend.slice(0, 8).map(pickDisplayFields),
+  });
+});
+\`\`\`
+
+BFF 的反模式与边界（不该引入的场景）：①把业务逻辑写进 BFF——BFF 只做"组装与适配"，一旦里面出现优惠计算、库存扣减这类领域逻辑，就形成了"游离在微服务体系外的逻辑黑洞"，两边改需求不同步必出事故；②小团队单前端应用——就一个 Web 端、后端也是单体，BFF 纯增一跳延迟和一层维护成本，直接让后端按页面需求出接口即可；③BFF 变成"新单体"——所有前端共用一个 BFF 应用，几十个页面端点互相影响（一个端点的内存泄漏拖死全部），正确姿势是按端拆分（Web-BFF/Mobile-BFF）或按域拆分模块 + 独立部署核心链路；④用 BFF 解决"后端接口烂"的问题——后端接口设计不合理应该推动后端改，BFF 糊一层只是技术债转移。
+
+真实案例：某电商 App 首页从"客户端直调 6 个微服务"改为 BFF 聚合后——首屏接口耗时 P95 从 2.8s 降到 0.9s（内网并行 + 少 5 次 TLS 握手），更重要的是错误处理统一了：原来客户端要处理 6 种不同的错误码体系，改后 BFF 统一输出"核心失败 / 部分降级"两种语义，客户端代码砍掉 40%。另一个视角：GraphQL 常被当作 BFF 的技术选型——它把"字段裁剪权"交给前端（查询语句即裁剪），适合多页面形态差异大的场景，但引入了 N+1 查询、缓存复杂化的新问题，不要为用 GraphQL 而用。`,
+    keyPoints: ["BFF 解决领域导向后端与场景导向前端的矛盾：聚合/转协议/收鉴权/裁字段", "聚合编排要独立容错：核心数据必成功，边缘数据可降级 null", "反模式：业务逻辑进 BFF、小团队硬上 BFF、BFF 长成新单体"],
+    followUps: ["GraphQL 作为 BFF 方案的 N+1 问题与 DataLoader 解法？", "BFF 层的接口契约如何与下游微服务版本演进解耦（契约测试）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-304",
+    nodeId: "node-bff",
+    question: "Node.js Stream 的四种类型与背压（backpressure）机制是什么？为什么处理大文件必须用流？pipe() 和 stream.pipeline() 的差异与错误处理要点？",
+    bigTech: true,
+    answer: `结论：四种流——Readable（读，如 fs.createReadStream）、Writable（写，如 res 响应对象）、Duplex（读写双向，如 TCP socket）、Transform（读写中转换，如 zlib.createGzip）。大文件必须用流的本质：把"文件全文进内存"（1GB 文件 = 1GB 内存 = 服务必挂）变成"64KB 块流水线"（内存恒定），背压机制保证"快生产者等慢消费者"——下游写不动时暂停上游读取，内存水位永远可控。
+
+\`\`\`js
+// ❌ 内存炸弹：1GB 文件直接爆掉默认堆（老版本默认 512MB）
+fs.readFile("big.log", (err, data) => res.end(data));
+
+// ✅ 流式：内存恒定 ~64KB 水位
+fs.createReadStream("big.log").pipe(res);
+
+// 背压的手动演示（pipe 内部就是这套逻辑）：
+const readable = fs.createReadStream("big.log");
+const writable = fs.createWriteStream("out.log");
+readable.on("data", (chunk) => {
+  const canContinue = writable.write(chunk);
+  // write 返回 false = 内核缓冲区已满（超过 highWaterMark）
+  if (!canContinue) readable.pause();          // 上游刹车
+});
+writable.on("drain", () => readable.resume()); // 下游排空 → 上游放行
+
+// pipe vs pipeline：错误处理与资源清理的差异是生产事故分水岭
+// pipe 的问题：①任一流出错不会自动销毁其他流（文件描述符泄漏）
+//             ②错误不会沿管道传播（gzip 炸了 res 还挂着）
+source.pipe(gzip).pipe(res);
+source.on("error", () => {}); gzip.on("error", () => {}); // 得手挂 N 次还容易漏
+
+// pipeline（Node 10+，生产标准）：任一出错全部清理 + 统一回调
+const { pipeline } = require("stream/promises");
+try {
+  await pipeline(
+    fs.createReadStream("big.log"),
+    zlib.createGzip(),
+    res,
+  );
+} catch (err) {
+  // 统一处理：源文件不存在/压缩失败/客户端断开都在这里
+  // 且所有流已被自动 destroy，无泄漏
+  res.destroy(err);
+}
+\`\`\`
+
+流的实战要点：①Transform 流的典型应用——BFF 里做"边下边转"：从上游服务拉 CSV 流，Transform 逐行转 JSON，边转边吐给客户端（首字节时间从"下载完整个文件"降到第一个 chunk）；②objectMode——普通流传 Buffer/string，objectMode: true 的流传任意对象（常用于数据库行流处理），highWaterMark 在对象模式下单位是"条数"而非字节；③背压失控案例——某日志收集服务用 readline 逐行读 + 直接推 Kafka，Kafka 客户端内部缓冲无限增长（没实现背压传播），堆内存 3 小时涨到 OOM——修复是换成 Kafka 客户端的流式接口并监听其 drain 等价物；④前端对应的场景——浏览器里的 fetch 响应体也是流（response.body.getReader()），大文件下载进度条、流式解析 NDJSON（LLM 流式输出就是 SSE 文本流）用的是同一套思想。
+
+坑点清单：①pipe 之后源流出错目标流不会结束——永远用 pipeline 替代裸 pipe；②res 是可写流，客户端断开连接会触发 error，不监听就抛 uncaughtException 打挂进程（Express 里 res.on('error') 常被漏掉）；③highWaterMark 默认 16KB（对象模式 16 条），盲目调大不能提速反而加剧内存波动；④流 + async/await 混用——for await (const chunk of readable) 是现代写法且自带背压，但注意循环里 await 慢操作时流会自动暂停（这正是你要的行为），别画蛇添足再 pause。`,
+    keyPoints: ["四流：Readable/Writable/Duplex/Transform；大文件必须流式（恒定内存 vs 全文进内存）", "背压=write 返回 false→pause，drain→resume；下游慢上游等，水位可控", "生产用 pipeline 不用 pipe：统一错误处理+自动 destroy 全链，防句柄泄漏"],
+    followUps: ["Node 流与 Web Streams API 的互操作（toWeb/fromWeb）在边缘运行时怎么用？", "如何实现一个限速 Transform（如控制上传速度 1MB/s）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-305",
+    nodeId: "node-bff",
+    question: "BFF 层调用下游微服务的稳定性三板斧：限流（令牌桶 vs 漏桶）、熔断、超时预算怎么设计？舱壁隔离（bulkhead）在 Node 单线程模型下如何落地？",
+    bigTech: true,
+    answer: `结论：BFF 是流量入口，下游任何一个慢服务都可能拖垮整个入口——三板斧的分工：超时控制（每个调用必须有截止时间，防"慢资源耗尽"）、熔断（下游持续失败时快速失败，防"重试风暴打挂病人"）、限流（入口和出口都要控，防"突发流量击穿"）。舱壁隔离在 Node 下的特殊含义：单线程模型没有线程池可隔，隔离的是"下游依赖的并发配额"和"进程维度"。
+
+\`\`\`ts
+// ① 超时预算：不是"每个接口一个超时"，而是"一次请求的预算在调用链上分配"
+// 页面接口总预算 800ms：商品 300ms / 价格 200ms / 库存 200ms / 推荐 150ms（可降级）
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer); // 不清理 = 定时器泄漏（每请求一个 setTimeout 常驻）
+  }
+}
+
+// ② 熔断器（三态机：CLOSED → OPEN → HALF_OPEN）
+class CircuitBreaker {
+  private failures = 0;
+  private state: "CLOSED" | "OPEN" | "HALF_OPEN" = "CLOSED";
+  private openedAt = 0;
+  constructor(private threshold = 5, private cooldownMs = 30_000) {}
+
+  async call<T>(fn: () => Promise<T>, fallback?: () => T): Promise<T> {
+    if (this.state === "OPEN") {
+      if (Date.now() - this.openedAt > this.cooldownMs) {
+        this.state = "HALF_OPEN"; // 冷却期到，放一个探测请求
+      } else if (fallback) {
+        return fallback();        // 熔断中：快速失败走降级
+      } else {
+        throw new Error("circuit open");
+      }
+    }
+    try {
+      const result = await fn();
+      if (this.state === "HALF_OPEN") this.state = "CLOSED"; // 探测成功，恢复
+      this.failures = 0;
+      return result;
+    } catch (err) {
+      this.failures++;
+      if (this.failures >= this.threshold) {
+        this.state = "OPEN";
+        this.openedAt = Date.now();
+      }
+      if (fallback && this.state === "OPEN") return fallback();
+      throw err;
+    }
+  }
+}
+
+// ③ 令牌桶限流（允许突发）vs 漏桶（恒定速率，削峰）
+// 令牌桶：桶容量 N，每秒放 R 个令牌，取到令牌才能过 → 允许 N 的瞬时突发
+// 漏桶：请求先进队列，以恒定 R/s 流出 → 出口绝对平滑，突发被排队（带超时丢弃）
+// BFF 入口用令牌桶（容忍用户操作的天然突发），出口调下游用漏桶（保护下游恒定负载）
+\`\`\`
+
+舱壁隔离在 Node 的落地（与 Java 线程池隔离思想对应）：①并发配额隔离——给每个下游依赖一个独立的并发上限（商品服务最多 30 并发、推荐服务最多 10 并发），用 semaphore 实现；推荐服务慢成蜗牛也只占满它自己的 10 个配额，不会耗尽进程资源影响商品链路；②进程隔离——核心链路（交易）与非核心链路（推荐/日志上报）部署不同 BFF 实例组，非核心组的内存泄漏/CPU 打满不影响核心组；③事件循环保护——同步 CPU 操作（大 JSON.parse、正则）是所有请求的共享风险，超过阈值的任务必须 worker_threads 化，否则任何隔离都白搭（单线程是全局共享的"最后一个舱壁"）。
+
+真实事故复盘：某 BFF 调推荐服务无超时控制，推荐服务慢查询从 50ms 劣化到 8s——BFF 的 fetch 全部挂起等待，Node 进程的 socket 连接数 5 分钟内耗尽（ulimit 65535），健康检查接口也得不到响应，LB 判定全组下线导致全站 503。修复组合：①所有下游调用强制 timeout（按 P99 延迟 × 2 设置）；②推荐服务加熔断（5 次失败开 30s）+ 降级（返回空推荐）；③各下游并发配额。事后指标：同样劣化场景下核心接口 P99 仅上升 8%。教训：稳定性手段的价值不在"防事故"（下游劣化你挡不住），而在"把事故的爆炸半径从全站压缩到单个功能降级"。`,
+    keyPoints: ["超时按预算在调用链分配；AbortController 用完必须 clearTimeout 防泄漏", "熔断三态：CLOSED→OPEN（快速失败+降级）→HALF_OPEN（探测恢复）", "Node 舱壁=下游并发配额+进程分组+CPU 任务 worker 化，单线程是最后共享舱壁"],
+    followUps: ["熔断器与重试策略如何配合（重试会加速熔断计数吗）？", "限流在被 LB 多实例部署时如何实现全局限额（Redis 分布式限流）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-306",
+    nodeId: "node-bff",
+    question: "Node.js 服务线上性能排查：如何定位内存泄漏（heapdump 对比法）与事件循环阻塞（event loop lag）？常见的泄漏模式有哪些？",
+    bigTech: true,
+    answer: `结论：Node 性能问题就两大类——内存泄漏（RSS 只涨不落，最终 OOM）和事件循环阻塞（单请求慢拖死所有请求，P99 飙升但 CPU 看着不高）。定位套路：内存问题用"三次 heapdump 对比"找只增不减的对象类型，阻塞问题用 eventLoopDelay 监控 + CPU profile 火焰图找热点函数。两类问题的高发元凶都是"无界增长"（无界缓存/无界队列）和"意外的闭包引用"。
+
+\`\`\`js
+// 内存泄漏排查三板斧：
+// ① 监控先行：process.memoryUsage() 定期上报（rss/heapUsed/external 分开看）
+//    heapUsed 涨 = JS 对象泄漏；external 涨 = Buffer/原生内存泄漏（另一个排查方向）
+setInterval(() => {
+  const m = process.memoryUsage();
+  metrics.gauge("node.rss", m.rss);
+  metrics.gauge("node.heapUsed", m.heapUsed);
+}, 10_000);
+
+// ② heapdump 对比法（泄漏定位黄金流程）：
+//    服务运行时打 3 次 dump：启动后 / 压测或运行一段时间后 / 再一段
+//    Chrome DevTools Memory 面板加载，按 "Comparison" 视图对比 dump1→dump2→dump3
+//    两次对比都正增长的对象类型 = 泄漏嫌疑人，看 Retainers（谁引用它）
+if (process.env.HEAPDUMP) {
+  // 注意：写死路径示例，实际用 path.join(os.tmpdir(), Date.now() + ".heapsnapshot")
+  require("heapdump").writeSnapshot("/tmp/" + Date.now() + ".heapsnapshot");
+}
+
+// ③ 事件循环阻塞监控：perf_hooks.monitorEventLoopDelay
+const { monitorEventLoopDelay } = require("perf_hooks");
+const h = monitorEventLoopDelay();
+h.enable();
+setInterval(() => {
+  metrics.gauge("node.loopLag.p99", h.percentile(99) / 1e6); // ns→ms
+  h.reset();
+}, 10_000);
+// p99 持续 >100ms = 有同步阻塞，上 clinic flame 或 --cpu-prof 找热点
+\`\`\`
+
+高频泄漏模式（真实案例库）：①无界 Map 当缓存——最经典：用全局 Map 做请求级缓存（key 是 userId），永不清理，两周 OOM。修复：LRU + TTL（如 lru-cache 库，max + ttl 双保险）；②闭包引用意外存活——事件监听器注册在短生命周期对象上但从不 off，emitter 活着对象就活着（EventEmitter 是泄漏重灾区，max listeners 警告别忽视）；③定时器泄漏——setInterval 回调闭包持有大对象，clearInterval 时机写错（比如请求级定时器在异常路径没清理）；④async 上下文泄漏——AsyncLocalStorage 存了大对象，在连接池复用的场景下 store 没正确清理；⑤Buffer 泄漏——external 涨的元凶：大 Buffer 被小视图引用（subarray/slice 在旧版本共享底层 ArrayBuffer，64KB 视图拖着 100MB 缓冲区不释放），Node 20 后 Buffer.copyBytesWithin 等行为有变化，排查时注意 external 指标。
+
+事件循环阻塞的高发元凶：①大 JSON——JSON.parse/stringify 一个 50MB 对象直接阻塞几百 ms（BFF 聚合大响应时常见），解法：流式解析（stream-json）、拆小、或 worker_threads 挪走；②灾难性正则——嵌套量词回溯（(a+)+$ 类），输入稍长直接卡死；③同步加密/压缩——bcrypt.hashSync、gzipSync 在请求路径上（都是 CPU 密集，有异步版本必须用异步）；④console.log 刷屏——stdout 是同步的（管道满时），高 QPS 下日志写满管道直接阻塞，用异步日志库（pino）并控制级别。
+
+真实案例：某网关服务每 24 小时 RSS 涨 200MB 必重启续命。heapdump 对比发现 LeakClass 是 "Timeout" 对象——查代码发现每个请求都 setTimeout 做兜底，但正常路径只 clear 了其中一个分支，异常分支漏 clear，定时器持有 req/res 大对象直到触发。修复 3 行代码（统一 finally 清理），内存曲线立刻平坦。另一个案例：P99 每隔几分钟飙升到 2s，火焰图显示热点是 gc——不是代码问题，是堆配小了（默认老生代 ~1.4GB 时 GC 频繁且长），--max-old-space-size 调到 4096 后 P99 平稳。教训：先排除"配置型问题"（堆大小/ulimit/线程池）再怀疑代码。`,
+    keyPoints: ["内存用三次 heapdump 对比找正增长类型；阻塞用 eventLoopDelay p99+CPU 火焰图", "泄漏四模式：无界缓存 Map/事件监听不 off/定时器不清/Buffer 小视图拖大缓冲", "阻塞三元凶：大 JSON 同步解析/灾难性正则/同步加密压缩；先查配置再查代码"],
+    followUps: ["external 内存（Buffer）泄漏与 heap 泄漏的排查路径差异？", "生产环境如何做低开销的持续 profiling（--cpu-prof 的开销与安全采样）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-307",
+    nodeId: "node-bff",
+    question: "BFF 聚合层的接口编排：并行调用 + 部分失败容忍的完整实现模式？超时预算如何在多下游调用间分配？为什么 Promise.all 直接用往往是错的？",
+    bigTech: true,
+    answer: `结论：BFF 编排的核心语义是"按数据的关键程度分级容错"——Promise.all 是"一损俱损"（任何一个 reject 整体失败），直接用于聚合意味着推荐服务抖动会导致商品详情页 500，这是把非核心故障放大成核心故障。正确模式：核心数据用 Promise.all（必须全成功，否则页面无意义），边缘数据用"独立 catch 降级"或 Promise.allSettled + 分级映射，且每个调用带独立超时和熔断。
+
+\`\`\`ts
+// 反模式：一个慢/挂的边缘服务拖死整个页面
+const [product, recommend] = await Promise.all([
+  productSvc.get(id),
+  recommendSvc.list(id),  // 挂了 → 整个接口 500
+]);
+
+// ✅ 分级容错编排（生产模式）
+interface Slot<T> { status: "ok" | "degraded" | "failed"; data: T | null }
+async function slot<T>(p: Promise<T>, timeoutMs: number): Promise<Slot<T>> {
+  try {
+    const data = await withTimeout(p, timeoutMs);
+    return { status: "ok", data };
+  } catch {
+    return { status: "degraded", data: null }; // 降级而非失败
+  }
+}
+
+app.get("/api/page/detail", async (req, res) => {
+  const id = req.query.id as string;
+  // 核心：必须成功（用 all，失败整体 500 合理——页面没商品没法看）
+  const [product, price] = await Promise.all([
+    withTimeout(productSvc.get(id), 300),
+    withTimeout(priceSvc.get(id), 200),
+  ]);
+  // 边缘：各自独立降级，互不影响（此时它们已在并行跑）
+  const [stock, recommend, comments] = await Promise.all([
+    slot(stockSvc.get(id), 200),
+    slot(recommendSvc.list(id), 150),
+    slot(commentSvc.summary(id), 150),
+  ]);
+  res.json({
+    product, price,
+    inStock: stock.data?.available ?? true,        // 降级默认值
+    recommends: recommend.data ?? [],               // 降级空列表
+    commentSummary: comments.data,
+    _meta: { degraded: [stock, recommend, comments] // 上报降级状态给前端展示/监控
+      .filter((s) => s.status === "degraded").length },
+  });
+});
+\`\`\`
+
+超时预算分配（不是拍脑袋）：①从页面 SLO 倒推——页面接口 SLO 800ms，BFF 自身处理 50ms，留给下游 750ms；②按调用拓扑分配——并行调用取 max 而非 sum（商品 300 与价格 200 并行，占用 300）；③按下游 P99 校准——下游 P99 是 120ms，超时设 200-250ms（P99 × 2 经验值），太短会切掉正常慢请求放大错误率，太长失去保护意义；④级联场景的余量——BFF 调下游，下游又调更下游，每级都要留余量（BFF 给 300ms，下游内部拆分总预算必须 < 280ms），否则出现"上级已超时返回，下级还在傻算"的浪费（孤儿请求），配合 context 传递截止时间（gRPC 的 deadline 语义，HTTP 用 header 如 X-Deadline-Ms）让下游主动放弃。
+
+Promise.allSettled 的正确使用姿势：它适合"所有数据都是边缘数据"的场景（如管理后台的仪表盘，8 个图表各自独立），返回结果后逐个 status 判断。但注意它不等价于"带超时的降级"——allSettled 只是收集了所有结果，慢调用依然会拖长整体响应时间（allSettled 等最慢的那个），所以必须 still 配合每调用 withTimeout。
+
+编排的进阶话题：①短路优化——核心数据失败时立即返回错误，边缘数据的 Promise 还在飞（要 AbortController 取消掉，防孤儿请求浪费下游资源）；②并行度控制——聚合 20 个下游时全并发可能把自己或下游打爆，用 p-limit 控并发（如 5 并发池）；③响应流式化——页面数据分块到达（先骨架与核心数据，边缘数据后续推），用 HTTP chunked 或 SSR 流式渲染，首字节时间从"最慢边缘服务"解绑。真实案例：某详情页 BFF 聚合 12 个服务，上线分级降级后，"部分降级率"日常维持在 0.3%（边缘服务抖动的正常水位），但整页 500 率从 0.4% 降到 0.001%——可用性提升两个数量级，靠的不是让下游更稳，而是承认下游必然抖动的现实设计。`,
+    keyPoints: ["核心数据 Promise.all 一损俱损（合理），边缘数据独立 catch 降级（all 直接聚合是反模式）", "超时预算：页面 SLO 倒推→并行取 max→按下游 P99×2 校准→级联留余量传 deadline", "allSettled 适合全边缘场景但仍需配每调用超时，否则被最慢调用拖住"],
+    followUps: ["孤儿请求（上级超时后下游继续算）的资源浪费如何用 deadline 传播根治？", "BFF 编排与 GraphQL federation 的容错语义差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-308",
+    nodeId: "node-bff",
+    question: "Node.js BFF 层的安全实践：SSRF、ReDoS、原型链污染、依赖供应链四类攻击的原理与防御？为什么 BFF 是这些攻击的首要暴露面？",
+    bigTech: true,
+    answer: `结论：BFF 同时暴露于公网流量且持有内网访问凭证，是"攻击者从外网摸到内网"的跳板——SSRF 用它打内网，ReDoS 用一条请求打挂它（单线程 = 一个请求就能 DoS 全站），原型链污染通过它污染全局状态，供应链通过它的 node_modules 投毒。防御的共同思想：输入零信任 + 最小权限 + 依赖治理。
+
+\`\`\`ts
+// ① SSRF（服务端请求伪造）：BFF 常见的"代理转发"功能是重灾区
+// 漏洞代码：把用户给的 URL 直接 fetch
+app.get("/api/proxy", async (req, res) => {
+  const data = await fetch(req.query.url as string); // 用户传 http://169.254.169.254/
+  res.json(await data.json());                         // 云元数据被盗 = 整个云账号沦陷
+});
+// 防御：协议白名单 + 域名白名单 + 解析后 IP 校验（防 DNS rebinding）
+const ALLOWED_HOSTS = new Set(["api.trusted.com"]);
+function assertSafeUrl(input: string) {
+  const u = new URL(input);
+  if (!["https:"].includes(u.protocol)) throw new Error("protocol denied");
+  if (!ALLOWED_HOSTS.has(u.hostname)) throw new Error("host denied");
+  // 进阶：DNS 解析后检查 IP 不在内网段（10/8, 172.16/12, 192.168/16, 169.254/16, 127/8）
+  // 且每次重定向后重新校验（否则白名单域名 302 到内网就绕过了）
+}
+
+// ② ReDoS（正则灾难性回溯）：Node 单线程，一条恶输入卡死全站
+// 漏洞模式：嵌套量词 /^(a+)+$/ 输入 "aaaaaaaaaaaaaaaaaaaaX" → 指数级回溯
+// 防御：
+// - 审计正则：嵌套量词 (a+)+ (a|a)* 这类结构禁止上生产
+// - 用 safe-regex 静态扫描 CI 拦截
+// - 输入长度先截断（正则前先 if (input.length > 200) reject）
+// - Node 15+ 可用超时执行（正则本身无超时 API，必须 worker 化或用 re2 线性引擎）
+const RE2 = require("re2"); // 线性时间正则引擎，无回溯风险
+const safePattern = new RE2(/^(a+)+$/); // RE2 直接拒绝病态模式或线性执行
+
+// ③ 原型链污染：递归合并不可信 JSON 时 __proto__ 键污染 Object.prototype
+function merge(target: any, source: any) {
+  for (const k in source) {
+    if (typeof source[k] === "object") merge(target[k] ??= {}, source[k]);
+    else target[k] = source[k]; // k = "__proto__" 时，target.__proto__.isAdmin = true
+  }                              // → 之后所有对象都带上 isAdmin
+}
+// 防御三连：
+// - 合并时跳过危险键：if (k === "__proto__" || k === "constructor" || k === "prototype") continue
+// - JSON 解析后立即 zod/class-validator 校验 schema（多余字段直接拒）
+// - 冻结根基：Object.freeze(Object.prototype)（激进，需评估兼容性）
+// - 或用 Object.create(null) 做字典对象（无原型可污染）
+
+// ④ 依赖供应链：node_modules 是前端最大攻击面（平均项目 1000+ 传递依赖）
+// 防御：
+// - lockfile 完整性：CI 强制 --frozen-lockfile，禁 npm install 漂移
+// - 安装脚本审计：ignore-scripts=true 默认全局，需要原生编译的包白名单放行
+//   （投毒高发区：postinstall 里 curl | sh）
+// - 定期 npm audit + Socket/Snyk 行为分析（版本突变 + 新 maintainer + 网络行为 = 高危）
+// - 私有 registry 代理（Verdaccio/Nexus）隔离公网，加"新包 24h 冷静期"策略
+\`\`\`
+
+BFF 特有风险与纵深防御：①凭证保护——BFF 持有的下游服务 token/mTLS 证书必须从密钥管理系统注入（K8s Secret 挂卷），绝不进代码库和镜像层；②日志脱敏——BFF 日志会记录请求体（可能含密码/身份证），日志管道里做正则脱敏 + 访问控制，日志泄漏 = 数据泄漏；③错误信息不外泄——生产环境错误响应只给通用 message，堆栈和内部错误码只进监控（Express 的默认错误处理器会吐堆栈，必须自定义）。
+
+真实案例：①event-stream 事件——2018 年下载量 200 万/周的 npm 包被新 maintainer 注入窃取比特币钱包的代码，通过传递依赖进入数千项目，教训：传递依赖的 maintainer 变更要监控；②某 BFF 的"图片代理"功能未校验 URL，被用来扫描内网 Redis（6379 端口探测），从外网一路摸进未授权 Redis 拿到会话数据——修复后加了 host 白名单 + 响应类型校验（只允许 image/*）；③polyfill.io 事件——2024 年知名 CDN 域名易主后对引用它的 10 万+ 网站投毒，说明"第三方脚本/依赖的信任是持续状态，不是一次性审核"。卡帕西视角：BFF 安全的核心是"假设每条输入都恶意、每个依赖都会烂"，然后把这两个假设变成自动化检查而不是靠人记。`,
+    keyPoints: ["SSRF 防御=协议+域名白名单+解析 IP 校验+重定向重校验；云元数据 169.254.169.254 是首要目标", "ReDoS 单线程一卡全站：safe-regex CI 拦截+RE2 线性引擎+输入截断", "原型链污染=递归合并过滤 __proto__+schema 校验；供应链=lockfile 冻结+ignore-scripts+行为审计"],
+    followUps: ["DNS rebinding 攻击如何绕过基于域名的 SSRF 白名单？防御的完整校验顺序？", "npm 包 typosquatting（仿冒名包）的识别与 CI 防御？"],
+    favorited: false,
+  },
+  {
+    id: "fe-309",
+    nodeId: "node-bff",
+    question: "SSR 服务在 Node 上的工程实现：渲染缓存（页面级/组件级）、流式渲染、内存控制、CSR 降级各怎么做？高并发下 SSR 服务的容量规划要点？",
+    bigTech: true,
+    answer: `结论：SSR 的工程矛盾是"每个请求都要跑一次 React 渲染（CPU 密集）"与"Node 单线程扛不住 CPU 密集"——所以 SSR 服务的核心设计不是渲染本身，而是"尽量少渲染"（多级缓存）和"渲染别堵门"（流式 + 容量隔离 + 降级 CSR）。生产 SSR 服务的请求路径上，真正走到 renderToString 的请求应该不到 20%。
+
+\`\`\`ts
+// ① 多级缓存体系（命中率决定容量）
+// L1 页面级缓存（整页 HTML 缓存，命中即返回，零渲染）：
+//    key = url + 用户分群（个性化页面不能整页缓存，或按分群维度缓存）
+const pageCache = new LRU<string, string>({ max: 500, ttl: 60_000 });
+// L2 数据缓存（渲染所需数据的接口结果缓存，命中率最高的层）：
+//    页面数据 80% 是公共数据（商品信息），只有 20% 是个性化（推荐）
+// L3 组件级缓存（昂贵子树的渲染结果缓存，React 18 暂无官方 API，
+//    实践中按"静态壳 + 动态岛"拆分，静态部分整段缓存）
+
+// ② 流式渲染（React 18 renderToPipeableStream）：首字节从"整页渲染完"
+//    变成"布局壳立刻吐"，数据慢的部分用 Suspense 边界后补
+import { renderToPipeableStream } from "react-dom/server";
+app.get("*", (req, res) => {
+  res.socket?.on("error", () => stream?.abort()); // 客户端断开即终止渲染
+  const stream = renderToPipeableStream(<App url={req.url} />, {
+    onShellReady() {
+      // 壳（含 Suspense fallback）就绪 → 立刻开吐，TTFB 极小化
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      stream.pipe(res);
+    },
+    onShellError(err) {
+      // 壳就崩了 → 降级 CSR：吐一个带客户端 bundle 的空壳 HTML
+      res.statusCode = 200;
+      res.end(csrFallbackHtml);
+    },
+    onError(err) {
+      logger.error(err); // Suspense 边界内错误不致命，该边界降级为 CSR
+    },
+  });
+  // 超时保护：5s 渲染不完强制 abort 走降级（防慢查询把渲染池耗死）
+  setTimeout(() => stream.abort(), 5000);
+});
+
+// ③ 内存控制：每个请求一次 V8 上下文级别的对象图，并发 = 内存乘数
+//    - 渲染并发上限：semaphore 控制同时渲染的请求数（如 CPU 核数 × 2）
+//    - 大对象不进渲染上下文（数据裁剪在渲染前做）
+//    - --max-old-space-size 按"单请求渲染峰值 × 并发数 × 3"配置
+\`\`\`
+
+CSR 降级（SSR 服务的保险丝，必须默认存在）：三级降级策略——①L1 渲染超时/渲染错误 → onShellError 吐 CSR 空壳（用户看到客户端渲染，体验降级但可用）；②L2 进程过载（event loop lag > 阈值或内存 > 85%）→ 健康检查返回异常让 LB 摘流，新请求直接返回 CSR 壳（注意：此时不能渲染 CSR 壳本身，CSR 壳 HTML 要预生成静态化，零渲染成本吐出）；③L3 全组故障 → CDN 边缘兜底（静态化的"简版页面"或历史缓存版本 stale-if-error）。降级的关键设计：CSR 壳必须零依赖（不查数据库、不调接口、不渲染），否则保险丝本身也会烧断。
+
+容量规划要点（SSR 特有）：①并发模型——SSR 是 CPU 绑定型负载，单进程有效并发 ≈ CPU 核数（渲染占满核时再多连接只是排队），扩容靠进程数（cluster/容器副本）不靠单机线程；②压测口径——必须用"混合页面类型 + 真实数据大小"压测（列表页和详情页渲染成本差 3 倍），只压首页会得出虚假容量；③预热——新实例启动后先跑渲染预热（V8 JIT 编译热点函数 + 缓存填充），直接接全量流量的冷实例 P99 会难看 10 倍；④指标基线——SSR 服务必须监控 renderTime（渲染耗时分布）、cacheHitRate（各级命中率）、fallbackRate（CSR 降级率，>5% 告警）。
+
+真实案例：某内容站 SSR 服务在明星绯闻热点时流量涨 8 倍，缓存命中率从 92% 暴跌到 40%（新内容 URL 都没缓存），渲染队列堆积 → event loop lag 到 2s → 健康检查失败 → LB 摘流 → 雪崩。复盘后三板斧：①热点内容主动预热缓存（编辑发布时触发渲染入库）；②过载保护前置——渲染请求入队前先查 lag 指标，超过 200ms 直接吐 CSR 壳，宁可降级不可排队（排队 = 全慢）；③容量按"缓存命中率 40% 的悲观水位"规划而非日常 92% 的乐观水位。教训：SSR 服务的容量模型必须以"缓存失效日"为基准设计，缓存是性能优化不是容量依赖——这个认知反过来了就是事故。`,
+    keyPoints: ["多级缓存（页面/数据/组件）+流式渲染让真实渲染请求 <20%；onShellError 兜底 CSR", "CSR 壳必须预生成零渲染成本；降级三级：渲染错误→过载摘流→CDN 兜底", "容量按悲观缓存水位规划；渲染并发≈核数，扩容靠进程数；新实例要 JIT 预热"],
+    followUps: ["React Server Components 与传统 SSR 的架构差异（渲染发生在哪里）？", "边缘 SSR（渲染放到 CDN 节点）对缓存与降级模型有什么改变？"],
+    favorited: false,
+  },
+  {
+    id: "fe-310",
+    nodeId: "cross-platform",
+    question: "跨端方案全景对比：React Native / Flutter / 小程序 / Taro 编译式 / Electron 五条路线的渲染原理本质差异是什么？选型决策树怎么走？",
+    bigTech: true,
+    answer: `结论：五路线的本质差异在"谁画出像素"——RN 是 JS 驱动原生组件（桥接通信），Flutter 是自绘引擎（Skia/Impeller 直接画像素，自带整套渲染），小程序是双线程 WebView（逻辑层 JS + 渲染层 WebView 桥接），Taro 是 DSL 编译（React 语法编译到各端原生 DSL），Electron 是打包整个 Chromium（每个应用一个浏览器）。差异决定了各自的性能上限、生态天花板和坑的形态。
+
+\`\`\`
+渲染原理对比：
+┌──────────┬────────────────────┬──────────────┬────────────────┐
+│ 方案      │ 像素由谁绘制        │ JS 如何触达 UI │ 性能天花板      │
+├──────────┼────────────────────┼──────────────┼────────────────┤
+│ RN       │ 原生组件（真 Button）│ Bridge/JSI    │ 接近原生        │
+│ Flutter  │ 自绘引擎 Skia       │ Dart（无 JS）  │ 高且稳定        │
+│ 小程序    │ WebView + 原生组件  │ JSBridge 异步  │ 受 WebView 限   │
+│ Taro     │ 各端原生 DSL        │ 编译期转译     │ 取决于目标端    │
+│ Electron │ Chromium 渲染引擎   │ 就是 Web      │ Web 水平        │
+└──────────┴────────────────────┴──────────────┴────────────────┘
+\`\`\`
+
+选型决策树（按问题顺序）：①目标平台只有 iOS+Android 且追求原生体验 → RN（团队是 React 技术栈）或 Flutter（追求一致性+性能，愿意学 Dart）；②要进微信/支付宝生态吃平台流量 → 小程序原生或 Taro（必须遵守平台规则，没的选）；③一套代码要同时覆盖 App+小程序+H5 → Taro/uni-app（接受"各端能力的最大公约数"限制）；④桌面端（Win/Mac/Linux）且团队是前端 → Electron（VS Code/Slack 验证过的成熟路线），包体积敏感可看 Tauri（Rust 壳 + 系统 WebView，体积从 150MB 降到 10MB）；⑤内容型页面为主 → 别跨端，H5 + 原生壳（WebView 混合）成本最低。
+
+各路线的隐性成本（决策时容易漏算的账）：①RN——原生模块维护成本（每个版本升级要跟原生生态），新架构迁移期（2024-2026 大量三方库新旧架构并存），调试链长（JS 崩溃好查，原生层崩溃要原生开发介入）；②Flutter——团队技术栈分裂（Dart 人才储备），包体积 +5-8MB，与平台原生 UI 的"质感差异"（自绘意味着每个控件都是 Flutter 自己画的，iOS 用户能感觉出来）；③小程序——平台审核与能力白名单（想要的能力平台不给就没辙），包体积限制（微信主包 2MB），WebView 内核碎片化（低端 Android 的 X5 内核坑）；④Taro——编译转译的能力损耗（React 的动态特性如高阶组件复杂用法转译后可能有边界 case），框架升级跟着 Taro 官方节奏走；⑤Electron——内存与包体积（每个应用带一个 Chromium，三个 Electron 应用 = 三个浏览器实例），自动更新与签名分发的运维成本。
+
+真实案例：某团队 App 首页用 RN，业务页面用小程序同款 Taro 编译到 RN——看起来"一套代码两端跑"很美，实际维护了一年发现：Taro 编译到 RN 的性能在高频交互场景（长列表 + 动画）掉帧明显，最终核心链路重写回纯 RN，Taro 只保留"低频运营页"——选型教训：跨端方案适合"变化快、体验要求中等"的页面，核心高频交互链路用平台原生或 RN/Flutter 直连。另一个视角：乔布斯会问你"用户感知到差异了吗"——如果用户感知不到（如设置页），用最便宜的方案；如果用户感知强烈（如首页 Feed 滑动），用性能上限最高的方案。跨端选型的第一性问题不是技术偏好，而是"哪些页面的体验值得付原生成本"。`,
+    keyPoints: ["本质差异=谁画像素：RN 原生组件 / Flutter 自绘 / 小程序 WebView / Taro 编译 DSL / Electron 打包浏览器", "决策树：平台范围→生态约束→交互性能要求→团队栈；核心交互链路慎用编译式方案", "隐性成本：RN 原生模块维护 / Flutter 栈分裂 / 小程序平台白名单 / Taro 转译损耗 / Electron 体积"],
+    followUps: ["Tauri（系统 WebView + Rust）与 Electron 的架构权衡？", "KMP（Kotlin Multiplatform）与跨端 UI 方案的互补关系（共享逻辑 vs 共享 UI）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-311",
+    nodeId: "cross-platform",
+    question: "React Native 新旧架构的本质差异：旧 Bridge 的异步序列化瓶颈具体是什么？JSI / Fabric / TurboModule / Codegen 四件套如何根治？升级新架构的坑有哪些？",
+    bigTech: true,
+    answer: `结论：旧架构的命门是"JS 与原生之间所有通信都要 JSON 序列化 + 异步排队过 Bridge"——一次 setState 引发的 UI 更新要序列化成 JSON 消息进队列，原生消费后再序列化回传，高频场景（滚动/动画/手势）每秒数百次序列化导致掉帧；且异步意味着 JS 无法同步调用原生方法（想同步读个屏幕宽度都做不到）。新架构用 JSI（C++ 层的 JS 引擎直接互操作，零序列化、可同步调用）替换 Bridge，Fabric（新渲染器，支持同步布局与并发渲染）替换旧 UI 管理器，TurboModule（懒加载 + JSI 直连的原生模块）替换旧 NativeModule，Codegen（从 TS 接口生成 C++ 绑定代码）保证类型安全。
+
+\`\`\`
+旧架构通信链路（每条消息的完整旅程）：
+JS 线程:  setState → Yoga 计算布局 → UI 操作指令
+    ↓ JSON.stringify(指令) → Bridge 消息队列（异步批量）
+原生线程: 取消息 → JSON.parse → 影子树 diff → 主线程执行 UI 变更
+    ↓ 原生事件（滚动/触摸）反向同样走一遍
+代价：每次通信 = 2 次序列化 + 队列延迟（~ms 级）
+高频滚动：JS 想跟手更新 UI？队列已堵 → 掉帧白屏（列表快速滑动的空白格）
+
+新架构链路：
+JS 线程 ──JSI（直接持有 C++ 对象引用，同步函数调用）──> C++ 层
+    ↓ Fabric 渲染器（C++ 影子树，可跨线程布局，支持 React 18 并发特性）
+    ↓ 同步布局提交（滚动时 JS 可同步驱动 UI，告别队列）
+TurboModule：原生模块首次调用时才初始化（旧架构启动时全量初始化拖慢启动）
+\`\`\`
+
+四件套的分工细节：①JSI 是地基——JS 引擎（Hermes）暴露 C++ API，JS 可以同步调用 C++ 函数、直接读写 C++ 对象内存（HostObject），序列化归零；②Fabric 是渲染层革新——旧的 UI 操作走"JS 算布局 → 序列化 → 原生执行"，Fabric 把影子树放 C++，布局计算可多线程，且支持同步渲染提交（useSyncExternalStore、并发渲染在 RN 才有意义）；③TurboModule 解决启动与类型——旧 NativeModule 启动时全部初始化（哪怕你只用 3 个模块的 1 个），TurboModule 懒加载 + JSI 直连，启动快且调用零桥接；④Codegen 是工程保障——从 TypeScript/Flow 接口定义自动生成 JS↔C++ 的绑定胶水，接口不匹配编译期就炸（旧架构靠运行时才发现参数传错）。
+
+升级新架构的真实坑（2024-2026 迁移期必读）：①三方库兼容性——老库只有 Bridge 实现，新架构下要么走兼容层（Interop Layer，性能打折），要么换库/自己包 TurboModule，迁移第一步是三方库盘点（rnnewarch 清单）；②Bridge 模式与新架构行为差异——旧架构下"启动时全量初始化模块"的副作用代码（有些库在 init 时注册了全局监听）在 TurboModule 懒加载下不再执行，功能静默失效；③同步调用的陷阱——JSI 同步调用让"原生卡顿直接卡 JS"成为可能（旧架构异步至少不堵 JS 线程），原生方法必须轻量；④Hermes 版本绑定——新架构强依赖 Hermes，用 JSC 的自定义场景要切换；⑤调试工具链变化——Flipper 被官方弃用，调试换成 Chrome DevTools（Hermes 直接支持 CDP）。
+
+真实案例：某社区 App 长列表（图文混排 + 视频）在旧架构下快速滑动白格率 15%，升级新架构 + FlashList 后降到 2%——关键收益来自 Fabric 的同步布局（滚动位置同步驱动内容回收）而非"序列化变快"这个直觉理解。另一个案例：启动耗时优化——旧架构启动初始化 40+ 原生模块耗时 380ms，TurboModule 化后实际启动只用 6 个模块，初始化降到 45ms。教训：新架构的收益不是平均分布的，列表/动画/启动三个场景拿到 90% 收益，迁移优先级按这三个场景的业务权重排。`,
+    keyPoints: ["旧 Bridge 三宗罪：JSON 序列化开销/异步队列延迟/无法同步调用；高频交互场景掉帧白格", "JSI 零序列化同步互操作；Fabric C++ 影子树+同步提交；TurboModule 懒加载；Codegen 类型安全", "迁移坑：三方库兼容盘点/模块初始化副作用失效/同步调用卡 JS 的新风险/Hermes 绑定"],
+    followUps: ["Fabric 的同步渲染与 React 18 并发特性（startTransition）在 RN 如何协同？", "自研原生模块从旧架构迁移到 TurboModule + Codegen 的完整步骤？"],
+    favorited: false,
+  },
+  {
+    id: "fe-312",
+    nodeId: "cross-platform",
+    question: "微信小程序为什么采用双线程架构（逻辑层 JSCore + 渲染层 WebView）？setData 的通信成本如何影响开发范式？skyline 渲染引擎解决了什么？",
+    bigTech: true,
+    answer: `结论：双线程架构是平台管控的必然选择——逻辑层（JS 跑在 JSCore/V8，无 DOM API）与渲染层（WXML/WXSS 在 WebView）彻底隔离，开发者无法直接操作 DOM，所有 UI 变更必须通过 setData 经 JSBridge 序列化传递。这个设计用通信成本换来了平台要的三样东西：安全可控（JS 碰不到 DOM 就做不了 XSS 类攻击和界面劫持）、审核可静态分析（WXML 是受限 DSL）、体验可兜底（渲染层在平台手里，可以统一做首屏优化和管控）。
+
+\`\`\`
+双线程通信模型：
+┌─────────────┐         ┌──────────────┐
+│  逻辑层 AppService     │  渲染层 WebView      │
+│  (JSCore，无 DOM/BOM)  │  (WXML 虚拟 DOM)     │
+│  this.setData({list})  │  模板渲染            │
+└──────┬──────┘         └──────▲───────┘
+       │  ① JS 侧序列化          │
+       └──> Native 中转（EvaluateJavascript）──┘
+             ② 原生桥传递（字符串）
+             ③ 渲染层反序列化 → diff → 更新 DOM
+
+成本结构：一次 setData = 序列化（JS 侧）+ 桥传输（按字节计）+ 反序列化 + diff
+数据量 256KB 的 setData 在低端 Android 上耗时可超 200ms，且传输期间 UI 无响应
+\`\`\`
+
+setData 成本对开发范式的深刻影响（每条都是血泪最佳实践）：①数据瘦身——只传"模板用到的字段"（后端返回 50 字段，setData 前裁剪到 5 个），一次传整个大对象数组是性能自杀；②路径更新——this.setData({ "list[3].done": true }) 只更新单个字段，而不是整个 list 重传（路径更新只序列化变化部分）；③粒度拆分——把大页面拆成自定义组件，每个组件独立 setData（组件间更新互不影响，避免页面级全量 diff）；④防抖合并——高频数据源（如滚动位置、倒计时）的 setData 必须节流（小程序官方建议每秒不超过 20 次）；⑤本地状态不外溢——纯 UI 状态（展开/收起）放组件的 data 局部管理，别都堆页面 data 里。
+
+skyline 引擎（微信 2022+ 新渲染层）解决什么：WebView 渲染的固有问题——首屏依赖 WebView 初始化（慢）、长列表内存高（DOM 节点膨胀）、动画性能受 WebView 合成器限制。skyline 抛弃 WebView 改用自绘渲染（类 Flutter 思路：直接接管光栅化，WXML 编译为渲染指令而非 DOM），收益：首屏快 30-50%、列表内存降一半、动画 60fps 稳定。代价：CSS 能力子集（不支持部分复杂选择器和布局）、生态组件要适配——所以它适合"性能敏感的新页面"，全量迁移要评估样式兼容性。这其实是跨端史的轮回：小程序从"WebView 够用"走向"自绘追性能"，和 Flutter 否定 WebView 的逻辑一模一样——Web 渲染引擎的通用性在受限场景下就是性能税。
+
+真实案例：某电商小程序商品列表页（100+ 卡片，每卡 10 图）初版直接在 onReachBottom 里 this.setData({ list: [...list, ...newItems] })——每加载一页全量重传整个数组，第 5 页时单次 setData 超 500KB，低端机直接卡死闪退。优化四连：①路径更新只追加新数据段 setData({ ["list[" + page + "]"]: newItems })（二维数组分页存储）；②图片字段裁剪（只留 id+url 缩略图，详情字段点击时再拉）；③骨架期用纯样式组件（不参与数据流）；④上 recycle-view（官方长列表组件，DOM 回收复用）——优化后第 10 页 setData 仍 <30KB，滑动 55fps。教训：小程序性能优化的 80% 是 setData 的学问，剩下 20% 才是常规 Web 优化。`,
+    keyPoints: ["双线程是平台管控设计：安全隔离+静态可审+渲染可兜底，代价是 setData 通信税", "setData 四原则：字段瘦身/路径更新/组件粒度拆分/高频节流（<20 次/s）", "skyline 自绘引擎解决 WebView 首屏慢/内存高/动画弱，代价是 CSS 子集与生态适配"],
+    followUps: ["小程序与宿主 App 的通信（小程序跳原生页面、共享登录态）机制？", "Donut/FinClip 类「小程序容器技术」把小程序跑在自有 App 的原理？"],
+    favorited: false,
+  },
+  {
+    id: "fe-313",
+    nodeId: "cross-platform",
+    question: "JSBridge 的实现原理：H5 与 Native 双向通信（URL Scheme 拦截 / 注入 API / WebView 消息通道）三种方式如何实现？回调管理、安全性与性能各有什么注意点？",
+    bigTech: true,
+    answer: `结论：JSBridge 的双向通信不对称——JS 调 Native 有三种姿势（URL Scheme 拦截、注入 API、官方消息通道），Native 调 JS 只有一种本质（在 WebView 上下文执行 JS 字符串）。生产级 Bridge 的复杂度不在"调通"而在"回调生命周期管理"（异步结果的配对与超时）和"安全"（任意 H5 页面都能调 bridge 等于把原生能力开放给全网）。
+
+\`\`\`js
+// ===== JS → Native 三方式 =====
+
+// 方式一：URL Scheme 拦截（兼容最老的方案）
+// JS 构造自定义 scheme 的 iframe 请求，Native 在 shouldOverrideUrlLoading 拦截
+function callNativeByScheme(action: string, params: object, cbId: string) {
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = \`jsbridge://\${action}?params=\${encodeURIComponent(JSON.stringify(params))}&cb=\${cbId}\`;
+  document.body.appendChild(iframe);
+  setTimeout(() => iframe.remove(), 0);
+}
+// Native 侧（Android）：shouldOverrideUrlLoading 里解析 scheme，处理并 return true 拦截
+// 缺点：URL 长度限制（参数大就截断）、无法同步返回、连续调用可能丢（导航队列）
+
+// 方式二：注入 API（Native 向 JS 上下文注入对象）
+// Android: webView.addJavascriptInterface(new BridgeObject(), "NativeBridge")
+// JS 直接同步调用：window.NativeBridge.scan({...}) ← 同步拿到返回值！
+// iOS WKWebView: window.webkit.messageHandlers.xxx.postMessage（异步，但官方安全）
+// Android 4.2 以下 addJavascriptInterface 有远程代码执行漏洞（反射任意类），
+// 现代项目 minSdk 都已远超此版本，但注入对象的 public 方法仍要当公网 API 审计
+
+// 方式三：官方消息通道（现代推荐）
+// iOS: WKScriptMessageHandler（postMessage 风格，自动序列化）
+// Android: WebMessagePort（WebViewCompat，双向通道）
+// 优点：官方维护、序列化自动、与页面加载生命周期绑定
+
+// ===== Native → JS =====
+// 本质只有"执行 JS 字符串"：
+// iOS: evaluateJavaScript("window.__onBridgeCallback('cb_1', {...})")
+// Android: evaluateJavascript / loadUrl("javascript:...")
+
+// ===== 回调管理（Bridge 的核心工程） =====
+class Bridge {
+  private callbacks = new Map<string, { resolve: Function; timer: number }>();
+  private seq = 0;
+
+  call<T>(action: string, params: object = {}): Promise<T> {
+    const cbId = \`cb_\${++this.seq}\`;
+    return new Promise((resolve, reject) => {
+      // 超时兜底：Native 崩溃/未实现时 Promise 不能永远 pending
+      const timer = setTimeout(() => {
+        this.callbacks.delete(cbId);
+        reject(new Error(\`bridge timeout: \${action}\`));
+      }, 10_000) as unknown as number;
+      this.callbacks.set(cbId, { resolve, timer });
+      this.invokeNative(action, params, cbId);
+    });
+  }
+
+  // Native 回调统一入口（注入到 window）
+  __onCallback(cbId: string, err: string | null, data: unknown) {
+    const cb = this.callbacks.get(cbId);
+    if (!cb) return; // 已超时清理过，Native 迟到的回调直接丢弃
+    clearTimeout(cb.timer);
+    this.callbacks.delete(cbId);
+    err ? cb.resolve(Promise.reject(err)) : cb.resolve(data as any);
+  }
+}
+\`\`\`
+
+安全三原则：①调用方鉴权——Bridge 方法执行前校验页面域名白名单（Native 侧拿 webView.url 判断），任意第三方 H5 加载进 WebView 就能调原生能力 = 灾难（比如 bridge.openCamera 被恶意页面调用）；②参数校验——action 白名单 + 参数 schema 校验（H5 传 {url: "file:///etc/passwd"} 给文件下载 bridge 就是任意文件读）；③能力分级——只读能力（获取设备信息）宽松，写能力（支付/通讯录/定位）要求登录态 + 用户授权弹窗（Native 侧二次确认，不信任 H5 侧的"用户已同意"声明）。
+
+性能注意：①避免高频桥调用——传感器数据、滚动位置同步这类每秒几十次的场景走"批量聚合"（Native 攒 100ms 数据一次推给 JS）或专用通道（WebSocket/共享内存）；②大对象传输——图片/base64 走桥很伤（序列化两次），改用"Native 存文件 → 传临时 URL"模式；③注入时机——Android 的 addJavascriptInterface 要在页面加载前注入，iOS WKUserScript 用 atDocumentStart，否则 H5 首屏脚本调 bridge 时是 undefined（经典白屏原因：bridge 未就绪就调用，需要 H5 侧做 ready 轮询或事件等待）。
+
+真实案例：某 Hybrid App 的"分享"bridge 在大促页面被第三方统计 SDK 的 iframe 误触发（iframe 里也有 window.NativeBridge 引用），导致用户没点分享却弹分享面板——修复是 Native 侧校验调用来源 frame 的 origin。另一个经典坑：iOS WKWebView 的 evaluateJavaScript 有主线程要求且大量调用会堆积，某页面每秒 30 次 Native→JS 推数据导致 WebView 卡顿，改批量推送后恢复。教训：Bridge 是"跨进程 RPC"，用它就要有 RPC 的觉悟——超时、幂等、限流、鉴权一个不能少。`,
+    keyPoints: ["JS→Native 三方式：Scheme 拦截（兼容）/注入 API（同步）/官方消息通道（推荐）；Native→JS 只有执行 JS 字符串", "回调管理=cbId 配对+超时清理+迟到丢弃；bridge 未就绪的 ready 等待是首屏必备", "安全：来源 origin 白名单+action 白名单+参数 schema 校验+写能力 Native 二次确认"],
+    followUps: ["WebView 复用池（预创建/预加载）对 Hybrid 首屏的优化与内存代价？", "DSBridge 等开源库相比手写 Bridge 解决了哪些工程问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-314",
+    nodeId: "cross-platform",
+    question: "Taro / uni-app 的编译时跨端与 RN 的运行时跨端本质差异是什么？DSL 转译（React 语法 → 小程序 WXML）的局限性体现在哪些场景？",
+    bigTech: true,
+    answer: `结论：编译时跨端把 React/Vue 代码在构建期翻译成各端原生 DSL（小程序 WXML/WXSS/JS 三件套），运行时没有框架内核——产物就是目标平台的标准代码；运行时跨端（RN）是带着一个 JS 引擎和框架内核在目标平台上跑，通过桥接驱动原生组件。本质差异：编译式是"翻译官"（翻译完就离场，产物受目标平台规则全约束），运行时是"虚拟机"（自带运行时，能力上限由自己的桥决定）。这决定了编译式的问题在"翻译损耗"，运行时的问题在"桥接成本"。
+
+\`\`\`jsx
+// 编译式转译（Taro 3 React → 微信小程序）：
+// 你写的：
+function List({ items }) {
+  const [expand, setExpand] = useState(false);
+  return (
+    <View onClick={() => setExpand(!expand)}>
+      {items.filter(i => i.visible).map(i => <Item key={i.id} data={i} />)}
+    </View>
+  );
+}
+// 编译后（概念示意）：
+// WXML: <view bindtap="onTap"><block wx:for="{{visibleItems}}" wx:key="id">...
+// JS:   Page({ data: { visibleItems, expand }, onTap() { this.setData(...) } })
+// React 的 JSX 动态结构 → 静态模板 + data 绑定 + setData 更新
+// 关键：运行时是小程序的，Taro 只留一个薄运行时做 React 语义模拟（reconciler）
+\`\`\`
+
+DSL 转译的局限性（真实踩坑场景）：①动态 JSX 结构——WXML 模板是静态的，React 里"运行时拼 JSX"（如条件返回完全不同的组件树、children 动态加工、render props 深度嵌套）转译后语义可能失真，Taro 3 用"运行时 reconciler 模拟"缓解了大部分但仍有边界 case（如 dangerouslySetInnerHTML 等价物、Portals 在小程序没有对应物）；②复杂 CSS——小程序 WXSS 的选择器能力子集（不支持复杂的后代/兄弟选择器组合）、无 CSS 变量（旧版）、媒体查询受限，编译器无法把全量 CSS 语义带过去，只能降级或告警；③跨端能力差异——React 生态的库（react-spring 动画、复杂手势库）依赖 DOM API，小程序没有 DOM，这些库编译不过去，跨端项目只能用"最大公约数"能力的库；④调试失真——出 bug 时你看的是编译后的 WXML/JS，源码映射多一层转译，堆栈定位比原生小程序或 RN 都难；⑤平台新能力滞后——微信小程序出了新组件（如 skyline、新的开放能力），要等 Taro 官方适配，原生小程序当天就能用。
+
+编译式 vs 运行时的选择逻辑：①要进小程序生态且想保留 React 技术栈 → 编译式唯一解（小程序不允许自带 JS 引擎跑框架，规则强制）；②多端覆盖（App+小程序+H5）且页面形态规整（表单/列表/详情为主）→ 编译式合适，接受公约数限制；③高频交互/复杂动画/长列表性能敏感 → 运行时（RN）或原生，编译式到小程序的性能受 setData 天花板限制（上一题）；④团队已有 React 组件库资产 → 编译式可复用部分（业务组件），但依赖 DOM 的底层组件（富文本/复杂手势）要重写。
+
+真实案例：某 O2O 团队用 Taro 一套代码覆盖微信小程序 + 支付宝小程序 + H5，页面型业务（下单/地址/订单列表）复用率 85%，一年节省的人力成本可观——但地图页（复杂手势 + 大量原生 SDK 交互）最终回退到各端原生写，Taro 只做页面壳。这个"85/15 分割"是编译式跨端的典型健康形态：把"页面结构规整的业务"交给编译式（吃复用红利），把"平台能力深度耦合的页面"交给原生（吃体验上限）。另一个教训：某团队在 Taro 项目里重度使用 styled-components（运行时 CSS-in-JS），编译到小程序后样式注入走的是 setData 内联 style，高频更新场景性能崩盘——选型编译式框架就要接受它的样式范式（静态 CSS 文件优先），把 Web 生态的运行时习惯带过去必踩坑。`,
+    keyPoints: ["编译式=翻译官（产物即目标平台标准代码，受平台规则约束）；运行时=虚拟机（自带内核+桥接，上限看桥）", "转译局限：动态 JSX/复杂 CSS 子集/DOM 生态库不可用/调试多一层映射/平台新能力滞后", "健康形态 85/15：规整页面吃复用，平台深度耦合页面回原生；样式走静态范式"],
+    followUps: ["Taro 3 的运行时 reconciler 如何在小程序里模拟 React 语义？这个设计的性能代价？", "鸿蒙（ArkTS）加入后，编译式跨端框架的多端适配成本有什么变化？"],
+    favorited: false,
+  },
+  {
+    id: "fe-315",
+    nodeId: "cross-platform",
+    question: "Electron 应用架构：主进程与渲染进程的职责边界、IPC 通信模式、安全模型（contextIsolation / nodeIntegration / sandbox）如何设计？为什么 VS Code 要自研进程模型而不是裸用 Electron 默认？",
+    bigTech: true,
+    answer: `结论：Electron 架构的第一性原则——渲染进程是不可信的（它跑任意网页/UI 代码），主进程是特权层（持有文件系统/系统 API 全权限）。安全模型的核心是"最小权限下放到渲染进程"：nodeIntegration: false（渲染进程禁止直接 require Node API）、contextIsolation: true（preload 的隔离世界，防页面 JS 篡改桥接对象）、sandbox: true（渲染进程跑在 OS 沙箱里）。所有特权操作必须经 IPC 上溯到主进程执行，且 IPC 入参当公网输入校验。
+
+\`\`\`ts
+// 主进程（main.ts）：特权层
+const win = new BrowserWindow({
+  webPreferences: {
+    nodeIntegration: false,        // ❌ true = 网页可直接 fs.readFileSync("/etc/passwd")
+    contextIsolation: true,        // ✅ preload 与页面 JS 隔离两个世界
+    sandbox: true,                 // ✅ OS 级沙箱，渲染进程连 Node 都没有
+    preload: path.join(__dirname, "preload.js"), // 唯一合法的桥
+  },
+});
+
+// preload.ts：桥接层（在隔离世界运行，能碰 Node API 也暴露受控接口给页面）
+import { contextBridge, ipcRenderer } from "electron";
+contextBridge.exposeInMainWorld("api", {
+  // 只暴露"语义化方法"，绝不暴露 ipcRenderer 本身！
+  readFile: (path: string) => ipcRenderer.invoke("fs:read", path),
+  // ❌ 反模式：exposeInMainWorld("ipc", ipcRenderer)
+  //    = 把 invoke 任意 channel 的能力给了页面，白名单形同虚设
+});
+
+// 主进程 handler：入参校验当公网 API 对待
+ipcMain.handle("fs:read", async (event, path: unknown) => {
+  if (typeof path !== "string" || path.includes("..")) {
+    throw new Error("invalid path"); // 防路径穿越
+  }
+  const allowed = await assertInWorkspace(path); // 工作区白名单
+  return fs.promises.readFile(allowed, "utf-8");
+});
+
+// 渲染进程：只能 window.api.readFile(...)，碰不到 ipcRenderer/Node
+\`\`\`
+
+IPC 通信模式选型：①invoke/handle（Promise 风格请求-响应，90% 场景用）；②send/on（单向事件，如渲染进程通知主进程"窗口要关"）；③webContents.send（主进程推渲染进程，如推送通知）；④MessagePort（高频双向数据流，如终端模拟器的 pty 数据——Electron 18+ 支持 MessageChannelMain，避免 ipc 序列化开销）。性能注意：IPC 默认走结构化克隆序列化，大对象（如读大文件返回 Buffer）有拷贝开销，高频场景用 MessagePort 或"主进程写临时文件 + 传路径"模式。
+
+为什么 VS Code 自研进程模型：Electron 默认模型是"一个窗口 = 一个渲染进程"，VS Code 的场景击穿了这个假设——①扩展需要 Node 能力但扩展可能恶意/有 bug：VS Code 把扩展放到独立的 Extension Host 进程（不是渲染进程也不是主进程），扩展崩溃不拖垮 UI，扩展的 API 能力被严格代理（vscode.window.xxx 实际走 RPC）；②性能隔离：编辑器 UI 进程绝不允许被扩展的 CPU 密集操作（如全项目符号索引）卡住，进程边界 = 事件循环边界；③共享服务进程：文件监听、搜索、TS Server 这类服务被多个窗口共享，放独立的 SharedProcess。这套"主进程 + UI 进程 × N + Extension Host × N + SharedProcess"的模型本质是微内核架构——Electron 只是它的窗口容器，进程编排全自研。这给所有 Electron 应用的启示：默认模型只适合简单应用，一旦"第三方代码/重 CPU 任务/多窗口共享状态"出现，就要自己设计进程拓扑。
+
+真实案例：①Slack/Discord 的崩溃恢复——渲染进程崩溃只弹"重新加载"而不是整个应用退出（主进程监听 render-process-gone），这是 Electron 应用的基线韧性；②某团队 Electron 应用把 nodeIntegration 开着跑内部系统，一次引入的 npm 依赖含恶意代码，直接读走了用户 SSH 私钥——渲染进程能 require 就意味着任何 XSS（哪怕是依赖投毒）都是系统级沦陷；③VS Code 的扩展沙箱演进——扩展历史上出过多个挖矿/盗 token 事件，所以市场扩展有签名与隔离推进，说明"插件生态的安全"最终都要走到进程隔离 + 能力代理这条路上。`,
+    keyPoints: ["安全三件套：nodeIntegration:false + contextIsolation:true + sandbox:true；特权操作全走 IPC 白名单", "preload 只暴露语义化方法，暴露 ipcRenderer 本体=白名单失效；主进程入参按公网输入校验", "VS Code 微内核进程拓扑（UI/ExtHost/SharedProcess）证明：重场景下 Electron 只是窗口容器"],
+    followUps: ["Electron 应用的自动更新（electron-updater）签名与灰度策略？", "Tauri 的「系统 WebView + Rust 核心」模型在安全边界上与 Electron 的差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-316",
+    nodeId: "cross-platform",
+    question: "跨端项目的代码同构工程：如何设计平台抽象层让业务代码最大化复用？条件编译、文件后缀分发、依赖注入三种隔离手段的适用场景与边界？",
+    bigTech: true,
+    answer: `结论：跨端同构的核心不是"一份代码到处跑"（那是宣传话术），而是"把平台差异收敛到可枚举的抽象点后复用其余全部"——健康项目的复用结构是：业务逻辑/状态管理/网络层/工具函数 100% 共享，UI 组件 60-80% 共享（设计系统统一的部分），平台适配层 0% 共享但只占 5-10% 代码量。三种隔离手段是同一个思想的不同粒度：文件后缀分发（模块级替换）、条件编译（代码块级裁剪）、依赖注入（运行时装配）。
+
+\`\`\`ts
+// ① 文件后缀分发（构建工具按平台解析优先级，最常用）
+//    storage.web.ts / storage.weapp.ts / storage.rn.ts
+//    import { storage } from "./storage" → 构建目标决定解析到哪个文件
+// 适用：模块级平台差异（存储/网络/路由/支付），接口完全一致
+// storage 抽象示例：
+export interface Storage {
+  get<T>(key: string): Promise<T | null>;
+  set(key: string, value: unknown): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+// storage.weapp.ts: 包 wx.getStorage；storage.web.ts: 包 localStorage；
+// storage.rn.ts: 包 AsyncStorage——业务代码永远 import "./storage"
+
+// ② 条件编译（代码块级，uni-app/Taro 的 #ifdef 或 webpack DefinePlugin）
+const channel = /* #ifdef WEAPP */ "wechat" /* #endif */
+  /* #ifdef H5 */ "h5" /* #endif */;
+// 或构建期常量：if (process.env.PLATFORM === "weapp") { ... }（死代码消除会剪掉）
+// 适用：小块逻辑分叉（一两行的平台判断），滥用会导致代码可读性崩坏
+// 红线：同文件条件编译超过 3 处就该拆成后缀分发
+
+// ③ 依赖注入（运行时装配，测试也受益）
+// 业务层只依赖接口，平台层在入口注入实现：
+interface PlatformDeps {
+  storage: Storage;
+  payment: Payment;
+  tracker: Tracker;
+}
+export function createApp(deps: PlatformDeps) { /* 业务逻辑只碰 deps */ }
+// entry.weapp.ts: createApp({ storage: weappStorage, payment: wxPay, ... })
+// entry.web.ts:   createApp({ storage: webStorage, payment: stripePay, ... })
+// 适用：有运行时差异决策（同平台不同渠道）+ 单测要 mock 的场景
+\`\`\`
+
+平台抽象层的设计要点（决定同构成败）：①抽象点枚举——先把所有平台差异列全（存储/网络/路由/分享/支付/推送/定位/文件/媒体/权限/登录/剪贴板/传感器），每个差异点定义 TS 接口，接口设计取"能力交集"而非"并集"（某平台独有的能力通过扩展接口可选暴露）；②抽象层禁止泄漏平台类型——接口的出入参不能出现 wx.xxx 或 DOM 类型（一旦泄漏，业务代码就被平台类型污染，复用率崩塌）；③能力探测而非平台探测——业务代码问"canShare()" 而不是 "isWeapp()"（平台判断散落各处后，新增平台要改 N 处；能力判断只需在适配层注册时声明）；④目录结构物理隔离——platforms/ 目录放全部适配实现，src/ 业务代码 lint 规则禁止 import platforms/ 以外任何平台 API（dependency-cruiser 守护）。
+
+复用率的度量与红线：①度量——统计 import 平台适配层的业务文件比例（应 <10%）、平台特定代码行占比（应 <15%）；②红线信号——业务文件里出现平台判断 if、同一组件三套实现且差异 >50%、抽象接口出现 any——出现任何一个说明抽象在腐化；③演进规律——新功能先在抽象层加接口再实现，"先写死某平台再抽象"的路径几乎必然烂尾（抽象成本后置 = 永不抽象）。
+
+真实案例：某工具型产品（Web + 小程序 + RN App）同构改造前三个端三套代码，需求吞吐量受制于最慢的小程序端。改造路径：①先统一网络层和状态管理（纯 JS 零 UI，两周完成，立刻三端共享）；②UI 层用 Taro 重写共享 70%，三个"平台气质强"的页面（分享海报/支付/地图）保留端原生；③抽象层 23 个接口，dependency-cruiser 守护边界。结果：新功能平均交付从"三端排期 3 周"变"一次开发 + 各端适配 2 天"，复用率稳定 78%。反面案例：某团队迷信"Write Once Run Anywhere"，把 RN 和 Web 的导航逻辑强行统一（RN 是栈导航，Web 是 URL 驱动），抽象出一个四不像的路由层，两端的高级能力（RN 的手势返回/Web 的浏览器前进后退）全被阉割——教训：同构抽象的是"业务语义"（去详情页），不是"平台机制"（导航栈操作），机制差异必须留给平台层。`,
+    keyPoints: ["健康复用结构：逻辑/状态/网络 100% 共享，UI 60-80%，适配层 0% 共享但只占 5-10%", "三手段粒度：后缀分发=模块级 / 条件编译=代码块级（≤3 处）/ 依赖注入=运行时装配", "抽象设计：能力探测非平台探测、接口不泄漏平台类型、lint 守护边界、度量复用率"],
+    followUps: ["设计系统跨端统一（设计令牌→各端主题）的工程链路怎么搭？", "Monorepo 中跨端共享包的构建目标差异（web ESM / 小程序 CJS）如何编排？"],
+    favorited: false,
+  },
+  {
+    id: "fe-317",
+    nodeId: "cross-platform",
+    question: "跨端性能优化实战：RN 长列表卡顿、小程序 setData 风暴、H5 动画掉帧三类典型问题的根因与优化方案？各端的性能分析工具怎么用？",
+    bigTech: true,
+    answer: `结论：三端性能问题的共同根因是"更新量超过帧预算（16.6ms）"，但超支的来源不同——RN 卡在 JS 线程与 UI 线程的协调（JS 算布局慢了，UI 就断粮），小程序卡在 setData 的序列化传输（数据量 × 频率），H5 卡在主线程的布局/绘制成本（触发 reflow 的属性滥用）。优化的共同范式：减少更新量（虚拟化/增量更新）、挪出关键路径（脱离 JS 线程/用合成器属性）、测量定位（先用工具找到耗时点再优化）。
+
+\`\`\`jsx
+// ① RN 长列表卡顿根因：FlatList 默认配置保守 + 复杂 cell 的 JS 布局成本
+<FlatList
+  data={items}
+  // 优化四件套：
+  windowSize={5}              // 渲染窗口（默认 10 屏 → 5 屏，内存/初始化减半）
+  initialNumToRender={8}      // 首屏条数（够一屏就行，别默认 10+）
+  maxToRenderPerBatch={5}     // 每批增量渲染数
+  removeClippedSubviews       // 屏外卸载原生视图（Android 收益大）
+  getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
+  // ↑ 固定高度时提供此项 = 跳过动态测量，滚动定位 O(1)
+  renderItem={renderItem}     // memo 化 cell：React.memo(Item) 防全表重渲染
+/>
+// 根因深挖：cell 里有图片+视频+复杂布局时，换 FlashList（回收复用 cell，
+// 类似 iOS UITableView 的 dequeueReusableCell，内存和初始化成本数量级下降）
+// JS 线程保护：列表数据变换（filter/sort）用 useMemo + InteractionManager
+// 把重计算推迟到交互动画结束后
+
+// ② 小程序 setData 风暴（前面题目详解过，此处列工具与验证）
+// 微信开发者工具 → Audits 面板：setData 频率/数据量直方图
+// 体验评分 → "避免 setData 数据量过大/频率过高" 是高频扣分项
+// 验证手段：Page 里 wrap setData 打日志，统计单次 KB 数与每秒次数
+
+// ③ H5 动画掉帧：用了触发 layout 的属性做动画
+// ❌ 每帧 reflow：el.style.left = x + "px"（left/top/width/height 都触发布局）
+// ✅ 合成器属性（跳过 layout/paint，GPU 直接合成）：
+el.style.transform = \`translateX(\${x}px)\`;
+el.style.opacity = "0.8";
+// will-change 预提层（但滥用会爆显存：每个提层都是一份位图内存）
+// 长列表：content-visibility: auto（屏外跳过渲染）+ contain-intrinsic-size 占位
+\`\`\`
+
+性能分析工具速查：①RN——Hermes Profiler（Chrome DevTools 直接采 JS 火焰图）、Perf Monitor（FPS 双曲线：JS fps 和 UI fps 分开看，哪个掉就是哪边的问题）、Systrace（原生层耗时）；②小程序——开发者工具 Audits/体验评分、真机调试的 Trace 面板（setData 调用瀑布）、Performance 面板（渲染层帧率）；③H5——Chrome Performance 面板（录制一帧看 Long Task 归属：Scripting/Rendering/Painting 三色比例）、Layers 面板（合成层爆炸检查）、Rendering 工具的 Paint Flashing（重绘区域可视化——整个页面闪绿说明提层失败）。
+
+共性优化心法：①先定位线程/进程边界——性能问题先问"慢在哪条线程"（RN: JS or UI；小程序： 逻辑层 or 渲染层；H5: 主线程 or 合成器），不同侧的药完全不同；②帧预算会计——把一帧 16.6ms 拆开记账（JS 执行 X ms + 序列化 Y ms + 布局 Z ms），优化就是削减最大科目；③降级预案——低端机检测（RN: DeviceInfo；小程序： 系统信息 API；H5: deviceMemory/hardwareConcurrency）后主动降配（关动画/减列表窗口/降图质量），让低端机"流畅的简陋"好过"卡顿的精美"。
+
+真实案例：①RN 信息流页 JS fps 掉到 20——Profiler 发现每次滚动都触发"全部已渲染 cell 的重新 render"（父组件 state 变了），cell 全部 React.memo + state 下沉后恢复 58fps；②小程序首页 setData 每秒 40 次（倒计时 + 轮播 + 埋点上报共用数据通道），拆数据通道 + 倒计时改纯样式动画后降到 8 次，低端机卡顿投诉消失；③H5 活动页 iPhone Safari 掉帧——Performance 面板发现 backdrop-filter: blur(20px) 全屏使用（每帧重绘成本爆炸），改成小面积毛玻璃 + 背景预模糊图片后满帧。卡帕西视角：性能优化的第一刀永远是测量，第二刀是删（减更新量），第三刀才是换（换实现/换架构）——大多数人直接跳到第三刀，所以总是在错误的层优化。`,
+    keyPoints: ["共同根因=帧预算超支，但超支位置不同：RN 在 JS 线程 / 小程序在序列化传输 / H5 在布局绘制", "RN 列表四件套+FlashList 复用；小程序拆数据通道；H5 动画只用 transform/opacity 合成器属性", "先定位慢在哪条线程再开药；帧预算记账找最大科目；低端机主动降级"],
+    followUps: ["RN 的 Reanimated（UI 线程跑动画）与普通 Animated 的架构差异？", "content-visibility 与虚拟列表的适用边界（什么时候前者就够，什么时候必须上虚拟化）？"],
     favorited: false,
   },
 ];
