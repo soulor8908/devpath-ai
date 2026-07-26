@@ -92,6 +92,32 @@ interview:
     followups:
       - 拒答检测用规则还是用小模型？误判率怎么控制？
       - 抽样人工核对的成本怎么算？抽样比例怎么定？
+  - q: 作为前端转 AI 的候选人，这个 CLI 项目的工程规范是怎么做的？跟你的前端工程化经验怎么映射？
+    answerSkeleton: >-
+      【分层原理】这个项目有一半的分数在"像不像一个真开源项目"而不是"能不能跑"。
+      工程规范四件套：项目结构——uv 管依赖，pyproject.toml 单一事实源，src 布局
+      把包代码与测试隔离，console_scripts 注册命令入口；类型——全量 type hints
+      加 mypy strict，LLM 返回的 JSON 用 Pydantic 建模而不是裸 dict 满天飞，接口
+      边界处做运行时校验；测试——pytest 分层，纯函数单测不碰网络，API 交互用
+      录制好的响应做 fixture 回放，CI 里跑不用真 Key；发布——版本号、changelog、
+      README 含安装、用法与成本测算。【实际案例】映射是真金白银的：uv 的 lock
+      文件对应 package-lock，src 布局对应 monorepo 的 packages 隔离，mypy strict
+      对应 tsconfig 的 strict，Pydantic 校验对应前端在 API 边界用 zod 校验响应——
+      我在前端被"后端返回结构和文档不符"坑过无数次，所以这个工具里所有 LLM 响应
+      先过 schema 校验再进业务逻辑，一次模型方把 usage 字段从必填改成可选，校验层
+      直接报错，而不是让成本统计静默归零。测试回放也是前端 msw 的思路：录制真实
+      API 响应做 fixture，CI 又快又稳，迭代 12 轮没被网络抖动坑过一次。【举一反三】
+      面试官问这个，是在探"你换语言后工程纪律还在不在"——前端转 AI 的最大卖点
+      恰恰是纪律：类型、测试、边界校验、可复现构建。到贵司接手任何 Python 代码库，
+      我第一天的动作都一样：看依赖锁定、看类型覆盖、看测试怎么隔离外部调用。
+      【扣分点对照】Demo 级回答："Python 脚本嘛，一个 main.py 搞定"。生产级回答：
+      能讲出 src 布局解决什么问题、为什么 LLM 响应要在边界处 schema 校验、测试
+      怎么不烧钱不依赖网络——把工程规范讲成"防的是哪类真实事故"的，才是被坑
+      过的人。
+    followups:
+      - Pydantic 校验和 TypeScript 的 zod 有什么本质差异？运行时校验为什么必须做？
+      - 测试用录制响应回放，模型 API 行为变了怎么发现？
+      - 如果这个工具要交给团队多人维护，你还要补什么？
 masteryCheck:
   level: V3
   type: project-checkpoint

@@ -65,6 +65,54 @@ interview:
     followups:
       - 必填字段太多时模型会"编造"内容来填满，这个矛盾怎么处理？
       - schema 里每个字段的 description 写什么有用？（提示：它会进 prompt）
+  - q: JSON Mode、Function Calling 的 parameters、Structured Outputs 三者有什么区别？怎么选型？
+    answerSkeleton: >-
+      【分层原理】三者常被混为一谈，但保证强度完全不同。JSON Mode 只保证输出是语法合法的 JSON，
+      结构全靠 prompt 里口头约定——本质是语法保证，约束发生在模型自觉。Structured Outputs 是把
+      JSON Schema 编译进解码器做约束解码：每个采样步骤屏蔽会让输出违反 schema 的 token，结构
+      错误在物理上不可能出现——这是结构保证，OpenAI 2024 年 8 月正式推出，response_format 传
+      json_schema 加 strict: true。Function Calling 的 parameters 用的是同一套 schema 约束机制，
+      但语义不同：它的产出是一个待执行的函数调用请求，模型在多个工具间做选择；Structured Outputs
+      是这次回答本身的格式。选型一句话：要模型给出机器消费的数据用 Structured Outputs，要模型
+      决定调用什么能力用 Function Calling，JSON Mode 只在 provider 不支持 Structured Outputs 时
+      当备胎。工程注意点：约束解码首次编译 schema 有几百毫秒初始化延迟（后续被缓存）；strict 模式
+      要求 additionalProperties: false、全字段 required，且只支持 JSON Schema 的一个子集。【实际案例】
+      我在信息抽取系统里三件套全用过：早期 JSON Mode 结构错误率 7.2%；切 Structured Outputs 后
+      归零，但第一次上线没设 additionalProperties: false，模型往输出里塞了个解释性字段，下游严格
+      反序列化直接报错，补上后稳定。Function Calling 用在同一系统的查询路由上：选查数据库还是查
+      文档是工具决策，选中后的参数同样受 schema 约束——抽取和路由是同一套机制的两种语义。
+      【举一反三】三者关系 ≈ 前端三种约束：JSON Mode 像只约定了接口文档没有任何检查，Structured
+      Outputs 像 TS 编译期类型（不合法根本产不出来），Function Calling 像事件派发（类型保证载荷
+      结构，但派哪个事件是另一层决策）。【扣分点对照】说 JSON Mode 就能保证结构的是踩坑预告；能
+      讲清约束解码的机制区别、strict 模式的 schema 硬性要求、首次编译延迟、以及格式约束与工具
+      决策是两种语义的，才是把三者都上过线的人。
+    followups:
+      - strict 模式对 schema 有什么硬性要求？哪些 JSON Schema 特性不支持？
+      - 约束解码首次编译有延迟，低延迟场景怎么处理？（提示：预热、复用、容忍首请求）
+      - 什么场景 Structured Outputs 也保证不了你要的结果？（提示：合法但错误的业务语义）
+  - q: 校验失败后的重试闭环怎么设计？错误信息怎么回喂模型才改得准？
+    answerSkeleton: >-
+      【分层原理】核心认知：校验失败裸重试（原 prompt 原样再发）是掷骰子，模型不知道自己错在哪，
+      失败率几乎不降；有效闭环是诊断式重试——把校验器输出的结构化错误回喂，让模型在知道错因的
+      前提下修正。回喂内容三要素：哪个字段（JSON path 精确定位）、期望什么（schema 约束原文）、
+      实际给了什么（模型错误输出原文），Zod 的 issues 数组天然就是这个结构。重试策略三原则：一是
+      带上完整原始输出让模型改错而不是重写——重写会引入新错误；二是最多重试一到两次，两次还改
+      不对说明是系统性问题（schema 与任务不匹配），再重试是烧钱，转人工或降级；三是重试用低温度，
+      修正任务不需要发散。监控闭环：按错误类型分桶统计（缺字段/类型错/枚举越界/格式错），桶分布
+      是 schema 与 prompt 优化的路标——类型错多说明字段描述不清，枚举越界多说明枚举值没覆盖
+      业务真实分布。【实际案例】我在简历解析项目把闭环从裸重试 3 次改成诊断式重试 1 次：裸重试
+      把 7.2% 失败率只压到 5.9% 还烧三倍 token；诊断式一次压到 0.3%，成本只有 1.3 倍。关键细节
+      是把 Zod issues 转成自然语言短句回喂（直接丢错误码模型改得慢），并把原始输出截断到错误字段
+      附近 200 字——整篇回喂时模型会顺手改动没错的字段，引入 2% 新错误，截断后降到 0.2%。
+      【举一反三】这就是表单校验交互：错误标到具体字段（JSON path 定位）、显示期望值与当前值
+      （校验信息）、用户局部修改而不是重填整个表单（带原文改错）——你设计过的表单纠错 UX，
+      模型也需要同款。【扣分点对照】答失败了把错误塞回 prompt 重试的是方向对但没做过；能讲出
+      改错 vs 重写的区别、重试温度调低、截断防连带改动、按错误类型分桶反哺 schema 设计的，才是
+      把闭环跑通过的人。
+    followups:
+      - 重试时换更强的模型来救火值得吗？成本收益怎么算？
+      - 两次重试还失败的 case 长什么样？怎么从根上消除？
+      - 回喂错误用自然语言还是结构化 JSON？你实测过差异吗？
 masteryCheck:
   level: V2
   type: code-challenge

@@ -387,3 +387,17 @@ sources:
     type: canonical-repo
     lastVerified: "2026-07-25"
     note: 语义缓存的经典开源实现
+
+  - id: ollama-docs
+    title: Ollama Documentation
+    url: https://github.com/ollama/ollama
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-26"
+
+  - id: llama-cpp-repo
+    title: llama.cpp
+    url: https://github.com/ggml-org/llama.cpp
+    tier: T1
+    type: canonical-repo
+    lastVerified: "2026-07-26"
