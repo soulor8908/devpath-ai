@@ -415,6 +415,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "受控/非受控 API 设计、复合组件与 Context 隐式共享、Render Props vs Hooks 逻辑复用、Design Token 主题架构、按需加载与 Tree-shaking、视觉回归测试、SemVer 与 codemod、Monorepo 发布流水线。",
     mastery: 0,
   },
+  // ===== 专项能力层（2 个节点） =====
+  {
+    id: "big-file-handling",
+    title: "大文件处理",
+    difficulty: 4,
+    prerequisites: ["js-api", "network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "分片上传与并发控制、抽样 hash 秒传与 Web Worker 计算、断点续传协议设计、流式下载与 Range 请求、大文件预览分片加载、大 Excel 解析决策、图片客户端压缩与 EXIF 修正、拖拽/文件夹上传。",
+    mastery: 0,
+  },
+  {
+    id: "data-visualization",
+    title: "数据可视化",
+    difficulty: 4,
+    prerequisites: ["browser-rendering", "js-api"],
+    frequency: "中",
+    bigTech: true,
+    summary: "Canvas/SVG/WebGL 选型决策树、大数据量抽样（LTTB）与增量渲染、ECharts 架构原理、D3 数据绑定思想、实时可视化渲染调度、脏矩形与分层优化、交互事件架构、HiDPI 适配与截图导出。",
+    mastery: 0,
+  },
   // ===== AI 前端方向（5 个节点，重点新增） =====
   {
     id: "ai-sdk-frontend",
@@ -12458,6 +12479,838 @@ Changesets 发布流水线（多包版本管理的行业标准）：①开发者
 真实案例：①Radix UI 的多包策略——@radix-ui/react-dialog 等 30+ 独立包，每个可单装，配合 changesets 管理（一次 Dialog 的 a11y 修复只 bump 一个包），这服务了它的定位"被设计系统二次封装"（shadcn/ui 只装了需要的十几个包）；反面是版本碎片化——业务方 lock 文件里 radix 各包版本交错，Dialog v1.0.3 + Popover v1.0.7 的内部依赖（都依赖 react-dismissable-layer）出现版本分裂，靠 pnpm overrides 压平；②antd 的单包巨无霸模式——一个 antd 包 300+ 组件，靠 ESM 摇树按需，业务方 lock 文件干净（就一个 antd 版本），但"只想用一个 DatePicker 却要装整个 antd（哪怕摇树，安装体积/类型检查速度都是成本）"的抱怨从未停止；③某团队组件库发布事故——手改版本号发版，忘了 components 依赖的 hooks 也变了，发了 components minor 但 hooks 没发，业务方安装后拿到老 hooks 新 components，运行时 undefined 函数崩溃——接入 changesets 后包间依赖联动 bump 自动化，此类事故绝迹。教训：Monorepo 的发布纪律必须工具化，人肉协调多包版本的错误率是 100%（只是时间问题）。`,
     keyPoints: ["包粒度决策：组件集中主包+icons/hooks/theme 独立包；多包只服务于「二次封装/单装」场景", "产物矩阵 2026：es（不 bundle 保模块粒度）+lib（CJS 兼容）+d.ts；umd 已死，CDN 用 esm.sh", "changesets 把版本决策左移到 PR 时+包间依赖联动自动 bump；人肉协调多包版本必出事故"],
     followUps: ["Radix 多包版本分裂的 pnpm overrides 压平策略与风险？", "文档站 import 源码（vite alias 到 src）在组件用了构建期宏/插件时的处理？"],
+    favorited: false,
+  },
+  // ===== 专项能力层：大文件处理（fe-334~fe-341） =====
+  {
+    id: "fe-334",
+    nodeId: "big-file-handling",
+    question: "大文件分片上传的完整方案怎么设计？分片大小如何决策？并发控制、进度聚合、暂停恢复各有什么实现要点？",
+    bigTech: true,
+    answer: `结论：分片上传的本质是"**把一次不可控的大请求拆成 N 次可控的小请求**"——解决三大问题：①单次请求体过大网关/服务端拒绝（nginx 默认 client_max_body_size 1MB，调大也有上限）；②网络抖动全量重传的灾难（2GB 文件传到 99% 断了重传是体验死刑）；③进度反馈缺失（单请求只有 0 和 1 两种状态）。完整方案五要素：分片（固定大小切片）→ 标识（文件 hash 作为 uploadId）→ 并发调度（控制同时上传的分片数）→ 进度聚合（各分片进度加权求和）→ 合并确认（全部分片就位后通知服务端 merge）。
+
+\`\`\`ts
+// 核心实现骨架（生产级要素已标注）
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB：见下方决策依据
+
+interface ChunkTask { index: number; blob: Blob; uploaded: boolean; }
+
+async function uploadFile(file: File) {
+  // ① 分片
+  const chunks: ChunkTask[] = [];
+  for (let i = 0; i < file.size; i += CHUNK_SIZE) {
+    chunks.push({
+      index: chunks.length,
+      blob: file.slice(i, i + CHUNK_SIZE), // slice 零拷贝，不读入内存
+      uploaded: false,
+    });
+  }
+  // ② 文件标识：hash 作为 uploadId（秒传与断点续传都靠它，见 fe-335）
+  const fileHash = await hashFile(file);
+  // 断点恢复：问服务端"这个 hash 哪些分片已传过"
+  const { uploaded: doneList } = await api.getUploadedChunks(fileHash);
+  chunks.forEach((c) => { c.uploaded = doneList.includes(c.index); });
+
+  // ③ 并发调度：信号量控制（同时 3 片，失败重试 3 次）
+  const pending = chunks.filter((c) => !c.uploaded);
+  await runWithConcurrency(pending, 3, async (chunk) => {
+    await retry(() => uploadChunk(fileHash, chunk), 3);
+    chunk.uploaded = true;
+    updateProgress(chunks); // ④ 进度聚合：已完成片数/总片数（加权更精确）
+  });
+  // ⑤ 合并：全绿后通知服务端按序拼接
+  await api.mergeChunks(fileHash, { fileName: file.name, total: chunks.length });
+}
+
+// 并发调度器（信号量模式，比 Promise.all 全发可控）
+async function runWithConcurrency<T>(
+  tasks: T[], limit: number, worker: (t: T) => Promise<void>,
+) {
+  const queue = [...tasks];
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const task = queue.shift()!;
+      await worker(task); // 一个 worker 串行取任务，N 个 worker 并行
+    }
+  });
+  await Promise.all(runners);
+}
+\`\`\`
+
+分片大小的决策依据（不是拍脑袋）：①**太小**（如 1MB）——分片数爆炸（2GB = 2000 片），请求开销占比飙升（每片都有 TLS/HTTP 头成本），服务端的"分片清单"管理成本也高；②**太大**（如 50MB）——单片失败重传成本高，进度粒度粗，弱网下单片成功率下降；③**经验值 2-10MB**——webuploader/阿里云 OSS 默认 4-5MB，七牛 4MB；④**动态调整**（进阶）：根据网络质量（navigator.connection.effectiveType 或前几片的实测吞吐）调整——快网加大片减少请求数，弱网减小片提高单片成功率。
+
+实现要点深挖：①**进度聚合的精确性**——简单版用"完成片数/总片数"，但各片进度不实时反映；精确版每片用 XMLHttpRequest 的 upload.onprogress 拿字节级进度，总进度 = Σ（每片已传字节）/总字节（fetch 不支持上传进度！必须用 XHR，这是大文件上传的技术选型关键点）；②**暂停/恢复**——暂停 = 清空调度队列不再取新任务（在飞的分片要么等它完成要么 AbortController 中断）；恢复 = 重新查询服务端已传分片清单，从未传分片继续（所以分片状态必须服务端持久化，不能只存前端内存）；③**分片与文件读取**——file.slice 是惰性的零拷贝操作，只有真正读 Blob 内容（formData.append 时）才触发磁盘 IO，所以分片本身不占内存。
+
+真实案例：①某网盘产品早期用"单请求 + 后端流式接收"，2GB 文件在弱网（地铁 4G）成功率不到 30%——改分片上传 + 断点续传后成功率 99.2%，核心指标"重传字节比"从平均 1.8（传 1.8 遍）降到 1.02；②一个经典的进度条 bug：前端用"已传片数/总片数"显示进度，最后一片是尾片（只有 800KB，其他 5MB），进度卡在 99% 很久——用户以为卡死狂点取消。修复：按字节加权进度；③服务端合并的坑：某团队 merge 接口用"按分片 index 顺序读临时文件拼接"，但没校验分片完整性（客户端 bug 漏传了第 7 片但调了 merge），生成缺块文件且前端显示"上传成功"——merge 前必须校验"分片数量齐全 + 每片 size 符合预期（除尾片）"，合并后再校验整体 hash（客户端算的文件 hash 与服务端合并后重算的 hash 对比），三重校验缺一不可。卡帕西视角：分片上传是"协议设计"问题不是"API 调用"问题——前端、网关、存储三方对"分片的生命周期"（创建/上传/校验/合并/清理过期分片）要有共识，任何一个环节的状态机没对齐都是线上事故。`,
+    keyPoints: ["分片上传五要素：固定分片（2-10MB)/文件 hash 标识/信号量并发/字节加权进度/合并前三重校验", "fetch 不支持上传进度，必须用 XHR 的 upload.onprogress；file.slice 零拷贝不占内存", "暂停=队列停取+Abort 在飞片；恢复=查服务端已传清单续传，分片状态必须服务端持久化"],
+    followUps: ["分片上传的服务端临时分片清理策略（上传中断后垃圾分片的 TTL 设计）？", "S3 multipart upload 协议与自研分片协议的映射关系（前端直传 OSS 的签名方案）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-335",
+    nodeId: "big-file-handling",
+    question: "文件 hash 秒传与断点续传如何实现？全量 MD5 太慢怎么优化（抽样 hash/Web Worker/异步分片调度）？抽样 hash 的碰撞风险怎么评估？",
+    bigTech: true,
+    answer: `结论：秒传的原理是"**内容寻址**"——上传前算文件 hash，问服务端"这个 hash 的文件存在吗"，存在则直接建立文件引用（秒传成功，零字节传输）。瓶颈在"算 hash 的成本"：2GB 文件全量 MD5 在主线程要 10-30 秒且页面卡死。三级优化：①Web Worker 算（不卡 UI，但用户仍要等）；②抽样 hash（牺牲唯一性换速度，1 秒内出结果）；③异步惰性调度（边上传边算，hash 还没算完第一片已在传）。抽样 hash 的碰撞风险工程上可控——只要 hash 用途是"去重提示"而非"安全校验"，误撞的后果是"误以为秒传成功"，服务端在 merge 时全量校验一次即可兜底。
+
+\`\`\`ts
+// ① Web Worker 全量 hash（spark-md5 增量计算，不一次性读入内存）
+// worker.ts
+importScripts("https://cdn.jsdelivr.net/npm/spark-md5/spark-md5.min.js");
+self.onmessage = async (e: MessageEvent<File>) => {
+  const file = e.data;
+  const spark = new self.SparkMD5.ArrayBuffer();
+  const CHUNK = 2 * 1024 * 1024;
+  for (let i = 0; i < file.size; i += CHUNK) {
+    const buf = await file.slice(i, i + CHUNK).arrayBuffer(); // 2MB 一读，内存友好
+    spark.append(buf);
+    self.postMessage({ type: "progress", value: i / file.size }); // 算 hash 也要进度
+  }
+  self.postMessage({ type: "done", hash: spark.end() });
+};
+
+// ② 抽样 hash（秒级方案）：只取"头中尾 + 若干随机点"的片段计算
+async function sampleHash(file: File): Promise<string> {
+  const spark = new SparkMD5.ArrayBuffer();
+  // 文件元信息混入 hash（同名不同内容会区分开）
+  spark.append(new TextEncoder().encode(file.name + file.size + file.lastModified));
+  const SAMPLE_SIZE = 1024 * 1024; // 每处抽 1MB
+  const positions = [
+    0,                                    // 头
+    Math.floor(file.size / 2),            // 中
+    Math.max(0, file.size - SAMPLE_SIZE), // 尾
+    // 可加 2-3 个基于 size 的伪随机点（确定性！同文件必同点）
+  ];
+  for (const pos of positions) {
+    spark.append(await file.slice(pos, pos + SAMPLE_SIZE).arrayBuffer());
+  }
+  return spark.end(); // 2GB 文件也只读 ~4MB，亚秒完成
+}
+
+// ③ 惰性调度（体验最优）：先抽样 hash 快速问秒传 → 不命中立即开传，
+//    同时在 Worker 里算全量 hash，算完再核对服务端（防抽样碰撞的误秒传）
+\`\`\`
+
+抽样 hash 的碰撞风险评估（面试加分项）：①**碰撞后果分级**——如果 hash 用于"秒传去重"，碰撞 = 用户 B 拿到了用户 A 的文件引用（数据错乱，严重）；如果 hash 只用于"断点续传的分片对齐"（同一用户同一浏览器的上传会话），碰撞 = 续传错位（merge 时全量校验能发现，可降级为重新上传，轻微）；②**碰撞概率工程化**——混入 size + 抽样点位确定性 + MD5 128bit，同 size 且抽样区相同的概率在天文数字级，真实风险不是随机碰撞而是"**相似文件**"：同一模板导出的 Excel（只有末尾几行不同）、视频文件的头部元数据相同——这就是为什么要抽"中尾"和混入 size；③**兜底设计**——抽样 hash 命中的秒传结果，服务端可标记"待确认"，后台全量校验，不匹配则撤销引用并通知客户端重传（最终一致性）。
+
+断点续传的协议设计：①**分片清单服务端持久化**——uploadId（hash）→ 已接收分片 index 列表 + 每片校验值，客户端重连后先 GET 清单，跳过已传片；②**会话过期**——分片上传会话要有 TTL（如 7 天），过期清理临时分片（否则存储泄漏），客户端拿到 410 Gone 要能重新全量；③**内容变更检测**——续传前重新算 hash 对比 uploadId，用户换了个同名文件继续传会错位（hash 不匹配则新开会话）；④**浏览器关闭恢复**——把 uploadId + 文件引用（File 对象不可持久化，重新选择文件后比对 name+size+hash 匹配才允许续传）。
+
+真实案例：①百度网盘的秒传神话——上传热门电影（院线种子）几乎 100% 秒传，因为全网用户内容相同，服务端 hash 库命中即完成；但这也引来"秒传审核"问题（已知违规文件的 hash 黑名单），说明 hash 寻址的隐私与安全边界是产品级议题；②某团队用"文件名+大小"当秒传标识（不算 hash，怕慢），用户把同名的新版本设计稿拖进去，直接"秒传成功"拿到了旧文件——hash 是内容寻址的必要条件，任何元信息替代方案都是自欺欺人；③Worker 的兼容坑：spark-md5 的 ArrayBuffer.append 在某些 Android WebView 的 Worker 里 importScripts CDN 脚本失败（离线/WebView 拦截），工程上要 Worker 脚本本地打包 + importScripts 失败降级主线程惰性计算。卡帕西视角：hash 方案的选择是"时间预算分配"——全量 hash 把成本付在上传前（用户等待），抽样 hash 把成本摊在风险里（服务端兜底），惰性调度把成本隐藏在并行里（体验最优实现最复杂），按业务的文件大小分布选（平均 <50MB 全量都行，GB 级必须抽样或惰性）。`,
+    keyPoints: ["秒传=内容寻址：hash 命中即零字节传输；全量 hash 用 Worker+增量计算（2MB 片），抽样 hash 头中尾+元信息亚秒出", "抽样碰撞工程可控：混入 size/name/lastModified+中尾采样防相似文件；秒传结果服务端全量校验兜底", "断点续传：分片清单服务端持久化+会话 TTL+重选文件后 hash 校验匹配才续传"],
+    followUps: ["hash 寻址存储的隐私问题（服务端知道「某文件存在」能推出什么）与加密网盘的矛盾？", "Web Crypto API 的 digest 为什么不支持流式增量 hash（SHA-256 的局限与应对）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-336",
+    nodeId: "big-file-handling",
+    question: "分片上传的失败重试策略怎么设计？指数退避、分片级校验、整体一致性保证（merge 校验）如何配合？为什么上传 99% 后失败最危险？",
+    bigTech: true,
+    answer: `结论：分片上传的重试体系要分三层：**分片级重试**（单片失败独立重传，指数退避）、**会话级恢复**（网络断开后整体续传）、**合并级校验**（服务端 merge 前的完整性检查）。最危险的状态是"99% 后失败"——不是进度问题，是**沉没成本与状态不一致的叠加**：用户等了 10 分钟，最后一步 merge 失败，如果此时客户端状态机设计不当（比如本地标记"已完成"但服务端 merge 失败，或临时分片被 TTL 清理），用户面临"重传全部"的崩溃体验。99% 失败的处理质量决定了整个功能的口碑。
+
+\`\`\`ts
+// ① 分片级重试：指数退避 + 抖动 + 可重入
+async function uploadChunkWithRetry(
+  uploadId: string, chunk: ChunkTask, maxRetry = 3,
+): Promise<void> {
+  for (let attempt = 0; attempt <= maxRetry; attempt++) {
+    try {
+      await uploadChunk(uploadId, chunk);
+      return;
+    } catch (err) {
+      if (attempt === maxRetry) throw err;
+      // 指数退避：1s, 2s, 4s + 随机抖动（防多客户端同步重试打爆服务端）
+      const backoff = 2 ** attempt * 1000 + Math.random() * 1000;
+      await sleep(backoff);
+      // 重试前检查：这片是不是其实已经传上去了（网络回包丢失的假失败）
+      const { uploaded } = await api.getUploadedChunks(uploadId);
+      if (uploaded.includes(chunk.index)) return; // 服务端有 = 成功，直接跳过
+    }
+  }
+}
+
+// ② 分片级校验：每片带上自己的校验值（服务端逐片验证，坏片立即暴露）
+async function uploadChunk(uploadId: string, chunk: ChunkTask) {
+  const buf = await chunk.blob.arrayBuffer();
+  const chunkMd5 = SparkMD5.ArrayBuffer.hash(buf); // 单片 hash 便宜
+  const form = new FormData();
+  form.append("uploadId", uploadId);
+  form.append("index", String(chunk.index));
+  form.append("checksum", chunkMd5);
+  form.append("data", chunk.blob);
+  await xhrPost("/upload/chunk", form); // 服务端收片先验 checksum 再落盘
+}
+
+// ③ merge 前三重校验（服务端职责，前端要懂协议）：
+//    - 数量齐全：收到的分片数 == 声明的总数
+//    - 尺寸合规：除尾片外每片大小 == CHUNK_SIZE
+//    - 整体 hash：合并后的文件重算 hash == 客户端上传前声明的 hash
+\`\`\`
+
+失败场景分类与策略（不是所有失败都配重试）：①**可重试错误**——网络超时/5xx/连接重置（瞬时故障，退避后重试）；②**不可重试错误**——4xx 业务错误（uploadId 过期 410、配额不足 413、文件类型拒绝 415），重试无意义，直接进入"恢复流程"（410 就重新创建会话）或失败终止；③**假失败**——请求发出去了服务端也处理了，但响应丢失（网络断在回程）——重试导致"重复分片"，所以分片上传必须幂等（同 uploadId+index 重复传，服务端覆盖或忽略，不能报错也不能存两份）；④**并发竞争**——用户在两个标签页同时传同一文件（同 hash），两个会话互相覆盖分片——服务端对 uploadId 加锁或按会话隔离（uploadId = hash + sessionId）。
+
+为什么 99% 失败最危险（深度分析）：①**用户心理**——损失厌恶在 99% 时最强（行为经济学：快到手的东西丢了比一开始没有更痛），此时给一个"重新开始"按钮等于劝退；②**状态腐烂**——分片在服务端有 TTL（常见 24h-7d），用户"明天再传"时 99% 的进度可能已被清理，前端显示的进度成了谎言（恢复前必须重新核对清单）；③**merge 的原子性**——merge 本身可能很慢（2GB 文件拼接+全量 hash 校验要秒级），merge 请求超时但服务端其实成功了（假失败的 merge 版）——merge 接口必须幂等且支持查询状态（merge 提交后轮询 merge 状态，而非依赖单次请求结果）。
+
+真实案例：①某企业网盘的"99% 重传"投诉潮——排查发现 merge 接口在文件 >1GB 时超时（nginx proxy_read_timeout 默认 60s，2GB 拼接+MD5 要 90s+），客户端把超时当失败，用户重传全部。修复三连：merge 改异步（提交即返回 taskId，客户端轮询）+ 分片 TTL 从 24h 延到 7d + merge 失败明确提示"分片已保存，点击重试合并"（而不是"上传失败"）——重试合并成功率 99.7%，投诉清零；②重试风暴事故：客户端无抖动指数退避，服务端一次 30 秒抖动后，5000 个上传会话在同一秒集体重试（大家的退避序列同步了），瞬间 QPS 打满网关——加随机抖动（±50%）后重试流量平滑化。卡帕西视角：重试不是"失败就再来一次"，是"**带状态判定的恢复协议**"——每次重试前问"当前真实状态是什么"（查清单），而不是假设"上次失败=没传上"，这个认知差是业余实现与生产实现的分水岭。`,
+    keyPoints: ["三层重试体系：分片级指数退避+抖动/会话级断点恢复/merge 级三重校验（数量/尺寸/整体 hash）", "分片与 merge 都必须幂等（防假失败重试造成重复）；4xx 业务错误不重试，410 重建会话", "99% 失败最危险：merge 要异步化+状态轮询；分片 TTL 内进度才可信，恢复前必查清单"],
+    followUps: ["merge 异步化后客户端轮询的频率策略（退避轮询 vs WebSocket 推送）？", "分片上传在弱网下的「小片重传优于大片」动态降级算法怎么设计？"],
+    favorited: false,
+  },
+  {
+    id: "fe-337",
+    nodeId: "big-file-handling",
+    question: "大文件下载的前端方案有哪些？Range 断点下载、流式保存（StreamSaver/File System Access API）、a[download] 的内存瓶颈各是什么原理？",
+    bigTech: true,
+    answer: `结论：大文件下载的核心矛盾是"**浏览器没有直接的'边下边存盘'通道**"——传统 a[download] + Blob URL 方案要求整个文件先进内存（Blob），2GB 文件 = 2GB 内存，标签页直接崩。三级方案：①a[download] 指向后端 URL（让浏览器原生下载器处理，最优但要求后端支持直链）；②ReadableStream + File System Access API（showSaveFilePicker 拿文件句柄，流式写入，Chrome 系最佳）；③StreamSaver.js（Service Worker 拦截流，模拟原生下载，兼容性兜底）。Range 请求解决的是"断点续传与并行下载"，与保存方案正交。
+
+\`\`\`ts
+// 方案 1：a[download] 直链（首选，零内存问题）
+function downloadByUrl(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;                    // 浏览器原生下载器接管：边下边存、自带续传
+  a.download = filename;           // 仅同源有效！跨域 download 属性被忽略
+  a.click();
+}
+// 前提：后端返回 Content-Disposition: attachment 头（跨域时强制下载的唯一办法）
+// 适合：静态资源/OSS 直链；不适合：需要鉴权 header 的动态流
+
+// 方案 2：File System Access API（Chrome/Edge 现代方案）
+async function streamDownload(url: string) {
+  // 先拿保存位置（用户选路径，拿可写句柄）
+  const handle = await window.showSaveFilePicker({ suggestedName: "big.zip" });
+  const writable = await handle.createWritable();
+  const resp = await fetch(url, { headers: { Authorization: "Bearer xxx" } });
+  // 流式：边下边写，内存恒定（不经过 Blob）
+  await resp.body!.pipeTo(writable);
+}
+// 优势：内存 O(1)、可带鉴权 header、用户指定路径
+// 限制：仅 Chromium 系、HTTPS、需用户手势触发
+
+// 方案 3：StreamSaver.js（兼容兜底：Service Worker 当中转站）
+// 原理：SW 注册一个虚拟 URL，fetch 到的流 pipe 给 SW，SW 以"响应"形式吐回浏览器
+// 浏览器把它当普通下载处理（边下边存），主页面全程不碰数据本体
+\`\`\`
+
+a[download] + Blob 的内存瓶颈剖析（经典错误）：const blob = await (await fetch(url)).blob() 把响应完整读入内存成 Blob，再 URL.createObjectURL(blob) 触发下载——①内存峰值 = 文件大小 ×（1~2）（Blob 本体 + 可能的 ArrayBuffer 中间态）；②浏览器对单标签内存有硬限制（移动端 Chrome 约 2GB、桌面约 4GB），1.5GB 文件在中端手机上必崩（崩的表现是标签页无声消失，用户甚至不知道下载失败）；③Blob URL 还有"会话生命周期"问题——长时间不消费可能被回收。这个方案的文件大小上限经验值：**100MB 以内可以忍，500MB 以上必死**。
+
+Range 断点下载的实现要点：①协议——请求头 Range: bytes=0-1048575，服务端回 206 Partial Content + Content-Range: bytes 0-1048575/52428800；②断点恢复——记录已下载字节数 N，重连时 Range: bytes=N- 续传（IndexedDB 存已下载分片，File System Access API 续写）；③并行下载（IDM 原理）——按 Range 把文件分 4 段并行拉取，本地拼接（File System Access API 的 writable.seek 定位写入）；④前置条件——服务端必须支持 Range（Accept-Ranges: bytes 响应头声明），OSS/S3 默认支持，自研文件服务用 nginx 的 sendfile 或 Node 的 fs.createReadStream({start, end})。
+
+真实案例：①某数据平台"导出报表"功能——用户导出 800MB CSV，前端用 Blob 方案，桌面 Chrome 内存冲到 3GB 后崩溃，客服收到"网站一导出就闪退"投诉。修复路径：后端改支持流式生成 + 前端迁 File System Access API（非 Chromium 用户提示用 StreamSaver 兜底），内存占用稳定 50MB；②鉴权下载的经典坑——视频站点的付费视频下载，URL 带签名参数（有效期 15 分钟），用户 2GB 文件下了 20 分钟到 95% 时签名过期，续传请求 403——签名 URL 的续传要"刷新签名"机制（按 Range 续传前先调 API 换新 URL，新 URL 必须与原文件 byte-level 一致）；③Safari 的特殊性——不支持 File System Access API，且对 SW 流的下载支持有 bug（旧版本），兜底方案是"后端生成临时直链 + a[download]"（把流式压力转给后端网关），这就是真实项目的"降级链"：FS Access API → StreamSaver → 后端直链。卡帕西视角：下载方案的选择是"**内存预算与兼容性的二维决策**"——先问文件多大（>100MB 排除 Blob），再问浏览器分布（内部系统 Chrome 优先 FS Access，C 端全兼容必须三层降级链），没有银弹，只有预算表。`,
+    keyPoints: ["三级方案：a[download] 直链（零成本）→ File System Access API 流式（Chrome 最优）→ StreamSaver SW 中转（兼容兜底）", "Blob 方案内存=文件大小×2，100MB 是上限 500MB 必崩；跨域 a[download] 无效，要 Content-Disposition: attachment", "Range 断点：记录字节数续传/分片并行/服务端必须回 206；签名 URL 续传要先刷新签名"],
+    followUps: ["Service Worker 流式下载在 Safari 的兼容性细节与降级检测代码？", "并行 Range 下载的分片乱序落盘（writable.seek）与最终完整性校验方案？"],
+    favorited: false,
+  },
+  {
+    id: "fe-338",
+    nodeId: "big-file-handling",
+    question: "大文件在线预览如何实现？PDF 分页加载、视频流式播放（HLS/Range）、大型文本/代码文件的虚拟化渲染各是什么原理？",
+    bigTech: true,
+    answer: `结论：大文件预览的统一思想是"**视口驱动加载**"——用户只看一屏，就只加载一屏的内容，滚动到哪里加载到哪里。三种文件类型的技术路径不同：PDF 靠"按页渲染 + 分页加载文档结构"（pdf.js 的 range request 只取当前页的页面对象）；视频靠"流媒体协议切片"（HLS 把视频切成 2-10s 的 ts 分片 + m3u8 索引，播放器按带宽选码率按需拉片）；大型文本靠"虚拟滚动 + 分片解析"（只渲染视口内行，按需读取文件字节段）。共同的敌人是"全量加载思维"。
+
+\`\`\`ts
+// ① PDF 分页加载（pdf.js 原理）
+const loadingTask = pdfjsLib.getDocument({
+  url: "/api/report.pdf",
+  // 关键：开启 Range 请求，pdf.js 先取文件尾部的 xref 索引表，
+  // 再按需取当前页的对象——100MB PDF 首屏只拉几百 KB
+  rangeChunkSize: 65536,
+});
+const pdf = await loadingTask.promise;   // 此时只加载了结构，未加载页面内容
+const page = await pdf.getPage(1);        // 只拉第 1 页的对象
+await page.render({ canvasContext: ctx, viewport }).promise;
+// 翻页才 getPage(2)；渲染过的页缓存，来回翻不重复拉
+
+// ② 大文本虚拟化（Monaco/自研虚拟列表原理）
+function VirtualTextView({ file }: { file: File }) {
+  const [lines, setLines] = useState<string[]>([]);
+  const [scrollTop, setScrollTop] = useState(0);
+  const LINE_HEIGHT = 20, VIEWPORT_LINES = 50;
+  // 滚动时只解析视口附近 ±100 行的字节段（文件已按行偏移建索引）
+  useEffect(() => {
+    const startLine = Math.floor(scrollTop / LINE_HEIGHT);
+    loadLineRange(file, startLine - 100, startLine + VIEWPORT_LINES + 100)
+      .then(setLines); // 只持有 250 行内存，不管文件是 10 万行还是 1000 万行
+  }, [scrollTop]);
+  // 总高度用 lineCount * LINE_HEIGHT 撑起滚动条，内容区绝对定位渲染可视行
+}
+
+// ③ 视频流式（HLS.js 接入）
+const hls = new Hls({ maxBufferLength: 30 }); // 最多缓冲 30s，控内存
+hls.loadSource("/api/video/index.m3u8");
+hls.attachMedia(videoEl);
+// m3u8 索引列出 N 个 ts 分片，播放器根据播放位置+带宽拉取，看多少下多少
+\`\`\`
+
+三种路径的深层原理：①**PDF 的结构特殊性**——PDF 是"随机访问"格式：文件尾部有 xref 交叉引用表（每页对象的字节偏移），所以可以先取尾部索引，再按 Range 取任意页——这是"格式本身支持分片"的幸运案例；②**视频的协议切片**——MP4 直接 Range 播放也可行（moov 元数据在前就能边下边播，所以 MP4 转码要 faststart 把 moov 移头部），HLS/DASH 更进一步：物理切成小片 + 多码率自适应（弱网自动降清晰度），代价是延迟（直播场景 HLS 延迟 10-30s，低延迟要用 LL-HLS 或 WebRTC）；③**文本的行偏移索引**——大文本虚拟化的前提是"知道第 N 行的字节偏移"，一次性扫一遍文件建"行号→偏移"索引（索引本身也要分块存储），之后按行号 O(1) 定位读取——日志平台（如 Kibana 前端）就是这么处理 GB 级日志的。
+
+真实案例与坑：①某网盘预览 50MB PDF 白屏 20 秒——pdf.js 未开 range 模式，全量下载后才渲染。开 rangeChunkSize 后首屏 1.2s。坑：服务端必须支持 Range 且正确返回 Content-Range，某些 CDN 配置会吃掉 Range 头回 200 全量，前端要检测（返回 200 而非 206 时降级提示）；②视频预览的"伪流式"——MP4 的 moov atom 在文件尾部（手机直接录的 MP4 常见），播放器必须下载完才能开始播，表现为"加载圈转到底才出画面"。修复：转码时加 -movflags faststart；检测：ffprobe 看 moov 位置；③大型 CSV 预览 200MB 卡死——直接 readAsText 全量读 + split("\n")，内存 3 倍爆炸（字符串 + 数组 + 渲染）。修复：流式读取（stream + TextDecoder 逐段）+ 行索引后台建 + 虚拟渲染，首屏 300ms。卡帕西视角：预览方案的选择先看"格式是否支持随机访问"（PDF/带索引文本 支持 → Range 按需；无结构二进制 不支持 → 转码出索引或切片），格式不给力就用服务端转码补——前端预览的终极形态是"前端只负责渲染视口，一切寻址与切片是协议与服务端的事"。`,
+    keyPoints: ["统一原则=视口驱动加载：PDF 按页 Range/视频 HLS 切片按需/文本行偏移索引+虚拟滚动", "MP4 边下边播要 moov 前置（faststart）；HLS 多码率自适应代价是直播延迟 10-30s", "pdf.js 开 rangeChunkSize 后首屏只拉几百 KB；服务端/CDN 必须真支持 Range（回 206 而非 200）"],
+    followUps: ["LL-HLS 与 WebRTC 在低延迟直播的技术路线差异？", "大文本「行偏移索引」如何在 Web Worker 里流式构建且不占双份内存？"],
+    favorited: false,
+  },
+  {
+    id: "fe-339",
+    nodeId: "big-file-handling",
+    question: "大型 Excel 文件（10 万行）的前端导入方案怎么设计？SheetJS 解析的内存问题、Web Worker 分片解析、前后端解析的职责边界如何决策？",
+    bigTech: true,
+    answer: `结论：10 万行 Excel 导入的核心矛盾是"**SheetJS 一次性全量解析的内存与时间成本**"——XLSX.read 一个 50MB Excel 在主线程要 10-30 秒且内存峰值可达文件 10 倍（解压 XML + JS 对象），页面假死甚至崩溃。三级方案：①Web Worker 里全量解析（不卡 UI，但内存峰值仍在，适合 <10MB）；②Worker + 分片流式解析（按 sheet/按行段切块处理，边解析边上报，内存可控）；③前端只传文件、后端解析（前端零负担，适合超大文件与需要入库校验的场景）。决策边界：**文件大小与"解析后数据的去向"**——纯前端预览/小规模入库用 ①②，要入库校验/超大文件/复杂业务规则用 ③。
+
+\`\`\`ts
+// ① Worker 内解析（基础版：不卡 UI）
+// excel.worker.ts
+self.onmessage = async (e: MessageEvent<ArrayBuffer>) => {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(e.data, { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  // 分块上报：每 5000 行 postMessage 一次（增量渲染进度条）
+  const rows = XLSX.utils.sheet_to_json<Row>(ws, { raw: true });
+  for (let i = 0; i < rows.length; i += 5000) {
+    self.postMessage({ type: "chunk", rows: rows.slice(i, i + 5000) });
+  }
+  self.postMessage({ type: "done", total: rows.length });
+};
+// 内存优化：dense: true 选项（行数组而非稀疏对象，内存降 30-50%）
+
+// ② 降内存关键选项与技巧
+const wb = XLSX.read(buf, {
+  type: "array",
+  dense: true,        // 稠密数组存储（sheet_to_json 直接出行数组）
+  sheetRows: 10000,   // 只解析前 N 行（预览模式！分次加载）
+  cellDates: false,   // 不转 Date 对象（省内存，需要时再转）
+  cellStyles: false,  // 不要样式信息（导入场景 99% 不需要）
+});
+// 真正的流式：xlsx 库本身不支持逐行流读（XML 结构限制），
+// 超大文件的终极方案是换库（exceljs 的 stream reader）或后端解析
+
+// ③ 后端解析的职责切分（企业级标准做法）
+// 前端：文件直传 OSS → 调导入 API（传 OSS key）
+// 后端：流式读 OSS → 逐行校验（业务规则）→ 批量写库 → 错误行生成报告
+// 前端轮询导入进度，完成后展示"成功 9982 行 / 失败 18 行（下载错误报告）"
+\`\`\`
+
+SheetJS 内存问题剖析：①**解压放大**——xlsx 本质是 zip，50MB 的 xlsx 解压出 XML 可能是 300MB；②**对象膨胀**——sheet_to_json 的默认输出每行是一个对象，10 万行 × 20 列 = 200 万个字符串引用，V8 的对象头开销让内存再翻 2-3 倍；③**峰值叠加**——ArrayBuffer（原文件）+ 解压 XML + 解析中的内部结构 + 输出行数组同时存活，峰值轻松破 GB。优化组合：dense 模式（行数组替对象）+ sheetRows 分批 + 解析完立即释放中间引用（wb 置 null 让 GC 收）+ Worker 独立堆（爆了不拖死主页面）。
+
+前后端解析的决策矩阵（真实项目选型框架）：①**文件 <5MB 且纯前端校验够用** → Worker 全量解析（体验最好：离线可用、零服务端成本）；②**5-50MB 或需要进度反馈** → Worker + 分批上报 + 分批提交后端入库（前端做格式校验，后端做业务校验）；③**>50MB 或校验依赖数据库（如"工号必须在 HR 系统存在"）或导入是高频运营动作** → 后端流式解析（前端只负责上传与进度展示）；④**混合校验陷阱**——常见错误是"前端校验一遍，后端又校验一遍，规则漂移"（前端说通过的后端拒了），规则必须单一事实源（通常在后端），前端校验只是"提前反馈体验"，错误文案要能从后端规则生成。
+
+真实案例：①某 CRM 批量导入联系人（运营常态动作，单次 5-20 万行）——初版前端 SheetJS 全量解析后 POST JSON，8 万行时请求体 40MB+，网关 413 拒绝；改成分批 5000 行/批 + 后端逐批入库，再改成前端直传 OSS 后端流式解析后，20 万行从"不可用"到 90 秒完成，且错误行报告精确到"第 3841 行手机号格式错"；②Worker 内存崩溃的教训——某团队 Worker 里 sheet_to_json 输出 15 万行对象数组，Worker 内存超 2GB 被杀（浏览器对 Worker 也有限制），表现为"解析到 80% 永远卡住"（Worker 死了 postMessage 没人收）。修复：dense 模式 + 分批立即 transfer 给主线程（Transferable 零拷贝移交所有权，Worker 侧立即释放）；③进度条谎言——sheet_to_json 是同步阻塞调用，"解析进度"无法实时上报（JS 单线程，解析时没机会 postMessage），所以进度只能按"分片解析"粒度伪造（每片之间上报），或干脆显示不确定进度（indeterminate spinner）——诚实比精确的谎言好。卡帕西视角：Excel 导入是"**内存预算、时间预算、校验归属**"的三元决策——先把三个预算算清楚，方案是自己浮出来的；带着"前端就该解析 Excel"的执念在 20 万行面前必然翻车。`,
+    keyPoints: ["三级方案：<5MB Worker 全量/5-50MB Worker 分批上报/>50MB 或需库校验 后端流式解析", "SheetJS 内存三板斧：dense 模式/sheetRows 分批/cellStyles:false；Worker 独立堆防爆主页面", "校验规则单一事实源在后端，前端校验只做提前反馈；Transferable 零拷贝移交防 Worker 内存翻倍"],
+    followUps: ["xlsx 的 XML 结构为什么决定了它无法真正逐行流读（sharedStrings 全局表）？", "exceljs stream reader 与 SheetJS 分片方案在 50MB 级文件上的实测对比？"],
+    favorited: false,
+  },
+  {
+    id: "fe-340",
+    nodeId: "big-file-handling",
+    question: "图片上传前的客户端压缩如何做到极致？canvas 缩放、createImageBitmap、OffscreenCanvas + Worker、EXIF 方向修正、WebP 转换的完整链路是什么？",
+    bigTech: true,
+    answer: `结论：客户端图片压缩的价值是"**把上行带宽成本降下来**"——手机直出照片 5-12MB，压缩到 200KB 上传，上传时间从 30s（弱网）缩到 1s，服务端存储成本降 95%。完整链路六步：读取（createImageBitmap 高效解码）→ EXIF 方向修正（手机照片旋转元数据）→ 尺寸缩放（canvas 按目标最长边等比缩）→ 质量压缩（canvas.toBlob webp/jpeg 质量参数）→ 效果校验（压缩后尺寸/体积断言）→ 上传。性能进阶：OffscreenCanvas + Worker 让解码压缩全程不碰主线程。
+
+\`\`\`ts
+// 生产级压缩管线（含全部关键细节）
+async function compressImage(file: File, opts = {
+  maxEdge: 1920, quality: 0.8, type: "image/webp",
+}): Promise<Blob> {
+  // ① 高效解码：createImageBitmap 比 <img> onload 快且支持 EXIF 取向
+  const bitmap = await createImageBitmap(file, {
+    imageOrientation: "flipY", // 见下方 EXIF 详解（兼容性注意）
+  });
+
+  // ② 等比缩放到最长边 maxEdge（不放大，只缩小）
+  const scale = Math.min(1, opts.maxEdge / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+
+  // ③ Canvas 重绘（缩放即重采样）
+  const canvas = new OffscreenCanvas(w, h); // 或 document.createElement("canvas")
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close(); // 立即释放解码内存（大图片占几十 MB）
+
+  // ④ 编码压缩：webp 同质量体积比 jpeg 小 25-35%
+  const blob = await canvas.convertToBlob({ type: opts.type, quality: opts.quality });
+  // canvas.toBlob 是 DOM 版 API，OffscreenCanvas 用 convertToBlob（Promise 化）
+
+  // ⑤ 兜底：压缩后反而变大（小图/已压过的图）→ 用原文件
+  return blob.size < file.size ? blob : file;
+}
+
+// ⑥ Worker 化（大图不卡 UI）：把 file 用 postMessage 传给 Worker（File 可结构化克隆）
+// Worker 内跑上面管线，结果 Blob transfer 回主线程
+\`\`\`
+
+EXIF 方向修正（手机照片的经典坑）：手机竖拍的照片像素数据其实是横的，正确朝向存在 EXIF 的 Orientation 字段（值 1-8，表示旋转/翻转组合）。问题：①<img> 标签渲染时现代浏览器会自动按 EXIF 旋转（image-orientation: from-image 默认行为），但 **canvas.drawImage 读的是原始像素**——直接 drawImage 画出来的图是躺倒的；②旧方案是用 exif.js 读 Orientation 再手动 ctx.rotate 修正；③现代方案：createImageBitmap(file, { imageOrientation: "from-image" }) 让浏览器解码时直接修正（Chrome/FF 支持，Safari 15.4-），不支持的环境降级 exif.js 手动旋转；④压缩后的图要**剥掉 EXIF**（canvas 重绘天然剥离，因为像素已经修正过了——如果保留原 EXIF，查看器会二次旋转）。
+
+压缩策略的进阶决策：①**格式选择**——webp 是 2026 年的默认答案（全平台支持已普及），avif 更小（再省 20%）但编码慢（客户端编码 avif 要 1-3s，webp 只要 100ms），jpeg 留给"必须兼容上古环境"；②**质量参数**——0.8 是甜点（视觉无损，体积降 60%+），头像类可以到 0.7，证件照/票据类要 0.9+（文字边缘不能糊）；③**尺寸策略**——按用途定 maxEdge（头像 512、动态图 1080、详情图 1920），不要无脑 4K；④**迭代压缩**——体积不达标时逐步降质量重试（0.8 → 0.6 → 0.5），比一次性低质量的观感好；⑤**透明通道**——png 截图类有 alpha 的别转 jpeg（变黑底），webp 支持 alpha。
+
+真实案例：①某社区 App 的图片上传优化——用户发帖 9 图（手机直出共 60MB），弱网失败率 40%；上压缩管线（1080px + webp 0.8 + Worker 并行 3 张）后单图 ~150KB，总上传量 1.4MB，失败率降到 2%，服务端存储账单降 92%；②EXIF 旋转事故——客服系统用户上传的"屏幕旋转截图"在服务端缩略图里全部躺倒（服务端 sharp 库默认不读 EXIF，而前端压缩时已经剥了 EXIF 但没修正像素）——两端必须对齐策略：要么前端修正像素+剥 EXIF（推荐，一劳永逸），要么全链路保留 EXIF 且所有渲染方都尊重它；③OffscreenCanvas 的兼容坑——Safari 16.4 前不支持 convertToBlob 的 webp 编码（能画不能编），检测方法：try 一次 1×1 webp 编码，失败降级 document canvas + jpeg。卡帕西视角：图片压缩是典型的"**用客户端免费算力换服务端付费带宽/存储**"——每 1ms 客户端压缩时间换回的是真金白银的 CDN 与 OSS 账单，这个交换率在所有前端优化里排前三。`,
+    keyPoints: ["压缩链路：createImageBitmap 解码→EXIF 修正→OffscreenCanvas 缩放→webp 0.8 编码→体积对比兜底", "canvas.drawImage 不读 EXIF，直接画会躺倒；修正像素后要剥 EXIF 防二次旋转；全链路策略要前后端对齐", "webp 默认/avif 更小但编码慢/jpeg 兼容兜底；OffscreenCanvas+Worker 大图不卡 UI，Safari 编码能力要探测降级"],
+    followUps: ["avif 客户端编码的 WASM 方案（avif.js）性能与体积收益实测？", "图片压缩与 CDN 图片处理（oss image process）的职责划分（哪些压缩该留给云端）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-341",
+    nodeId: "big-file-handling",
+    question: "拖拽上传、粘贴上传、文件夹上传三种增强上传交互的实现原理是什么？DataTransferItem 的 getAsFileSystemHandle 与 webkitGetAsEntry 在遍历文件夹时有什么差异？",
+    bigTech: true,
+    answer: `结论：三种交互的数据源都是 DataTransfer（拖拽/粘贴事件的剪贴数据载体），但能力不同：拖拽上传读 drop 事件的 dataTransfer.files；粘贴上传读 paste 事件的 clipboardData（截图粘贴得到的是 image/png 的 File）；文件夹上传的关键是"**递归遍历目录**"——input 的 webkitdirectory 属性最简（用户选文件夹，files 平铺展开），拖拽文件夹必须用 webkitGetAsEntry（Entry API，递归 walk 目录树）或新的 getAsFileSystemHandle（File System Access API）。上传器的产品力 80% 在这些交互细节里。
+
+\`\`\`ts
+// ① 拖拽上传（含拖拽态视觉反馈的完整实现）
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault(); // 必须！否则 drop 不触发（浏览器默认行为是打开文件）
+  dropZone.classList.add("drag-over");
+});
+dropZone.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  const items = e.dataTransfer!.items; // 用 items 不用 files（items 才能探文件夹）
+  const files = await collectFiles(items); // 见③：递归展开文件夹
+  upload(files);
+});
+// 坑：拖拽区域是整个页面时要防"拖文件到页面误导航"——window 上也 preventDefault
+
+// ② 粘贴上传（截图直达）
+document.addEventListener("paste", (e) => {
+  for (const item of e.clipboardData!.items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const file = item.getAsFile()!;
+      // 粘贴的文件名是 "image.png" 无意义，按时间戳重命名
+      upload([renameFile(file, "screenshot-" + Date.now() + ".png")]);
+    }
+  }
+});
+// 注意：粘贴的文件没有路径信息；富文本编辑器里粘贴 HTML 中的图片是 URL 不是 File
+
+// ③ 文件夹上传：拖拽场景的递归遍历（webkitGetAsEntry 版）
+async function collectFiles(items: DataTransferItemList): Promise<File[]> {
+  const result: File[] = [];
+  const walk = async (entry: FileSystemEntry): Promise<void> => {
+    if (entry.isFile) {
+      const file = await new Promise<File>((res) =>
+        (entry as FileSystemFileEntry).file(res));
+      // file 无路径，用 fullPath 保留目录结构（后端据此还原目录树）
+      Object.defineProperty(file, "relativePath", { value: entry.fullPath });
+      result.push(file);
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      // 坑！readEntries 每次最多 100 条，必须循环读到空
+      let batch: FileSystemEntry[];
+      do {
+        batch = await new Promise((res) => reader.readEntries(res));
+        for (const e of batch) await walk(e);
+      } while (batch.length > 0);
+    }
+  };
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry?.();
+    if (entry) await walk(entry);
+  }
+  return result;
+}
+\`\`\`
+
+getAsFileSystemHandle vs webkitGetAsEntry（新旧 API 的差异决策）：①**能力**——Handle 是新标准（File System Access API），拿到 handle 可以重复读文件（甚至写），Entry 只能读一次（file() 回调）；②**兼容性**——Entry API（webkit 前缀）实际支持更广（Chrome/FF/Edge/Safari 都支持拖拽遍历），Handle 在拖拽场景仅 Chromium（Firefox/Safari 的 DataTransferItem.getAsFileSystemHandle 长期未实现）——**2026 年的现实：拖拽文件夹遍历还是 webkitGetAsEntry 的天下**，Handle 用于 showDirectoryPicker 主动选择场景；③**大目录性能**——两者都是异步分批，但 Entry 的 readEntries 有"每次最多 100 条必须循环读"的祖传坑（只读一次会漏文件，这是无数上传器丢文件的根因）。
+
+input webkitdirectory vs 拖拽遍历的取舍：①**input 版**（<input type="file" webkitdirectory>）——实现成本零（浏览器自己递归，files 平铺 + webkitRelativePath 给相对路径），但交互是"系统选择器选文件夹"，不能拖拽；②**拖拽版**——交互丝滑但实现复杂（上面的递归 + 100 条分页坑 + fullPath 拼接）；③**生产答案：两个都要**——入口按钮用 input 版（可靠），拖拽区用 Entry 版（体验），两者产出的 File 统一带 relativePath 进入同一上传管线。
+
+真实案例与坑：①readEntries 漏文件事故——某设计稿上传工具，用户拖入 500 个文件的文件夹只传了 100 个，设计师"丢稿"投诉到 CEO。根因：readEntries 只调了一次（规范就是每次最多 100，要循环到空数组）。修复 + 加测试："mock 250 个 entry 的目录断言全部收齐"；②粘贴上传的格式陷阱——Mac 截图粘贴是 PNG，Windows 微信截图粘贴有时是 image/jpeg 有时直接给不出 File（剪贴板里是 DIB 位图格式，浏览器不暴露），要做"粘贴无 File 时的提示降级"；③拖拽区的 event 冒泡坑——页面多处 drop 监听（编辑器、上传组件、全局）互相 preventDefault 导致某些区域收不到，要用"最近原则"（最内层 dropZone 处理并 stopPropagation）+ 全局兜底防导航。卡帕西视角：上传交互的本质是"**把操作系统的文件语义翻译成 Web 的数据结构**"——目录树→平铺列表+路径字符串，剪贴板→File 对象，这个翻译层的 bug 全部表现为"用户文件丢失"，是产品信任度的生死线。`,
+    keyPoints: ["拖拽文件夹遍历用 webkitGetAsEntry 递归（readEntries 必须循环读到空，单次最多 100 条是丢文件根因）", "getAsFileSystemHandle 仅 Chromium 支持拖拽场景，Entry API 才是全兼容现实；input webkitdirectory 做可靠入口", "粘贴截图文件名无意义要重命名；拖拽区 preventDefault 是前提，多 dropZone 用最近原则+全局兜底防误导航"],
+    followUps: ["拖拽上传时如何在 drop 前预判内容（dragover 的 items 只有 type 没有 File）做「可放置」提示？", "webkitRelativePath 与 Entry fullPath 的路径格式差异（斜杠/盘符/编码）如何统一？"],
+    favorited: false,
+  },
+  // ===== 专项能力层：数据可视化（fe-342~fe-349） =====
+  {
+    id: "fe-342",
+    nodeId: "data-visualization",
+    question: "图表渲染技术选型：Canvas、SVG、WebGL 三者的渲染原理、性能边界与适用场景是什么？ECharts 为什么选 Canvas？D3 为什么默认 SVG？",
+    bigTech: true,
+    answer: `结论：三者的本质差异在"**渲染结果的表示形式**"——SVG 是"DOM 节点即图形"（每个圆/线都是一个元素，可被 CSS/事件/无障碍树感知），Canvas 是"位图画布"（画完就是像素，无对象无事件，全部自己管理），WebGL 是"GPU 指令通道"（顶点着色器批量喂给显卡，JS 只组织数据不画像素）。性能边界经验值：SVG 在 ~1000 个元素内流畅（每元素都是 DOM 成本），Canvas 到 ~10 万图元（重绘整帧但无 DOM 开销），WebGL 百万级顶点（GPU 并行）。选型三问：多少个图元？要不要逐元素交互/无障碍？要不要逐帧动画？
+
+\`\`\`
+决策树（经验法则，不是教条）：
+├─ 图元 < 1k 且需要复杂交互/可访问性（点击某个扇区/屏幕阅读器）
+│   → SVG（D3 的默认领土：地图、关系图、编辑器类可视化）
+├─ 图元 1k-100k 或需要频繁整体刷新（实时折线/大数据散点）
+│   → Canvas（ECharts 的主战场：通用图表）
+├─ 图元 > 100k（百万散点/轨迹流/3D）
+│   → WebGL（deck.gl/l7/echarts-gl：地理与 3D 可视化）
+└─ 混合：Canvas 画底图（性能敏感层）+ SVG 画标注层（交互敏感层）
+    → 高德/百度地图标注、BI 工具的十字线层都是这个结构
+\`\`\`
+
+ECharts 选 Canvas 的深层理由：①**数据规模假设**——商业图表库按"万级数据点"设计（10 万点的折线），SVG 在这个规模 DOM 操作直接卡死（1 万个 circle 元素，一次数据更新 = 1 万次 DOM 属性写 + 全树 reflow）；②**增量渲染可控**——Canvas 每帧重绘，ECharts 的 incremental 模式把 10 万点分片到多帧渲染（不阻塞交互），SVG 做不到这种帧级调度；③**导出/合成自由**——Canvas 可直接 toDataURL 出图、可以离屏合成，SVG 导出要序列化 DOM + 处理外部资源；④代价就是交互要自己做：ECharts 内部维护"图元拾取系统"（每个图形的包围盒/路径，鼠标事件时做几何命中检测——zrender 库的 silent/ignore 机制），把 Canvas 的"无对象"劣势用空间索引补回来。
+
+D3 默认 SVG 的理由（设计哲学）：①D3 的定位是"**数据驱动文档**"（Data-Driven Documents）——它的核心抽象是 data join（数据与 DOM 元素绑定），SVG 元素天然是 DOM，join 后 enter/update/exit 三态管理就是 D3 的灵魂；②D3 的目标场景是"定制化可视化"（NYT 的可交互新闻图、学术图表）——图元少（几百个）但每个都要精确控制（自定义路径/渐变/标注），SVG 的声明式正合适；③D3 也能画 Canvas（它有 d3-path 生成 Canvas 指令），但那就退化成"绘图工具"，失去了 DOM 绑定这个核心优势——所以 D3 + Canvas 的场景通常是"D3 算布局，Canvas 画像素"（力导向图 10 万节点：d3-force 算坐标，Canvas 画点）。
+
+真实案例：①某监控大盘从 SVG 迁 Canvas——500 台服务器的状态网格（500 个 rect 每分钟变色），SVG 版变色时全页卡顿 200ms（500 次 DOM 写 + reflow），Canvas 版重绘 2ms；但后来产品要"点击格子下钻"，Canvas 版得自己写命中检测（算鼠标在哪个格子的数学）——**性能换来的代价是交互代码量**；②高德地图的标注层架构：百万 POI 用 WebGL（deck.gl 图层），几千个业务标注用 Canvas 层，几十个可点击气泡用 DOM 层——三层各取所长，这是"混合渲染"的教科书；③可访问性事故：某政府数据平台用纯 Canvas 图表，无障碍审计不过（屏幕阅读器读不到任何数据），被迫为每个图表补"隐藏的 SVG/表格版本"——Canvas 图表的可访问性要从第一天设计（aria-label 描述 + 数据表格备选），不是事后补丁。卡帕西视角：选型不是选"最强的技术"而是选"**与数据规模和交互复杂度匹配的最简技术**"——能用 SVG 不碰 Canvas（DOM 免费的交互/样式/无障碍），能用 Canvas 不碰 WebGL（2D API 一天上手，shader 一周入门），性能不够时自然知道该往哪迁。`,
+    keyPoints: ["SVG=DOM 即图形（<1k 元素，交互/无障碍免费）；Canvas=位图（1k-100k，重绘整帧）；WebGL=GPU 通道（>100k 顶点）", "ECharts 选 Canvas：万级数据假设+分片增量渲染+导出自由，交互用空间索引（zrender 命中检测）补", "D3 默认 SVG 因核心抽象是 data join（数据绑 DOM）；D3+Canvas 场景=D3 算布局 Canvas 画像素"],
+    followUps: ["WebGL 的 instancing（实例化渲染）如何把百万散点的 draw call 压到个位数？", "Canvas 图表的 aria 无障碍方案（aria-label+数据表格+focus 管理）完整设计？"],
+    favorited: false,
+  },
+  {
+    id: "fe-343",
+    nodeId: "data-visualization",
+    question: "10 万个数据点的折线图如何流畅渲染？数据抽样（LTTB 算法）、Canvas 分片绘制、WebGL 加速三条路径的原理与取舍？为什么直接全量绘制必死？",
+    bigTech: true,
+    answer: `结论：10 万点全量绘制的死因是"**像素浪费**"——1920px 宽的图表，横向只有 1920 个像素列，10 万点意味着每列 52 个点叠在一起，肉眼看到的效果与 2000 点完全一样，但绘制成本是 50 倍。第一条路永远是**数据抽样**（把 10 万点降到像素级密度，视觉无损）：LTTB（Largest-Triangle-Three-Buckets）是时序数据抽样的黄金标准（保形状不失真，远胜简单隔 N 取一）。抽样到 2000 点后 Canvas 轻松应对；WebGL 是"不能抽样"场景（金融逐笔/科学数据）的终极手段。
+
+\`\`\`ts
+// ① LTTB 抽样（保形抽样的经典算法，30 行实现）
+function lttb(data: [number, number][], threshold: number): [number, number][] {
+  if (data.length <= threshold) return data;
+  const sampled: [number, number][] = [data[0]]; // 首尾必保留
+  const bucketSize = (data.length - 2) / (threshold - 2);
+  let a = 0; // 当前选中的点（三角形的左顶点）
+  for (let i = 0; i < threshold - 2; i++) {
+    // 当前桶范围 + 下一个桶的平均点（三角形右顶点用邻桶均值，保持趋势）
+    const rangeStart = Math.floor((i + 1) * bucketSize) + 1;
+    const rangeEnd = Math.floor((i + 2) * bucketSize) + 1;
+    const nextBucket = data.slice(rangeStart, Math.min(rangeEnd, data.length));
+    const avgX = avg(nextBucket.map((p) => p[0]));
+    const avgY = avg(nextBucket.map((p) => p[1]));
+    // 桶内选"与左顶点 a、邻桶均值构成最大三角形"的点（形状贡献最大者）
+    let maxArea = -1, maxIdx = rangeStart;
+    const bucketStart = Math.floor(i * bucketSize) + 1;
+    const bucketEnd = Math.floor((i + 1) * bucketSize) + 1;
+    for (let j = bucketStart; j < bucketEnd; j++) {
+      const area = Math.abs(
+        (data[a][0] - avgX) * (data[j][1] - data[a][1]) -
+        (data[a][0] - data[j][0]) * (avgY - data[a][1]),
+      );
+      if (area > maxArea) { maxArea = area; maxIdx = j; }
+    }
+    sampled.push(data[maxIdx]);
+    a = maxIdx;
+  }
+  sampled.push(data[data.length - 1]);
+  return sampled;
+}
+// 对比：隔 N 取一会丢峰值/谷值（极端点恰好被跳过），LTTB 保证形状特征点入选
+
+// ② Canvas 分片绘制（抽样后仍大或不可抽样时的调度）
+function drawInChunks(ctx: CanvasRenderingContext2D, points: [number, number][]) {
+  const CHUNK = 20000;
+  let i = 0;
+  function drawChunk() {
+    ctx.beginPath();
+    for (let j = 0; j < CHUNK && i < points.length; j++, i++) {
+      ctx.lineTo(points[i][0], points[i][1]); // 连续 path 不 break
+    }
+    ctx.stroke();
+    if (i < points.length) requestAnimationFrame(drawChunk); // 每帧一片，不阻塞
+  }
+  drawChunk(); // ECharts 的 incremental rendering 同款思路
+}
+\`\`\`
+
+三条路径的取舍矩阵：①**LTTB 抽样**——优点：视觉无损（峰值谷值全保留）、实现极简、与任何渲染层兼容；缺点：缩放时要按新视口重新抽样（zoom-in 后 2000 点不够用，要保留原始数据按需重抽）；适用：时序数据默认答案。②**Canvas 分片**——优点：数据保真（全量绘制）、代码简单；缺点：总绘制时间不变（只是摊到多帧）、低端机仍可能掉帧；适用：2-20 万点且"必须看到每一个点"的场景（如异常检测散点）。③**WebGL**——优点：百万点 60fps（GPU 并行，点的位置用 attribute buffer 一次喂入）；缺点：开发成本数量级上升（着色器/缓冲区管理/文字渲染要另想办法），或依赖 echarts-gl/deck.gl；适用：>50 万点或 3D 场景。工程上的组合策略：**缩略图用 LTTB 全览 + 主视图按视口范围抽 + 原始数据留在 Worker 里按需切片**——Kibana/Grafana 都是这个架构。
+
+真实案例：①某 APM 产品的 trace 火焰图（单次请求 8 万 span）——初版全量 Canvas 绘制首屏 12s 白屏，用户以为卡死。优化链：span 按宽度过滤（<0.5px 的 span 聚合为"合并段"）+ 视口外不绘制 + LTTB 思想的三维变体（时间×层级×宽度三约束抽样），首屏降到 400ms；②Grafana 的 downsampling 演进——早期用平均聚合（avg 每 N 点），告警毛刺被平均掉（峰值没了，用户"监控漏报"），后来 M3/ClickHouse 后端默认用 min+max+avg 三聚合（前端画区间带），保峰又保形——说明**抽样算法的选择是业务语义问题**（监控场景丢峰值=事故）；③echarts-gl 的教训：某团队为 30 万散点上 WebGL，发现文字标签渲染还要 fallback 回 Canvas 2D（WebGL 画文字极难），两层对齐（相机矩阵同步）写了一个月——WebGL 路径的隐性成本 70% 在"非图形"部分（文字/交互/导出）。卡帕西视角：性能优化的第一性问题永远是"**用户真的需要这 10 万个点吗**"——抽样是把问题消灭在数据层，分片是把成本摊在时间维，WebGL 是用硬件暴力碾过去，按这个顺序尝试，90% 的问题在第一层就死了。`,
+    keyPoints: ["全量必死因像素浪费：1920 列像素对 10 万点=每列 52 点叠加，视觉与 2000 点无异但成本 50 倍", "LTTB 保形抽样：桶内选最大三角形点，峰值谷值必保留；隔 N 取一会丢极端点；缩放要按视口重抽", "组合架构：缩略图全览抽样+主视图按视口抽+原始数据 Worker 切片；WebGL 的隐性成本在文字/交互/导出"],
+    followUps: ["LTTB 在「多序列对齐抽样」（多折线共享 x 轴）时的失真问题与改进算法？", "Grafana 的 min/max/avg 三聚合区间带如何在 ECharts 里用 custom series 实现？"],
+    favorited: false,
+  },
+  {
+    id: "fe-344",
+    nodeId: "data-visualization",
+    question: "ECharts 的架构原理是什么？zrender 渲染层、增量渲染、数据驱动 option、动画系统四层如何协作？为什么 setOption 是增量合并而非全量替换？",
+    bigTech: true,
+    answer: `结论：ECharts 的四层架构：**zrender**（自研 2D 渲染引擎，Canvas/SVG 双后端，负责图形绘制与事件拾取）→ **series 层**（每种图表类型一个"数据→图元"的翻译器）→ **动画系统**（图元属性的插值引擎，数据更新自动补间）→ **option 驱动**（声明式配置，setOption 做 diff 合并后触发最小更新）。setOption 用增量合并（merge）而非替换的原因：**保留内部状态与动画连续性**——全量替换会让"上次的缩放位置、图例选中态、正在进行的动画"全部丢失，用户看到的就是图表闪断重开；merge 让"只改数据"时坐标轴/交互状态原样保留，数据变化还能平滑动画过渡。
+
+\`\`\`js
+// setOption 合并语义的实际影响
+chart.setOption({                          // 第一次：完整配置
+  xAxis: { type: "time" },
+  series: [{ type: "line", data: [/* 1万点 */] }],
+});
+chart.setOption({ series: [{ data: newData }] }); // 第二次：只给数据
+// merge 结果：xAxis 保留，series[0].type 保留（按 index 合并！），只有 data 被替换
+// 且数据替换触发"形变动画"：旧折线平滑过渡到新折线（而非闪烁重开）
+
+// 按 index 合并的坑：series 数组顺序变了会错位合并
+chart.setOption({
+  series: [
+    { id: "a", data: d1 },  // ✅ 用 id 指定合并目标（顺序无关）
+    { id: "b", data: d2 },
+  ],
+});
+// 或 notMerge: true 彻底重建（放弃动画与状态保留，用于结构大改）
+chart.setOption(newOption, { notMerge: true });
+// 或 replaceMerge 只替换指定组件（精控制衡点）
+chart.setOption(option, { replaceMerge: ["series"] });
+\`\`\`
+
+zrender 的核心设计（为什么是自研而非用现成库）：①**图形拾取系统**——Canvas 无 DOM 事件，zrender 给每个图形存包围盒与路径，鼠标移动时做"空间索引粗筛 + 路径精判"（isPointInPath），实现了悬停高亮/点击扇区这些"Canvas 上的 DOM 级交互"；②**增量渲染（incremental）**——大数据量时把图元分片，每帧画一批（不阻塞主线程长任务），用户看到图表"渐进式浮现"且中途可以交互；③**双后端抽象**——同一套图形描述可输出 Canvas 或 SVG（SVG 模式用于小数据量 + 需要 DOM 交互/打印保真的场景），业务无感切换；④**脏矩形优化**——局部更新时只重绘受影响区域（而不是整画布清屏重画），配合分层画布（静态层 + 动态层分离，十字线层独立重绘不碰底图）。
+
+动画系统的本质：图元不是重建而是"**属性插值**"——数据更新时，每个图形元素的形状属性（path 的点坐标、rect 的宽高、颜色）从旧值插值到新值（requestAnimationFrame 驱动 + easing 函数），所以"折线图数据刷新"呈现为线条平滑蠕动到新形状。这个设计的代价：**动画要求新旧图元可配对**（同 id/同 index 的图元才能插值），所以 series 用 id 合并不仅为了正确性也为了动画连续性。性能预算上，同时动画的图元数要控制（几千个图元同时插值时 CPU 算不过来，ECharts 大数据量时会自动降级为无动画直接跳变）。
+
+真实案例与坑：①实时行情大屏的"闪断"事故——前端每秒 setOption 全量 option（后端推什么塞什么），图表每秒闪白重开，客户投诉"像 PPT 翻页"。根因：全量 option 里 series 无 id，且包含 layout 配置导致 merge 后判定为结构变化重建。修复：静态配置只 setOption 一次，数据更新只推 { series: [{ id: "main", data }] }，闪断消失且有了平滑过渡动画；②merge 的数组陷阱——setOption({ xAxis: [{ max: 100 }] }) 后再 setOption({ xAxis: [{ min: 0 }] })，结果是 { max: 100, min: 0 }（merge 不是替换！），想清掉 max 必须显式 max: undefined 或 notMerge——无数人栽在"我明明没设这个值它哪来的"；③incremental 的交互坑——增量渲染进行中时，部分图元还没画出来，此时点击"未渲染区域"无响应（拾取系统里也还没有这些图元），大数据量下要展示"渲染中"状态并暂缓交互响应。卡帕西视角：ECharts 的架构是"**声明式外壳 + 命令式内核**"——option 是给人写的（声明心智），内部转 zrender 图元是指令式的（性能心智），merge 语义是两界的翻译协议，理解了 merge 就理解了为什么"声明式 API 也可以有状态"。`,
+    keyPoints: ["四层架构：zrender（绘制+拾取）→series（数据→图元翻译）→动画（属性插值）→option（声明式 diff 合并）", "setOption merge 保状态与动画连续性；series 合并按 index（用 id 防错位）；数组字段 merge 不替换，清值要显式 undefined", "zrender 三大件：空间索引拾取（Canvas 上的 DOM 级交互）/分片增量渲染/脏矩形+分层重绘"],
+    followUps: ["ECharts 5 的 dataset 组件与 series.data 直填在「数据复用与更新粒度」上的架构差异？", "zrender 的 SVG 后端与 Canvas 后端在事件拾取实现上的本质不同？"],
+    favorited: false,
+  },
+  {
+    id: "fe-345",
+    nodeId: "data-visualization",
+    question: "D3 的 data join（enter/update/exit）设计思想是什么？为什么说 D3 是「可视化内核」而非图表库？什么场景该用 D3 而非 ECharts？",
+    bigTech: true,
+    answer: `结论：D3 的核心抽象是"**数据与文档元素的绑定关系**"——data join 把数据数组和 DOM 选择集对齐，产生三种状态：enter（有数据无元素 → 创建）、update（都有 → 更新属性）、exit（有元素无数据 → 移除）。这个抽象让"数据变化驱动的 DOM 增删改"变成声明式三态处理，而不是手动 diff。D3 不是图表库——它不提供 barChart() 这种成品，它提供的是"**构造任何可视化的零件**"（比例尺/形状生成器/布局算法/数据绑定），所以 D3 的正确心智是"可视化领域的 jQuery + 算法库"。
+
+\`\`\`js
+// data join 三态的完整范式（D3 的灵魂代码）
+const bars = d3.select("svg").selectAll("rect").data(data, (d) => d.id);
+// key 函数 (d) => d.id：按 id 配对（默认按索引，数据乱序时按索引会错配！）
+
+bars.enter()                    // 新数据：创建元素
+  .append("rect")
+  .attr("height", 0)            // 初始状态（动画起点）
+  .merge(bars)                  // enter + update 合并处理共同属性
+  .transition()
+  .attr("x", (d) => x(d.name))
+  .attr("height", (d) => h - y(d.value)); // 新值（动画终点）
+
+bars.exit()                     // 消失的数据：移除元素
+  .transition()
+  .attr("height", 0)
+  .remove();
+// 数据从 10 条变 8 条：2 个 rect 退场动画后移除，8 个平滑更新
+// 全程没有 if/else 判断"哪个该增哪个该删"——三态声明完毕，D3 做 diff
+
+// D3 的"零件"示例：比例尺（数据域→像素域的纯函数）
+const x = d3.scaleBand().domain(data.map(d => d.name)).range([0, width]);
+const y = d3.scaleLinear().domain([0, d3.max(data, d => d.value)]).range([h, 0]);
+// 布局算法（力导向/层级/弦图——这些才是 D3 的不可替代品）
+const simulation = d3.forceSimulation(nodes).force("link", d3.forceLink(links));
+\`\`\`
+
+D3 vs ECharts 的决策框架（不是高低之分是定位之差）：①**需求是标准图表（折线/柱/饼/散点/雷达）+ 快速交付** → ECharts（配置 10 分钟出图，D3 要写 200 行）；②**需求是"世界上没有这种图"（定制布局/特殊映射/交互叙事）** → D3（NYT 的 scrollytelling、学术界的和弦图/桑基图定制、网络关系图）；③**需要 D3 的算法但不需要它的渲染** → 现代混血方案：d3-force 算节点坐标 + React 渲染 DOM、scaleLinear 做映射 + ECharts custom series 画图——D3 的模块是独立发布的（d3-scale/d3-force/d3-hierarchy 可单装），**把 D3 当算法库用是 2026 年的主流姿势**；④**数据量**——D3 默认 SVG（<1k 元素），超了要 D3 算 + Canvas 画，此时复杂度直逼自研，先问自己 ECharts 能不能凑合。
+
+D3 的现代演进与误区：①**Observable Plot**——D3 团队意识到"零件太散"后出的"图表语法层"（Plot.barY(data).plot() 一行出图），定位类似 ggplot2——证明社区痛点的真实存在；②**D3 + React 的集成之争**——早期模式是"D3 操作 DOM，React 靠边"（useRef + useEffect 里跑 D3），这与 React 的声明式心智冲突；现代模式是"**D3 只做计算，React 负责渲染**"（D3 的 scale/shape 输出坐标和 path 字符串，React 渲染 <path d={pathStr}>），data join 的角色被 React 的 key + diff 接管——这是两个声明式系统的正确分工；③误区：把 D3 当"高级图表库"期待——它学习曲线陡（数据绑定/选择集/生成器三层概念），但陡的部分正是它的力量来源，用 ECharts 的心态学 D3 必然挫败。
+
+真实案例：①某知识图谱产品（5 万节点关系图）——先用 ECharts graph 系列，力导向布局帧率 8fps 且定制节点形状受限；迁到 d3-force（Worker 里跑物理模拟）+ Canvas 自绘，帧率 45fps，节点的"论文卡片"样式完全自定义——D3 的布局算法质量（力收敛速度/稳定性）是 ECharts 内置布局比不了的；②一个数据新闻项目（滚动叙事：滚动到某段落，图表平滑形变到对应状态）——ECharts 做这种"图表即叙事道具"要 hack 大量私有 API，D3 + GSAP 用数据 join + transition 自然表达——**当可视化是"内容的一部分"而非"数据的容器"时，D3 是唯一解**；③反例：某团队用 D3 做管理后台的 20 个常规图表，两个前端写了三个月（坐标轴/图例/tooltip 全手撸），同样的活 ECharts 一周——选型错误不是技术问题是成本问题。卡帕西视角：D3 是"**给你最大的表达自由，同时把组合成本也给你**"——它是汇编语言，ECharts 是高级语言；问"该用哪个"前先问"我的需求在现有图表库的词汇表里吗"，在就用库，不在才上 D3。`,
+    keyPoints: ["data join 三态：enter 创建/update 更新/exit 移除，key 函数配对防索引错配；声明三态，D3 做 diff", "D3=可视化内核（零件：比例尺/生成器/布局算法）非图表库；现代姿势=D3 当算法库单装模块用", "决策：标准图表快交付用 ECharts；定制布局/交互叙事/特殊映射用 D3；D3+React 现代分工=D3 算 React 渲染"],
+    followUps: ["Observable Plot 的语法层设计（marks/channels）与 D3 原生 API 的抽象差异？", "d3-force 放 Web Worker 的架构（数据序列化成本与物理模拟帧率平衡）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-346",
+    nodeId: "data-visualization",
+    question: "实时数据可视化（行情/监控大盘）的渲染调度怎么设计？高频推送（100 次/秒）下 requestAnimationFrame 节流、批量聚合、离屏缓冲、数据窗口滑动各起什么作用？",
+    bigTech: true,
+    answer: `结论：实时可视化的核心矛盾是"**数据到达速率 >> 屏幕刷新速率**"——WebSocket 推 100 次/秒，屏幕只有 60fps，且人眼能感知的极限也就 60 帧。渲染调度的四层设计：①**数据层缓冲**（推送先进队列，不直接触发渲染）；②**rAF 对齐渲染**（每帧最多渲染一次，把帧间到达的数据批量应用）；③**聚合降频**（帧内多次更新合并为最新快照，或按时间窗口聚合）；④**窗口滑动**（只保留可视时间窗的数据，老数据出窗即弃）。目标：渲染成本与数据速率解耦——推 100 次还是 1000 次，渲染都是 60fps 恒定。
+
+\`\`\`ts
+// 生产级实时渲染调度器
+class RealtimeChart {
+  private buffer: DataPoint[] = [];        // ① 数据缓冲队列
+  private dirty = false;                    // 帧标记：本帧有待渲染数据
+  private windowMs = 60_000;                // ④ 可视窗口 60s
+
+  onPush(points: DataPoint[]) {
+    this.buffer.push(...points);            // 推送只进队列，零渲染成本
+    if (!this.dirty) {
+      this.dirty = true;
+      requestAnimationFrame(() => this.flush()); // ② 注册本帧渲染
+    }
+  }
+
+  private flush() {
+    this.dirty = false;
+    // ③ 批量应用：帧内到达的 N 批数据一次处理
+    const batch = this.buffer;
+    this.buffer = [];
+    this.data.push(...batch);
+    // ④ 窗口滑动：丢弃出窗数据（数组头删是 O(n)，用环形缓冲或定期 slice）
+    const cutoff = Date.now() - this.windowMs;
+    let dropCount = 0;
+    while (dropCount < this.data.length && this.data[dropCount].t < cutoff) {
+      dropCount++;
+    }
+    if (dropCount > 1000) this.data = this.data.slice(dropCount); // 攒批删
+
+    // 渲染：抽样后绘制（复用 fe-343 的 LTTB，窗口内 8 万点抽 1500）
+    const sampled = lttb(this.data, this.targetPoints);
+    this.draw(sampled);
+  }
+}
+\`\`\`
+
+四层机制的深度剖析：①**rAF 对齐的必要性**——直接在 onPush 里渲染，100 次推送 = 100 次绘制（60fps 屏幕浪费 40 次），且绘制阻塞 WS 消息处理（消息堆积，延迟越来越大，恶性循环）；rAF 把渲染锁在帧边界，绘制最多 60 次/秒，消息处理与渲染互不阻塞。②**批量聚合的两级**——第一级"快照覆盖"（同一指标的多次更新只保留最新值：股价 10ms 内跳 5 次，渲染时只画最后一次）；第二级"时间聚合"（100 个点聚合成 OHLC 一根 K 线，数据密度超过像素密度时聚合而非叠加）。③**窗口滑动的数据结构**——朴素 shift/slice 是 O(n) 且制造大量垃圾（每帧产生新数组），生产方案：环形缓冲区（RingBuffer，头尾指针移动 O(1)）或分块数组（chunk list，整块出窗整块丢）；内存硬顶必须设（WS 断开重连期间数据可能洪水般补发，无上限会 OOM）。④**离屏缓冲的适用面**——底图（坐标轴/网格/历史数据）不变时画到离屏 canvas，每帧只画"新增数据段"然后与底图合成（drawImage 贴底图 + 增量路径），避免全量重绘历史数据——滑动窗口场景"历史左移"其实整体在变，所以更常见的做法是**滚动偏移优化**：把画布内容 drawImage 左移 dx 像素，只在右侧空白带画新数据（股票软件的滚动条就是这么做的，整帧绘制量从 N 点降到新增 M 点）。
+
+真实案例与坑：①某交易所行情页（500 档深度 + 逐笔成交 200 条/秒）——初版每条推送 setState（React），每秒 200 次 reconciliation，页面卡到 5fps。重构：推送 → 缓冲队列 → rAF 批量 flush → Canvas 绘制（绕过 React 渲染层），帧率稳定 60，CPU 降 70%。教训：**React 不适合承载高频数据流**（它的渲染调度以"用户交互"为假设），高频数据要在框架外的 ref/Worker 层处理，React 只负责低频的 UI 状态（连接状态/面板布局）；②聚合的语义坑——监控大盘把 1s 内 100 个 CPU 采样聚合为 avg，结果 99% 的毛刺被平均掉（故障时刻恰好在两帧之间），告警漏报。修复：聚合函数按业务选（监控用 max 保毛刺，趋势图用 avg 平滑，交易量用 sum），且聚合要在数据层完成而非渲染层；③离屏合成的 HiDPI 坑——离屏 canvas 没按 devicePixelRatio 缩放，drawImage 合成后全图模糊（Retina 屏），离屏与主屏必须同倍率。卡帕西视角：实时渲染的本质是"**用缓冲把「推送驱动」改造成「帧驱动」**"——推送是敌（不可控速率），帧是友（恒定预算），中间的四层机制都是这个改造工程的部件；谁直接在回调里画图，谁就把系统的生死交给了推送方的良心。`,
+    keyPoints: ["四层调度：推送进缓冲队列→rAF 帧边界批量 flush→帧内快照/时间聚合→窗口滑动+环形缓冲控内存", "React 不承载高频流（200 次/s setState=5fps），数据层在 ref/Worker，React 只管低频 UI 状态", "滚动场景用 drawImage 左移+右侧增量绘制；离屏缓冲必须按 devicePixelRatio 同倍率否则 Retina 模糊"],
+    followUps: ["Web Worker 里做数据聚合 + Transferable 传输给主线程渲染的架构与序列化成本？", "环形缓冲区在「多序列不同速率推送」时的对齐与水位管理？"],
+    favorited: false,
+  },
+  {
+    id: "fe-347",
+    nodeId: "data-visualization",
+    question: "Canvas 可视化的性能优化武器库：脏矩形重绘、图层分离（多层 canvas 叠加）、离屏缓存、避免状态切换，各自的原理与适用场景？",
+    bigTech: true,
+    answer: `结论：Canvas 性能优化的总纲是"**减少每帧的绘制工作量**"——Canvas 没有 DOM 的"只更新变化元素"概念，默认每帧全量重绘，所有优化武器都在回答"这一帧哪些可以不画"。四大武器：①**脏矩形**（只重绘变化区域的矩形范围，clearRect + clip 限定）；②**图层分离**（多个 canvas 元素叠放，静态层不动，动态层独立重绘——牺牲内存换帧率）；③**离屏缓存**（复杂图形一次画到离屏 canvas，之后 drawImage 复用位图，把"绘制成本"换成"贴图成本"）；④**状态批处理**（fillStyle/strokeStyle 切换有成本，按样式分组批量绘制）。
+
+\`\`\`js
+// ① 脏矩形：只重绘变化区域
+function renderDirtyRegion(dirty: {x: number; y: number; w: number; h: number}) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(dirty.x, dirty.y, dirty.w, dirty.h);
+  ctx.clip();                       // 裁剪：后续绘制只影响此区域
+  ctx.clearRect(dirty.x, dirty.y, dirty.w, dirty.h);
+  redrawElementsInRegion(dirty);    // 只画与此区域相交的元素（需空间索引）
+  ctx.restore();
+}
+// 适用：局部变化（光标移动/单点更新）；收益与画布面积成反比
+// 坑：抗锯齿边缘要外扩 1-2px，否则留下残影；元素跨区时重绘边界计算复杂
+
+// ② 图层分离：canvas 元素叠放（CSS position absolute 叠层）
+// <canvas id="bg">   静态：坐标轴/网格/历史底图（数据不变不重画）
+// <canvas id="main"> 半动态：数据图形（数据变才重画）
+// <canvas id="hud">  高频：十字线/tooltip/高亮框（每鼠标移动都重画，但只有几笔）
+function onMouseMove(e: MouseEvent) {
+  hudCtx.clearRect(0, 0, W, H);     // 只清 HUD 层（几 KB 像素）
+  drawCrosshair(hudCtx, e.offsetX, e.offsetY); // 底图层零成本
+}
+// 收益：高频小更新的成本不再与底图复杂度挂钩
+// 代价：N 层 = N 份位图内存（4K 画布一层 33MB）；层数 3-4 层是甜点
+
+// ③ 离屏缓存：复杂图形位图化
+const spriteCache = new OffscreenCanvas(64, 64);
+drawComplexIcon(spriteCache.getContext("2d")!); // 画一次（100 条 path）
+// 之后一万次引用：
+for (const pos of positions) {
+  ctx.drawImage(spriteCache, pos.x, pos.y); // 每次 1 次 drawImage（GPU 纹理拷贝）
+}
+// 收益：绘制成本 O(path 复杂度) → O(1)；散点图的自定义点形状、地图的 POI 图标必用
+// 注意：HiDPI 下离屏要按 dpr 缩放，否则贴上去模糊
+
+// ④ 状态批处理：按样式分组
+// ❌ 交替切换样式（每次切换都 flush GPU 管线）
+items.forEach((it) => {
+  ctx.fillStyle = it.color;
+  ctx.fillRect(it.x, it.y, 10, 10);
+});
+// ✅ 按颜色分组（同样式一段 path 一次 fill）
+const byColor = groupBy(items, "color");
+for (const [color, group] of byColor) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  group.forEach((it) => ctx.rect(it.x, it.y, 10, 10));
+  ctx.fill(); // 一次提交
+}
+\`\`\`
+
+武器的选择与组合拳：①**更新频率分层**是选武器的元规则——把场景元素按更新频率分档（永不/低频/高频/每帧），每档一个策略：永不→静态层或离屏缓存，低频→脏矩形，高频→独立图层，每帧→最小化该层元素数；②**测量先行**——Canvas 性能的测量工具：Performance 面板看 Rendering/Painting 占比、ECharts 的 opts.useDirtyRect（内置脏矩形开关，官方实测大数据 tooltip 场景帧率提升 2-5 倍）、自测每帧绘制指令数；③**反面教材预警**——save/restore 滥用（每画一个元素 save 一次，状态栈 push/pop 成本可观）、shadowBlur 大量使用（阴影是逐像素模糊，Canvas 性能黑洞，图表里能不用就不用）、渐变对象每帧新建（createLinearGradient 每帧调用 = 每帧分配新对象，缓存之）。
+
+真实案例：①某电力监控大屏（2 万设备点位 + 每 5s 数据刷新）——初版单 canvas 全量重绘，每帧 180ms（幻灯片体验）。优化组合：底图（地图+网格）静态层 + 设备图标离屏 sprite 缓存 + 数据变化用脏矩形（5s 内变化的设备通常 <5%，区域重绘）+ 告警闪烁动画独立 HUD 层，帧成本降到 8ms；②ECharts 的 dirtyRect 实践——官方 5.3 引入 useDirtyRect，在"大数据量 + tooltip 十字线"场景，鼠标移动从整画布重绘变为只重绘十字线经过的窄条区域，低端机帧率 12→55fps；③阴影性能事故：某设计稿要求所有柱状图带弥散阴影（shadowBlur: 20），800 根柱子帧率 6fps，改成立体渐变模拟阴影视觉（无 shadowBlur）后 60fps——设计师要的"柔和感"可以用渐变/透明度骗出来，不要用真实模糊算出来。卡帕西视角：Canvas 优化与 DOM 优化的思维差异在于"**DOM 帮你做增量，Canvas 增量全靠自己**"——所有武器本质都是"自己实现一个增量系统"（按区域增量=脏矩形，按频率增量=图层，按内容增量=离屏缓存），理解了这一点，武器库可以自己生长。`,
+    keyPoints: ["四大武器：脏矩形（区域增量）/图层分离（频率分层，3-4 层甜点）/离屏缓存（内容复用位图化）/状态批处理（按样式分组一次提交）", "元规则=按更新频率分档配策略；ECharts useDirtyRect 官方实测 tooltip 场景帧率 2-5 倍", "性能黑洞：save/restore 滥用/shadowBlur 大面积模糊/每帧新建渐变对象；HiDPI 离屏必须按 dpr 缩放"],
+    followUps: ["脏矩形在「元素大面积重叠」（散点密集区）时的收益衰减与合并策略？", "多层 canvas 与 WebGL 的单一上下文在多显示器不同 dpr 场景的适配差异？"],
+    favorited: false,
+  },
+  {
+    id: "fe-348",
+    nodeId: "data-visualization",
+    question: "图表的交互系统怎么设计？tooltip 十字线、框选缩放（brush）、图例联动、下钻（drill-down）四类交互的事件架构与状态管理？Canvas 图表如何做精确的图形拾取？",
+    bigTech: true,
+    answer: `结论：Canvas 图表交互的核心难点是"**没有 DOM 事件免费午餐**"——所有交互要自建：图形拾取（鼠标位置→命中哪个图元）、事件分发（hover/click/drag 路由到对应交互模块）、状态管理（当前高亮/选中/缩放窗）。架构三层：①**拾取层**（空间索引 + 几何判定）；②**交互层**（每种交互一个状态机：tooltip/brush/legend/drill）；③**渲染层联动**（交互状态变化触发对应图层重绘）。四类交互的共性：都是"**手势 → 状态机迁移 → 视觉反馈**"的循环。
+
+\`\`\`ts
+// ① 图形拾取：空间索引 + 两级判定
+class PickSystem {
+  private grid = new Map<string, GraphicElement[]>(); // 空间哈希格
+
+  build(elements: GraphicElement[]) {
+    // 粗筛结构：把画布分成 64px 格子，元素按包围盒注册到覆盖的格子
+    for (const el of elements) {
+      for (const key of coveredGridKeys(el.bbox)) {
+        pushTo(this.grid, key, el);
+      }
+    }
+  }
+  pick(x: number, y: number): GraphicElement | null {
+    // 第一级：只查鼠标所在格子的元素（10 万元素 → 格子内几个）
+    const candidates = this.grid.get(gridKey(x, y)) ?? [];
+    // 第二级：精确几何判定
+    for (let i = candidates.length - 1; i >= 0; i--) { // 顶层优先（后画的在上）
+      const el = candidates[i];
+      if (el.type === "rect" && pointInRect(x, y, el.bbox)) return el;
+      if (el.type === "path" && ctx.isPointInPath(el.path2d, x, y)) return el;
+      if (el.type === "circle" && dist(x, y, el.cx, el.cy) <= el.r) return el;
+    }
+    return null;
+  }
+}
+// Path2D 是现代 Canvas 的拾取利器：路径存对象，isPointInPath 硬件加速
+// 折线图的拾取不是"点在线上"而是"最近数据点吸附"（距离 x 最近的点高亮）
+
+// ② 框选缩放（brush）的状态机
+// idle →(mousedown)→ brushing(记录起点，HUD 层画选框)
+//      →(mousemove 实时更新选框)→ brushing
+//      →(mouseup)→ 计算选框覆盖的数据范围 → setZoom(domain) → idle
+// 关键：选框画在 HUD 层（不动底图）；松手后按选框范围重设比例尺 domain，
+// 数据按新 domain 重抽样（复用 LTTB）再重绘——这是"缩放即重新抽样"的联动
+
+// ③ 图例联动：legend 点击 → 该 series visible=false →
+//    重算可见系列的 y 轴 domain（隐藏最大值系列后轴要自适应收缩）→ 形变动画
+\`\`\`
+
+四类交互的设计要点与坑：①**tooltip**——十字线跟随是"最近点吸附"（对 x 扫描线找最近数据点），多序列时一次性展示该 x 处所有序列值（联动 tooltip）；坑：大数据量下"找最近点"必须二分查找（有序 x 轴），线性扫描 10 万点每次 mousemove 卡 5ms 积累成掉帧；②**brush 缩放**——选框过程中不要实时重抽样（拖动时数据不动，只有 HUD 选框动），松手才一次性重算；坑：时序轴缩放要处理"选框跨夏令时/跨断档"（金融数据周末空档），比例尺的 domain 语义要分清"索引域"还是"时间域"；③**图例联动**——隐藏系列后 y 轴自适应是体验关键（ECharts 默认重算 domain），但"多 y 轴"（左右双轴）时联动规则要用户可预期（左轴系列隐藏只重算左轴）；④**下钻**——本质是"数据层级导航"（省 → 市 → 区），状态栈管理（面包屑 = 栈），每层有自己的比例尺与抽样；坑：下钻动画（父块放大过渡到子视图）要求父子图元可配对（同 id 映射），与 fe-344 的动画配对机制同源。
+
+事件架构的工程化（ECharts 的做法值得抄）：①**事件总线解耦**——拾取层只发"原始事件 + 命中图元"，交互模块订阅自己关心的（tooltip 订阅 mousemove，brush 订阅 mousedown/move/up 序列）；②**手势识别层**——mousedown+move+up 序列识别为 click/drag/wheel-zoom 等"手势"，交互模块面向手势编程而非原始事件（双击与两次单击的消歧、拖拽阈值 3px 内算点击）；③**状态与渲染的联动协议**——交互状态存统一 store（hovered/selected/zoomStack），渲染层订阅 store 变化按图层重绘（hover 只重绘 HUD 层，zoom 重绘全部）；④**移动端手势**——touch 的 pinch（双指缩放）与 pan（平移）要映射到同一套状态机（pinch → zoom，pan → 窗口平移），不能只写 mouse 事件。
+
+真实案例：①某 BI 工具的"联动分析"（点击 A 图的柱子，B/C/D 图同时过滤高亮）——初版用事件直接互调（A 图调 B 图的 filter 方法），图表多了以后依赖成网；重构为"全局 selection store"（所有图表订阅同一份选择状态，各自决定如何视觉响应），新增图表零接入成本——**联动交互的正确架构是共享状态而非互相调用**；②tooltip 的边界处理事故——图表贴屏幕右边缘时 tooltip 浮层超出视口被裁，用户看不到值。修复：浮层定位逻辑加"视口碰撞检测"（右侧不够放就翻到左侧，上不够翻到下），这个细节是"能用"与"好用"的分水岭；③Canvas 拾取的替代方案评估：有团队用"离屏颜色编码拾取"（每个图元在离屏画布用唯一颜色画一遍，读鼠标处像素色值反查图元）——O(1) 精确拾取（连 path 内部都准），代价是一份离屏内存；适合图元形状极复杂（地图多边形）的场景，空间索引适合常规图元。卡帕西视角：交互系统的复杂度不在"单个交互"而在"**交互间的状态一致性**"（brush 中 tooltip 要不要显示？下钻后 legend 状态保留吗？）——这些问题的答案不在代码里在产品定义里，先画出"交互状态机全图"再动手，否则每个新交互都是一次存量回归。`,
+    keyPoints: ["拾取两层判定：空间哈希粗筛（格子索引）+几何精判（Path2D.isPointInPath 硬件加速）；折线用最近点吸附+二分查找", "brush 拖动只动 HUD 选框，松手才重设 domain+重抽样；tooltip 贴边要视口碰撞检测翻转", "联动架构=共享 selection store 而非图表互调；手势识别层消歧 click/drag/pinch，移动端映射同一状态机"],
+    followUps: ["颜色编码离屏拾取（唯一色反查）与空间索引在 10 万图元下的性能对比？", "「框选过滤」与「框选缩放」的产品语义差异在状态机上如何区分（mouseup 后的分支）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-349",
+    nodeId: "data-visualization",
+    question: "Canvas 图表的 HiDPI（Retina）适配怎么做？devicePixelRatio 缩放的完整实现、线条发虚/文字模糊的根因、图表导出高清图片的方案？",
+    bigTech: true,
+    answer: `结论：HiDPI 适配的本质是"**CSS 像素与物理像素的换算**"——Retina 屏 devicePixelRatio=2，一个 CSS 像素对应 2×2 物理像素，Canvas 默认按 CSS 尺寸分配位图（1:1），浏览器把 300px 位图拉伸到 600 物理像素显示 = 全线模糊。标准解法三连：①canvas.width/height 按 dpr 放大（位图用物理像素尺寸）；②canvas.style.width/height 保持 CSS 尺寸（布局不变）；③ctx.scale(dpr, dpr)（绘图坐标系仍用 CSS 像素思考，映射到底层物理像素）。导出高清图：用更大 dpr 重绘到离屏再 toDataURL。
+
+\`\`\`ts
+// ① HiDPI 适配的标准三件套
+function setupHiDPICanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(cssW * dpr);   // 位图物理尺寸
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.width = cssW + "px";         // CSS 布局尺寸（不变）
+  canvas.style.height = cssH + "px";
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(dpr, dpr);                      // 坐标系映射：代码里继续用 CSS 像素
+  return ctx;
+}
+// 之后所有绘制坐标/字号都用 CSS 像素值，浏览器按 dpr 映射到物理像素 = 全清晰
+
+// ② 0.5px 对齐（细线发虚的克星）
+// dpr=1 屏幕上画 1px 竖线 x=100：线横跨 x=99.5~100.5 两个物理像素列，
+// 每列只覆盖一半 → 抗锯齿成 50% 灰度的"虚线"
+// 解法：奇数宽度的线画在半像素处
+ctx.moveTo(Math.round(x) + 0.5, 0);  // 1px 线完美落在物理像素列中央
+ctx.lineTo(Math.round(x) + 0.5, h);
+// dpr=2 屏无此问题（1 CSS px = 2 物理 px 整除），所以发虚多在 dpr=1 屏
+
+// ③ 导出高清图（离屏放大重绘）
+function exportPNG(chart: Chart, scale = 3): string {
+  const off = document.createElement("canvas");
+  const { width, height } = chart.size;
+  off.width = width * scale;
+  off.height = height * scale;
+  const offCtx = off.getContext("2d")!;
+  offCtx.scale(scale, scale);
+  chart.render(offCtx);                    // 用 3 倍尺寸完整重绘（矢量指令重放）
+  return off.toDataURL("image/png");       // 3000×2000 的高清图（印刷级）
+}
+// 关键：导出是"重绘"而非"放大截图"——canvas.toDataURL 直接导当前画布
+// 只有 dpr 倍清晰度，重绘到 3x 离屏才是真高清（文字/线条重新光栅化）
+\`\`\`
+
+模糊根因的深度剖析（面试要能讲出三层）：①**位图拉伸模糊**——canvas 位图 < 显示尺寸时被浏览器插值放大（双线性插值，边缘发虚）——这是没做 dpr 三件套的症状；②**半像素抗锯齿**——线条落在物理像素边界上，每边覆盖 50%，抗锯齿渲染成灰色半透明（1px 线变 2px 灰线）——dpr=1 屏的经典病，0.5px 对齐解决；③**变换矩阵累积误差**——多次 scale/translate 后坐标变成 100.499999 这类值，落在非整数像素上全线轻微模糊——解法：关键绘制前 ctx.setTransform(dpr, 0, 0, dpr, 0, 0) 重置矩阵（而不是在脏矩阵上继续叠）。文字模糊的特例：textBaseline/字体在缩放后由系统重新光栅化，理论上 ctx.scale 后文字是清晰的（文字是矢量渲染），如果文字模糊大概率是"截取了缩放前的画布"或 CSS transform: scale 缩放 canvas 元素（CSS 缩放是位图拉伸，必模糊——检查有没有给 canvas 加 transform！）。
+
+dpr 的动态性（容易漏的边界）：①**多显示器拖动**——窗口从 dpr=1 的显示器拖到 dpr=2 的显示器，matchMedia("(resolution: 2dppx)").change 或 resize 监听里要重新 setup（位图尺寸重建 + 重绘）；②**浏览器缩放**——Ctrl +/- 改变 dpr（125% 缩放时 dpr=1.25），同上监听重建；③**dpr 不是整数**——1.25/1.5 倍缩放下，0.5px 对齐规则失效（物理像素网格变了），此时"对齐到物理像素"的正确计算是 Math.round(x * dpr) / dpr。
+
+真实案例：①某报表系统的"打印模糊"投诉——屏幕上看清晰（dpr 适配做了），打印模糊（打印机 300dpi，相当于 dpr≈3）。修复：打印前用 3x 离屏重绘导出 PNG 塞进打印视图，或用 SVG 后端（矢量天然高清）——ECharts 双后端的价值在此显现（屏幕用 Canvas 性能，打印切 SVG 矢量）；②CSS transform 事故——设计师给图表容器加了 transform: scale(0.9) 做"卡片缩略"效果，图表全糊（位图被二次拉伸），排查两天才发现不是图表库问题是外层 CSS。规则：**canvas 元素及其祖先禁止 CSS 缩放**，要缩放就重设 canvas 尺寸重绘；③ECharts 的实现参考——它内部 pixelRatio 选项默认取 window.devicePixelRatio，导出 getDataURL 时可以传 pixelRatio: 3 获得高清图（离屏重绘机制官方封装好了），自研图表库时这三个 API（init 的 pixelRatio、export 的 pixelRatio、resize 时的重建）抄它的语义即可。卡帕西视角：HiDPI 问题的本质是"**抽象泄漏**"——Canvas 用"像素"这个词同时指 CSS 像素和物理像素，所有模糊都是这两个"像素"没对齐的症状；适配方案的优雅之处在于 ctx.scale 把这层换算一次性吃掉，让业务代码重新活在"一像素就是一像素"的纯真年代。`,
+    keyPoints: ["HiDPI 三件套：位图按 dpr 放大+CSS 尺寸不变+ctx.scale(dpr) 坐标映射；dpr 动态变化（拖屏/缩放）要监听重建", "模糊三根因：位图拉伸（没适配）/半像素抗锯齿（dpr=1 要 0.5px 对齐）/CSS transform 缩放 canvas（位图二次拉伸，禁止）", "导出高清=离屏 3x 重绘（矢量指令重放重新光栅化），不是放大当前画布位图；打印场景可切 SVG 后端"],
+    followUps: ["dpr=1.25/1.5 非整数屏的物理像素对齐通式（Math.round(x*dpr)/dpr）在折线密集场景的实测效果？", "WebGL 场景的 HiDPI 适配与 Canvas2D 的差异（drawingBufferSize 与抗锯齿 MSAA）？"],
     favorited: false,
   },
 ];
