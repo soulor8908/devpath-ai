@@ -11,7 +11,7 @@ import type { KnowledgeNode, Question, ScheduleItem } from "../types";
 // ====================================================================
 
 const LLM_APP_NODES: KnowledgeNode[] = [
-  // ===== LLM 基础（5 个节点） =====
+  // ===== LLM 基础（5 个节点） + 训练数据与微调实战（2 个节点） =====
   {
     id: "llm-fundamentals",
     title: "LLM 基础（Transformer/Tokenization/上下文窗口/采样参数）",
@@ -30,6 +30,26 @@ const LLM_APP_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "预训练数据流程、SFT 对话模板、LoRA/QLoRA 低秩适配、PEFT 方法、DPO 与 RLHF 对齐、指令微调 vs 对话微调、数据污染检测。",
+    mastery: 0,
+  },
+  {
+    id: "llm-data-engineering",
+    title: "训练数据工程（清洗/去重/质量分类/合成数据/数据配比）",
+    difficulty: 4,
+    prerequisites: ["llm-fundamentals"],
+    frequency: "高",
+    bigTech: true,
+    summary: "预训练数据 Pipeline 六阶段、MinHash/LSH 近重复去除、fastText 质量分类器、困惑度过滤、Self-Instruct/Evol-Instruct 合成数据、模型坍缩风险、数据配比 DoReMi、LIMA 少即是多、PII 清洗与去毒。",
+    mastery: 0,
+  },
+  {
+    id: "llm-finetune-practice",
+    title: "微调实战工程（LLaMA-Factory/显存估算/超参/灾难性遗忘/评测闭环）",
+    difficulty: 4,
+    prerequisites: ["llm-training"],
+    frequency: "高",
+    bigTech: true,
+    summary: "LLaMA-Factory/unsloth 实操、7B/13B/70B 显存估算、LoRA rank/alpha/target_modules 选型、学习率与 warmup、灾难性遗忘缓解、NF4 双重量化、DDP/FSDP/DeepSpeed ZeRO 多卡方案、微调评测闭环。",
     mastery: 0,
   },
   {
@@ -90,6 +110,16 @@ const LLM_APP_NODES: KnowledgeNode[] = [
     frequency: "高",
     bigTech: true,
     summary: "Prompt Injection 攻击向量、Jailbreak 越狱技术、间接注入、系统提示加固、输出过滤、红队测试与对抗评估。",
+    mastery: 0,
+  },
+  {
+    id: "llm-context-engineering",
+    title: "上下文工程（Context 预算/压缩/分层 System Prompt/DSPy/Context Rot）",
+    difficulty: 4,
+    prerequisites: ["llm-prompt-advanced"],
+    frequency: "高",
+    bigTech: true,
+    summary: "上下文工程 vs Prompt 工程、Context 预算分配、LLMLingua 压缩与选择性保留、Context Rot 性能衰减、System Prompt 分层设计、DSPy 自动优化、KV Cache 前缀稳定性、Agent 轨迹上下文管理。",
     mastery: 0,
   },
   // ===== API 与集成（4 个节点） =====
