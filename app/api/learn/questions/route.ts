@@ -61,7 +61,26 @@ export async function POST(req: NextRequest) {
     // 答案字段清空，待第 3 步生成
     const withoutAnswers = questions.map((q) => ({ ...q, answer: "" }));
 
-    const response = NextResponse.json({ questions: withoutAnswers });
+    // 2026-07-26 修复：题目生成失败但前端误报"生成成功"的问题
+    // generateQuestions 对单题失败会返回占位 Question（question === "生成失败，点击重试"），
+    // 不抛错。原 API 路由不区分"全部成功 / 部分失败 / 全部失败"，统一以 200 返回，
+    // 前端无条件 toast.success("已生成 X 道题目")，误导用户。
+    // 现在统计失败题数并附在响应体里，让前端按情况显示分级提示：
+    //   - failedCount === 0 → 全部成功，正常 toast.success
+    //   - 0 < failedCount < total → 部分成功，toast.warning 提示可重试
+    //   - failedCount === total → 全部失败，toast.error 提示用户检查 API Key 或重试
+    const FAILED_SENTINEL = "生成失败，点击重试";
+    const failedCount = withoutAnswers.filter(
+      (q) => q.question === FAILED_SENTINEL,
+    ).length;
+    const successCount = withoutAnswers.length - failedCount;
+
+    const response = NextResponse.json({
+      questions: withoutAnswers,
+      failedCount,
+      successCount,
+      total: withoutAnswers.length,
+    });
     applyTrialHeaders(response, isTrial, trialRemaining);
     return response;
   } catch (error) {

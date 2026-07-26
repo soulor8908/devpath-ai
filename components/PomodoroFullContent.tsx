@@ -34,7 +34,13 @@ import {
   pauseSession,
   resumeSession,
   recoverInterruptedSession,
-  getRunningSession,
+  // 2026-07-26 修复：用 getActiveSession 替代 getRunningSession
+  // 原因：用户在 ring 小图长按暂停后，session.status 变为 "paused"，
+  // 切换到 expanded 全屏时 PomodoroFullContent 重新挂载并调用 init()，
+  // 旧代码用 getRunningSession() 只查 status="running"，paused 状态返回 null
+  // → PomodoroFullContent 进入 idle 视图，丢失暂停状态。
+  // 改用 getActiveSession() 同时查 running 和 paused，正确恢复 paused 视图。
+  getActiveSession,
   markSessionCurrent,
   POMODORO_SESSION_CHANGED_EVENT,
 } from "@/lib/timer/pomodoro";
@@ -170,9 +176,12 @@ export function PomodoroFullContent({
     if (recovered) {
       setRecoveryPrompt(recovered);
     }
-    const running = await getRunningSession();
+    // 2026-07-26 修复：用 getActiveSession 替代 getRunningSession
+    // 同时识别 running 和 paused 状态，避免暂停后切换到全屏时丢失暂停态
+    const running = await getActiveSession();
     if (running && !recovered) {
-      // 有进行中 session 且未超时：直接进入 running 视图
+      // 有进行中 session（running 或 paused）且未超时：直接进入 running 视图
+      // running 视图内部会根据 session.status 渲染"专注中 / 已暂停"两种子状态
       setSession(running);
       setView("running");
       setInterruptions(running.interruptions ?? 0);

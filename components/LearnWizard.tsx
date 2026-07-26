@@ -269,14 +269,40 @@ export function LearnWizard({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `请求失败 (${res.status})`);
       }
-      const data = (await res.json()) as { questions: Question[] };
+      const data = (await res.json()) as {
+        questions: Question[];
+        failedCount?: number;
+        successCount?: number;
+        total?: number;
+      };
       if (!data.questions || data.questions.length === 0) {
         throw new Error("AI 未返回题目，请重试");
       }
       setQuestions(data.questions);
-      toast.success(`已生成 ${data.questions.length} 道题目`);
+      // 2026-07-26 修复：根据 failedCount 显示分级提示
+      // 之前无条件 toast.success("已生成 X 道题目")，即使所有题目都是
+      // "生成失败，点击重试" 占位也提示成功，误导用户。
+      // 现在：全部成功 → success；部分失败 → warning；全部失败 → error
+      const failedCount = data.failedCount ?? 0;
+      const total = data.total ?? data.questions.length;
+      const successCount = data.successCount ?? total - failedCount;
+
+      if (failedCount === 0) {
+        toast.success(`已生成 ${total} 道题目`);
+      } else if (successCount > 0) {
+        // 部分失败：仍然进入 questions 步骤让用户看到失败题目（可点击"重新生成"）
+        toast.warning(
+          `已生成 ${successCount}/${total} 道题目，${failedCount} 道失败，可点击"重新生成"重试`,
+        );
+      } else {
+        // 全部失败：仍然进入 questions 步骤，让用户看到失败题目列表 + 重试按钮
+        // 不抛错让用户卡在原步骤，因为失败题目也需要展示出来让用户知道发生了什么
+        toast.error(
+          `全部 ${total} 道题目生成失败，请检查 AI 配置后点击"重新生成"`,
+        );
+      }
       setStep("questions");
-      setAITaskContent(aiTaskId, `已生成 ${data.questions.length} 道题目`);
+      setAITaskContent(aiTaskId, `已生成 ${successCount}/${total} 道题目`);
       completeAITask(aiTaskId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "未知错误";

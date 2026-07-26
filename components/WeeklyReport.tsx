@@ -11,6 +11,7 @@ import { aiFetch } from "@/lib/api-client";
 import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, TokenUsage } from "@/lib/types";
 import { KEY_PREFIXES } from "@/lib/types";
 import { Button } from "@/components/ui";
+import { AnswerContent } from "@/components/CodeBlock";
 import { toast } from "@/lib/toast";
 import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 import {
@@ -127,9 +128,14 @@ export function WeeklyReport({ learnLogs, reviewLogs, statuses }: Props) {
       </Button>
 
       {current && (
-        <div className="rounded-lg border p-4">
-          <h3 className="mb-2 font-semibold">本周报告（{current.weekStart} 起）</h3>
-          <pre className="whitespace-pre-wrap text-sm text-gray-700">{current.content}</pre>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">本周报告（{current.weekStart} 起）</h3>
+          {/* 2026-07-26 修复：周报用 Markdown 预览样式渲染，而不是 <pre> 显示源码 */}
+          {/* AnswerContent 内部支持标题/列表/引用/代码块/粗体/斜体/链接等 Markdown 语法 */}
+          <AnswerContent
+            text={current.content}
+            className="text-sm text-gray-700 dark:text-gray-300"
+          />
         </div>
       )}
 
