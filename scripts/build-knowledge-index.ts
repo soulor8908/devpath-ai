@@ -23,8 +23,25 @@ import type {
   KnowledgeIndexEntry,
   KnowledgeIndexManifest,
 } from "../lib/types";
-import { PRESETS } from "../lib/presets";
+import { PRESET_METAS, type PresetMeta } from "../lib/presets";
+import { FRONTEND_TO_AI_ENGINEER_PRESET } from "../lib/presets/frontend-to-ai-engineer";
+import { ALGORITHM_200_PRESET } from "../lib/presets/algorithm-200";
+import { FRONTEND_PRESET } from "../lib/presets/frontend";
+import { BACKEND_PRESET } from "../lib/presets/backend";
+import { AI_PRESET } from "../lib/presets/ai";
+import { LLM_APP_PRESET } from "../lib/presets/llm-app";
 import { DOC_SECTIONS } from "../lib/docs-content";
+
+// preset 数据已改为运行时 fetch JSON（v3，修复 Worker bundle > 3MB 部署失败），
+// 脚本直接 import TS 源模块（不走 fetch，保证索引源码内容）。
+const PRESET_DATA_RECORD: Record<string, Omit<PresetMeta, keyof typeof PRESET_METAS[number]>> = {
+  "frontend-to-ai-engineer": FRONTEND_TO_AI_ENGINEER_PRESET,
+  "algorithm-200": ALGORITHM_200_PRESET,
+  frontend: FRONTEND_PRESET,
+  backend: BACKEND_PRESET,
+  ai: AI_PRESET,
+  "llm-app": LLM_APP_PRESET,
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,11 +60,16 @@ const BATCH_SIZE = 50;
 // 构造索引条目（不含 vector）
 // ============================================================================
 
-function buildEntries(): KnowledgeIndexEntry[] {
+async function buildEntries(): Promise<KnowledgeIndexEntry[]> {
   const entries: KnowledgeIndexEntry[] = [];
 
-  // 1. 静态预设节点
-  for (const preset of PRESETS) {
+  // 1. 静态预设节点（v3：直接 import TS 源模块，不走 fetch）
+  for (const meta of PRESET_METAS) {
+    const data = PRESET_DATA_RECORD[meta.id];
+    if (!data) {
+      throw new Error(`buildEntries: preset ${meta.id} 缺少源数据`);
+    }
+    const preset: PresetMeta = { ...meta, ...data };
     for (const node of preset.knowledgeTree) {
       const searchText = `${node.title} ${node.summary}`.trim();
       entries.push({
@@ -220,7 +242,7 @@ async function main() {
   console.info(`[build-knowledge-index] 使用 ${provider.name}`);
 
   // 构造条目
-  const entries = buildEntries();
+  const entries = await buildEntries();
   console.info(`[build-knowledge-index] 共 ${entries.length} 条目待嵌入`);
 
   // 校验 id 唯一

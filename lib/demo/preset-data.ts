@@ -14,7 +14,6 @@
 import { getItem, setItem, listItems, delItem } from "@/lib/storage/db";
 import { savePlanSummary, deletePlanSummary } from "@/lib/plan-summary";
 import { createCard } from "@/lib/fsrs";
-import { FRONTEND_PRESET } from "@/lib/presets/frontend";
 import { KEY_PREFIXES } from "@/lib/types";
 import type { LearningPlan, ReviewCard, LearnLog } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
@@ -58,16 +57,22 @@ export async function shouldInjectDemo(): Promise<boolean> {
 export async function injectDemoData(): Promise<void> {
   if (typeof window === "undefined") return;
 
+  // 动态 import：避免静态 import FRONTEND_PRESET（13k 行）打进 Worker bundle
+  // 导致 Cloudflare Pages 部署失败（Worker bundle > 3MB 限制）。
+  // hasDemoData / clearDemoData / shouldInjectDemo 不需要 preset 数据，
+  // 只有本函数实际注入时才加载。
+  const { FRONTEND_PRESET: preset } = await import("@/lib/presets/frontend");
+
   const now = new Date().toISOString();
   const today = chinaDateNow();
 
   // 1. Demo 计划（基于 frontend preset）
   const plan: LearningPlan = {
     id: DEMO_PLAN_ID,
-    topic: FRONTEND_PRESET.topic,
-    knowledgeTree: FRONTEND_PRESET.knowledgeTree,
-    questions: FRONTEND_PRESET.questions,
-    schedule: FRONTEND_PRESET.schedule,
+    topic: preset.topic,
+    knowledgeTree: preset.knowledgeTree,
+    questions: preset.questions,
+    schedule: preset.schedule,
     dailyMinutes: 30,
     maxNewPerDay: 1,
     fsrsMode: "standard",
@@ -80,7 +85,7 @@ export async function injectDemoData(): Promise<void> {
   await savePlanSummary(plan);
 
   // 2. 3 张 FSRS 卡片（取前 3 道面试题）
-  const demoQuestions = FRONTEND_PRESET.questions.slice(0, 3);
+  const demoQuestions = preset.questions.slice(0, 3);
   for (let i = 0; i < demoQuestions.length; i++) {
     const q = demoQuestions[i];
     const card = createCard(

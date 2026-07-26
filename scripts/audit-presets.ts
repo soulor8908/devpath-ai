@@ -1,8 +1,26 @@
 /**
  * 预置知识库量化体检脚本（一次性审计工具，不进 CI）
  * 用法：npx tsx scripts/audit-presets.ts
+ *
+ * 注意：preset 数据已改为运行时 fetch JSON（v3，修复 Worker bundle > 3MB 部署失败），
+ * 脚本直接 import TS 源模块（不走 fetch，保证校验源码内容）。
  */
-import { PRESETS } from "../lib/presets";
+import { PRESET_METAS, type PresetMeta } from "../lib/presets";
+import { FRONTEND_TO_AI_ENGINEER_PRESET } from "../lib/presets/frontend-to-ai-engineer";
+import { ALGORITHM_200_PRESET } from "../lib/presets/algorithm-200";
+import { FRONTEND_PRESET } from "../lib/presets/frontend";
+import { BACKEND_PRESET } from "../lib/presets/backend";
+import { AI_PRESET } from "../lib/presets/ai";
+import { LLM_APP_PRESET } from "../lib/presets/llm-app";
+
+const PRESET_DATA_RECORD: Record<string, Omit<PresetMeta, keyof typeof PRESET_METAS[number]>> = {
+  "frontend-to-ai-engineer": FRONTEND_TO_AI_ENGINEER_PRESET,
+  "algorithm-200": ALGORITHM_200_PRESET,
+  frontend: FRONTEND_PRESET,
+  backend: BACKEND_PRESET,
+  ai: AI_PRESET,
+  "llm-app": LLM_APP_PRESET,
+};
 
 const FLAG_ANSWER_SHORT = 300; // 答案低于此字符数视为浅薄
 const FLAG_ANSWER_MIN = 80; // 低于此视为严重残缺
@@ -28,7 +46,7 @@ function median(nums: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-function auditPreset(p: (typeof PRESETS)[number]): PresetStats {
+function auditPreset(p: PresetMeta): PresetStats {
   const treeIds = new Set(p.knowledgeTree.map((n) => n.id));
   const answerLens = p.questions.map((q) => q.answer.length);
   const nodeQuestionCount = new Map<string, number>();
@@ -84,43 +102,53 @@ function auditPreset(p: (typeof PRESETS)[number]): PresetStats {
   };
 }
 
-const results = PRESETS.map(auditPreset);
+function main() {
+  const presets: PresetMeta[] = PRESET_METAS.map((meta) => {
+    const data = PRESET_DATA_RECORD[meta.id];
+    if (!data) throw new Error(`preset ${meta.id} 缺少源数据`);
+    return { ...meta, ...data };
+  });
 
-for (const r of results) {
-  console.log(`\n========== ${r.id} ==========`);
-  console.log(
-    `节点 ${r.nodes} | 题目 ${r.questions} | 题/节点 ${(r.questions / r.nodes).toFixed(1)}`,
-  );
-  console.log(
-    `答案长度: min=${r.answerLen.min} avg=${r.answerLen.avg} median=${r.answerLen.median} max=${r.answerLen.max}`,
-  );
-  console.log(
-    `严重残缺(<${FLAG_ANSWER_MIN}) ${r.severeShort.length} | 浅薄(<${FLAG_ANSWER_SHORT}) ${r.shallow.length} | 缺keyPoints ${r.missingKeyPoints.length} | 缺followUps ${r.missingFollowUps.length}`,
-  );
-  console.log(
-    `无题节点 ${r.nodesWithoutQuestions.length} | 孤儿题 ${r.orphanQuestions.length} | 重复题 ${r.duplicateQuestions.length} | 悬空前置 ${r.invalidPrereqs.length}`,
-  );
-  if (r.severeShort.length > 0) {
-    console.log(`  严重残缺: ${r.severeShort.map((s) => `${s.id}(${s.len})`).join(", ")}`);
-  }
-  if (r.nodesWithoutQuestions.length > 0) {
-    console.log(`  无题节点: ${r.nodesWithoutQuestions.join(", ")}`);
-  }
-  if (r.orphanQuestions.length > 0) {
-    console.log(`  孤儿题: ${r.orphanQuestions.join(", ")}`);
-  }
-  if (r.invalidPrereqs.length > 0) {
+  const results = presets.map(auditPreset);
+
+  for (const r of results) {
+    console.log(`\n========== ${r.id} ==========`);
     console.log(
-      `  悬空前置: ${r.invalidPrereqs.map((x) => `${x.node}→${x.prereq}`).join(", ")}`,
+      `节点 ${r.nodes} | 题目 ${r.questions} | 题/节点 ${(r.questions / r.nodes).toFixed(1)}`,
     );
+    console.log(
+      `答案长度: min=${r.answerLen.min} avg=${r.answerLen.avg} median=${r.answerLen.median} max=${r.answerLen.max}`,
+    );
+    console.log(
+      `严重残缺(<${FLAG_ANSWER_MIN}) ${r.severeShort.length} | 浅薄(<${FLAG_ANSWER_SHORT}) ${r.shallow.length} | 缺keyPoints ${r.missingKeyPoints.length} | 缺followUps ${r.missingFollowUps.length}`,
+    );
+    console.log(
+      `无题节点 ${r.nodesWithoutQuestions.length} | 孤儿题 ${r.orphanQuestions.length} | 重复题 ${r.duplicateQuestions.length} | 悬空前置 ${r.invalidPrereqs.length}`,
+    );
+    if (r.severeShort.length > 0) {
+      console.log(`  严重残缺: ${r.severeShort.map((s) => `${s.id}(${s.len})`).join(", ")}`);
+    }
+    if (r.nodesWithoutQuestions.length > 0) {
+      console.log(`  无题节点: ${r.nodesWithoutQuestions.join(", ")}`);
+    }
+    if (r.orphanQuestions.length > 0) {
+      console.log(`  孤儿题: ${r.orphanQuestions.join(", ")}`);
+    }
+    if (r.invalidPrereqs.length > 0) {
+      console.log(
+        `  悬空前置: ${r.invalidPrereqs.map((x) => `${x.node}→${x.prereq}`).join(", ")}`,
+      );
+    }
   }
+
+  // 汇总浅答题数量（用于修复工作量评估）
+  const totalShallow = results.reduce((s, r) => s + r.shallow.length, 0);
+  const totalSevere = results.reduce((s, r) => s + r.severeShort.length, 0);
+  const totalQ = results.reduce((s, r) => s + r.questions, 0);
+  console.log(`\n===== 汇总 =====`);
+  console.log(
+    `总题数 ${totalQ} | 严重残缺 ${totalSevere} | 浅薄 ${totalShallow} | 健康 ${totalQ - totalSevere - totalShallow}`,
+  );
 }
 
-// 汇总浅答题数量（用于修复工作量评估）
-const totalShallow = results.reduce((s, r) => s + r.shallow.length, 0);
-const totalSevere = results.reduce((s, r) => s + r.severeShort.length, 0);
-const totalQ = results.reduce((s, r) => s + r.questions, 0);
-console.log(`\n===== 汇总 =====`);
-console.log(
-  `总题数 ${totalQ} | 严重残缺 ${totalSevere} | 浅薄 ${totalShallow} | 健康 ${totalQ - totalSevere - totalShallow}`,
-);
+void main();

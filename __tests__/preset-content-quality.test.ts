@@ -23,7 +23,37 @@
 
 import { describe, it, expect } from "vitest";
 
-import { PRESETS } from "@/lib/presets";
+import { PRESET_METAS, type PresetMeta } from "@/lib/presets";
+import { FRONTEND_TO_AI_ENGINEER_PRESET } from "@/lib/presets/frontend-to-ai-engineer";
+import { ALGORITHM_200_PRESET } from "@/lib/presets/algorithm-200";
+import { FRONTEND_PRESET } from "@/lib/presets/frontend";
+import { BACKEND_PRESET } from "@/lib/presets/backend";
+import { AI_PRESET } from "@/lib/presets/ai";
+import { LLM_APP_PRESET } from "@/lib/presets/llm-app";
+
+// preset 数据改为运行时 fetch JSON 后（v3，修复 Worker bundle > 3MB 部署失败），
+// 测试直接 import TS 源模块：保证类型安全 + 校验源码内容（而非 fetch 产物）。
+// 测试只在 vitest（Node 环境）跑，不进客户端 bundle，不影响部署。
+const PRESET_DATA_RECORD: Record<string, Omit<PresetMeta, keyof typeof PRESET_METAS[number]>> = {
+  "frontend-to-ai-engineer": FRONTEND_TO_AI_ENGINEER_PRESET,
+  "algorithm-200": ALGORITHM_200_PRESET,
+  frontend: FRONTEND_PRESET,
+  backend: BACKEND_PRESET,
+  ai: AI_PRESET,
+  "llm-app": LLM_APP_PRESET,
+};
+
+const presets: PresetMeta[] = PRESET_METAS.map((meta) => {
+  const data = PRESET_DATA_RECORD[meta.id];
+  if (!data) throw new Error(`preset ${meta.id} 缺少源数据`);
+  return { ...meta, ...data };
+});
+
+if (presets.length !== PRESET_METAS.length) {
+  throw new Error(
+    `preset 加载不全：期望 ${PRESET_METAS.length} 个，实际 ${presets.length} 个`,
+  );
+}
 
 // ============ 阈值与占位符清单 ============
 
@@ -75,12 +105,12 @@ function findPlaceholder(text: string): string | null {
 }
 
 /** 收集一道题的所有可扫描文本字段 */
-function collectQuestionFields(q: (typeof PRESETS)[number]["questions"][number]): FieldToScan[] {
+function collectQuestionFields(q: PresetMeta["questions"][number]): FieldToScan[] {
   return [
     { field: "question", value: q.question },
     { field: "answer", value: q.answer },
-    ...q.keyPoints.map((kp, i) => ({ field: `keyPoints[${i}]`, value: kp })),
-    ...q.followUps.map((fu, i) => ({ field: `followUps[${i}]`, value: fu })),
+    ...q.keyPoints.map((kp: string, i: number) => ({ field: `keyPoints[${i}]`, value: kp })),
+    ...q.followUps.map((fu: string, i: number) => ({ field: `followUps[${i}]`, value: fu })),
   ];
 }
 
@@ -90,7 +120,7 @@ describe("preset 内容质量门禁", () => {
   describe("答案最小长度阈值", () => {
     it(`每道题答案 >= ${MIN_ANSWER_LENGTH} 字符（防浅薄，与 audit 浅薄线对齐）`, () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           if (q.answer.length < MIN_ANSWER_LENGTH) {
             offenders.push(
@@ -103,7 +133,7 @@ describe("preset 内容质量门禁", () => {
     });
 
     it("答案非空且去除空白后仍有内容", () => {
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           expect(q.answer.trim().length).toBeGreaterThan(0);
         }
@@ -114,7 +144,7 @@ describe("preset 内容质量门禁", () => {
   describe("keyPoints / followUps 必填", () => {
     it("每道题至少 1 条 keyPoint", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           if (q.keyPoints.length === 0) {
             offenders.push(`${preset.id}/${q.id}`);
@@ -126,7 +156,7 @@ describe("preset 内容质量门禁", () => {
 
     it("每道题至少 1 条 followUp", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           if (q.followUps.length === 0) {
             offenders.push(`${preset.id}/${q.id}`);
@@ -137,7 +167,7 @@ describe("preset 内容质量门禁", () => {
     });
 
     it("keyPoints / followUps 每条非空且去空白后仍有内容", () => {
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           for (const kp of q.keyPoints) {
             expect(kp.trim().length).toBeGreaterThan(0);
@@ -153,7 +183,7 @@ describe("preset 内容质量门禁", () => {
   describe("无占位符", () => {
     it("题目、答案、keyPoints、followUps 均不含占位符", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const q of preset.questions) {
           for (const { field, value } of collectQuestionFields(q)) {
             const hit = findPlaceholder(value);
@@ -172,7 +202,7 @@ describe("preset 内容质量门禁", () => {
   describe("nodeId 引用有效", () => {
     it("每道题的 nodeId 都存在于该 preset 的知识树", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         const treeIds = new Set(preset.knowledgeTree.map((n) => n.id));
         for (const q of preset.questions) {
           if (!treeIds.has(q.nodeId)) {
@@ -186,7 +216,7 @@ describe("preset 内容质量门禁", () => {
 
   describe("题目 id 唯一", () => {
     it("每个 preset 内题目 id 全局唯一", () => {
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         const ids = preset.questions.map((q) => q.id);
         const unique = new Set(ids);
         expect(unique.size).toBe(ids.length);
@@ -195,7 +225,7 @@ describe("preset 内容质量门禁", () => {
 
     it("跨 preset 题目 id 也唯一（防 id 冲突污染收藏/复习）", () => {
       const allIds: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         allIds.push(...preset.questions.map((q) => q.id));
       }
       const unique = new Set(allIds);
@@ -205,7 +235,7 @@ describe("preset 内容质量门禁", () => {
 
   describe("题面不重复", () => {
     it("每个 preset 内题面不重复（trim + 大小写不敏感）", () => {
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         const seen = new Map<string, number>();
         for (const q of preset.questions) {
           const key = q.question.trim().toLowerCase();
@@ -221,14 +251,14 @@ describe("preset 内容质量门禁", () => {
     it("知识树节点的 prerequisites 在全局节点集中存在或为跨轨道前置", () => {
       // 跨 preset 的全局节点 id 集合（允许跨轨道引用前置）
       const globalNodeIds = new Set<string>();
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           globalNodeIds.add(n.id);
         }
       }
       // 策展轨道（frontend-to-ai-engineer）的前置可能是同轨道或外部节点
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         const localIds = new Set(preset.knowledgeTree.map((n) => n.id));
         for (const n of preset.knowledgeTree) {
           for (const pre of n.prerequisites) {
@@ -254,7 +284,7 @@ describe("preset 内容质量门禁", () => {
   describe("深度字段达标（v4，节点若带深度字段必须达标）", () => {
     it("coreMechanism 若存在，长度 >= 50 字符且不含占位符", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           const cm = n.coreMechanism;
           if (cm === undefined) continue; // 可选字段，未提供不报错
@@ -274,7 +304,7 @@ describe("preset 内容质量门禁", () => {
 
     it("commonPitfalls 若存在，至少 2 条且每条带具体场景（>= 10 字符）", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           const cp = n.commonPitfalls;
           if (cp === undefined) continue;
@@ -303,7 +333,7 @@ describe("preset 内容质量门禁", () => {
 
     it("interviewAngles 若存在，必须正好 4 条（对应四角度）且每条非空", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           const ia = n.interviewAngles;
           if (ia === undefined) continue;
@@ -330,7 +360,7 @@ describe("preset 内容质量门禁", () => {
 
     it("sourceHint 若存在，长度 >= 5 字符且不含占位符", () => {
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           const sh = n.sourceHint;
           if (sh === undefined) continue;
@@ -356,7 +386,7 @@ describe("preset 内容质量门禁", () => {
         "sourceHint",
       ] as const;
       const offenders: string[] = [];
-      for (const preset of PRESETS) {
+      for (const preset of presets) {
         for (const n of preset.knowledgeTree) {
           const present = DEPTH_FIELDS.filter((f) => n[f] !== undefined).length;
           // 允许 0 个（旧节点）或 4 个（完整深度节点），不允许 1-3 个（凑数）

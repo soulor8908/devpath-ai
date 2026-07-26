@@ -40,10 +40,32 @@ import { apiFetch } from "@/lib/api-client";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
 import type { PortfolioEntry, PublicProfile } from "@/lib/types";
-import type { CurriculumGraph } from "@/lib/types/curriculum";
-import rawGraph from "@/public/data/curriculum-graph.json";
+import type { CurriculumGraph, SkillNode } from "@/lib/types/curriculum";
 
-const graph = rawGraph as unknown as CurriculumGraph;
+// 改为运行时 fetch（避免静态 import 把 568KB JSON 打进客户端 bundle，
+// 修复 Cloudflare Pages 部署失败：Worker bundle 总大小超 3MB 限制）
+// graph.json 是 public/data/ 下的静态资源，部署后直接 fetch 即可。
+let graphCache: CurriculumGraph | null = null;
+async function loadGraph(): Promise<CurriculumGraph> {
+  if (graphCache) return graphCache;
+  const res = await fetch("/data/curriculum-graph.json");
+  if (!res.ok) {
+    throw new Error(`加载课程图谱失败: ${res.status}`);
+  }
+  graphCache = (await res.json()) as CurriculumGraph;
+  return graphCache;
+}
+
+// 兼容原 `graph.nodes.find(...)` 调用的轻量查找函数
+async function findNode(nodeId: string): Promise<SkillNode | undefined> {
+  const g = await loadGraph();
+  return g.nodes.find((n) => n.id === nodeId);
+}
+
+async function getAllNodes(): Promise<SkillNode[]> {
+  const g = await loadGraph();
+  return g.nodes;
+}
 
 type LoadState =
   | { kind: "loading" }
@@ -55,6 +77,18 @@ export default function PortfolioManagementPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<PortfolioEntry | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
+  // 节点列表供 PortfolioEditorModal 使用，按需 async 加载（避免静态 import 大 JSON）
+  const [allNodes, setAllNodes] = useState<SkillNode[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAllNodes().then((nodes) => {
+      if (!cancelled) setAllNodes(nodes);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function refresh() {
     try {
@@ -130,7 +164,7 @@ export default function PortfolioManagementPage() {
       toast.success("已发布到云端");
 
       // 若关联节点是 V4 验证等级，记录 V4 通过 → 节点状态机到顶
-      const node = graph.nodes.find((n) => n.id === entry.nodeId);
+      const node = await findNode(entry.nodeId);
       if (node && node.masteryCheck?.level === "V4") {
         try {
           await recordVerificationResult(node, "V4", {
@@ -337,7 +371,7 @@ export default function PortfolioManagementPage() {
       <PortfolioEditorModal
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        nodes={graph.nodes}
+        nodes={allNodes}
         entry={editingEntry}
         onSubmit={handleSubmit}
       />

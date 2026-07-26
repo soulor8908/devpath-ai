@@ -1,9 +1,12 @@
 /**
  * 旗舰轨道 preset 集成测试：
- * 策展图谱（编译产物）→ preset → PRESETS / CAREER_PATHS 注册链路全量校验
+ * 策展图谱（编译产物）→ preset → PRESET_METAS / CAREER_PATHS 注册链路全量校验
  *
  * 这是 L1 内容层与 L4 交付层的接缝测试：
  * 保证 onboarding 职业卡、预设选择、计划生成、脑图、FSRS 能零改动消费策展内容。
+ *
+ * 注意：preset 数据已改为运行时 fetch JSON（v3，修复 Worker bundle > 3MB 部署失败），
+ * 测试直接 import TS 源模块，不走 fetch，保证校验源码内容。
  */
 import { describe, expect, it } from "vitest";
 
@@ -11,23 +14,30 @@ import rawGraph from "@/public/data/curriculum-graph.json";
 import type { CurriculumGraph } from "@/lib/types";
 import { computePath } from "@/lib/curriculum/path-engine";
 import {
-  getPresetById,
   matchPresetByTopic,
-  PRESETS,
+  PRESET_METAS,
+  type PresetMeta,
 } from "@/lib/presets";
 import { CAREER_PATHS } from "@/lib/onboarding/career-paths";
-import { CURRICULUM_TRACK_ID } from "@/lib/presets/frontend-to-ai-engineer";
+import {
+  CURRICULUM_TRACK_ID,
+  FRONTEND_TO_AI_ENGINEER_PRESET,
+} from "@/lib/presets/frontend-to-ai-engineer";
 
 const graph = rawGraph as unknown as CurriculumGraph;
-const preset = getPresetById(CURRICULUM_TRACK_ID);
 const trackNodes = graph.nodes.filter((n) =>
   n.tracks.includes(CURRICULUM_TRACK_ID),
 );
 
+// 测试直接 import TS 源模块（不走 fetch），校验源码内容
+const presetMeta = PRESET_METAS.find((m) => m.id === CURRICULUM_TRACK_ID);
+if (!presetMeta) throw new Error(`PRESET_METAS 缺少 ${CURRICULUM_TRACK_ID}`);
+const preset: PresetMeta = { ...presetMeta, ...FRONTEND_TO_AI_ENGINEER_PRESET };
+
 describe("preset 注册", () => {
-  it("已在 PRESETS 中注册且可查询", () => {
+  it("已在 PRESET_METAS 中注册且可加载", () => {
     expect(preset).toBeDefined();
-    expect(PRESETS.some((p) => p.id === CURRICULUM_TRACK_ID)).toBe(true);
+    expect(PRESET_METAS.some((p) => p.id === CURRICULUM_TRACK_ID)).toBe(true);
   });
 
   it("topic 精确匹配可命中", () => {
@@ -46,7 +56,7 @@ describe("职业卡注册", () => {
     const card = CAREER_PATHS.find((c) => c.id === CURRICULUM_TRACK_ID);
     expect(card).toBeDefined();
     expect(CAREER_PATHS[0].id).toBe(CURRICULUM_TRACK_ID);
-    expect(getPresetById(card!.linkedPresetId)).toBeDefined();
+    expect(PRESET_METAS.some((p) => p.id === card!.linkedPresetId)).toBe(true);
   });
 
   it("职业卡每日分钟数与 preset 排程假设一致", () => {
@@ -63,7 +73,7 @@ describe("knowledgeTree 与策展图谱一致性", () => {
 
   it("拓扑序合法：所有前置节点出现在依赖者之前", () => {
     const order = preset!.knowledgeTree.map((n) => n.id);
-    const position = new Map(order.map((id, i) => [id, i]));
+    const position = new Map(order.map((id, i) => [id, i] as const));
     for (const node of trackNodes) {
       for (const pre of node.prerequisites) {
         if (!position.has(pre)) continue; // 跨轨道前置不在本树中

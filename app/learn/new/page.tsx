@@ -16,7 +16,7 @@ import Link from "next/link";
 import { setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES, type LearningPlan, type KnowledgeNode, type Question, type ScheduleItem, type PromptLibraryItem } from "@/lib/types";
-import { PRESETS, type PresetMeta, matchPresetByTopic } from "@/lib/presets";
+import { PRESET_METAS, type PresetMeta, type PresetMetaInfo, matchPresetByTopic, loadPresetData } from "@/lib/presets";
 import { MindMap } from "@/components/MindMap";
 import {
   listPrompts,
@@ -135,6 +135,20 @@ export default function LearnNewPage() {
     setSelectedNodeId(undefined);
   }
 
+  // 点击预设卡片：按需异步加载完整数据后打开弹窗
+  // PRESET_METAS 只含元信息（无 knowledgeTree/questions/schedule），
+  // 必须先 await loadPresetData 拉取重数据 chunk，再交给 openPreset
+  async function openPresetById(p: PresetMetaInfo) {
+    setLoading(true);
+    const data = await loadPresetData(p.id);
+    if (data) {
+      openPreset(data);
+    } else {
+      setError("加载预设失败，请重试");
+    }
+    setLoading(false);
+  }
+
   function closePreset() {
     setActivePreset(null);
     setPresetData(null);
@@ -229,18 +243,24 @@ export default function LearnNewPage() {
     e.preventDefault();
     if (!topic.trim()) return;
 
-    // 精确匹配预设 → 立即打开预设弹窗（零等待，预设数据秒开）
+    // 精确匹配预设 → 异步加载完整数据后打开弹窗
     // 无匹配 → 进入 LearnWizard 渐进式向导（拆知识点 → 题目 → 答案 → 计划）
-    const matched = matchPresetByTopic(topic.trim());
-    if (matched) {
-      const customizedPreset: PresetMeta = {
-        ...matched,
-        topic: topic.trim(),
-      };
-      openPreset(customizedPreset);
-      setError("");
-      setLoading(false);
-      return;
+    const matchedMeta = matchPresetByTopic(topic.trim());
+    if (matchedMeta) {
+      // 匹配到预设元信息 → 异步加载完整数据
+      setLoading(true);
+      const data = await loadPresetData(matchedMeta.id);
+      if (data) {
+        const customizedPreset: PresetMeta = {
+          ...data,
+          topic: topic.trim(),
+        };
+        openPreset(customizedPreset);
+        setError("");
+        setLoading(false);
+        return;
+      }
+      // 加载失败 → 继续走向导流程
     }
 
     // 无匹配预设 → 进入渐进式向导（取代旧版 /api/learn 全量生成）
@@ -480,22 +500,22 @@ export default function LearnNewPage() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
             <Icon name="package" className="w-4 h-4" />
-            内置知识库（{PRESETS.length} 个方向）
+            内置知识库（{PRESET_METAS.length} 个方向）
           </h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">秒级加载 · 可重新生成</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PRESETS.map((p) => (
+          {PRESET_METAS.map((p) => (
             <div
               key={p.id}
               role="button"
               tabIndex={0}
               aria-label={`打开内置知识库：${p.name}`}
-              onClick={() => openPreset(p)}
+              onClick={() => openPresetById(p)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  openPreset(p);
+                  openPresetById(p);
                 }
               }}
               className="group cursor-pointer text-left p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-card dark:hover:shadow-gray-900/30 rounded-card transition-all flex flex-col w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
@@ -528,11 +548,11 @@ export default function LearnNewPage() {
               <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
                 <span className="flex items-center gap-0.5">
                   <Icon name="book" className="w-3 h-3" />
-                  {p.knowledgeTree.length} 知识点
+                  {p.knowledgeNodeCount} 知识点
                 </span>
                 <span className="flex items-center gap-0.5">
                   <Icon name="list" className="w-3 h-3" />
-                  {p.questions.length} 题
+                  {p.questionCount} 题
                 </span>
               </div>
             </div>

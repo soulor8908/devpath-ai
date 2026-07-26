@@ -9,13 +9,13 @@
 //   - API Key 在第一次需要 AI 生成时再提示，不堵在门口
 //   - 跳转 /train 而不是 /learn，立即进入沉浸式训练
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setItem, set as dbSet } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type CareerPath as CareerPathType, type CareerPathNode } from "@/lib/types";
 import { CAREER_PATHS, getCareerPathNodes } from "@/lib/onboarding/career-paths";
-import { getPresetById } from "@/lib/presets";
+import { PRESET_METAS, loadPresetData } from "@/lib/presets";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
@@ -46,7 +46,7 @@ export default function OnboardingPage() {
       }
 
       const now = new Date().toISOString();
-      const preset = getPresetById(selectedPath.linkedPresetId);
+      const preset = await loadPresetData(selectedPath.linkedPresetId);
       const plan: LearningPlan = {
         id: nanoid(),
         topic: selectedPath.title,
@@ -72,12 +72,25 @@ export default function OnboardingPage() {
     }
   }
 
-  // 从 preset 动态获取路径预览节点（必须在条件 return 之前调用 hooks）
-  const previewNodes: CareerPathNode[] = useMemo(() => {
-    if (!selectedPath) return [];
-    const preset = getPresetById(selectedPath.linkedPresetId);
-    if (!preset) return [];
-    return getCareerPathNodes(selectedPath, preset.knowledgeTree);
+  // 从 preset 动态获取路径预览节点（异步按需加载，避免把全部 preset 打进主 bundle）
+  const [previewNodes, setPreviewNodes] = useState<CareerPathNode[]>([]);
+  useEffect(() => {
+    if (!selectedPath) {
+      setPreviewNodes([]);
+      return;
+    }
+    let cancelled = false;
+    loadPresetData(selectedPath.linkedPresetId).then((preset) => {
+      if (cancelled) return;
+      if (!preset) {
+        setPreviewNodes([]);
+        return;
+      }
+      setPreviewNodes(getCareerPathNodes(selectedPath, preset.knowledgeTree));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedPath]);
 
   // 第一步：3 选 1
@@ -118,7 +131,7 @@ export default function OnboardingPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Icon name="target" className="w-3 h-3" />
-                      {getPresetById(path.linkedPresetId)?.knowledgeTree.length ?? 0} 个知识点
+                      {PRESET_METAS.find((m) => m.id === path.linkedPresetId)?.knowledgeNodeCount ?? 0} 个知识点
                     </span>
                     <span className="flex items-center gap-1">
                       <Icon name="calendar" className="w-3 h-3" />

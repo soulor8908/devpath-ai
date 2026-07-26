@@ -18,6 +18,7 @@
     "audit": "cat docs/code-audit-methodology.md",
     "prepare": "husky",
     "build:knowledge-index": "tsx scripts/build-knowledge-index.ts",
+    "presets:export": "tsx scripts/export-presets.ts",
     "content:compile": "tsx scripts/compile-content.ts",
     "content:validate": "tsx scripts/compile-content.ts --check",
     "content:freshness": "tsx scripts/audit-source-freshness.ts"

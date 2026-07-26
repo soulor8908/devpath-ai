@@ -1,5 +1,5 @@
 import type { LoadedCurriculum } from "@/lib/curriculum/loader";
-import { ContentLoadError } from "@/lib/curriculum/loader";
+import { ContentLoadError } from "@/lib/curriculum/content-load-error";
 import type {
   CurriculumGraph,
   SourceTier,
