@@ -58,7 +58,7 @@ npx wrangler pages secret put MASTER_KEY --project-name=devpath-ai
 ## 测试
 
 ```bash
-# 全部单测（758+ 用例 / 67 个测试文件）
+# 全部单测（986 用例 / 77 个测试文件）
 npm test
 
 # 监听模式
@@ -371,6 +371,131 @@ lib/ai/rhythm-engine.ts
 | `maybeRunHealthCheck` | `lib/ai/plan-health.ts` | 当日只跑一次，检查计划健康 |
 
 > 所有后台任务失败静默，不阻塞 UI。
+
+## 课程内容开发（L1 内容层）
+
+DevPath 的知识库不是数据库行，是仓库里的 YAML 代码（Content-as-Code）。详见 [docs/curriculum-content.md](file:///workspace/docs/curriculum-content.md)。
+
+### 仓库布局
+
+```
+content/
+├── graph/
+│   ├── tracks/                  # 学习轨道（一条轨道 = 一条转型路径）
+│   │   └── frontend-to-ai-engineer.yaml
+│   └── nodes/                   # 技能节点（一个节点一个文件）
+│       ├── llm.tokens-and-context.yaml
+│       ├── rag.chunking-strategies.yaml
+│       └── ... (49 个)
+├── sources/registry.yaml        # 权威来源登记处（URL/类型/等级/最后验证日期）
+├── labs/                        # 可运行代码实验
+├── projects/                    # 项目制课程的脚手架 + 评分细则（Rubric）
+└── reviews/                     # 内容审校记录
+```
+
+### 添加新的技能节点
+
+1. 在 `content/graph/nodes/` 新建 `<domain>.<topic>.yaml`
+2. 必填字段（zod schema 强制，缺一不可）：
+   - `id` / `title` / `track` / `phase`
+   - `prerequisites`（前置节点 id 列表）
+   - `authoritative_sources`（≥2 条，至少 1 条 T0-T1 级）
+   - `concepts` / `gotchas` / `interview`
+   - `mastery_check`（V1-V4 验证方式）
+   - `status`（draft → reviewed → authoritative）/ `reviewers` / `last_verified`
+3. 运行校验：
+
+```bash
+npm run content:validate     # zod schema + G1-G7 图谱规则
+npm run content:freshness    # 来源 URL 可达性 + 最后验证日期
+```
+
+4. 编译产物：
+
+```bash
+npm run content:compile      # → public/data/curriculum-graph.json
+```
+
+### G1-G7 图谱规则（CI 强制）
+
+| 规则 | 含义 |
+|---|---|
+| G1 | 前置节点必须在图谱中存在 |
+| G2 | 节点必须挂载 ≥1 条已登记的权威来源 |
+| G3 | 至少 1 条来源为 T0 或 T1 等级 |
+| G4 | 图谱无环（拓扑排序可跑通） |
+| G5 | 节点 phase 必须在所属 track 的合法阶段内 |
+| G6 | V3 / V4 验证节点必须挂 Rubric |
+| G7 | track 内所有节点权重之和 = 100 |
+
+### 添加新的预置学习计划（preset）
+
+> **重要**：preset TS 源文件不再进 Worker bundle（避免 Cloudflare Pages 3MB 限制）。运行时通过 `fetch('/data/presets/{id}.json')` 加载。
+
+1. 在 `lib/presets/` 新建 `<id>.ts`，导出 `<ID>_PRESET: PresetMeta`（含 `topic` / `knowledgeTree` / `questions` / `schedule`）
+2. 在 `lib/presets/index.ts` 的 `PRESET_METAS` 添加元信息条目（轻量，< 2KB，安全打进客户端 bundle）：
+   ```ts
+   {
+     id: "<id>",
+     name: "...",
+     icon: "...",
+     description: "...",
+     tags: [...],
+     topic: "...",  // 必须与 TS 文件里的 topic 字段一致
+     knowledgeNodeCount: N,
+     questionCount: M,
+   }
+   ```
+3. 导出 JSON 产物：
+
+```bash
+npm run presets:export       # → public/data/presets/<id>.json
+```
+
+4. 客户端用 `loadPresetData(id)` 异步加载完整数据；用 `matchPresetByTopic(topic)` 同步匹配元信息
+
+### 知识库向量搜索
+
+- `lib/knowledge/index-store.ts` — 加载 `public/data/knowledge-index.json`（500 条 × 768 维 BGE 嵌入，构建期预嵌入）
+- `lib/knowledge/search.ts` — `searchKnowledge(query, topK)` 余弦相似度 top-k + 关键词降级 + 启发式判定（命令型前缀不检索）
+- 构建索引：
+
+```bash
+npm run build:knowledge-index  # → public/data/knowledge-index.json
+```
+
+## PWA Service Worker 开发
+
+- `public/sw.js` — Service Worker 注册入口
+- 缓存策略：
+  - 静态资源（JS / CSS / 字体）：stale-while-revalidate
+  - API 路由：不缓存（避免脏数据）
+  - HTML：network-first，降级到缓存
+- Web Push 推送（VAPID）：
+  - `lib/push/subscription.ts` — 订阅管理
+  - `app/api/push/subscribe/route.ts` — 订阅端点
+  - `app/api/push/send/route.ts` — 服务端推送（到期复习 + 断卡回归）
+- `periodicsync` 事件：后台检查到期卡片，触发推送通知
+
+## 性能优化（已完成 + 持续）
+
+详见 [docs/perf-optimization-methodology.md](file:///workspace/docs/perf-optimization-methodology.md)。
+
+### 已完成优化
+
+- **Worker bundle 体积**：preset 数据从静态 import 改为运行时 fetch JSON（13MB → 6.5MB），并拆分 recharts-vendor / ai-sdk-vendor chunk
+- **首屏懒加载**：`FloatingChat` / `PomodoroWidget` / `AITaskModal` / `HeatmapContent` 全部改为 `dynamic(() => import(...), { ssr: false })`
+- **路由级 loading**：所有主要路由加 `loading.tsx` + 统一 `RouteLoading` 骨架屏
+- **统一组件**：`ProgressBar` / `LoadingScreen` / `RouteLoading` 替代多处内联实现
+- **工具函数抽取**：`formatISODate` / `formatCountdown` / `formatDuration` 等通用函数统一到 `lib/time.ts` / `lib/timer/format.ts`
+- **optimizePackageImports**：recharts / date-fns / @ai-sdk/openai / zod / nanoid / ts-fsrs / react-activity-calendar 按需导入
+- **热力图 SVG 修复**：`renderBlock` 用 `cloneElement` 给原 SVG rect 加事件，禁止 div 包裹（破坏 SVG 渲染）
+
+### 性能基线
+
+```bash
+npm run test:perf     # 性能基准测试
+```
 
 ## 代码风格
 

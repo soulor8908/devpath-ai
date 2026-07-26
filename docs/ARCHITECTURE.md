@@ -1,8 +1,95 @@
 # devpath-ai 架构文档
 
-> 面向开发者：理解 DevPath 的分层、数据流、关键设计决策、AI-Native 架构。
+> 面向开发者：理解 DevPath 的产品分层、运行时分层、数据流、关键设计决策、AI-Native 架构。
 
-## 分层架构
+## 产品四层架构（L1-L4）
+
+DevPath 不是单一学习工具，而是从内容到交付的完整转型系统。四层架构互为支撑：内容是护城河、路径是个性化、验证是闭环证据、交付解决坚持与记忆。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  L4 交付层（已有，保留并增强）                                       │
+│  FSRS 复习 · 番茄钟 · 节奏引擎 · 优先级引擎 · 能量回归 · 情绪 · 成就 │
+│  PWA Service Worker（stale-while-revalidate + Web Push + periodicsync）│
+│  → 职责：解决"坚持"和"记忆"                                         │
+├─────────────────────────────────────────────────────────────────┤
+│  L3 验证层（V1-V4 能力证据链）                                       │
+│  V1 FSRS 卡片（理解）→ V2 沙箱代码题（应用）→                       │
+│  V3 项目检查点（AI 按 Rubric 审 GitHub 仓库）→ V4 作品集发布（交付） │
+│  L4 作品集：/portfolio 草稿/发布/同步 + 二维码分享；/u/[user]/portfolio │
+│  → 职责：解决"学会了吗"的客观验证                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  L2 路径引擎（个性化最短路径）                                       │
+│  技能图谱 + 拓扑排序（Kahn 算法，同层按 phase/id 字典序确定性产物）   │
+│  + 迁移映射 + 跳过已掌握节点 + 时间约束分配                          │
+│  → 职责：解决"下一步学什么"                                         │
+├─────────────────────────────────────────────────────────────────┤
+│  L1 内容层（Content-as-Code 护城河）                                 │
+│  content/graph/nodes/*.yaml（49 节点）+ tracks/ + sources/registry  │
+│  + labs/ + projects/ + reviews/（版本化、可审查）                    │
+│  三层质量门禁：zod schema + G1-G7 图谱规则 + 成分权威体系            │
+│  → 职责：解决"学什么"和"凭什么信你"                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### L1 内容层关键设计
+
+- **Content-as-Code**：知识库不是数据库行，是仓库里的 YAML 代码。`content/graph/nodes/*.yaml` 49 个技能节点（覆盖 LLM / RAG / Agent / 工程 / Python / Prompt 等九大类），每个节点必须挂载 ≥2 条 T0-T2 级权威来源（官方文档 / 论文 / 经典源码 / 一线工程博客），不允许 LLM 即兴生成
+- **权威来源等级**：T0 一手规范（官方文档/论文） / T1 一手实现（经典源码/Cookbook） / T2 权威工程实践（一线从业者深度文章） / T3 二手解读（仅作补充，不可单独支撑节点）
+- **三层质量门禁**：
+  - 结构层：`lib/curriculum/schema.ts` zod schema 强制字段完整
+  - 图谱层：G1-G7 规则（前置存在 / 来源已登记 / ≥1 T0-T1 / 无环 / 轨道阶段合法 / V3-V4 必挂 Rubric / 权重=100）
+  - 成分层：权威体系 / 教学完备 / 路径引擎端到端可跑
+- **内容生产管线**：AI 起草（读 T0/T1 来源）→ 自动校验（CI 跑 schema + 来源可达性 + 代码实验可运行）→ 人工审校（领域专家 review）→ 合并入库（带 reviewer 签名）→ 持续保鲜（每季度重新验证来源有效性）
+- **6 个预置学习计划**：frontend-to-ai-engineer（旗舰，49 节点派生自策展图谱）/ algorithm-200（LeetCode 200 题）/ frontend / backend / ai / llm-app
+- **运行时加载**：preset TS 源文件不再进 Worker bundle（避免 Cloudflare Pages 3MB 限制），由 `scripts/export-presets.ts` 导出为 `public/data/presets/{id}.json`，运行时 `loadPresetData(id)` 用 `fetch()` 按需加载
+- **知识库向量搜索**：500 条 × 768 维 BGE 嵌入（构建期预嵌入，运行时只嵌查询文本），余弦相似度 top-k + 关键词降级 + 启发式判定（命令型前缀不检索）
+
+### 零信任 session（安全架构）
+
+```
+客户端                                     Cloudflare Edge
+  │                                              │
+  ├─ 1. POST /api/auth/exchange                  │
+  │     { apiKey, modelId }                      │
+  │                                              │
+  │                                              ├─ 2. AES-GCM 加密 apiKey
+  │                                              │     → KV session:{id}
+  │                                              │   HMAC-SHA256 签名
+  │                                              │     → 返回 sessionToken
+  │  3. 收到 sessionToken                         │
+  │     + nonce（5min TTL，一次性消费）            │
+  │     + 时间窗 ±60s                             │
+  ↓                                              ↓
+  每次 AI 调用：                                   │
+  ┌──────────────────────────────────────────────┘
+  │ Authorization: Bearer <sessionToken>:<nonce>
+  │ X-Timestamp: <unix-ms>
+  ├─ 服务端校验：
+  │  - HMAC 签名匹配
+  │  - nonce 未消费过（KV nonce:{nonce} TTL 5min）
+  │  - timestamp 在 ±60s 窗口内
+  │  - session 未过期（滑动续期 7d）
+  ├─ 校验通过 → 解密 apiKey → 调 AI → 返回响应
+  └─ 消费 nonce（一次性）
+```
+
+关键文件：
+- `lib/auth/session.ts` — AES-GCM 加密 / HMAC 签名 / nonce 生成
+- `lib/auth/server.ts` — 服务端校验链
+- `app/api/auth/exchange/route.ts` — apiKey → sessionToken 交换
+- `lib/storage/kv.ts` — session / nonce / 审计 4 个独立 KV namespace
+
+旧用户首次访问检测：有 `modelConfig.apiKey` 但无 session → 显示升级提示，引导重新 exchange。
+
+### PWA Service Worker
+
+- `public/sw.js` — stale-while-revalidate 缓存策略（API 不缓存，静态资源 CDN 优先）
+- Web Push 推送：到期复习提醒 + 断卡回归提醒（VAPID keys）
+- `periodicsync` 事件：后台检查到期卡片，触发推送通知
+- 安装提示：满足 PWA criteria 后自动提示添加到主屏
+
+## 运行时分层架构
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -284,22 +371,22 @@ buildProfileContext(profile) → ≤500 字符文本
 | **成本控制** | 场景化配额 + 用户自带 Key 跳过 + 节奏引擎不消耗 AI + token 用量追踪 + USD 成本估算 + 仪表盘可视化 | ★★★★★ |
 | **可观测性** | AI 质量看板 + 失败模式聚类 + prompt 版本归因 | ★★★★☆ |
 | **个性化** | Persona + 画像驱动计划生成 + 跳过已掌握节点 | ★★★★☆ |
-| **增量学习** | 能量回归模型在线训练，但画像是批量重建 | ★★☆☆☆ |
+| **增量学习** | 能量回归模型在线训练，但画像是批量重建（averageSessionMinutes / accuracy 已增量） | ★★★☆☆ |
 | **多模型编排** | 单模型 per call，无 fallback 链 | ★☆☆☆☆ |
-| **语义检索** | 无，知识查询全靠 ID 索引 | ★☆☆☆☆ |
+| **语义检索** | 500 条 × 768 维 BGE 嵌入向量搜索 + 关键词降级 + 启发式判定 | ★★★☆☆ |
 
 ### 优化方向
 
 1. **~~AI 调用成本追踪~~（P0 ✅ 已完成 2025-11）**：从 Vercel AI SDK data stream 协议解析 token usage，按模型定价表（`MODEL_PRICING`）估算 USD 成本，仪表盘展示 Token 总量 + 估算成本 + 场景级聚合。详见 `lib/ai/quality-tracker.ts` 的 `estimateCost()` / `parseUsageFromFinishMessage()`
-2. **模型 fallback 链**（P1）：主模型超时/失败时自动降级到备选模型（如 GLM → DeepSeek）
-3. **画像增量更新**（P1）：高频维度（averageSessionMinutes / weakAreas）事件驱动更新，低频维度（skillLevel）保持 24h 批量
-4. **Prompt A/B 测试**（P2）：同一场景同时跑两个 prompt 版本，对比采纳率自动选优
-5. **语义搜索**（P2）：对知识节点 summary 做向量化，支持「我想学 X」的模糊匹配
+2. **~~知识库向量搜索~~（P1 ✅ 已完成 2026-07）**：500 条 × 768 维 BGE 嵌入向量搜索 + 关键词降级 + 启发式判定（命令型前缀不检索）。详见 `lib/knowledge/`
+3. **模型 fallback 链**（P1）：主模型超时/失败时自动降级到备选模型（如 GLM → DeepSeek）
+4. **~~画像增量更新~~（P1 ✅ 部分完成 2026-07）**：高频维度（averageSessionMinutes / accuracy）已事件驱动增量更新，低频维度（skillLevel / weakAreas）保持 24h 批量
+5. **Prompt A/B 测试**（P2）：同一场景同时跑两个 prompt 版本，对比采纳率自动选优
 6. **成本追踪扩展到非流式路由**（P1）：目前仅 `/api/chat` 接入成本追踪，扩展到 `/api/daily-nudge` / `/api/learn` / `/api/weekly-report` 等非流式路由
 
 ## 测试策略
 
-- **Vitest 单测**（786 用例 / 70 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / no-native-form-elements 守护 / ui-design-system-guard 守护 / pomodoro-widget-no-modal 守护 / mindmap-question-stats 守护 / nav-icon-only 守护 等核心模块
+- **Vitest 单测**（986 用例 / 77 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / curriculum 图谱规则 / preset 内容质量 / no-native-form-elements 守护 / ui-design-system-guard 守护 / pomodoro-widget-no-modal 守护 / mindmap-question-stats 守护 / nav-icon-only 守护 / heatmap SVG 渲染守护 等核心模块
 - **Playwright E2E**：主流程（首页 → 学习 → 复习 → 我的；浮动按钮打开 AI 对话）+ Demo 注入/清除
 - **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint、UI 设计系统守护测试（原生表单元素 / dark 配对 / 逃逸值）
 
