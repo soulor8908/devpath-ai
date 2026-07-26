@@ -1,0 +1,268 @@
+[
+  {
+    "id": "fe-32",
+    "answer": "Symbol 是 ES2015 引入的原始类型，每次调用 Symbol() 引擎内部都会生成全局唯一标识，description 仅是调试标签，不参与唯一性比较。规范规定对象属性 key 只能是 String 或 Symbol 两类，而 for...in、Object.keys、Object.getOwnPropertyNames 只枚举字符串 key，Symbol key 必须用 Object.getOwnPropertySymbols 或 Reflect.ownKeys 才能取到——这就是「半私有」的本质：不是访问控制，而是默认枚举路径不可见，拿到引用的人依然能读写。\n\n代码示例：\n  const id = Symbol(\"id\");\n  const user = { name: \"Tom\", [id]: 123 };\n  Object.keys(user);       // [\"name\"]\n  Reflect.ownKeys(user);   // [\"name\", Symbol(id)]\n  class Range {\n    *[Symbol.iterator]() { yield 1; yield 2; }\n  }\n  [...new Range()];        // [1, 2]：内置协议定制行为\n\n真实场景：给第三方对象打标记防命名冲突，React 用 Symbol.for(\"react.element\") 标识元素类型，事件总线用 Symbol 当事件名避免撞车。坑点：Symbol.for(\"x\") 写入全局注册表可跨 realm（iframe）共享，Symbol(\"x\") 每次唯一；Symbol 不能 new（规范显式抛 TypeError，防止包装对象破坏唯一性）；JSON.stringify 会忽略 Symbol key 和 Symbol 值，序列化后丢失；description 相同不代表相等，Symbol(\"a\") !== Symbol(\"a\")。",
+    "keyPoints": [
+      "Symbol 唯一不可变，description 仅调试不参与相等",
+      "不被 for...in/Object.keys 枚举，需 Reflect.ownKeys",
+      "Symbol.iterator 等内置协议定制对象行为",
+      "Symbol.for 全局注册表跨 realm 共享"
+    ],
+    "followUps": [
+      "Symbol.iterator 如何让对象可迭代？",
+      "Symbol 和 class 私有字段 #field 的本质区别？"
+    ]
+  },
+  {
+    "id": "fe-34",
+    "answer": "原始值本身没有属性和方法，但 ECMAScript 规范在属性访问求值时定义了隐式装箱：对原始值取属性，引擎会临时创建对应包装对象（String/Number/Boolean），在其原型链上查找属性，表达式求值结束立即销毁该临时对象。所以 \"abc\".length 取到的是临时 String 对象的 length；而 \"abc\".x = 1 是往临时对象上写，对象随即被回收，下次再访问又是一个全新临时对象，自然读不到。这解释了「能读方法、不能存属性」的经典现象。\n\n代码示例：\n  \"abc\".length;         // 3：临时 new String(\"abc\").length\n  \"abc\".x = 1;\n  \"abc\".x;              // undefined：换了新临时对象\n  const s = new String(\"abc\");\n  typeof s;              // \"object\"，s === \"abc\" 为 false\n  String(5);             // \"5\"：转型函数（推荐用法）\n\n真实场景：面试常结合装箱考 === 与 typeof；工程上要警惕 new Boolean(false) 是对象、在 if 里恒真导致的线上 bug，所以 ESLint 的 no-new-wrappers 规则默认禁用显式包装。坑点：typeof 判断在包装对象上失效，需 instanceof 或 Object.prototype.toString；Symbol/BigInt 规范禁止 new，保证原始值身份；valueOf/toString 在对象参与运算时按 ToPrimitive 顺序触发，1 + new Number(1) 得 2 就是这个机制。",
+    "keyPoints": [
+      "访问属性时引擎临时装箱，用完即销毁",
+      "临时对象不能存属性，每次访问都是新对象",
+      "new String/Boolean 是对象，=== 与 typeof 均失真",
+      "Symbol/BigInt 禁止 new，本身是原始值"
+    ],
+    "followUps": [
+      "new String(\"a\") 和 String(\"a\") 的区别？",
+      "对象参与运算时 ToPrimitive 的转换顺序？"
+    ]
+  },
+  {
+    "id": "fe-35",
+    "answer": "NaN 是 IEEE 754 规定的特殊浮点值，表示未定义或不可表示的运算结果（0/0、Infinity - Infinity），typeof NaN === \"number\"，且规范规定 NaN 与任何值比较都为 false，包括自身——这是为了忠实表达「无效结果不等于任何已知值」的数学语义。全局 isNaN 的历史包袱在于先对参数做 ToNumber 强制转换再判断，任何转成 NaN 的值都被误判，isNaN(\"abc\")、isNaN(undefined) 都是 true。ES6 的 Number.isNaN 不做转换，仅当值类型为 number 且等于 NaN 才返回 true，是语义正确的版本。\n\n代码示例：\n  isNaN(\"abc\");           // true：Number(\"abc\") 得 NaN，误判\n  isNaN(\"123\");           // false：能转成 123\n  Number.isNaN(\"abc\");    // false：不转换，类型不符\n  Number.isNaN(NaN);      // true：严格判断\n  const isNaNSafe = v => v !== v;   // 利用 NaN 唯一不等于自身\n\n真实场景：表单数值校验、接口数据清洗时必须先 Number.isFinite 过滤再使用；polyfill 时代 v !== v 是标准技巧，速度也最快。坑点：NaN 参与算术运算结果恒为 NaN 且静默传播，一个 NaN 污染整条计算链；[NaN].indexOf(NaN) 为 -1，因为 indexOf 用严格相等，而 includes 用 SameValueZero 算法能找到 NaN；Object.is(NaN, NaN) 为 true，遵循 SameValue 语义，与 === 形成三种相等算法的对照。",
+    "keyPoints": [
+      "NaN 是 number 类型，唯一不等于自身的值",
+      "全局 isNaN 先强制转换，误报非数字字符串",
+      "Number.isNaN 不转换严格判断，或 v !== v",
+      "indexOf 找不到 NaN，includes 用 SameValueZero 能找到"
+    ],
+    "followUps": [
+      "为什么 IEEE 754 规定 NaN 不等于自身？",
+      "===、SameValueZero、SameValue 三种相等算法差异？"
+    ]
+  },
+  {
+    "id": "fe-38",
+    "answer": "词法作用域（静态作用域）：函数能访问哪些变量由它「写在哪儿」决定，引擎在编译阶段就根据代码嵌套结构建立作用域链；动态作用域则由「在哪儿调用」决定，沿调用栈向上查找，典型代表是 Bash 和早期 Lisp。JS 采用词法作用域，证据就是函数定义位置决定自由变量的绑定，闭包正是词法作用域的直接产物——内部函数持有定义处环境记录的引用。\n\n代码示例：\n  let a = 1;\n  function foo() { console.log(a); }\n  function bar() { let a = 2; foo(); }\n  bar();               // 1：foo 定义在全局，与调用处无关\n  const obj = { n: 1, get() { return this.n; } };\n  const fn = obj.get;\n  fn();                // undefined：this 按调用方式动态绑定\n\n真实场景：React Hooks 依赖词法作用域捕获当次渲染的 props 和 state，「过期闭包」问题根源在此；ESM 的文件级隔离也基于词法作用域。坑点：this 是动态绑定的特例（看调用点不看定义点），但它不是真正的动态作用域，只是默认/隐式/显式/new 四条规则决定的运行时绑定；闭包捕获的是变量引用而非快照值，var 循环注册事件拿到的是同一个 i，let 每轮迭代创建新环境记录副本；eval/with 能在运行时注入作用域，破坏引擎编译期优化，严格模式直接禁用。",
+    "keyPoints": [
+      "词法作用域由定义位置决定，编译期确定",
+      "JS 是词法作用域，闭包是其直接产物",
+      "this 动态绑定看调用点，但非真正动态作用域",
+      "闭包捕获引用非快照，let 每轮生成新副本"
+    ],
+    "followUps": [
+      "with 语句为什么被严格模式禁用？",
+      "箭头函数的 this 绑定规则与普通函数有何不同？"
+    ]
+  },
+  {
+    "id": "fe-41",
+    "answer": "模块模式利用 IIFE 立即执行创建独立函数作用域，内部变量被返回的公共方法以闭包形式引用，从而在外层函数执行完毕后依然存活，实现「私有状态 + 受控接口」。本质是闭包延长了局部变量的生命周期：返回对象的方法持有词法环境引用，垃圾回收无法释放私有变量。ES6 前这是事实标准的封装方案（jQuery 插件、早期模块化都基于此），如今多被 class 私有字段 # 和 ESM 文件作用域取代，但面试必考其原理。\n\n代码示例：\n  const Counter = (function () {\n    let count = 0;                        // 私有变量\n    const inc = () => ++count;            // 私有函数\n    return { increment: inc, get: () => count };  // 公共接口\n  })();\n  Counter.increment(); Counter.get();     // 1，count 外部摸不到\n  class C {\n    #count = 0;                           // 引擎级硬私有\n    inc() { return ++this.#count; }\n  }\n\n真实场景：全局配置中心、单例 store、SDK 内部状态常用此模式防外部篡改；揭示模块模式（Revealing Module）在 return 时把私有函数统一映射为公共名，声明与暴露分离可读性更好。坑点：IIFE 产物是单例无法 new 多实例，需要工厂函数返回闭包对象；# 私有字段是硬私有（子类、外部、序列化全不可见）且无原型查找开销，闭包私有则依赖封装约定；闭包长期引用大对象要警惕内存泄漏，用完应置 null 断开引用。",
+    "keyPoints": [
+      "IIFE + 闭包让私有变量在函数返回后存活",
+      "只暴露公共接口，实现封装与信息隐藏",
+      "揭示模块模式统一在 return 映射公共名",
+      "现代替代：class # 私有字段 + ESM 文件作用域"
+    ],
+    "followUps": [
+      "class # 私有字段和闭包私有在机制上的区别？",
+      "如何用工厂模式让模块模式支持多实例？"
+    ]
+  },
+  {
+    "id": "fe-59",
+    "answer": "Tree Shaking 依赖 ESM 的静态结构：import/export 必须在模块顶层声明，绑定关系编译期即可确定，打包器（Webpack/Rollup/esbuild）从入口出发构建模块依赖图，标记「被引用」的导出，未标记的代码连同只被死代码引用的部分在压缩阶段（Terser）被丢弃。CommonJS 的 require 是普通函数调用，参数可以是变量、可以写在任何位置，module.exports 还能动态赋值，绑定关系只有运行时才能确定，静态分析无解，故天然无法摇树。\n\n代码示例：\n  // math.js\n  export function add(a, b) { return a + b; }   // 被引用，保留\n  export function sub(a, b) { return a - b; }   // 未被引用，剔除\n  // main.js\n  import { add } from \"./math\";\n  // package.json\n  { \"sideEffects\": false }\n\n真实场景：按需加载 lodash 必须用 lodash-es 或 babel-plugin-import，直接 import { cloneDeep } from \"lodash\"（CJS 版）摇不动，包体积凭空多几十 KB。坑点：有副作用的模块（顶层改全局、注册 polyfill、纯 import CSS）会被误摇，需 sideEffects 数组显式保留；只有生产模式才摇（dev 保留便于调试）；Webpack 还需 usedExports 与 minimize 联动才生效；class 实例方法默认保留（静态分析无法确定哪些方法被调用），导出纯函数更利于摇树。",
+    "keyPoints": [
+      "ESM 顶层静态声明，编译期可确定绑定图",
+      "CJS require 是运行时函数调用，无法静态分析",
+      "sideEffects 标记保护副作用模块免误摇",
+      "生产模式 + 压缩器协同才真正剔除死代码"
+    ],
+    "followUps": [
+      "sideEffects 字段如何精确配置？",
+      "为什么 class 方法默认不会被摇掉？"
+    ]
+  },
+  {
+    "id": "fe-88",
+    "answer": "key 是 React Reconciliation 阶段识别同层兄弟节点身份的唯一线索：diff 时先比 type 再比 key，key 相同则复用 Fiber 节点和对应 DOM，仅更新 props；key 不同则卸载旧子树、挂载新子树，内部 state 全部丢弃。用 index 做 key 的致命问题是列表增删后索引整体漂移，React 按错位的 key 复用了不属于自己的 DOM 和 state，造成状态串台；同时大量节点 key 变化触发不必要的卸载重建，性能随之劣化。\n\n代码示例：\n  {items.map((item, i) => <Item key={i} data={item} />)}     // 差\n  {items.map(item => <Item key={item.id} data={item} />)}    // 好\n  // 删除 items[0] 后 key=0 的 Fiber 被复用给原 items[1]，\n  // 其内部 input 值、展开状态全部错乱\n\n真实案例：字节直播间礼物列表曾用 index 做 key，删除首个礼物后进场动画串到下一个礼物，换 id 后修复；表单列表删除中间行导致未受控 input 内容错位也是经典线上事故。坑点：key 只需兄弟间唯一，不要求全局唯一；key 变化等价于组件替换，会完整走卸载-挂载（input 失焦、动画重置），可借此做「切换用户重置表单」技巧 key={userId}；纯静态且永不变序的列表用 index 不出 bug，但仍是坏习惯；key 不会传入子组件 props，需要 key 值得另传属性。",
+    "keyPoints": [
+      "key 是 diff 时同层节点身份标识，决定复用或重建",
+      "index 做 key 增删后索引漂移，状态串台",
+      "用稳定唯一业务 id，key 变化等于组件替换",
+      "key 只在兄弟间唯一，且不传给子组件"
+    ],
+    "followUps": [
+      "key 变化会触发哪些生命周期和副作用清理？",
+      "静态永不变化的列表用 index 做 key 有风险吗？"
+    ]
+  },
+  {
+    "id": "fe-90",
+    "answer": "Reconciliation 是 React 对比新旧两棵 Fiber 树求最小更新的 diff 算法。理论最优的树 diff 是 O(n³)，React 用三条启发式假设降到 O(n)：一、只同层比较，跨层移动直接视为删除加新建；二、type 不同判定为不同子树，整棵销毁重建（含 DOM 与 state）；三、同层兄弟靠 key 匹配身份，key 相同复用节点仅更新 props。Fiber 架构把递归 diff 改写成可中断的链表遍历，渲染可分片让出主线程，高优先级更新可插队。\n\n代码示例：\n  <div>{cond ? <A /> : <B />}</div>   // type 不同：A 卸载 B 挂载，state 不保留\n  {items.map(i => <Item key={i.id} v={i.v} />)}   // key 稳定：只更新 v\n  // <A/> 从 div1 挪到 div2：React 不识别为移动，销毁后重建\n\n真实场景：登录/注册表单切换时 state 互串，就是 type 相同位置相同被复用所致，加 key 或包不同 type 可解决；长列表重排序配合稳定 key 才能把 DOM 移动降到最少。坑点：别指望 React 保留跨层移动的 state，需手动提升 state 或引入状态管理；数组 reverse 后 key 不变则全量复用仅移动 DOM，key 用 index 则全量重写内容；三条假设是启发式，极端场景（大量跨层移动）会退化为全量重建，这也是长列表要用虚拟滚动的根本原因。",
+    "keyPoints": [
+      "三条启发式假设把 diff 从 O(n³) 降到 O(n)",
+      "同层比较，type 变则整棵销毁重建",
+      "key 匹配身份复用节点，跨层移动不识别",
+      "Fiber 让 diff 可中断分片，支持优先级插队"
+    ],
+    "followUps": [
+      "为什么 React 放弃跨层 diff 这个场景？",
+      "Fiber 架构如何让渲染过程可中断？"
+    ]
+  },
+  {
+    "id": "fe-112",
+    "answer": "lane 是 React 18 并发架构的优先级模型：用 31 位二进制掩码表示优先级轨道，每个 bit 位段对应一类更新（同步、输入连续、默认、过渡、空闲等）。一次更新被分配一个或多个 lane，调度器按 lane 优先级决定渲染顺序；渲染中途来了更高 lane 的更新，当前渲染被打断丢弃，高优渲染完成后低优再重做。相比旧的 expirationTime 模型（单时间戳只能表达一种优先级，多更新互相覆盖且无法批量分组），lane 用位掩码可同时表达多个并存优先级、批量合并与纠缠（entanglement），这是 useTransition、Suspense 流式渲染的调度地基。\n\n代码示例（简化位段）：\n  const SyncLane = 0b0001;        // onClick 等同步最高\n  const InputLane = 0b0010;       // 输入连续事件\n  const TransitionLane = 0b0100;  // useTransition 标记\n  const IdleLane = 0b1000;        // 空闲最低\n  // lanes = 0b0110 表示 Input 与 Transition 同批调度\n\n真实场景：搜索框输入（InputLane 高优）与结果列表更新（TransitionLane 低优）分离，输入永远跟手不卡；Tab 切换包 startTransition 标记低优，点击立即响应。坑点：业务代码不直接操作 lane，只能通过 useTransition、useDeferredValue 间接影响；被打断的过渡更新中间结果被丢弃重做，所以并发渲染必须无副作用；同一组件可同时存在多个不同 lane 的未完成更新。",
+    "keyPoints": [
+      "lane 用 31 位掩码表示优先级轨道，可组合并存",
+      "高优先级 lane 打断低优渲染，丢弃重做",
+      "比 expirationTime 细粒度，支持批量与纠缠",
+      "业务经 useTransition 间接影响，不直接操作 lane"
+    ],
+    "followUps": [
+      "lane 模型相比 expirationTime 解决了什么具体问题？",
+      "Offscreen lane 在 Suspense 中扮演什么角色？"
+    ]
+  },
+  {
+    "id": "fe-117",
+    "answer": "三者定位不同：computed 是声明式派生值，内部用响应式依赖收集 + 脏标记实现缓存——依赖没变直接返回缓存值，依赖变了下次取值才重算，必须纯且有返回值；watch 是显式侦听某个响应式源，变化时执行副作用回调，能拿到新旧值，适合异步请求、本地存储同步等命令式逻辑；watchEffect 立即执行一次并自动收集回调里用到的所有依赖，依赖变化就重跑，适合「用到谁就依赖谁」的同步副作用。\n\n代码示例：\n  const fullName = computed(() => first.value + \" \" + last.value);\n  watch(count, (n, o) => { saveToServer(n); }, { immediate: true });\n  watchEffect(() => { document.title = String(count.value); });\n\n真实场景：表单联动计算总价用 computed（多次渲染不重复算）；搜索防抖请求用 watch（拿新值发请求、对比旧值取消过期请求）；调试埋点打印状态用 watchEffect 最省事。坑点：computed 里写副作用（发请求、改 DOM）是大忌，缓存语义会让时序错乱；watch 监听 reactive 对象默认深层遍历，监听 ref 包裹的对象需 deep: true，监听嵌套属性推荐 getter 写法 () => obj.a.b；watchEffect 清理副作用用 onCleanup 参数（如取消上一次请求）；computed 依赖必须是响应式数据，普通变量变化不触发重算。",
+    "keyPoints": [
+      "computed 缓存纯派生，依赖不变不重算",
+      "watch 显式侦听拿新旧值，承载副作用",
+      "watchEffect 自动收集依赖且立即执行",
+      "computed 禁副作用，watch 嵌套属性用 getter"
+    ],
+    "followUps": [
+      "computed 的缓存依赖什么机制失效？",
+      "watch 的 deep、immediate、flush 选项各控制什么？"
+    ]
+  },
+  {
+    "id": "fe-118",
+    "answer": "Vue3 生命周期围绕组件实例三阶段：挂载前 onBeforeMount（VDOM 就绪、真实 DOM 未插入）→ 挂载后 onMounted（DOM 就绪，可操作节点、发请求）；更新前 onBeforeUpdate → 更新后 onUpdated（DOM 已按新状态渲染）；卸载前 onBeforeUnmount → 卸载后 onUnmounted（实例销毁，必须清理副作用）。另有 onErrorCaptured 捕获后代错误、onRenderTracked/onRenderTriggered 调试响应式追踪，keep-alive 场景用 onActivated/onDeactivated 替代挂载卸载。\n\n代码示例：\n  import { onMounted, onUnmounted, onUpdated } from \"vue\";\n  setup() {\n    onMounted(() => {\n      fetchList();\n      window.addEventListener(\"resize\", onResize);\n    });\n    onUpdated(() => { console.log(\"DOM 已更新\"); });\n    onUnmounted(() => {\n      clearInterval(timer);\n      window.removeEventListener(\"resize\", onResize);\n    });\n  }\n\n真实场景：ECharts 实例在 onMounted 初始化（此时容器才有尺寸）、onUnmounted 调 dispose，漏掉 dispose 是常见内存泄漏源；轮询定时器同理。Options API 的 created/mounted 等钩子在 Composition API 里全部以 onXxx 形式注册。坑点：onUpdated 内修改响应式状态可能再次触发更新形成死循环，确需修改必须加终止条件；onMounted 不保证所有子组件挂载完，要等 nextTick；SSR 场景只有 onBeforeMount 之前的钩子在服务端执行，访问 window 必须放 onMounted。",
+    "keyPoints": [
+      "挂载/更新/卸载三阶段对应 onXxx 钩子",
+      "onMounted 中 DOM 就绪，可初始化图表发请求",
+      "onUnmounted 必须清理定时器/事件/实例防泄漏",
+      "keep-alive 用 onActivated/onDeactivated 替代"
+    ],
+    "followUps": [
+      "keep-alive 组件的缓存与激活流程是什么？",
+      "onUpdated 内改 state 为什么会死循环，如何避免？"
+    ]
+  },
+  {
+    "id": "fe-119",
+    "answer": "key 在 Vue 的 patch 过程中标识同层 vnode 身份：key 相同则判定为同一节点，复用 DOM 和组件实例只更新内容；key 不同则卸载重建。语义与 React 一致，但 diff 实现不同：Vue2 用双端比较（头头、尾尾、头尾、尾头四次比对），Vue3 在双端比较之后接最长递增子序列（LIS）算法，求出未乱序的最长节点子序列保持不动，只移动其余节点，把 DOM 移动次数压到理论最少。用 index 做 key 时列表增删导致索引漂移，组件复用错位，输入框内容、勾选状态就会串行。\n\n代码示例：\n  <li v-for=\"(item, i) in list\" :key=\"i\">{{ item.name }}<input /></li>\n  <!-- 差：删除首项后所有 key 错位 -->\n  <li v-for=\"item in list\" :key=\"item.id\">{{ item.name }}<input /></li>\n  <!-- 好：稳定业务主键 -->\n\n真实场景：表格勾选若干行后翻页选中态错乱、拖拽排序后输入框内容错位，九成是 index key 引起，换成业务主键 id 即修复。坑点：key 只需兄弟间唯一；不写 key 时 Vue 默认按位置就地复用（等效 index key）；Vue3 中 v-for 与 v-if 同节点时 v-if 优先级更高，key 应放在 template 包裹层或组件上；key 变化可主动强制组件重建，常用于「切换 tab 重置表单」；key 与 ref 不同，ref 拿实例引用，key 只做 diff 身份标识。",
+    "keyPoints": [
+      "key 标识 vnode 身份，相同复用不同重建",
+      "Vue3 双端比较 + LIS 把 DOM 移动减到最少",
+      "index 做 key 增删后状态错乱，须用稳定 id",
+      "key 变化可强制重建组件，与 ref 职责不同"
+    ],
+    "followUps": [
+      "Vue3 的 LIS diff 具体比 Vue2 双端比较省了什么？",
+      "key 和 ref 在组件复用中的区别？"
+    ]
+  },
+  {
+    "id": "fe-121",
+    "answer": "Teleport 是 Vue3 内置组件，把子树的真实 DOM 渲染到组件层级之外的指定容器（to 选择器），而逻辑上仍属于原组件——props、emit、provide/inject、响应式全部照常工作。它解决的核心矛盾是：弹窗、Toast、全局 loading 这类 UI 在逻辑上属于某个深层业务组件，但若 DOM 就地渲染，会被祖先的 overflow:hidden、transform（创建新包含块使 position:fixed 失效）、z-index 层叠上下文截断或压盖。渲染到 body 下即可脱离这些约束。\n\n代码示例：\n  <Teleport to=\"body\">\n    <div class=\"modal\" v-if=\"show\">\n      <h2>标题</h2>\n      <slot />\n    </div>\n  </Teleport>\n  <Teleport :to=\"target\" :disabled=\"!needTeleport\">\n    <Tooltip />\n  </Teleport>\n\n真实场景：卡片内的确认弹窗用 Teleport 挂到 body，避免被卡片 overflow 裁切；多个 Teleport 指向同一目标按挂载顺序追加，天然实现消息堆叠；disabled 属性可做「大屏传送到侧边栏、小屏就地展示」的响应式布局。坑点：scoped 样式仍按原组件作用域生成属性选择器，传送到 body 后可能失效，需 :deep() 或全局类；to 目标必须在挂载时已存在（可先渲染占位 div）；SSR 下 Teleport 默认只在客户端激活，配合 defer 属性；与 React Portal（createPortal 命令式 API）能力等价，只是声明式写法更贴合模板。",
+    "keyPoints": [
+      "DOM 渲染到外部容器，逻辑仍是原组件子树",
+      "解决弹窗被 overflow/transform/z-index 截断",
+      "disabled 可关闭传送，多实例按序追加",
+      "scoped 样式需 :deep，目标容器须先存在"
+    ],
+    "followUps": [
+      "Teleport 后 scoped 样式失效如何处理？",
+      "Teleport 与 React Portal 的异同？"
+    ]
+  },
+  {
+    "id": "fe-123",
+    "answer": "Vue3 编译器在 template 转 render 函数阶段做静态分析，产出带优化信息的代码：一、静态提升，把纯静态 vnode 和静态 props 提升到 render 函数外只创建一次，后续渲染直接复用引用；二、补丁标记（PatchFlag），给动态节点打数字标记（TEXT=1、CLASS=2、PROPS=8 等）并记录动态属性名，diff 时只看标记位做靶向更新，静态属性和静态子树整体跳过；三、Block Tree，根 Block 把后代所有动态节点收集成扁平数组，diff 从「全树递归」变成「只遍历动态列表」；四、事件缓存 cacheHandlers，内联事件函数缓存复用，避免子组件因函数引用变化而无效更新。\n\n代码示例：\n  const _hoisted = createVNode(\"div\", null, \"静态内容\");  // 提升出 render\n  createVNode(\"div\", { id: dynamicId }, text, 8, [\"id\"]);  // PROPS 标记\n  // diff 时只比较 id，其余静态部分跳过\n\n真实场景：万行表单页面 Vue2 全树 diff 卡顿，Vue3 只比几十个动态节点，官方基准快 1.3-2 倍；v-memo 指令可手动标记跳过子树更新，适合超长列表行内优化。坑点：手写 h/render 函数拿不到编译优化，能用模板就别手写；v-if 分支间结构频繁变化会让 Block 失稳退化；动态组件 :is 和运行时拼接模板无法静态提升；优化信息由编译器生成，构建时开启 production 才完整生效。",
+    "keyPoints": [
+      "静态提升 + 补丁标记 + Block Tree 三大编译优化",
+      "diff 只遍历动态节点列表，跳过静态子树",
+      "cacheHandlers 稳定事件引用，减少子组件重渲染",
+      "模板优先于手写 h，v-memo 手动跳过子树"
+    ],
+    "followUps": [
+      "Block Tree 在什么场景下会退化失效？",
+      "Vue3 相对 Vue2 的性能提升来自哪几个层面？"
+    ]
+  },
+  {
+    "id": "fe-146",
+    "answer": "Source Map 是压缩混淆产物与源码之间的映射文件（.map，基于 VLQ 编码记录行列映射关系），浏览器 DevTools 和错误监控平台据此把打包后的位置还原成源码文件与行号，调试体验等同直接调源码。生产环境的两难在于：不留 map 无法定位线上错误栈，公开 map 又等于开源全部源码。标准做法是 devtool 用 hidden-source-map（Webpack）或 sourcemap: \"hidden\"（Vite）——生成 map 文件但产物末尾不写 sourceMappingURL 注释，map 只上传到 Sentry 等私有监控平台，服务器不对外托管。\n\n代码示例：\n  // Vite\n  build: { sourcemap: \"hidden\" }\n  // Webpack\n  devtool: \"hidden-source-map\"\n  // 构建后上传 Sentry 再删除本地 map\n  sentry-cli sourcemaps upload ./dist && rm -rf ./dist/**/*.map\n\n真实场景：线上 window.onerror 捕获的压缩栈经 Sentry 用 map 还原为 src/utils/pay.ts:42 并关联 release，定位效率天差地别；部分公司用 nginx 鉴权让 map 仅内网可访问，兼顾排障与安全。坑点：eval-cheap-module-source-map 开发期重建快但含 eval 且映射粗糙，生产禁用；CSS sourcemap 需 css.devSourcemap 单独开启；noscript-sourcemap 只去注释不生成文件，别选错；上传 Sentry 后务必从 CDN 删除 map，否则等于没隐藏；Worker 文件的 map 路径常被 CSP 拦截需单独放行。",
+    "keyPoints": [
+      "map 用 VLQ 编码记录产物到源码的行列映射",
+      "生产用 hidden 模式：生成但不引用，防源码泄露",
+      "map 上传 Sentry 私有平台，传完从服务器删除",
+      "开发用 eval 系求快，生产禁用 eval 类 sourcemap"
+    ],
+    "followUps": [
+      "source map 的 mappings 字段是如何编码的？",
+      "eval-source-map 为什么重建速度最快？"
+    ]
+  },
+  {
+    "id": "fe-152",
+    "answer": "覆盖率四大指标：语句覆盖 Statements（每条语句是否执行过）、分支覆盖 Branches（if/else、三元、switch 每个分支是否都走到）、函数覆盖 Functions（每个函数是否被调用）、行覆盖 Lines（可执行行的覆盖比例）。分支覆盖通常最难达标也最接近「场景穷尽」。业界常见门槛 80%：Google 测试分级把 60% 划为可接受、75% 推荐、90% 优秀，但数字只是底线约束——支付、鉴权、资金计算等关键路径应接近 100%，纯 UI 展示和胶水代码可适当放低。\n\n代码示例（vitest 配置）：\n  test: {\n    coverage: {\n      provider: \"v8\",\n      reporter: [\"text\", \"html\", \"lcov\"],\n      thresholds: { statements: 80, branches: 75,\n                    functions: 80, lines: 80 },\n    },\n  }\n  // 执行 vitest run --coverage，不达标 CI 直接失败\n\n真实场景：CI 卡阈值防止「改一行代码覆盖率掉 5 个点」的回退；新增代码用 changed-files 类插件只考核 diff 覆盖率，老代码不背锅；Codecov 报告挂到 PR 上评审体验最好。坑点：100% 覆盖不等于无 bug——它只证明代码被执行过，不证明断言正确，缺断言时覆盖全绿照样漏 bug；分支覆盖要警惕条件组合爆炸，可上 mutation testing（Stryker）检验断言强度；不要为凑数写「调一下不断言」的僵尸测试，反而制造虚假安全感，评审时应把覆盖率当参考而非 KPI。",
+    "keyPoints": [
+      "语句/分支/函数/行四指标，分支最难也最有价值",
+      "80% 是常见门槛，关键路径追求接近 100%",
+      "100% 覆盖只证明执行过，不证明断言正确",
+      "CI 卡阈值 + diff 覆盖率防回退，拒绝僵尸测试"
+    ],
+    "followUps": [
+      "分支覆盖和语句覆盖的差异体现在哪？",
+      "如何在 CI 中落地覆盖率门禁且不影响老代码？"
+    ]
+  },
+  {
+    "id": "fe-153",
+    "answer": "视觉回归测试用「基线截图 + 像素对比」捕获 UI 的意外视觉变化：首次运行为页面或组件生成基准图，后续每次提交重新截图并做像素级 diff，差异超过阈值即失败，差异高亮图供人工确认——是有意变更（更新基线）还是回归 bug（修复代码）。工具链分两类：Playwright/Puppeteer 自带截图对比，零成本接入；Percy、Chromatic 等 SaaS 提供云端渲染、跨浏览器矩阵和评审工作流。\n\n代码示例（Playwright）：\n  test(\"首页视觉\", async ({ page }) => {\n    await page.goto(\"/\");\n    await expect(page).toHaveScreenshot(\"home.png\", {\n      maxDiffPixelRatio: 0.01,\n      animations: \"disabled\",\n    });\n  });\n  // 首次运行生成基线；确认变更后 --update-snapshots 更新\n\n真实场景：设计系统组件库每次发版跑全组件截图矩阵（主题 × 状态 × 尺寸），防止改 Button 波及 Modal；电商大促页改样式后对比确认没有误伤相邻模块。坑点：字体抗锯齿、GPU 渲染差异导致跨平台误报，必须在统一 CI 容器（如 Playwright 官方 Docker 镜像）里跑；动画、光标闪烁要禁用，动态内容（时间戳、随机头像、广告位）需 mock 或用 mask 遮挡对应区域；响应式页面要配多视口截图；阈值设 0 过于敏感全是误报，0.01-0.02 是常用平衡点；基线更新要走 Code Review 防止误更新掩盖真 bug。",
+    "keyPoints": [
+      "基线截图 + 像素 diff + 阈值 + 人工确认四步",
+      "Playwright 零成本，Percy/Chromatic 上云端矩阵",
+      "统一 CI 环境、禁动画、mock 动态内容防误报",
+      "阈值 0.01-0.02 平衡灵敏度与噪声"
+    ],
+    "followUps": [
+      "截图中的动态内容（时间、随机数据）如何处理？",
+      "Percy 这类 SaaS 比本地截图对比强在哪？"
+    ]
+  },
+  {
+    "id": "fe-154",
+    "answer": "TDD 循环三步：Red——先写一个描述期望行为的测试，运行必红（证明测试本身有效）；Green——写最少的实现代码让测试变绿，允许实现丑陋；Refactor——在测试保护下重构优化，保持常绿。外圈配合「待测行为清单」驱动下一步开发。优势在于倒逼可测性设计（依赖注入、纯函数、小接口）、获得即时反馈与重构勇气、测试即文档；代价是初期进度慢 15-30%、对开发者设计能力要求高，且强依赖「需求可预先明确」这个前提。\n\n代码示例：\n  // Red：先写失败测试\n  test(\"格式化金额\", () => {\n    expect(formatMoney(1234.5)).toBe(\"1,234.50\");\n  });\n  // Green：最小实现让测试过\n  function formatMoney(n) {\n    return n.toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g, \",\");\n  }\n  // Refactor：抽正则常量、补负数分支，测试保持绿\n\n真实场景：金融计算、状态机、编译器这类边界清晰的纯逻辑模块 TDD 收益最大；前端的工具函数、store 的 reducer 也很适合。BDD 是它的外延，用 Given-When-Then 描述业务场景对接需求方。坑点：UI 布局、探索性原型、需求频繁变动的业务不适合先写测试，强行 TDD 只会反复重写测试；一个红-绿循环只解决一个小行为，不要一次写全；实现写完再补测试不是 TDD，那只是普通单测，丢掉了设计驱动这个核心价值；过度追求「所有代码都 TDD」会在不合适场景制造挫败感。",
+    "keyPoints": [
+      "Red 失败 → Green 最小实现 → Refactor 保绿",
+      "测试先行倒逼可测性设计，测试即文档",
+      "适合边界清晰的纯逻辑，不适合 UI 与探索",
+      "写完实现再补测试不是 TDD，丢了设计驱动"
+    ],
+    "followUps": [
+      "TDD 与 BDD 的关注点有何不同？",
+      "哪些前端场景你会明确放弃 TDD？"
+    ]
+  },
+  {
+    "id": "fe-166",
+    "answer": "SRI（Subresource Integrity）是浏览器安全特性：给 script/link 标签加 integrity 属性，内容为先对资源做哈希（sha256/384/512）再 base64 编码并带算法前缀。浏览器下载完资源后在执行前重算哈希，与 integrity 不符则拒绝执行并报错，从机制上保证「第三方 CDN 资源就是我发布时审计过的那份」。它防御的核心威胁是 CDN 被入侵或劫持后投毒——2018 年 Browsealoud 插件被篡改注入挖矿脚本、波及数千政府网站，正是 SRI 要解决的场景。\n\n代码示例：\n  <script src=\"https://cdn.com/lib.js\"\n    integrity=\"sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/ux...\"\n    crossorigin=\"anonymous\"></script>\n  <link rel=\"stylesheet\" href=\"https://cdn.com/style.css\"\n    integrity=\"sha384-xyz...\" crossorigin=\"anonymous\" />\n\n真实场景：官网落地页引第三方统计 SDK、支付页引风控脚本必须加 SRI；构建期用 webpack-subresource-integrity 插件自动算哈希注入 HTML，或 openssl dgst -sha384 -binary 手工生成。坑点：跨源资源必须配 crossorigin 属性（否则 CORS 阻断连加载都失败），且 CDN 需返回 Access-Control-Allow-Origin；资源每次发版哈希都变，手工维护不现实，必须构建自动化；SRI 只保完整性不保可用性，校验失败资源直接不执行，关键库要备 onerror 降级加载本地副本；动态 insertBefore 插入的脚本不受 SRI 保护。",
+    "keyPoints": [
+      "integrity 哈希校验，不符则拒绝执行",
+      "防 CDN 篡改投毒，典型如 Browsealoud 事件",
+      "跨源资源必须配 crossorigin + CORS 响应头",
+      "只保完整性不保可用性，需 onerror 降级"
+    ],
+    "followUps": [
+      "SRI 的哈希在构建流程中如何自动生成？",
+      "SRI 校验失败时如何做优雅降级？"
+    ]
+  }
+]

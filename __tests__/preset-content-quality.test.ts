@@ -13,14 +13,13 @@
 //   5. 题目 id 唯一、题面不重复（防拷贝粘贴污染）
 //
 // 阈值说明：
-//   - 全局硬阈值 = 80 字符（audit-presets.ts 的「严重残缺」线）
-//   - 当前所有 preset 均通过此阈值（最低 min=193，见 algorithm-200）
-//   - 300 字符的「浅薄」线由 audit-presets.ts 手动体检追踪，不进 CI 硬门禁
-//   - 这样既能防极端贫血，又不会因 algorithm-200 的 25 条 < 300 题目让 CI red
+//   - 全局硬阈值 = 500 字符（与 audit-presets.ts 的「浅薄」线 FLAG_ANSWER_SHORT 对齐）
+//   - 2026-07-26 收紧：5 个工程师 preset 完成深度扩充 + algorithm-200 重写 69 条弱答案后，
+//     全部 1332 道题答案均 >= 500 字符，阈值从 80（防严重残缺）提升到 500（防浅薄）
+//   - 这意味着任何新提交的预置题答案必须有思路推导 + 代码 + 案例 + 变体的完整深度
 //
-// 渐进收紧策略：
-//   - 当所有 preset 的 min 都 >= 150 时，可将阈值提升到 150
-//   - 当所有 preset 的 min 都 >= 300 时，可将阈值提升到 300（与浅薄线对齐）
+// 渐进收紧策略（已完成）：
+//   - 80 → 500：2026-07-26 完成，与「浅薄」线对齐，audit 与 CI 双闸门同一标准
 
 import { describe, it, expect } from "vitest";
 
@@ -28,8 +27,8 @@ import { PRESETS } from "@/lib/presets";
 
 // ============ 阈值与占位符清单 ============
 
-/** 答案最小字符数（与 audit-presets.ts 的 FLAG_ANSWER_MIN 对齐） */
-const MIN_ANSWER_LENGTH = 80;
+/** 答案最小字符数（与 audit-presets.ts 的 FLAG_ANSWER_SHORT「浅薄」线对齐） */
+const MIN_ANSWER_LENGTH = 500;
 
 /**
  * 占位符黑名单（大小写不敏感）：
@@ -89,7 +88,7 @@ function collectQuestionFields(q: (typeof PRESETS)[number]["questions"][number])
 
 describe("preset 内容质量门禁", () => {
   describe("答案最小长度阈值", () => {
-    it(`每道题答案 >= ${MIN_ANSWER_LENGTH} 字符（防严重残缺）`, () => {
+    it(`每道题答案 >= ${MIN_ANSWER_LENGTH} 字符（防浅薄，与 audit 浅薄线对齐）`, () => {
       const offenders: string[] = [];
       for (const preset of PRESETS) {
         for (const q of preset.questions) {

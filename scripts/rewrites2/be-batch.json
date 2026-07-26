@@ -1,0 +1,36 @@
+[
+  {
+    "id": "be-99",
+    "presetId": "backend",
+    "nodeTitle": "NoSQL（MongoDB/ES/图数据库/时序库）",
+    "question": "MongoDB 文档模型与索引设计？何时用嵌套文档何时用引用？",
+    "answer": "结论：嵌套文档适合一对一、少量一对多且数据一起读的场景；引用适合多对多、数据量大、需独立更新的场景。索引设计遵循 ESR 原则（Equality > Sort > Range）。\n\n案例：抖音用户资料存储用 MongoDB，用户基本信息+标签嵌套存储（一次读取拿到全部），但视频列表用引用（视频独立增长、分页查询）。\n\n```javascript\n// 嵌套文档：用户+地址\ndb.users.insertOne({\n  name: \"张三\",\n  addresses: [{ city: \"北京\", zip: \"100000\" }]\n});\n// 建索引：ESR 原则\ndb.orders.createIndex({ status: 1, createTime: -1, amount: 1 });\n// 复合索引：等值在前、排序在中、范围在后\ndb.events.createIndex({ type: 1, date: -1, price: 1 });\n```\n\n踩坑：嵌套文档上限 16MB；数组索引需注意多键索引（multikey）；嵌套太深影响查询性能；索引不是越多越好（写放大）。",
+    "answerLen": 497,
+    "keyPoints": [
+      "嵌套 vs 引用选型",
+      "ESR 索引原则",
+      "16MB 文档上限"
+    ],
+    "followUps": [
+      "MongoDB 索引底层是什么结构？",
+      "覆盖查询如何优化？"
+    ]
+  },
+  {
+    "id": "be-113",
+    "presetId": "backend",
+    "nodeTitle": "微服务（注册发现/熔断/链路追踪/网关）",
+    "question": "微服务架构 vs 单体架构？什么时候该拆？拆分原则？",
+    "answer": "结论：单体适合早期快速迭代，微服务适合团队规模大、业务复杂、需独立扩展的场景。拆分原则：按业务领域（DDD）、高内聚低耦合、数据库独占、接口稳定。\n\n案例：抖音从单体 Java 演进到微服务（视频/推荐/用户/评论独立部署），团队 50+ 时拆分；早期美团外卖从 PHP 单体拆为 Java 微服务（订单/配送/支付/商家独立）。\n\n```text\n// 拆分前（单体）\napp/\n  controllers/order.ts\n  controllers/payment.ts\n  controllers/delivery.ts\n  // 共享一个数据库\n\n// 拆分后（微服务）\norder-service/      -> 独立 DB\npayment-service/    -> 独立 DB\ndelivery-service/   -> 独立 DB\n// 各服务独立部署、独立扩展\n```\n\n踩坑：不要过早拆分（团队小时分布式成本 > 收益）；拆太细变\"纳米服务\"（运维爆炸）；数据库不能共享（否则耦合）；跨服务事务难处理。",
+    "answerLen": 465,
+    "keyPoints": [
+      "DDD 领域驱动拆分",
+      "数据库独占",
+      "高内聚低耦合"
+    ],
+    "followUps": [
+      "微服务拆多细合适？",
+      "如何评估拆分收益？"
+    ]
+  }
+]
