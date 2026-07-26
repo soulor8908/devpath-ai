@@ -249,6 +249,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "React Router v6、Next.js 数据获取、SWR、React Query 缓存、路由守卫、嵌套路由、懒加载路由。",
     mastery: 0,
   },
+  // ===== 手写代码层（3 个节点） =====
+  {
+    id: "coding-utility",
+    title: "手写题：JS 核心工具",
+    difficulty: 4,
+    prerequisites: ["js-prototype"],
+    frequency: "高",
+    bigTech: true,
+    summary: "防抖节流、深拷贝（循环引用/特殊类型）、call/apply/bind、new/instanceof、柯里化、EventEmitter、寄生组合继承。",
+    mastery: 0,
+  },
+  {
+    id: "coding-async",
+    title: "手写题：异步与并发控制",
+    difficulty: 5,
+    prerequisites: ["js-async", "coding-utility"],
+    frequency: "高",
+    bigTech: true,
+    summary: "手写 Promise A+、Promise.all/race/allSettled/any、并发限制调度器、重试超时、红绿灯循环、可取消异步。",
+    mastery: 0,
+  },
   // ===== 工程化层（5 个节点） =====
   {
     id: "build-tools",
@@ -7794,6 +7815,1090 @@ class LiveSocket {
 踩坑：①TTL 设太短（<60s）递归服务器频繁回源，解析变慢且权威服务器压力大；设太长（>1天）切机房/换 IP 时老缓存不生效——灰度期调短，稳定期调长；②预解析别超过 10 个域，多了反而争抢；③HTTPDNS 拿到的 IP 直连后，HTTPS 证书校验的 SNI/Host 要手动带上原域名（不然证书不匹配）；④DoH 会让企业内网的 DNS 审计/安全网关失效，部分企业策略会封禁 DoH 域名；⑤IPv6 AAAA 记录和 A 记录并行查询，配错 AAAA（指向不可达 IPv6）会导致部分用户连接超时——Happy Eyeballs 算法能缓解但不根治。`,
     keyPoints: ["递归链：根→顶级→权威，TTL 层层缓存", "HTTPDNS 治劫持/调度错/TTL 篡改", "dns-prefetch 预解析，preconnect 连握手都提前"],
     followUps: ["Happy Eyeballs（RFC 8305）如何优化 IPv4/IPv6 竞速？", "ECS（EDNS Client Subnet）对 CDN 调度的意义？"],
+    favorited: false,
+  },
+  // ===== 35. coding-utility 手写题：JS 核心工具 =====
+  {
+    id: "fe-246",
+    nodeId: "coding-utility",
+    question: "手写防抖和节流。两者本质区别是什么？immediate 版防抖如何实现？各自有哪些容易踩的坑？",
+    bigTech: true,
+    answer: `结论：防抖（debounce）是"等你不动了才执行"——n 秒内连续触发只保留最后一次；节流（throttle）是"按固定节奏执行"——n 秒内最多执行一次。防抖合并的是"意图"（搜索联想、resize 重算、自动保存），节流限制的是"频率"（滚动监听、按钮防连点、mousemove 上报）。
+
+本质区别在"时间窗口的归属"：防抖的窗口随每次触发不断重置（ trailing edge 执行），节流的窗口固定向前推进（leading 或 trailing edge 执行）。
+
+在字节跳动的中台表单项目中，我们用 immediate 防抖做"提交按钮防连点"——首次点击立即执行，之后 1 秒内的重复点击全部丢弃。如果用普通防抖，用户会觉得"点了没反应"：
+
+\`\`\`ts
+// 防抖：触发后等待 wait ms，期间再触发则重新计时
+function debounce<T extends (...args: unknown[]) => void>(fn: T, wait: number, immediate = false) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  function debounced(this: ThisParameterType<T>, ...args: Parameters<T>) {
+    if (timer) clearTimeout(timer);          // 重置窗口：防抖的核心
+    const callNow = immediate && !timer;     // immediate：窗口首次立即执行
+    timer = setTimeout(() => {
+      timer = null;
+      if (!immediate) fn.apply(this, args);  // 尾部执行
+    }, wait);
+    if (callNow) fn.apply(this, args);       // 立即执行分支
+  }
+  debounced.cancel = () => {                 // 必须提供 cancel：组件卸载防内存泄漏
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  return debounced;
+}
+
+// 节流：时间戳 + 定时器双版本。时间戳版 leading 执行，定时器版 trailing 执行
+function throttle<T extends (...args: unknown[]) => void>(fn: T, interval: number) {
+  let last = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return function throttled(this: ThisParameterType<T>, ...args: Parameters<T>) {
+    const now = Date.now();
+    const remaining = interval - (now - last);
+    if (remaining <= 0) {                    // 间隔已到：立即执行（leading）
+      if (timer) { clearTimeout(timer); timer = null; }
+      last = now;
+      fn.apply(this, args);
+    } else if (!timer) {                     // 间隔内：挂一个尾随和弦（trailing）
+      timer = setTimeout(() => {
+        last = Date.now();
+        timer = null;
+        fn.apply(this, args);
+      }, remaining);
+    }
+  };
+}
+\`\`\`
+
+踩坑实录：①this 和 event 丢失——React 合成事件有对象池复用（React 17 已移除但观念残留），防抖后 event 是"过期"的，要提前 e.persist() 或解构出值；②忘加 cancel——组件卸载后定时器回调访问已卸载的 setState，React 会警告内存泄漏；③immediate 版的判断顺序——先 clearTimeout 再判断 callNow，否则 immediate 永远 false；④时间戳版节流在"最后一段间隔内"的触发被直接丢弃，滚动停止时最后一帧丢失，需要 trailing 定时器补发；⑤requestAnimationFrame 其实是更"屏幕同步"的节流（16.6ms），视觉类场景优先 rAF 而非 setTimeout 节流。`,
+    keyPoints: ["防抖重置窗口、节流固定窗口", "immediate = 窗口首次立即执行", "cancel 防卸载后回调，rAF 是视觉场景的更优节流"],
+    followUps: ["防抖节流在 React 18 中与 startTransition 如何取舍？", "如何用 AbortController 统一管理一批 debounced 函数的生命周期？"],
+    favorited: false,
+  },
+  {
+    id: "fe-247",
+    nodeId: "coding-utility",
+    question: "手写深拷贝。如何处理循环引用、Date/RegExp/Map/Set 等特殊类型？structuredClone 能替代手写吗？",
+    bigTech: true,
+    answer: `结论：JSON.parse(JSON.stringify()) 只能处理纯数据——会丢 undefined/function/Symbol、Date 变字符串、RegExp 变 {}、循环引用直接抛错。生产级深拷贝必须递归遍历 + WeakMap 缓存处理循环引用 + 按类型分发特殊拷贝。structuredClone 是原生方案，能处理 90% 场景，但无法拷贝函数和 DOM 节点，且老浏览器要 polyfill。
+
+在富文本编辑器项目中，我们曾用 JSON 深拷贝备份文档模型，结果文档里的 Date 字段全部变成字符串，导致"最近编辑时间"显示错乱；换成结构化深拷贝后解决：
+
+\`\`\`ts
+function deepClone<T>(value: T, hash = new WeakMap<object, unknown>()): T {
+  // 1. 原始类型与函数直接返回（函数不可拷贝，共享引用）
+  if (value === null || typeof value !== "object") return value;
+
+  // 2. 循环引用：已拷贝过的对象直接返回缓存
+  if (hash.has(value as object)) return hash.get(value as object) as T;
+
+  // 3. 特殊类型分支
+  if (value instanceof Date) return new Date(value.getTime()) as T;
+  if (value instanceof RegExp) {
+    const re = new RegExp(value.source, value.flags) as T;
+    (re as RegExp).lastIndex = value.lastIndex; // 保留 lastIndex，g 标志的坑
+    return re;
+  }
+  if (value instanceof Map) {
+    const result = new Map();
+    hash.set(value as object, result);          // 先注册再递归，防自引用 Map
+    value.forEach((v, k) => result.set(deepClone(k, hash), deepClone(v, hash)));
+    return result as T;
+  }
+  if (value instanceof Set) {
+    const result = new Set();
+    hash.set(value as object, result);
+    value.forEach((v) => result.add(deepClone(v, hash)));
+    return result as T;
+  }
+  if (value instanceof ArrayBuffer) return value.slice(0) as T;
+
+  // 4. 普通对象/数组：保持原型链（class 实例不失真）
+  const result: Record<PropertyKey, unknown> = Array.isArray(value)
+    ? []
+    : Object.create(Object.getPrototypeOf(value));
+  hash.set(value as object, result);            // 关键：递归前先登记
+  // Reflect.ownKeys 覆盖 string + Symbol 键（Object.keys 漏 Symbol）
+  for (const key of Reflect.ownKeys(value)) {
+    result[key] = deepClone((value as Record<PropertyKey, unknown>)[key], hash);
+  }
+  return result as T;
+}
+\`\`\`
+
+要点解析：①WeakMap 而不是 Map——键是对象且弱引用，拷贝结束后缓存可被 GC，不会内存泄漏；②先 hash.set 再递归——遇到 { a: { self: a } } 这种结构时，递归回 self 时能命中缓存直接返回，否则栈溢出；③Object.create(Object.getPrototypeOf(value)) 保留原型链——class 实例拷贝后 instanceof 仍为 true，方法（在原型上）天然共享无需拷贝；④Reflect.ownKeys 而非 Object.keys——后者漏掉 Symbol 键和不可枚举键。
+
+structuredClone 的现实定位：Chrome 98+/Safari 15.4+ 可用，原生 C++ 实现比 JS 递归快 5-10 倍，支持 Map/Set/Date/RegExp/ArrayBuffer/TypedArray 和循环引用。但它抛 DataCloneError 的场景：函数、DOM 节点、Proxy 对象、class 实例会丢原型（退化为普通对象！）。所以：纯数据用 structuredClone，含 class 实例的模型层还是得手写。
+
+踩坑：①拷贝 Proxy 对象时读到的是代理后的值，可能触发意外的 getter 副作用；②getter/setter 会被"固化"成普通属性——拷贝后失去响应性（Vue2 的 defineProperty 响应式对象深拷贝后会失去响应，Vue3 的 Proxy 同理）；③共享引用变独立副本——{ x: shared, y: shared } 拷贝后 x !== y，如果业务依赖"同一引用"语义（如双向关联的图谱节点）会出 bug，需要拷贝后重建关联；④性能：10 万节点对象的深拷贝在主线程可能 100ms+，大对象考虑不可变数据结构（Immer）按需共享未变更部分，而不是全量拷贝。`,
+    keyPoints: ["WeakMap 缓存治循环引用，先登记再递归", "Object.create(getPrototypeOf) 保原型链", "structuredClone 快但丢 class 原型、拒函数 DOM"],
+    followUps: ["Immer 的结构共享（structural sharing）如何避免全量拷贝？", "如何深拷贝一个包含 DOM 引用的对象图？"],
+    favorited: false,
+  },
+  {
+    id: "fe-248",
+    nodeId: "coding-utility",
+    question: "手写 call、apply、bind。bind 返回的函数被 new 调用时 this 指向谁？",
+    bigTech: true,
+    answer: `结论：三者都是"显式绑定 this"。call/apply 立即调用（参数一个散一个数组），bind 返回绑定后的新函数。实现核心：把函数挂载为 context 的临时属性，通过"谁调用 this 就是谁"的隐式绑定规则借道执行，执行完删除属性。bind 被 new 调用时，new 绑定优先级最高，bind 绑定的 this 失效，this 指向新创建的实例。
+
+在一个低代码平台的"表达式沙箱"里，我们需要让用户表达式在指定作用域对象上执行，用的就是 call 显式绑定；而 bind 的 new 场景出现在组件库的"偏函数 + 构造器复用"模式里：
+
+\`\`\`ts
+// call：thisArg + 散参，立即执行
+Function.prototype.myCall = function (thisArg: unknown, ...args: unknown[]) {
+  // 1. thisArg 为 null/undefined 时指向全局（非严格模式）——严格模式应保持 undefined
+  const context = thisArg == null ? globalThis : Object(thisArg);
+  // 2. Symbol 做临时键，防与 context 自有属性冲突
+  const fnKey = Symbol("fn");
+  context[fnKey] = this;          // this 就是调用 myCall 的函数
+  const result = context[fnKey](...args); // 隐式绑定：context.fn() → this = context
+  delete context[fnKey];          // 3. 清理现场
+  return result;
+};
+
+// apply：参数是数组
+Function.prototype.myApply = function (thisArg: unknown, argsArray: unknown[] = []) {
+  const context = thisArg == null ? globalThis : Object(thisArg);
+  const fnKey = Symbol("fn");
+  context[fnKey] = this;
+  const result = context[fnKey](...argsArray);
+  delete context[fnKey];
+  return result;
+};
+
+// bind：返回函数，支持柯里化预设参数，且要处理 new 场景
+Function.prototype.myBind = function (thisArg: unknown, ...presetArgs: unknown[]) {
+  if (typeof this !== "function") throw new TypeError("Bind must be called on a function");
+  const originalFn = this;
+  function boundFn(this: unknown, ...callArgs: unknown[]) {
+    // 关键：new 调用时 this 是 boundFn 的实例，此时忽略 thisArg
+    const isNew = this instanceof boundFn;
+    return originalFn.apply(isNew ? this : thisArg, [...presetArgs, ...callArgs]);
+  }
+  // 维护原型链：new boundFn() 能访问 originalFn.prototype 上的方法
+  boundFn.prototype = Object.create(originalFn.prototype);
+  return boundFn;
+};
+\`\`\`
+
+this 绑定优先级（从高到低）：①new 绑定（new fn()）→ ②显式绑定（call/apply/bind）→ ③隐式绑定（obj.fn()）→ ④默认绑定（独立调用，严格模式 undefined / 非严格全局）。验证：
+
+\`\`\`js
+function Foo(name) { this.name = name; }
+const obj = {};
+const BoundFoo = Foo.myBind(obj, "preset");
+const inst = new BoundFoo("real");
+console.log(inst.name);  // "real" —— new 赢了，this 不是 obj 是新实例
+console.log(obj.name);   // undefined —— bind 的 thisArg 被 new 覆盖
+\`\`\`
+
+要点：①thisArg 是原始值要 Object(thisArg) 装箱——"abc".myCall 时 context 必须是对象；②Symbol 临时键防冲突——若 context 本来就有 fnKey 同名属性会被覆盖，Symbol 保证唯一；③bind 的原型链维护——漏了 boundFn.prototype = Object.create(originalFn.prototype)，new 出的实例就 instanceof 不了原函数（注意：这行用赋值会让两个 prototype 联动变更，原生 bind 用的是空函数中转，防互相污染）；④箭头函数没有自己的 this，call/apply/bind 对它无效——这是箭头函数"this 词法绑定"的定义，不是 bug。
+
+踩坑：①非严格模式下 myCall(null) 指向 globalThis，严格模式下原生行为是保持 null/undefined，生产代码几乎都用严格模式，模拟实现与原生有细微差异；②bind 链——fn.bind(a).bind(b) 永远只有第一次的 a 生效（bind 不可覆盖）；③bind 后函数的 length 属性是 原length - 预设参数个数，柯里化判断参数个数时要小心；④性能敏感场景（每帧调用）避免频繁 bind 创建新函数，构造函数里 bind 一次缓存复用。`,
+    keyPoints: ["临时属性借道隐式绑定，Symbol 防冲突", "this 优先级：new > 显式 > 隐式 > 默认", "bind 需维护原型链，bind 链只有首次生效"],
+    followUps: ["为什么箭头函数无法被 bind 改变 this？", "实现一个软绑定 softBind：this 为 undefined 时才用默认对象"],
+    favorited: false,
+  },
+  {
+    id: "fe-249",
+    nodeId: "coding-utility",
+    question: "手写 new 操作符和 instanceof。new 的过程中发生了什么？instanceof 如何判断跨 iframe 的对象？",
+    bigTech: true,
+    answer: `结论：new 做四件事——①创建空对象、②空对象的 __proto__ 指向构造函数的 prototype、③以空对象为 this 执行构造函数、④构造函数返回对象则用之，否则返回空对象。instanceof 沿原型链向上找构造函数的 prototype。跨 iframe 的对象原型链不同（每个 realm 有自己的 Object.prototype），instanceof 会误判，应用 Object.prototype.toString 或结构化判断。
+
+\`\`\`ts
+// 手写 new：myNew(Constructor, ...args)
+function myNew<T extends new (...args: unknown[]) => unknown>(
+  Constructor: T,
+  ...args: ConstructorParameters<T>
+): InstanceType<T> {
+  // 1+2. 建对象并链接原型（Object.create 一步搞定）
+  const obj = Object.create(Constructor.prototype);
+  // 3. 以 obj 为 this 执行构造函数
+  const result = Constructor.apply(obj, args);
+  // 4. 构造函数显式返回对象则用它，否则用 obj（返回原始值被忽略）
+  return (result !== null && (typeof result === "object" || typeof result === "function"))
+    ? (result as InstanceType<T>)
+    : (obj as InstanceType<T>);
+}
+
+// 手写 instanceof：右值 prototype 在左值原型链上即 true
+function myInstanceof(left: unknown, right: new (...args: unknown[]) => unknown): boolean {
+  if (typeof right !== "function") throw new TypeError("Right-hand side must be callable");
+  let proto = Object.getPrototypeOf(left); // 取左值原型
+  const target = right.prototype;
+  while (proto !== null) {
+    if (proto === target) return true;     // 链上命中
+    proto = Object.getPrototypeOf(proto);  // 沿链向上
+  }
+  return false;                            // 查到 null 还没命中
+}
+\`\`\`
+
+new 的细节决定面试深度：①构造函数返回原始值（return 1）被忽略，返回对象（return { x: 1 }）则替换新实例——这是"工厂函数伪装构造器"的技巧，也是 Vue2 的 this 不能被 return 覆盖的原因；②箭头函数不能 new——它没有 [[Construct]] 内部方法，也没有 prototype 属性；③Object.create(null) 的对象没有原型，myInstanceof(obj, Object) 为 false——做"纯净字典"防原型污染时有用，但别人 instanceof 判断会全部失效。
+
+跨 realm 判定是真实痛点：在微前端 qiankun 项目中，主应用和子应用跑在不同 JS 全局环境里，子应用 new Array() 的结果在主应用 arr instanceof Array === false，导致主应用的"参数校验"误杀子应用传过来的数组。解决方案分层：
+
+\`\`\`ts
+// 1. Object.prototype.toString：读内部 [[Class]]，跨 realm 稳定
+function isArrayLike(v: unknown): boolean {
+  return Object.prototype.toString.call(v) === "[object Array]"; // 跨 iframe 也准
+}
+// 2. Array.isArray：ES5 起原生支持跨 realm
+Array.isArray(iframeArr); // true，比 instanceof 可靠
+// 3. Symbol.hasInstance：自定义 instanceof 行为（ES6）
+class MyArray {
+  static [Symbol.hasInstance](inst: unknown) {
+    return Array.isArray(inst); // 让 instanceof 也走跨 realm 逻辑
+  }
+}
+\`\`\`
+
+要点：①instanceof 查的是"构造函数的 prototype 属性"，不是构造函数本身——改写了 Fn.prototype = {} 后，之前创建的实例 instanceof Fn 变 false；②基本类型 instanceof 永远 false——"a" instanceof String 是 false，因为左值是原始值没有原型链，Object.getPrototypeOf("a") 取到的是装箱后的 String.prototype（这步是规范行为）；③Symbol.hasInstance 是元编程钩子，可让"鸭子类型 instanceof"成为可能。
+
+踩坑：①iframe 间通信用 postMessage 传的是结构化克隆后的副本，不存在跨 realm 引用问题，只有直接访问 iframe.contentWindow 的对象才会踩坑；②跨 realm 的 Promise 互相 await 没问题（thenable 鸭子检测），但 promise instanceof Promise 跨 realm false；③React DevTools 早期版本在微前端场景误判组件类型，就是 realm 问题；④Node 的 vm 模块、Worker 都是独立 realm，同理。`,
+    keyPoints: ["new 四步：建对象/链原型/执行/返回值裁决", "instanceof 走原型链，改 prototype 会反转既有实例判定", "跨 realm 用 toString.call / Array.isArray 而非 instanceof"],
+    followUps: ["Object.create(null) 对象的使用场景与代价？", "Symbol.hasInstance 如何被滥用导致 instanceof 语义混乱？"],
+    favorited: false,
+  },
+  {
+    id: "fe-250",
+    nodeId: "coding-utility",
+    question: "实现柯里化函数 curry，要求支持任意参数个数和占位符 _ 跳过参数。柯里化在真实项目里解决什么问题？",
+    bigTech: true,
+    answer: `结论：柯里化把 f(a, b, c) 变成 f(a)(b)(c)——收集参数直到凑齐原函数形参个数再执行。占位符 _ 允许"先传后面的参数"，本质是参数的重排等待。真实价值在于：参数复用（偏应用）、延迟执行（配置先行）、函数组合（pointfree 风格）。
+
+在数据可视化项目中，我们有一个绘图函数 drawChart(type, config, data)，初始化阶段定了 type 和 config，运行期只有 data 在变——柯里化后 const drawLine = curry(drawChart)("line", lineConfig)，业务层只管 drawLine(data)，语义清晰且避免到处传重复配置：
+
+\`\`\`ts
+// 基础版：按形参个数（fn.length）判断凑齐
+function curry<T extends (...args: unknown[]) => unknown>(fn: T) {
+  return function curried(...args: unknown[]): unknown {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args);       // 凑齐：执行
+    }
+    return function (this: unknown, ...rest: unknown[]) {
+      return curried.apply(this, [...args, ...rest]); // 未凑齐：合并参数继续等
+    };
+  };
+}
+
+// 占位符版：curry._ 占位，允许"跳过某参数后补"
+const _ = Symbol("placeholder");
+function curryP<T extends (...args: unknown[]) => unknown>(fn: T) {
+  // 判断 args 是否已"完整"：长度够 且 前 fn.length 位无占位符
+  const isComplete = (args: unknown[]) =>
+    args.length >= fn.length && !args.slice(0, fn.length).includes(_);
+
+  // 合并：新参数尽量填充旧参数中的占位符空位
+  const merge = (oldArgs: unknown[], newArgs: unknown[]) => {
+    const result = [...oldArgs];
+    const rest = [...newArgs];
+    for (let i = 0; i < result.length && rest.length; i++) {
+      if (result[i] === _) result[i] = rest.shift(); // 占位符被实参替换
+    }
+    return [...result, ...rest]; // 剩余实参追加
+  };
+
+  return function curried(...args: unknown[]): unknown {
+    if (isComplete(args)) return fn.apply(this, args);
+    return (this: unknown, ...rest: unknown[]) => curried.apply(this, merge(args, rest));
+  };
+}
+curryP._ = _;
+
+// 用法
+const api = (method: string, url: string, body: unknown) => fetch(url, { method, body: JSON.stringify(body) });
+const post = curryP(api)("POST");              // 固定 method
+const postUser = curryP(api)("POST", "/user"); // 固定 method+url
+const withMethod = curryP(api)(curryP._, "/log"); // method 留空后补
+withMethod("PUT", { a: 1 }); // → api("PUT", "/log", { a: 1 })
+\`\`\`
+
+要点：①fn.length 是"声明的形参个数（不含默认值之后的）"——rest 参数和默认参数会让 length 失真，函数签名设计要注意；②递归返回的函数要透传 this——curried.apply(this, ...) 保留调用上下文，否则绑定丢失；③占位符合并算法是"填坑优先、追加其次"——Lodash 的 _.curry 就是这么干的；④柯里化与箭头函数——箭头函数没有自己的 this，curry 后 this 语义更可控，函数式库里几乎全用箭头函数。
+
+真实价值场景：①事件处理参数复用——const handleClick = curry(logEvent)("click")，列表里 100 个按钮共享前缀；②中间件签名统一——Redux 的 middleware 是 store => next => action => ... 三层柯里化，让 store 在 applyMiddleware 时注入一次，运行时只过 action；③与组合函数配合——compose(map(f), filter(g)) 要求每个函数单参，柯里化是把多参函数塞进管道的适配器；④类型体操——TypeScript 下柯里化函数的类型推导（Curried<T>）是高级技巧，能精确推导每一步的剩余参数。
+
+踩坑：①过度柯里化让调用栈变深、调试栈帧爆炸——Chrome DevTools 里看到十几层匿名函数很难追；②fn.length 失真：function f(a, b = 1, ...c) 的 length 是 1，curry(f)(1) 就直接执行了，b/c 永远收不到；③占位符版本无法用普通值当占位符（万一业务真传 undefined 呢）——必须用 Symbol 保证唯一；④柯里化函数无法被 .bind 二次绑定后还保持参数收集语义，this 绑定和参数收集是两层独立逻辑，别混用。`,
+    keyPoints: ["收集参数至 fn.length 再执行，未齐则返回等待函数", "占位符 = Symbol，合并时填坑优先", "价值：参数复用/延迟执行/函数组合适配"],
+    followUps: ["Redux middleware 三层柯里化各注入了什么？", "TypeScript 如何推导柯里化函数的剩余参数类型？"],
+    favorited: false,
+  },
+  {
+    id: "fe-251",
+    nodeId: "coding-utility",
+    question: "手写 EventEmitter（on/off/once/emit）。如何防止内存泄漏？为什么 Node 的 EventEmitter 默认限制 10 个监听器？",
+    bigTech: true,
+    answer: `结论：EventEmitter 是发布订阅的最小实现——用 Map<事件名, 监听器数组> 存订阅关系，emit 时按序同步执行。内存泄漏的根因是"订阅了但没人退订"——监听器闭包持有外部对象，事件中心不释放，外部对象就无法 GC。Node 默认限 10 个是"可能的泄漏预警"（不是硬限制），因为一个事件挂几十上百个监听器，大概率是忘了 off。
+
+在跨组件通信总线（micro-frontend 下主子应用通信）中，我们实现过生产级 EventEmitter：
+
+\`\`\`ts
+type Listener = (...args: unknown[]) => void;
+interface WrappedListener extends Listener { __original?: Listener } // once 包装溯源
+
+class EventEmitter {
+  private events = new Map<string, WrappedListener[]>();
+
+  on(event: string, listener: Listener): this {
+    const list = this.events.get(event) ?? [];
+    list.push(listener);
+    this.events.set(event, list);
+    return this; // 链式调用
+  }
+
+  once(event: string, listener: Listener): this {
+    // 包装：执行一次后自动 off
+    const wrapper: WrappedListener = (...args) => {
+      this.off(event, wrapper);      // 先退订再执行，防重入
+      listener.apply(this, args);
+    };
+    wrapper.__original = listener;   // 记录原函数：off(event, 原函数) 也能退掉 once 注册的
+    return this.on(event, wrapper);
+  }
+
+  off(event: string, listener?: Listener): this {
+    if (!listener) { this.events.delete(event); return this; } // 不传则清空该事件
+    const list = this.events.get(event);
+    if (!list) return this;
+    // 同时匹配原函数与 once 包装（__original 溯源）
+    const next = list.filter((l) => l !== listener && l.__original !== listener);
+    if (next.length) this.events.set(event, next);
+    else this.events.delete(event);  // 空数组也要清，防 Map 无限增长
+    return this;
+  }
+
+  emit(event: string, ...args: unknown[]): boolean {
+    const list = this.events.get(event);
+    if (!list?.length) return false;
+    // 切片复制再遍历：防监听器内 off 自己导致数组被原地修改、跳过后续监听器
+    for (const listener of [...list]) {
+      listener.apply(this, args);
+    }
+    return true;
+  }
+
+  listenerCount(event: string): number {
+    return this.events.get(event)?.length ?? 0;
+  }
+
+  removeAll(): void { this.events.clear(); }
+}
+\`\`\`
+
+关键实现决策：①emit 前 [...list] 切片——这是最容易被挂的点：监听器 A 里 off 了监听器 B，原地遍历时 B 已被 splice 掉，索引错位导致 C 被跳过。复制数组遍历，"本次 emit 的监听器快照"语义清晰；②once 的 wrapper 要先 off 再执行——监听器内同步 emit 同一事件（重入），若先执行后 off，wrapper 会被执行第二次；③__original 溯源——否则 once 注册的函数永远 off 不掉（你手里只有原函数引用，没有 wrapper）；④off 后清理空数组——高频 on/off 场景下 Map 的 key 无限膨胀也是泄漏。
+
+内存泄漏防治体系：①组件级自动退订——React 里 useEffect(() => { bus.on(x, fn); return () => bus.off(x, fn); }, [])，cleanup 是强约束；②WeakRef 版监听器（实验）——监听器持有对象用 WeakRef，对象死了监听器自动失效，但回调时机不确定，生产慎用；③maxListeners 预警——Node 的 setMaxListeners(10) 是默认值，超过打警告 (MaxListenersExceededWarning)，定位"循环里重复 on"的低级错误；④命名空间事件——"user:login"、"user:logout" 前缀分组，便于按命名空间批量清理。
+
+为什么 Node 默认 10 个：经验值——一个事件正常消费方就 1-3 个（日志、指标、业务），10 个以上通常意味着在循环/渲染里误注册。可调 emitter.setMaxListeners(0)（关闭限制），但正确姿势是怀疑代码而非调大阈值。我们线上出过一次事故：WebSocket 断线重连逻辑里每次重连都 on("message")，运行三天后单事件挂了 2000+ 监听器，每条消息触发 2000 次回调，CPU 直接打满。
+
+踩坑：①同步执行模型——EventEmitter 的 emit 是同步的，监听器抛错会中断后续监听器并向上传播（Node 里 uncaughtException 直接挂进程），生产环境 emit 体要 try/catch 或监听器自治；②与 Promise 混用——once(event) 改成 Promise 风格 await once(emitter, "done") 时，事件先于监听触发会永久挂起，需要"已发生事件缓存"（replay 语义）；③EventTarget（DOM 标准）与 EventEmitter  API 不同（addEventListener/removeEventListener），浏览器新代码可优先 EventTarget，天然支持 signal 自动退订。`,
+    keyPoints: ["emit 切片遍历防原地修改跳监听", "once 先 off 再执行 + __original 溯源", "泄漏根因 = 订阅无退订，10 监听上限是预警"],
+    followUps: ["如何实现带 replay 语义的事件总线（新订阅者立即收到上次值）？", "AbortSignal 如何让 addEventListener 批量退订更优雅？"],
+    favorited: false,
+  },
+  {
+    id: "fe-252",
+    nodeId: "coding-utility",
+    question: "手写寄生组合继承，并说明它为什么是 ES5 时代最优继承方案。class extends 与它是什么关系？",
+    bigTech: true,
+    answer: `结论：继承要解决两件事——实例属性的独立（构造函数借调）+ 方法共享（原型链链接）。寄生组合继承用"借调父构造函数 + Object.create 链原型"，避开了组合继承"父构造函数被调两次"的浪费，是 ES5 最优解。class extends 是它的语法糖，Babel 转译后核心逻辑就是寄生组合继承。
+
+先看不优的方案：①原型链继承 Child.prototype = new Parent()——父类引用类型属性被所有子实例共享，改一个全改；②构造函数继承 Parent.call(this)——方法在每个实例上重复创建，无法复用；③组合继承（前两个加起来）——属性独立了、方法共享了，但 Parent() 被调用两次：一次 call(this)、一次 new 挂原型，实例上属性覆盖了原型上的同名属性，纯属浪费。
+
+寄生组合继承的"寄生"之处：不 new Parent()，而是 Object.create(Parent.prototype) 凭空造一个"只有原型链接、没有实例属性"的替身：
+
+\`\`\`js
+function Parent(name) {
+  this.name = name;
+  this.colors = ["red"];
+}
+Parent.prototype.sayName = function () { return this.name; };
+
+function Child(name, age) {
+  Parent.call(this, name); // 第二次调用（借调）——实例属性独立
+  this.age = age;
+}
+// 关键三步：替代 Child.prototype = new Parent()
+Child.prototype = Object.create(Parent.prototype); // 原型链接，不调 Parent
+Child.prototype.constructor = Child;               // 修复 constructor 指回自己
+// Object.create 的对象 constructor 默认继承自原型链上的 Parent，必须修正
+
+const a = new Child("a", 1);
+const b = new Child("b", 2);
+a.colors.push("blue");
+console.log(b.colors);           // ["red"] —— 引用属性不共享 ✓
+console.log(a.sayName());        // "a" —— 原型方法共享 ✓
+console.log(a.constructor);      // Child —— constructor 正确 ✓
+\`\`\`
+
+为什么最优：Parent 只被调一次（call 那次），原型上干干净净没有多余实例属性；instanceof、isPrototypeOf 全部正常工作；ES6 之前这就是事实标准（YUI、Dojo 都这么做）。
+
+class extends 的关系——Babel 转译的核心就是这个模式 + 几条强化规则：
+
+\`\`\`js
+// class Child extends Parent {} 转译后（简化）
+function _inherits(Child, Parent) {
+  Child.prototype = Object.create(Parent.prototype);
+  Child.prototype.constructor = Child;
+  Object.setPrototypeOf(Child, Parent); // 静态属性的继承！寄生组合继承漏了这条
+}
+\`\`\`
+
+class 相对手写方案的增强：①静态属性继承——Object.setPrototypeOf(Child, Parent) 让 Child.staticMethod 能访问 Parent.staticMethod，寄生组合继承只管实例链；②super 语义——super.method() 通过 [[HomeObject]] 内部槽定位父类方法，手写方案只能 Parent.prototype.method.call(this) 笨拙模拟；③new.target 检查——class 不用 new 调用直接抛错，手写函数靠 instanceof 判断兜底；④原生 class 不能被 .call 借用——Parent.call(this) 对 class Parent 会抛 TypeError（class constructor cannot be invoked without 'new'），混合新旧代码时的真实坑：父类是 class、子类想 ES5 风格继承，无解，必须统一用 class。
+
+踩坑：①constructor 修正时机——Child.prototype = Object.create(...) 是整体替换，之后补的 constructor 别忘了设 writable/enumerable 语义（默认赋值是可枚举的，原生 constructor 不可枚举，for-in 遍历会暴露，用 Object.defineProperty 补精确语义）；②继承内置类型（Array/Error）在 ES5 下有坑——new ChildArray() 的 length 行为异常，因为内置构造器有内部槽，class extends Array 也要配合 Symbol.species 才完备；③方法复写时调父类同名方法要 Parent.prototype.method.call(this)，忘了 .call(this) 会导致父方法里 this 指向原型对象，改的是共享状态；④多重继承 ES 不支持——Mixin 模式（Object.assign(Child.prototype, mixinA, mixinB)）是组合式替代，比继承更灵活。`,
+    keyPoints: ["借调构造函数 + Object.create 链原型，父构造只调一次", "别忘了修 constructor，且注意可枚举性", "class extends = 语法糖 + 静态继承 + super 语义 + new 检查"],
+    followUps: ["super 的 [[HomeObject]] 机制为什么让对象字面量方法也能用 super？", "Mixin 模式如何处理同名方法冲突？"],
+    favorited: false,
+  },
+  {
+    id: "fe-253",
+    nodeId: "coding-utility",
+    question: "手写 LRU 缓存，要求 get/put 都是 O(1)。为什么用 Map 而不是 {}？LRU 在前端有哪些真实应用？",
+    bigTech: true,
+    answer: `结论：LRU（最近最少使用）淘汰最久未访问的条目。O(1) 的关键是"哈希表 + 双向链表"：哈希表 O(1) 定位，双向链表 O(1) 移动/删除节点。JS 里 Map 天然是有序哈希表（插入序），迭代时第一个就是最久未用、最后一个是最新——用 Map 的"删除再重插"即可模拟双向链表行为，比手写链表简洁且不易错。
+
+\`\`\`ts
+class LRUCache<K, V> {
+  private cache = new Map<K, V>();
+  constructor(private readonly capacity: number) {}
+
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+    const value = this.cache.get(key)!;
+    // 访问后移到最新：删除重插，Map 迭代序即"新旧序"
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  put(key: K, value: V): void {
+    if (this.cache.has(key)) this.cache.delete(key); // 已存在：先删，确保重插到最新
+    this.cache.set(key, value);
+    if (this.cache.size > this.capacity) {
+      // 淘汰最久未用：Map 第一个 key（迭代序最老）
+      const oldestKey = this.cache.keys().next().value as K;
+      this.cache.delete(oldestKey);
+    }
+  }
+}
+\`\`\`
+
+为什么用 Map 而不是 {}：①键类型——{} 的键被强制 toString（数字 1 和 "1" 冲突，对象键变 "[object Object]"），Map 支持任意类型键（对象、函数、NaN）；②顺序保证——Map 严格按插入序迭代（ES2015 规范），普通对象的整数键会按数值升序排在前面，迭代序不可靠；③性能——V8 对 Map 的频繁增删有专门优化，{} 频繁 delete 会从"字典模式"降级（hidden class 失效），性能劣化；④size O(1)——{} 要数成员得 Object.keys().length 是 O(n)。
+
+前端真实应用（不是背八股）：①组件级数据缓存——我们中台项目的列表页"前进后退不重新请求"：路由参数做 key、响应数据做 value，capacity=20，返回历史页秒开且不会无限吃内存；②计算结果缓存（memoize）——大数据表格的"行高度计算"函数包一层 LRU，相同行数据直接命中缓存，万行表格滚动白屏率降 80%；③图片/资源缓存——canvas 编辑器的缩略图缓存，LRU 自动淘汰最早缩略图，防 Blob 对象撑爆内存；④API 去重 + 短缓存——搜索联想接口 1 秒内相同 query 直接返回缓存，capacity=50。
+
+与 WeakMap 的分工：WeakMap 键弱引用、不可迭代，做不了 LRU（无法找"最老"键），它适合"对象附属数据"存储（对象死数据随之死）；LRU 要主动管理生命周期，Map 才是正解。
+
+进阶追问：①容量语义——按"条目数"还是按"字节数"？大 value（图片 Blob）场景按条目数会撑爆内存，需要在 put 时累加 size、超限淘汰（size-based LRU）；②并发 get 同一 key——缓存未命中时 10 个并发请求同时回源（缓存击穿），要用 in-flight Promise 去重（同一个 key 的 pending Promise 复用）；③淘汰回调——淘汰的条目若是占用资源的对象（WebGL 纹理、Worker），需要 onEvict 钩子释放资源，光 delete 不够；④TTL 语义——LRU 只管"新旧"不管"过期"，数据缓存常要 LRU + TTL 双保险，条目存 { value, expireAt }，get 时先判过期。`,
+    keyPoints: ["Map 迭代序即新旧序，删除重插模拟链表", "Map 胜在任意键/顺序保证/删除性能", "生产要加击穿去重、淘汰回调、TTL"],
+    followUps: ["LRU-K 与 2Q 如何改进热点突发流量下的命中率？", "如何给 LRU 加 TTL 且过期清理不遍历全表？"],
+    favorited: false,
+  },
+  // ===== 36. coding-async 手写题：异步与并发控制 =====
+  {
+    id: "fe-254",
+    nodeId: "coding-async",
+    question: "手写一个符合 Promise/A+ 规范的 Promise。then 的链式调用、值穿透、resolvePromise 循环引用检测分别怎么实现？",
+    bigTech: true,
+    answer: `结论：Promise 本质是"状态机 + 回调队列"——pending/fulfilled/rejected 三态不可逆迁移，then 注册回调并按当前状态决定"立即执行"还是"入队等待"，且 then 必须返回新 Promise 实现链式。链式的核心是 resolvePromise 决议程序：用前一个 then 回调的返回值决议下一个 Promise。
+
+这是理解 async/await、微任务、框架响应式的地基。实现（含关键注释）：
+
+\`\`\`ts
+const PENDING = "pending", FULFILLED = "fulfilled", REJECTED = "rejected";
+
+class MyPromise<T> {
+  private state = PENDING;
+  private value: unknown;
+  private reason: unknown;
+  private onFulfilledCallbacks: Array<() => void> = [];
+  private onRejectedCallbacks: Array<() => void> = [];
+
+  constructor(executor: (resolve: (v: unknown) => void, reject: (r: unknown) => void) => void) {
+    const resolve = (value: unknown) => {
+      if (this.state !== PENDING) return;          // 状态不可逆：已决后忽略
+      this.state = FULFILLED;
+      this.value = value;
+      this.onFulfilledCallbacks.forEach((fn) => fn()); // 发布
+    };
+    const reject = (reason: unknown) => {
+      if (this.state !== PENDING) return;
+      this.state = REJECTED;
+      this.reason = reason;
+      this.onRejectedCallbacks.forEach((fn) => fn());
+    };
+    try { executor(resolve, reject); }
+    catch (e) { reject(e); }                        // executor 抛错即 reject
+  }
+
+  then(onFulfilled?: (v: unknown) => unknown, onRejected?: (r: unknown) => unknown): MyPromise<unknown> {
+    // 值穿透：回调非函数则透传原值/原错 —— p.then().then(v => v) 拿到原值
+    const fulfilledFn = typeof onFulfilled === "function" ? onFulfilled : (v: unknown) => v;
+    const rejectedFn = typeof onRejected === "function"
+      ? onRejected
+      : (r: unknown) => { throw r; };              // 错误穿透：抛给下游 catch
+
+    // then 必须返回新 Promise —— 链式的根基
+    const next = new MyPromise<unknown>((resolve, reject) => {
+      const runFulfilled = () => {
+        queueMicrotask(() => {                     // 规范要求回调异步执行（微任务）
+          try {
+            const x = fulfilledFn(this.value);
+            resolvePromise(next, x, resolve, reject); // 决议程序接管
+          } catch (e) { reject(e); }               // 回调抛错 → 新 Promise reject
+        });
+      };
+      const runRejected = () => {
+        queueMicrotask(() => {
+          try {
+            const x = rejectedFn(this.reason);
+            resolvePromise(next, x, resolve, reject);
+          } catch (e) { reject(e); }
+        });
+      };
+      if (this.state === FULFILLED) runFulfilled();       // 已决：立即调度
+      else if (this.state === REJECTED) runRejected();
+      else {                                               // 未决：入队等发布
+        this.onFulfilledCallbacks.push(runFulfilled);
+        this.onRejectedCallbacks.push(runRejected);
+      }
+    });
+    return next;
+  }
+}
+
+// resolvePromise 决议程序：链式调用的核心
+function resolvePromise(next: MyPromise<unknown>, x: unknown, resolve: (v: unknown) => void, reject: (r: unknown) => void) {
+  if (next === x) {                                  // 循环引用检测
+    return reject(new TypeError("Chaining cycle detected for promise"));
+  }
+  if (x instanceof MyPromise) {                      // 返回 Promise：等待其决议
+    x.then(resolve, reject);
+    return;
+  }
+  if (x !== null && (typeof x === "object" || typeof x === "function")) {
+    let called = false;                              // thenable 多次调用只取第一次
+    try {
+      const then = (x as { then?: unknown }).then;   // 鸭子检测 thenable
+      if (typeof then === "function") {
+        then.call(
+          x,
+          (y: unknown) => { if (!called) { called = true; resolvePromise(next, y, resolve, reject); } },
+          (r: unknown) => { if (!called) { called = true; reject(r); } },
+        );
+        return;
+      }
+    } catch (e) { if (!called) { called = true; reject(e); } return; }
+  }
+  resolve(x);                                        // 普通值：直接决议
+}
+\`\`\`
+
+三大考点拆解：①链式——then 返回新 Promise（next），回调返回值 x 经 resolvePromise 决议后成为 next 的结果。回调返回 Promise 时，next 会"等待"它——这就是 await 链能拍平嵌套的原因；②值穿透——then() 不传回调时，默认函数原样透传 value/throw reason，所以 p.then().then(v => console.log(v)) 仍能拿到值，catch 能跳过中间所有无 onRejected 的 then 直到最近一个 catch；③循环引用——const p2 = p1.then(() => p2) 中，回调返回值就是 then 返回的 next 本身，决议时 next === x 必须抛 TypeError，否则死循环。
+
+微任务选择：规范只要求"异步执行"，浏览器原生用微任务。我们用 queueMicrotask 保真；若用 setTimeout 会变成宏任务，then 回调与原生 Promise 混用时执行顺序错乱（await 后面的代码跑到你的回调前面），测试环境断言会诡异失败。
+
+踩坑：①executor 里 resolve(Promise) 时新 Promise 状态跟随该 Promise——我们的 resolve 没有递归解 thenable（规范 2.3.2 要求 resolve 也走决议程序，上面的实现为了突出 then 的路径做了简化，面试要主动说出这点）；②called 锁——恶意 thenable（then: (res) => { res(1); res(2); }）多次调 resolve 必须只生效第一次；③取 x.then 本身可能抛错（getter 副作用），要包在 try 里；④回调里访问 this.value 的时机——已决时立即调度微任务，但 this.value 读取被闭包延迟到微任务执行时，语义正确。`,
+    keyPoints: ["状态机 + 回调队列，then 返回新 Promise", "resolvePromise：循环检测/thenable 鸭子检测/called 锁", "值穿透：默认 onFulfilled 透传、onRejected 抛出"],
+    followUps: ["为什么 Promise 回调必须是微任务而非宏任务？（Zone.js 与宿主环境一致性）", "实现 Promise.prototype.finally 与 catch 的差异点在哪？"],
+    favorited: false,
+  },
+  {
+    id: "fe-255",
+    nodeId: "coding-async",
+    question: "手写 Promise.all / race / allSettled / any，说明四者的语义差异与真实使用场景。",
+    bigTech: true,
+    answer: `结论：四个组合器的差异在"完成条件与失败策略"——all 全成功才成功、一败全败；race 第一个 settle 的定胜负；allSettled 等全部 settle 永不 reject；any 第一个成功的赢、全败才报 AggregateError。计数器 + 保序写入是 all/allSettled 的实现核心。
+
+\`\`\`ts
+// all：全部 fulfilled → 按入序返回结果数组；任一 rejected → 立即 reject
+function myAll<T>(promises: Iterable<Promise<T> | T>): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const list = [...promises];
+    if (list.length === 0) return resolve([]);        // 空数组边界：同步 resolve
+    const results = new Array(list.length);
+    let done = 0;
+    list.forEach((p, i) => {
+      Promise.resolve(p).then(                        // 包一层：兼容非 Promise 值
+        (value) => {
+          results[i] = value;                         // 保序：写入原索引，不用 push
+          if (++done === list.length) resolve(results); // 计数器判定全部完成
+        },
+        reject,                                       // 一败即整体 reject（快速失败）
+      );
+    });
+  });
+}
+
+// race：第一个 settle（无论成败）即定结果
+function myRace<T>(promises: Iterable<Promise<T> | T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    for (const p of promises) {
+      Promise.resolve(p).then(resolve, reject);      // 谁的 then 先触发谁赢，天然竞态
+    }
+  });
+}
+
+// allSettled：等全部 settle，返回带 status 的结果描述
+function myAllSettled<T>(promises: Iterable<Promise<T> | T>) {
+  return new Promise((resolve) => {
+    const list = [...promises];
+    if (list.length === 0) return resolve([]);
+    const results = new Array(list.length);
+    let done = 0;
+    list.forEach((p, i) => {
+      Promise.resolve(p).then(
+        (value) => { results[i] = { status: "fulfilled", value }; if (++done === list.length) resolve(results); },
+        (reason) => { results[i] = { status: "rejected", reason }; if (++done === list.length) resolve(results); },
+      );
+    });
+  });
+}
+
+// any：第一个 fulfilled 赢；全 rejected → AggregateError 汇总所有错误
+function myAny<T>(promises: Iterable<Promise<T> | T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const list = [...promises];
+    if (list.length === 0) return reject(new AggregateError([], "All promises were rejected"));
+    const errors = new Array(list.length);
+    let rejectedCount = 0;
+    list.forEach((p, i) => {
+      Promise.resolve(p).then(
+        resolve,                                      // 一成即赢
+        (reason) => {
+          errors[i] = reason;
+          if (++rejectedCount === list.length) reject(new AggregateError(errors, "All promises were rejected"));
+        },
+      );
+    });
+  });
+}
+\`\`\`
+
+真实场景对号入座（来自生产项目）：①all——仪表盘首屏并行拉 5 个接口，任一失败则整屏降级到错误页（数据强一致性要求，缺一角的图表宁可不显示）；②race——接口超时控制：Promise.race([request, timeout(3000)])，3 秒没回来判超时（注意：原请求还在跑，配合 AbortController 真正取消才不浪费）；③allSettled——批量消息推送/批量操作结果面板：100 条里 97 成功 3 失败，要把 3 条失败原因列出来给用户重试，不能用 all 一败全丢；④any——多 CDN 容灾：同时向 3 个 CDN 域名请求同一资源，最快的成功就用，全部失败才报错（图片/字体等幂等资源的兜底策略）。
+
+实现要点：①保序——结果数组按下标写入而非 push，因为完成顺序 ≠ 入参顺序；②Promise.resolve(p) 包一层——规范允许入参混合 Promise 与普通值；③空数组边界——all/allSettled 空入参同步 resolve([])，any 空入参 reject AggregateError，race 空入参永远 pending（规范行为，面试答出加分）；④快速失败语义——all 的 reject 是"立即"的，但已发出的请求不会取消，只是结果被忽略（Promise 无取消语义）。
+
+踩坑：①all 的快速失败 ≠ 取消——5 个请求第 2 个失败，all 立即 reject，但剩 3 个还在跑，如果它们带着副作用（写库）会"无人认领地成功"，需要 AbortController 联动取消；②race 的泄漏——race([slowRequest, timeout]) 超时后 slowRequest 仍持有连接和回调，长轮询场景反复 race 会累积未决 Promise；③any 的 AggregateError 兼容性——ES2021 才有，老环境要手动构造 Error 并挂 errors 数组；④计数器并发安全——JS 单线程所以 ++done 是安全的，但同样的模式搬到 Worker 共享内存场景就要 Atomics。`,
+    keyPoints: ["all 快速失败 / race 首个 settle / allSettled 永不败 / any 全败才败", "保序按下标写、入参包 Promise.resolve", "快速失败不取消请求，需 AbortController 联动"],
+    followUps: ["Promise.all 失败时如何拿到已成功部分的结果？", "race 超时方案中如何真正中止被超时的请求？"],
+    favorited: false,
+  },
+  {
+    id: "fe-256",
+    nodeId: "coding-async",
+    question: "实现一个并发限制调度器 Scheduler：add(promiseCreator) 提交任务，最多同时运行 max 个。真实项目中哪里用到？",
+    bigTech: true,
+    answer: `结论：并发限制是"信号量"思想——维护运行计数与等待队列，任务完成时释放名额并唤醒队首。浏览器对同域名只有 6 个 TCP 连接，业务层不做并发控制，几十个请求同时发出去只会排队甚至互相拖垮。
+
+\`\`\`ts
+class Scheduler {
+  private running = 0;
+  private queue: Array<() => void> = [];
+
+  constructor(private readonly max: number) {}
+
+  /** 提交任务工厂（注意：传的是函数而非已创建的 Promise，避免任务提前启动） */
+  add<T>(promiseCreator: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const task = () => {
+        this.running++;
+        promiseCreator()
+          .then(resolve, reject)          // 结果透传给 add 的调用方
+          .finally(() => {
+            this.running--;
+            this.next();                  // 释放名额，唤醒下一个
+          });
+      };
+      if (this.running < this.max) task(); // 有空位：立即跑
+      else this.queue.push(task);          // 满员：排队
+    });
+  }
+
+  private next() {
+    const task = this.queue.shift();
+    if (task) task();
+  }
+
+  /** 运行中 + 等待中的任务数（监控用） */
+  get pending(): number { return this.running + this.queue.length; }
+}
+
+// 用法：图片上传，一次最多 3 个
+const scheduler = new Scheduler(3);
+const uploadTasks = files.map((file) =>
+  scheduler.add(() => uploadFile(file).then((url) => ({ file, url })))
+);
+const results = await Promise.allSettled(uploadTasks);
+\`\`\`
+
+实现要点：①传 promiseCreator 函数而非 Promise——Promise 创建即执行，直接传 Promise 的话 10 个任务早就全发出去了，调度器形同虚设。这是最经典的设计点，p-limit 库也是这个 API 形态；②.finally 里释放名额——成功失败都要释放，漏掉则队列永久卡死（曾经线上事故：只用 .then 释放，一个 500 错误后整个上传队列停摆）；③next() 同步唤醒——任务完成同步拉起队首，名额无缝衔接；④add 返回 Promise 给调用方——调度透明，调用方照常 await，还能配合 Promise.allSettled 汇总。
+
+真实应用场景：①批量上传/下载——100 张图片上传限 4 并发，防浏览器连接打满导致页面其他请求（心跳、埋点）饿死；②爬虫/数据同步——后台管理系统同步 5000 条商品数据到第三方平台，对方限流 10 QPS，客户端先自我约束避免被 ban；③接口防雪崩——活动页初始化要拉 20 个配置接口，限 5 并发 + 优先级（首屏必需的插到队首）；④Node 侧更普遍——文件遍历、数据库批量写入、调 LLM API（严格 RPM 限制）。
+
+进阶增强（面试加分）：①优先级队列——queue 改成堆结构，add 支持 priority 参数，高优先级插队（首屏关键请求 > 埋点上报）；②动态调整 max——网络从 Wi-Fi 掉到 4G 时把 max 从 6 降到 2（NetInfo API 感知）；③超时与取消——任务包装 AbortController，支持 scheduler.abort(taskId) 取消排队中/运行中的任务；④指数退避重试——任务失败自动重试 N 次再放回队列尾部，配合 jitter 防同步重试风暴；⑤全局单例 vs 按域隔离——API 调度器和上传调度器分开实例，互不占名额。
+
+踩坑：①promiseCreator 同步抛错——promiseCreator() 本身（不是返回的 Promise）可能同步抛，要 try/catch 转成 reject 并释放名额；②内存——queue 无限增长（生产速度 > 消费速度），要有上限保护或背压（backpressure）策略；③与浏览器自带队列的关系——限 6 并发但浏览器同域连接也只有 6，如果页面还有其他请求，业务并发数要预留余量；④测试——调度器含异步时序，单测要用假定时器 + 可控 Promise 精确驱动，断言"同一时刻最多 max 个 running"。`,
+    keyPoints: ["信号量：运行计数 + 等待队列，finally 释放名额", "传工厂函数不传 Promise，否则任务已提前启动", "生产增强：优先级/动态并发/取消/重试"],
+    followUps: ["如何实现带优先级的并发调度（堆结构）？", "背压（backpressure）在前端流式处理中如何落地？"],
+    favorited: false,
+  },
+  {
+    id: "fe-257",
+    nodeId: "coding-async",
+    question: "实现带指数退避和随机抖动的请求重试函数 retry(fn, options)，要求支持超时控制与错误类型过滤。",
+    bigTech: true,
+    answer: `结论：重试是分布式系统的必修课，但无脑立即重试会加剧服务端雪崩。正确姿势：指数退避（间隔 = base * 2^n）拉开发送间隔，随机抖动（jitter）打散并发重试的同步效应，错误过滤（网络错误/5xx 才重试，4xx 业务错误重试无意义），单请求超时（AbortController）防悬挂。
+
+\`\`\`ts
+interface RetryOptions {
+  retries?: number;          // 最大重试次数（不含首次）
+  baseDelay?: number;        // 基础间隔 ms
+  maxDelay?: number;         // 间隔上限
+  timeout?: number;          // 单次尝试超时 ms
+  shouldRetry?: (err: unknown) => boolean; // 错误过滤器
+  onRetry?: (err: unknown, attempt: number) => void; // 重试钩子（埋点/日志）
+}
+
+async function retry<T>(fn: (signal: AbortSignal) => Promise<T>, options: RetryOptions = {}): Promise<T> {
+  const {
+    retries = 3,
+    baseDelay = 500,
+    maxDelay = 10_000,
+    timeout = 5_000,
+    shouldRetry = defaultShouldRetry,
+    onRetry,
+  } = options;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout); // 单次超时
+    try {
+      return await fn(controller.signal);          // 成功直接返回
+    } catch (err) {
+      lastError = err;
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+      // 不重试的情形：最后一次 / 错误过滤器否决
+      if (attempt === retries || (!isAbort && !shouldRetry(err))) throw err;
+      onRetry?.(err, attempt + 1);
+      // 指数退避 + Full Jitter（AWS 推荐：在 [0, 上限] 均匀随机，彻底打散同步重试）
+      const backoff = Math.min(baseDelay * 2 ** attempt, maxDelay);
+      const wait = Math.random() * backoff;
+      await new Promise((r) => setTimeout(r, wait));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError;
+}
+
+// 默认过滤：仅网络错误与 5xx 值得重试；4xx（参数/权限错）重试也是白试
+function defaultShouldRetry(err: unknown): boolean {
+  if (err instanceof TypeError) return true;              // fetch 网络层失败（断网/DNS/CORS）
+  if (err instanceof HttpError) return err.status >= 500; // 服务端错误
+  return false;
+}
+\`\`\`
+
+为什么必须有抖动：服务端宕机恢复的瞬间，几千个客户端如果都按 1s/2s/4s 整齐重试，会形成"重试风暴"再次打垮服务（thundering herd）。Full Jitter 把重试时刻均匀打散到 [0, backoff] 区间，服务端压力曲线平滑。AWS 架构博客实测：同样重试预算下，Full Jitter 的完成时间分布显著优于无抖动退避。
+
+真实项目案例：电商大促的库存接口，高峰期偶发 502。上重试策略后成功率从 99.2% 提到 99.97%，但最初没加抖动和错误过滤，一次后端发版事故中，前端把 400（参数错误，发版导致协议不匹配）也重试了 3 次，错误监控告警量翻 4 倍、后端错误日志爆炸——加上 shouldRetry 后只对 5xx/网络错重试才解决。
+
+要点：①fn 接收 signal——重试函数必须把 AbortSignal 传给内部 fetch，否则超时只是"忽略结果"而非"取消请求"，悬挂请求照样占连接；②AbortError 的特殊地位——超时的请求算不算可重试？通常是（超时=服务慢，再试可能成功），上面实现里 isAbort 跳过过滤器直接重试，这是产品决策点，面试要讲出"为什么"；③退避上限——maxDelay 防 2^n 爆炸到分钟级；④onRetry 钩子——重试行为必须可观测（多少次重试、最终成功率），否则线上问题被重试掩盖，SLA 数据失真。
+
+踩坑：①幂等性——只有幂等请求（GET/PUT/DELETE）能安全重试，POST 下单接口重试可能重复下单，必须配合幂等键（Idempotency-Key 头，服务端去重）；②重试与用户等待——首屏接口重试 3 次最长等 15s，用户早流失了，首屏要快败 + 友好降级，后台同步任务才适合激进重试；③定时器泄漏——fn 成功/失败后 clearTimeout，finally 里清，漏了则定时器持有 controller 引用延迟 GC；④与熔断配合——重试是"个体乐观"，熔断是"全局悲观"，错误率超阈值后熔断器直接拒发（不再重试），给服务端喘息，两者是互补的两层。`,
+    keyPoints: ["指数退避 + Full Jitter 打散重试风暴", "shouldRetry 过滤：网络错/5xx 才重，4xx 白重", "AbortController 真取消；非幂等请求配幂等键"],
+    followUps: ["熔断器（Circuit Breaker）三态如何与重试配合？", "Idempotency-Key 在服务端如何实现去重？"],
+    favorited: false,
+  },
+  {
+    id: "fe-258",
+    nodeId: "coding-async",
+    question: "经典题：用 JS 实现红绿灯循环——红灯 3 秒、绿灯 2 秒、黄灯 1 秒，无限循环切换。给出 Promise 链与 async 两种实现，并说明可取消性。",
+    bigTech: true,
+    answer: `结论：红绿灯题考察的是"异步串行编排"能力——把定时器 Promise 化后串起来。Promise 链版用递归生成无限链，async 版用 while(true) + await，后者可读性碾压前者。生产价值不在灯本身，而在"定时状态机"这个模式：轮播图、轮询任务、引导动画都是它。
+
+\`\`\`ts
+// 定时器 Promise 化：一切的基础
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ===== 方案 1：Promise 链递归 =====
+function trafficLight(): void {
+  const red = () => { console.log("红"); return sleep(3000); };
+  const green = () => { console.log("绿"); return sleep(2000); };
+  const yellow = () => { console.log("黄"); return sleep(1000); };
+  const cycle = (): Promise<void> =>
+    red().then(green).then(yellow).then(cycle); // 递归续链，无限循环
+  cycle();
+}
+
+// ===== 方案 2：async/await（推荐） =====
+async function trafficLightAsync(): Promise<void> {
+  const steps: Array<[string, number]> = [["红", 3000], ["绿", 2000], ["黄", 1000]];
+  let i = 0;
+  while (true) {
+    const [color, duration] = steps[i % steps.length];
+    console.log(color);
+    await sleep(duration);
+    i++;
+  }
+}
+
+// ===== 方案 3：可取消版（生产形态） =====
+async function trafficLightCancellable(signal: AbortSignal): Promise<void> {
+  const cancellableSleep = (ms: number) =>
+    new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal.addEventListener("abort", () => {
+        clearTimeout(timer);                    // 清定时器，reject 中止循环
+        reject(new DOMException("Aborted", "AbortError"));
+      }, { once: true });
+    });
+
+  const steps: Array<[string, number]> = [["红", 3000], ["绿", 2000], ["黄", 1000]];
+  let i = 0;
+  try {
+    while (!signal.aborted) {
+      const [color, duration] = steps[i % steps.length];
+      console.log(color);
+      await cancellableSleep(duration);         // abort 时这里抛 AbortError
+      i++;
+    }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") return; // 正常取消
+    throw e;
+  }
+}
+
+// 使用：组件卸载时取消
+const controller = new AbortController();
+trafficLightCancellable(controller.signal);
+controller.abort(); // 立即停止，无残留定时器
+\`\`\`
+
+三种方案的工程对比：①Promise 链递归——while 题的标准答案，但语义藏在递归里，维护者要绕一圈才看懂；且无法优雅取消（链条一旦生成只能等当前环节走完）；②async 版——线性的代码表达异步的流程，是 async/await 存在意义的最好例证；状态表 steps 数据驱动，加"黄闪 3 次"这种需求只改数据不改结构；③可取消版——生产必备：组件卸载、路由切换时无限循环必须可停，否则定时器泄漏 + 对已卸载组件 setState。
+
+考点延伸（面试官真正想听的）：①为什么递归 Promise 链不会栈溢出——then 回调在微任务里执行，每次递归调用栈是全新的，不累积栈帧（对比同步递归 setTimeout 早就爆栈）；②setTimeout 的误差——最小 4ms 嵌套钳制 + 事件循环延迟，红绿灯实际间隔 ≥ 标称值，对精度敏感场景（音乐节拍器）要用 Web Audio API 的时钟；③页面隐藏时 setTimeout 被节流（后台标签页 1s 一次），轮播图切后台再回来会"跳帧"，要用 visibilitychange 暂停或 rAF + 时间戳补偿。
+
+踩坑：①while(true) + await 忘了 await——死循环直接卡死主线程；②递归版漏写 return——then 链断掉，只跑一轮就停；③取消时只 break 不清定时器——cancellableSleep 里 abort 必须 clearTimeout，否则定时器到点还会 resolve（虽然循环已退，但回调里若有副作用就出事）；④多实例竞争——两个 trafficLight 同时跑（重复挂载组件），灯的状态互相覆盖，组件级 AbortController 一一对应。`,
+    keyPoints: ["sleep 化定时器 + 串行编排；async 版可读性碾压递归链", "递归链不爆栈：微任务每次全新调用栈", "生产必须可取消：AbortController + clearTimeout"],
+    followUps: ["如何用 rAF + 时间戳实现不受后台节流影响的定时器？", "把红绿灯改造成「黄灯闪烁 3 次」需要什么改动？（状态机数据驱动的优势）"],
+    favorited: false,
+  },
+  {
+    id: "fe-259",
+    nodeId: "coding-async",
+    question: "Promise 本身不可取消。请设计一个可取消异步任务的方案，并说明 AbortController 的设计哲学。",
+    bigTech: true,
+    answer: `结论：Promise 规范刻意不含取消——一个 Promise 可能有多个消费者，取消语义对谁生效无解（A 取消了，B 还在等结果怎么办）。社区共识方案是 AbortController：分离"取消信号的生产者"（controller）与"取消信号的订阅者"（signal），任务内部主动检查信号并自行终止——取消是协作式的，不是强杀。
+
+\`\`\`ts
+// ===== 1. 通用可取消包装器：race 语义 =====
+function cancellable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (v) => { signal.removeEventListener("abort", onAbort); resolve(v); },
+      (e) => { signal.removeEventListener("abort", onAbort); reject(e); },
+    );
+  });
+}
+
+// ===== 2. 任务内部深度支持（真正释放资源）=====
+async function fetchWithProgress(url: string, signal: AbortSignal) {
+  const resp = await fetch(url, { signal });       // fetch 原生支持：abort 真正断开 TCP
+  const reader = resp.body!.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    if (signal.aborted) {                          // 循环内主动检查
+      await reader.cancel();                       // 释放流资源
+      throw new DOMException("Aborted", "AbortError");
+    }
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  return chunks;
+}
+
+// ===== 3. 搜索联想场景：新输入取消旧请求 =====
+class SearchBox {
+  private controller: AbortController | null = null;
+  async onInput(keyword: string) {
+    this.controller?.abort();              // 取消上一次
+    this.controller = new AbortController();
+    try {
+      const result = await searchApi(keyword, { signal: this.controller.signal });
+      render(result);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return; // 被自己取消，静默
+      showError(e);
+    }
+  }
+  destroy() { this.controller?.abort(); }   // 组件销毁取消在途请求
+}
+\`\`\`
+
+AbortController 的设计哲学（为什么是 W3C 标准而非 Bluebird 的 cancel）：①信号与执行分离——controller 只有 abort()，signal 只能被监听，无法反向 abort，权限最小化。把 signal 传给第三方代码很安全，它只能"知道被取消"，不能"取消别人"；②协作式取消——abort 只是置位标记，任务在合适的检查点（checkpoint）自行清理后终止。对比线程强杀（Thread.stop，Java 已废弃）：强杀会留下不一致状态（写一半的文件、锁未释放），协作式让任务自己决定"在哪里安全退出"；③统一标准——fetch、addEventListener、setTimeout 包装、Node 的 fs/net 全部接受 signal，一个信号取消整条调用链，生态一致性远超各库自造轮子。
+
+为什么"race 包装"不是真取消：cancellable() 只是让你的 await 提前 reject，原 Promise 还在跑——网络请求继续耗连接、回调继续执行、结果被丢弃。真取消必须任务内部支持：fetch 收到 abort 会真的断开 TCP 连接、停止下载。所以分层：浅层包装解决"消费者不再等待"，深层 signal 透传解决"生产者停止工作"。
+
+多消费者语义：signal 天然广播——一个 controller 可以取消挂在同一 signal 上的 10 个任务（页面卸载时批量取消所有请求），这解决了"Promise 取消语义对多消费者无解"的难题：取消的是"任务"本身，不是某个"订阅"。
+
+踩坑：①AbortError 的识别——e.name === "AbortError" 是标准判法，别拿 message 匹配（不同实现文案不同）；取消是"预期行为"不是错误，监控上报要过滤，否则告警被刷爆；②signal 复用——一个 controller abort 后 signal 永久 aborted，不能"重置"，每次操作要 new 一个新 controller；③监听泄漏——长存任务给 signal addEventListener 后，任务完成必须 removeEventListener（或用 { once: true }），否则 signal 对象持有回调无法 GC；④async 函数中 throw AbortError 与 return 的选择——协作取消的惯例是抛 AbortError，让调用方能区分"被取消"和"正常结束"。`,
+    keyPoints: ["Promise 无取消是多消费者语义无解，AbortController 用信号广播破解", "协作式取消：任务自查信号、安全点退出、自行清理", "race 包装是假取消，真取消要 signal 透传到任务内部"],
+    followUps: ["AbortSignal.timeout() 与手动 controller 实现超时有何差异？", "如何用 AbortSignal 实现「批量任务取消其中一个」的粒度控制？"],
+    favorited: false,
+  },
+  {
+    id: "fe-260",
+    nodeId: "coding-async",
+    question: "实现异步串行执行器：一系列返回 Promise 的函数，按顺序一个接一个执行（前一个完成后才启动下一个），收集所有结果。对比 reduce 链式与 for await 两种实现。",
+    bigTech: true,
+    answer: `结论：串行的本质是"把数组折叠成一条 Promise 链"。reduce 版函数式、一行流；for await 版命令式、可读性好且天然支持中途 break/条件跳过。关键区别在"任务何时被创建"：传工厂函数才能控制启动时机，传已创建的 Promise 数组则任务早已并发启动，串行只是"按序等待"的假象。
+
+\`\`\`ts
+// ===== 方案 1：reduce 链式（函数式） =====
+function serial<T>(tasks: Array<() => Promise<T>>): Promise<T[]> {
+  return tasks.reduce<Promise<T[]>>(
+    (chain, task) => chain.then(async (results) => {
+      const value = await task();        // 前一个完成后才调用 task() —— 真串行
+      return [...results, value];
+    }),
+    Promise.resolve([]),                 // 初始链：已完成的空结果
+  );
+}
+
+// ===== 方案 2：for await（命令式，推荐） =====
+async function serialFor<T>(tasks: Array<() => Promise<T>>): Promise<T[]> {
+  const results: T[] = [];
+  for (const task of tasks) {
+    results.push(await task());          // await 天然阻塞循环推进
+  }
+  return results;
+}
+
+// ===== 方案 3：支持失败策略的生产版 =====
+async function serialRobust<T>(
+  tasks: Array<() => Promise<T>>,
+  options: { stopOnError?: boolean } = {},
+): Promise<Array<{ status: "fulfilled"; value: T } | { status: "rejected"; reason: unknown }>> {
+  const results: Array<{ status: "fulfilled"; value: T } | { status: "rejected"; reason: unknown }> = [];
+  for (const task of tasks) {
+    try {
+      results.push({ status: "fulfilled", value: await task() });
+    } catch (reason) {
+      results.push({ status: "rejected", reason });
+      if (options.stopOnError !== false) break;   // 默认快速失败，中断后续
+    }
+  }
+  return results;
+}
+
+// 用法：按顺序迁移数据库（顺序有依赖，必须串行）
+await serial([
+  () => migrate("001_create_users"),
+  () => migrate("002_add_index"),
+  () => migrate("003_seed_admin"),
+]);
+\`\`\`
+
+两种实现对比：reduce 版把"串行"编码进数据结构（链），优雅但调试时调用栈不直观；for await 版就是同步代码的样子，异常栈清晰、能随手加 if (condition) continue、需要时 break，团队协作首选。性能无差异——都是同一时刻只跑一个任务。
+
+最大的坑——"假串行"：
+
+\`\`\`ts
+// ❌ 假串行：Promise 在 map 那一刻就全部并发启动了！
+const promises = urls.map((url) => fetch(url)); // 10 个请求已发出
+const results = [];
+for (const p of promises) results.push(await p); // 只是按序收割
+
+// ✅ 真串行：工厂函数延迟创建
+const tasks = urls.map((url) => () => fetch(url)); // 只是函数，未启动
+await serialFor(tasks); // 一个完成才调下一个工厂
+\`\`\`
+
+区分"按序等待已并发的任务"和"真按序启动"是这道题的分水岭——前者并发数不受控（可能瞬间打满连接），后者才是限流/依赖场景要的语义。
+
+真实场景：①有序副作用——数据库迁移、数据修复脚本，步骤间有先后依赖（建表 → 建索引 → 灌数据）；②外部系统限流——调企业微信 API 发 500 条通知，对方限 20 QPS，串行 + 间隔 sleep 最稳妥；③事务语义模拟——多步操作任一失败要回滚已完成的（补偿模式），串行才能记录回滚栈逆序撤销；④爬取详情页——列表 100 个详情页串行抓，避免对目标站点造成并发压力被封 IP。
+
+进阶：①串行与并发的中间态——分批并发（batch size = 5，批内并发批间串行），就是把 serial 和并发限制调度器组合；②reduce 版的内存——[...results, value] 每次复制数组，万级任务 O(n²)，改 push + 最后 return 的写法（上面 for 版天然没这问题）；③串行中传递上下文——前一个结果是后一个的参数（pipeline），把 results.push 换成 current = await task(current) 即可，这就是 Koa 中间件洋葱模型的串行内核。`,
+    keyPoints: ["工厂函数延迟创建 = 真串行；已建 Promise 数组 = 假串行", "reduce 折叠成链 / for await 可读性胜出", "生产版：stopOnError 策略 + 结果带状态"],
+    followUps: ["Koa 洋葱模型如何用串行 compose 实现前置/后置逻辑？", "批间串行批内并发（batch）如何实现？"],
+    favorited: false,
+  },
+  {
+    id: "fe-261",
+    nodeId: "coding-async",
+    question: "async/await 的本质是什么？用 Generator + 自动执行器实现一个简化版 async 函数，并解释错误传播机制。",
+    bigTech: true,
+    answer: `结论：async/await 是 Generator 的语法糖——async 函数 ≈ Generator 函数 + 自动执行器（spawn）。await 一个值 ≈ yield 一个 Promise，执行器负责：调用 next() 推进、把 Promise 结果回传（next(result)）、把 Promise 拒绝转成生成器内 throw（throw(err)）。理解了这层，就理解了为什么 await 能"暂停又恢复"，以及错误为什么能用 try/catch 捕获。
+
+\`\`\`ts
+// 自动执行器：让 Generator 像 async 一样自己跑完
+function spawn<T>(genFn: (...args: unknown[]) => Generator<unknown, T, unknown>) {
+  return function (this: unknown, ...args: unknown[]): Promise<T> {
+    const gen = genFn.apply(this, args);
+    return new Promise<T>((resolve, reject) => {
+      // step 是推进引擎：每次拿到 yield 出来的 Promise，完成后喂回结果
+      const step = (method: "next" | "throw", arg?: unknown) => {
+        let result: IteratorResult<unknown, T>;
+        try {
+          result = gen[method](arg);        // 推进一格（或向内抛错）
+        } catch (e) {
+          return reject(e);                 // 生成器内未捕获的错 → 整体 reject
+        }
+        if (result.done) return resolve(result.value); // 跑完：return 值即 resolve
+        // 未完成：把 yield 的值 Promise 化，挂回调继续推进
+        Promise.resolve(result.value).then(
+          (value) => step("next", value),   // fulfilled：结果喂回 yield 表达式
+          (err) => step("throw", err),      // rejected：在 yield 处抛出，可被 try/catch
+        );
+      };
+      step("next");                          // 点火
+    });
+  };
+}
+
+// 效果对比——两段代码等价：
+// async 版
+async function getUser(id: string) {
+  try {
+    const user = await fetchUser(id);       // 暂停，等结果恢复
+    const posts = await fetchPosts(user.id);
+    return { user, posts };
+  } catch (e) {
+    return fallback;
+  }
+}
+// spawn 版（async 的"脱糖"形态）
+const getUser2 = spawn(function* (id: string) {
+  try {
+    const user = yield fetchUser(id);       // yield ≈ await
+    const posts = yield fetchPosts((user as { id: string }).id);
+    return { user, posts };
+  } catch (e) {
+    return fallback;
+  }
+});
+\`\`\`
+
+错误传播机制是精髓：await 的 Promise reject 时，执行器调 gen.throw(err)——错误在 yield 表达式那个位置被"注入"到生成器内部，所以函数体内的 try/catch 能捕获它，就像同步代码一样。这是 async/await 相对 .then 链的革命性体验：异步错误可以用同步的错误处理语法捕获。反过来，函数体内 throw 的错没被捕获时，gen.next() 本身抛给执行器，执行器 reject 给外层 Promise——两条错误路径（内部 catch 消化 / 外层 reject）泾渭分明。
+
+为什么选 Generator 做底层：Generator 是 JS 里唯一"可暂停、可恢复、可双向通信"的函数形态——next(value) 能把值注回暂停点，throw(err) 能在暂停点抛错。这种"协程"（coroutine）能力恰好是 await 需要的。Babel 转译 async 函数时，就是转成 _asyncToGenerator 包裹的 Generator + 一个 _wrap 状态机（regenerator 运行时）。
+
+延伸理解：①微任务边界——每个 await 至少产生一个微任务跳变（实际规范下 await Promise.resolve() 有三个 tick 的历史包袱，Chrome 73 后优化为一个），循环里 await 一万次就是一万个微任务；②顶层 await（ES2022）——模块级 await 让模块本身变成"异步模块"，import 方会等它 resolve，背后是模块图的异步执行标记；③async 函数返回值——永远被 Promise 化（return 1 也是 Promise<1>），因为执行器 resolve 时走了 Promise.resolve 决议；④迭代器协议——Generator 的 next/throw/return 三方法对应"推进/注入错误/提前结束"，执行器只用了前两个，for await...of（异步迭代器）则是这个模式的镜像：消费端拉取式异步。
+
+踩坑：①Generator 的 this 与箭头函数——Generator 函数不能是箭头函数（无 this、无 prototype），spawn 里要 apply(this) 透传；②错误时序——gen.throw(err) 若生成器内没有 try/catch 包裹该 yield，错误冒泡出生成器，执行器 reject，与 async 行为一致；③return 提前结束——生成器内 return 时 done: true，执行器 resolve 该值，对应 async 的 return；④for await 消费同步可迭代对象——会把每个元素 Promise.resolve 包一层再 await，语义安全但有微任务开销。`,
+    keyPoints: ["async = Generator + spawn 自动执行器", "reject → gen.throw 在 yield 处注入，故可 try/catch", "双向通信（next 注值/throw 注错）是协程暂停恢复的本质"],
+    followUps: ["for await...of 的异步迭代器协议（Symbol.asyncIterator）如何工作？", "为什么 await 循环会拖慢微任务队列？如何批量优化？"],
     favorited: false,
   },
 ];
