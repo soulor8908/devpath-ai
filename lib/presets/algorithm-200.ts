@@ -1540,19 +1540,22 @@ def _mirror(a: "TreeNode | None", b: "TreeNode | None") -> bool:
     nodeId: "p1-tree",
     question: "543. 二叉树直径（LeetCode 543）\n返回任意两节点路径的最大长度（边数）。",
     answer: `【思路推导】暴力：对每个节点算左深加右深再取最大，深度被重复计算，O(n^2)。关键洞察：直径必形如“过某节点的两条最长链拼接”，即左深加右深。于是后序一趟：自底向上返回深度的同时用 l+r 更新全局最大，深度信息被复用，零冗余。注意直径不保证过根，故需全局记录。类比：集团内最远两名员工的汇报线必经其公共上级，但那人不一定是 CEO。
-【代码实现】function diameterOfBinaryTree(root: TreeNode | null): number {
-  let best = 0;
-  const depth = (node: TreeNode | null): number => {
-    if (node === null) return 0;
-    const l = depth(node.left);
-    const r = depth(node.right);
-    best = Math.max(best, l + r); // 过该节点的直径
-    return Math.max(l, r) + 1; // 返回的是深度
-  };
-  depth(root);
-  return best;
-}
-时间 O(n)，空间 O(h)。
+【代码实现】
+\`\`\`python
+def diameter_of_binary_tree(root: TreeNode | None) -> int:
+    best = 0
+    def depth(node: TreeNode | None) -> int:
+        nonlocal best
+        if node is None:
+            return 0
+        l = depth(node.left)
+        r = depth(node.right)
+        best = max(best, l + r)        # 过该节点的直径
+        return max(l, r) + 1           # 返回的是深度
+    depth(root)
+    return best
+# 时间 O(n)，空间 O(h)
+\`\`\`
 【实际应用】最长路径见于网络拓扑最大跳数、依赖图最长调用链（构建关键路径）、社交关系最远两人距离。面试官考察“返回 A 顺带更新 B”的后序套路：LeetCode 124 最大路径和、337 打家劫舍 III 同模式。
 【踩坑与变体】1. 误以为直径必过根，只在根处算 l+r；2. 混淆返回值与目标值：返回深度、更新直径；3. best 初值取 0 即可覆盖空树；4. 变体：LeetCode 124 最大路径和、687 最长同值路径、1372 最长 ZigZag 路径。`,
     keyPoints: ["过某节点的直径等于左子树深度加右子树深度","后序遍历返回深度、顺手更新全局最大直径，一趟 O(n)","直径不一定过根节点，必须用全局量记录","“返回 A 更新 B”是树形 DP 通用套路，124 与 337 同款"],
