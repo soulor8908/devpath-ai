@@ -114,6 +114,13 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   // 加载当前任务的知识点和题目
   // 2026-07-25 修改：移除 setAnswerRevealed(false) —— answerRevealed 的重置
   // 由 LEARN_COMPLETE / NEXT_TASK 的 dispatch 处负责，避免恢复时被错误清空
+  //
+  // 2026-07-26 修复（用户反馈"下次进来那道题还是没学，要重新学"）：
+  //   原版 `plan.questions.find((q) => q.nodeId === node?.id)` 取节点下第一道题，
+  //   不区分该题是否已 understood。导致用户上次点过"我答对了"的题会被再次展示。
+  //   修复：优先选节点下第一道 `!understood` 的题；若全部 understood（理论上
+  //   studyQueue 会过滤掉该节点，但兜底处理），回退到第一道题。
+  //   这样用户每次进入训练，看到的都是真正"还没学"的题，不会重复已答对的题。
   const loadCurrentTask = useCallback(async () => {
     if (!currentTask) {
       dispatch({ type: "SESSION_COMPLETE" });
@@ -126,7 +133,11 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
         const plan = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + currentTask.planId);
         if (plan) {
           const node = plan.knowledgeTree.find((n) => n.id === currentTask.nodeId) || plan.knowledgeTree[0];
-          const question = plan.questions.find((q) => q.nodeId === node?.id) || null;
+          // 优先选未看懂的题；若全部看懂则回退到首题（兜底）
+          const question =
+            plan.questions.find((q) => q.nodeId === node?.id && !q.understood) ||
+            plan.questions.find((q) => q.nodeId === node?.id) ||
+            null;
           setCurrentNode(node ?? null);
           setCurrentQuestion(question);
           setCurrentPlan(plan);
@@ -257,36 +268,44 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   // 因此训练中点"我答对了"应：
   //   1. 调 markQuestionUnderstoodAndMaybeMasterNode 持久化 understood=true
   //   2. 同步更新 currentPlan / currentQuestion 内存状态（避免 NEXT_TASK 重新 loadCurrentTask 读到旧 plan）
-  //   3. 若触发自动掌握，弹 toast 提示用户
+  //   3. 弹 toast 提示用户（autoMastered 显示节点掌握，否则显示题目已记录）
+  //
+  // 2026-07-26 修复（用户反馈"点击我答对了，进度没变化、知识库没被改变"）：
+  //   - 原版仅在 autoMastered 时弹 toast，单题理解时用户无感知 → 补 else 分支 toast
+  //   - 原版 fire-and-forget 写库与 NEXT_TASK 存在竞态：写未完成时 loadCurrentTask
+  //     可能读到旧 plan → 改为返回 Promise，让 onClick 决定是否阻塞 dispatch
+  //   - 关键根因：loadCurrentTask 取节点首题而非首道未看懂题，导致用户下次进来
+  //     还会看到已答对的题（详见 loadCurrentTask 注释）
   //
   // 注意：
   //   - "没答对"按钮不写 understood=false（避免污染从未标记过的题）
   //   - 仅 type="new" 且有 currentQuestion 时调用（review 任务无 Question 概念）
-  //   - async 函数：用 IIFE 调用避免阻塞 dispatch（让 reducer 立即切到 feedback phase）
-  const handleAnswerCorrect = useCallback(() => {
+  const handleAnswerCorrect = useCallback(async () => {
     if (!currentQuestion || !currentPlan) return;
-    // 异步写入 understood + 自动掌握，不阻塞 UI
-    void (async () => {
-      try {
-        const { plan: updatedPlan, autoMastered, node } =
-          await markQuestionUnderstoodAndMaybeMasterNode(
-            currentPlan,
-            currentQuestion.id,
-          );
-        setCurrentPlan(updatedPlan);
-        const updatedQ =
-          updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
-        setCurrentQuestion(updatedQ);
-        if (autoMastered && node) {
-          toast.success(
-            `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
-          );
-        }
-      } catch (e) {
-        // 持久化失败不影响训练流程，仅记日志
-        console.warn("[train] 写 understood 失败:", e);
+    try {
+      const { plan: updatedPlan, autoMastered, node } =
+        await markQuestionUnderstoodAndMaybeMasterNode(
+          currentPlan,
+          currentQuestion.id,
+        );
+      setCurrentPlan(updatedPlan);
+      const updatedQ =
+        updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
+      setCurrentQuestion(updatedQ);
+      // 与 PlanDetailClient.handleMarkUnderstood 保持一致：
+      // autoMastered 显示节点掌握提示，否则显示单题已记录（让用户知道点击有效）
+      if (autoMastered && node) {
+        toast.success(
+          `「${node.title}」下题目全部看懂，已自动标记为「已掌握」`,
+        );
+      } else {
+        toast.success("已记录「我答对了」");
       }
-    })();
+    } catch (e) {
+      // 持久化失败不影响训练流程，但要让用户看到错误（避免静默失败导致"下次进来还是没学"）
+      console.warn("[train] 写 understood 失败:", e);
+      toast.error("记录失败，请重试");
+    }
   }, [currentQuestion, currentPlan]);
 
   // 会话完成
@@ -454,12 +473,12 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                 <Button
                   variant="success"
                   block
-                  onClick={() => {
+                  onClick={async () => {
                     setIsCorrect(true);
                     setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
-                    // 2026-07-25 用户需求：训练中"我答对了"= 题目"看懂了"
-                    // 写入 Question.understood=true，节点下所有题看懂时自动标记掌握
-                    handleAnswerCorrect();
+                    // 2026-07-26 修复：await 写库再 dispatch，避免 NEXT_TASK 读到旧 plan
+                    // 写库期间按钮会显示 loading 状态（loading prop），用户感知到"系统在处理"
+                    await handleAnswerCorrect();
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
                   }}
                   leftIcon="check"
