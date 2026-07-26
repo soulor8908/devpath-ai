@@ -352,6 +352,27 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "pnpm workspace 依赖管理、幽灵依赖治理、Turborepo/Nx 构建缓存与拓扑编排、changesets 版本发布、包边界约束、CI 增量构建。",
     mastery: 0,
   },
+  // ===== 质量与发布层（2 个节点） =====
+  {
+    id: "frontend-monitoring",
+    title: "前端监控与可观测性",
+    difficulty: 4,
+    prerequisites: ["browser-rendering", "performance"],
+    frequency: "高",
+    bigTech: true,
+    summary: "错误捕获（onerror/unhandledrejection/资源错误）、Source Map 堆栈还原、Web Vitals 采集、白屏检测、埋点体系、Sentry 原理、Session Replay、性能基线与告警。",
+    mastery: 0,
+  },
+  {
+    id: "cicd-frontend",
+    title: "CI/CD 与发布工程",
+    difficulty: 4,
+    prerequisites: ["build-tools"],
+    frequency: "高",
+    bigTech: true,
+    summary: "CI 流水线设计、contenthash 版本管理、CDN 缓存与失效、灰度发布/Feature Flag、秒级回滚、构建提速、多环境配置注入、质量门禁与包体积预算。",
+    mastery: 0,
+  },
   // ===== AI 前端方向（5 个节点，重点新增） =====
   {
     id: "ai-sdk-frontend",
@@ -10083,6 +10104,743 @@ pnpm build     # turbo 接管：拓扑并行 + 缓存
 卡帕西视角：初始化的艺术是"把不可逆决策做对，把可逆决策推迟"——包管理器和目录结构是早期就要钉死的（迁移成本高），构建缓存和边界规则可以渐进增强。最小可用配置跑通全链路 > 一次配齐所有花哨特性。`,
     keyPoints: ["甜点组合：pnpm workspace + Turborepo + changesets + GitHub Actions", "源码直出 internal package 推迟构建决策；apps 永远 private 不发版", "验收：install 五分钟跑通/改库 HMR 秒更/二次构建全缓存命中"],
     followUps: ["什么信号出现时该从 Turborepo 迁移到 Nx/Bazel？", "Monorepo 中如何接入已有的独立仓库（存量迁移策略）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-286",
+    nodeId: "frontend-monitoring",
+    question: "前端错误监控的三类捕获方式（window.onerror / unhandledrejection / addEventListener('error', true)）各覆盖什么场景？跨域脚本报错只拿到 \"Script error.\" 时如何还原完整堆栈？",
+    bigTech: true,
+    answer: `结论：三类捕获覆盖的错误类型互不重叠，缺一不可——window.onerror 抓 JS 运行时同步错误，unhandledrejection 抓未 catch 的 Promise 拒绝，addEventListener('error', true) 捕获阶段抓资源加载错误（script/img/link 的加载失败不冒泡、不触发 onerror）。生产环境必须三个都挂。
+
+\`\`\`js
+// 1. JS 运行时错误（同步 throw、引用错误等）
+window.onerror = (msg, source, lineno, colno, error) => {
+  report({ type: "js", msg, source, lineno, colno, stack: error?.stack });
+  // 返回 true 阻止控制台默认输出（一般不用，保持 false）
+};
+// 等价写法：window.addEventListener("error", e => { if (e.error) ... })
+
+// 2. Promise 未捕获拒绝（async/await 漏 catch、.then 链断尾）
+window.addEventListener("unhandledrejection", (e) => {
+  report({ type: "promise", reason: e.reason?.stack ?? String(e.reason) });
+});
+
+// 3. 资源加载错误（必须捕获阶段 + 第三个参数 true，因为资源 error 事件不冒泡）
+window.addEventListener("error", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "SCRIPT" || t.tagName === "IMG" || t.tagName === "LINK")) {
+    report({ type: "resource", src: t.src ?? t.href, tag: t.tagName });
+  }
+}, true);
+\`\`\`
+
+盲区清单（真实事故里踩过的坑）：①异步回调里的错误（setTimeout 回调 throw）onerror 能抓到，但 stack 只剩回调帧，需要错误边界或包裹上报补齐上下文；②跨域 iframe 内的错误被同源策略吞掉；③console.error 不算错误（需覆写 console 才能采集，Sentry 的 CaptureConsole 就是这么做的）；④React 组件渲染错误不会被 window.onerror 捕获（React 16+ 在自身 error boundary 链路里 throw，但 development 模式下会再抛一次到 window——生产模式依赖 ErrorBoundary 上报）；⑤Web Worker 内错误需 worker.onerror 单独挂。
+
+跨域脚本 "Script error." 的还原：浏览器对跨域脚本的错误详情做脱敏（防信息泄漏：攻击者可通过错误信息探测第三方脚本内容）。解锁需要两步同时满足——①script 标签加 crossorigin="anonymous" 属性（让浏览器以 CORS 模式请求）；②CDN 对脚本响应头返回 Access-Control-Allow-Origin: *（或你的域名）。只加属性不配响应头，脚本直接加载失败。搞定后 onerror 就能拿到完整 message + lineno + stack。对不可控的第三方脚本（如某些广告 SDK），只能包裹 try-catch 的代理注入或用 Sentry 的 ignoreErrors 过滤掉噪音。
+
+真实案例：某电商大促页面上线后错误率从 0.1% 飙到 2.3%，但 Sentry 里全是 "Script error." 无堆栈——排查发现运维新上的 CDN 配置丢了 CORS 响应头。修复 crossorigin + 响应头后定位到真凶：一个压缩工具把可选链 ?. 转译出错。教训：监控链路本身也要被监控（每天校验"能否收到带堆栈的测试错误"），否则监控失明比没监控更危险——你以为系统健康。`,
+    keyPoints: ["onerror=同步错误 / unhandledrejection=Promise 断尾 / 捕获阶段 error=资源加载失败，三者互补", "跨域还原堆栈需 crossorigin 属性 + CDN CORS 响应头双满足", "监控本身要被监控：每日校验测试错误能否带堆栈上报"],
+    followUps: ["React ErrorBoundary 与 window.onerror 的职责边界如何划分？", "如何设计错误采样率既控成本又不漏掉低频致命错误？"],
+    favorited: false,
+  },
+  {
+    id: "fe-287",
+    nodeId: "frontend-monitoring",
+    question: "Source Map 在生产环境还原压缩堆栈的完整链路是什么？为什么 Source Map 文件不能直接公开部署到 CDN？有哪些安全的分发方案？",
+    bigTech: true,
+    answer: `结论：Source Map 是"压缩后位置 ↔ 源码位置"的映射表（VLQ 编码的 mappings 字段记录行列映射，sourcesContent 内嵌源码）。还原链路：浏览器/Sentry 拿到压缩堆栈（file.min.js:1:23456）→ 拉取对应 .map 文件 → 用 source-map 库解析 mappings → 二分查找映射到（src/App.tsx:42:10）→ 结合 sourcesContent 显示源码上下文。整条链路的安全要害在于：.map 文件等于把你的源码全文公开。
+
+完整链路拆解（以 Sentry 为例）：
+
+\`\`\`bash
+# 1. 构建时生成 map（hidden-source-map：生成 map 但产物里不写 //# sourceMappingURL 注释）
+# vite.config.ts
+export default { build: { sourcemap: "hidden" } }
+
+# 2. 产物：app.a1b2c3.js（无 sourceMappingURL 注释）+ app.a1b2c3.js.map（含 mappings + sourcesContent）
+
+# 3. 上传 map 到 Sentry（CI 里，发布前）
+sentry-cli releases files v1.2.3 upload-sourcemaps ./dist \\
+  --url-prefix "~/static/js" --validate
+
+# 4. 删除本地 map，只部署 js 到 CDN
+rm ./dist/**/*.map
+
+# 5. 线上报错 → Sentry 用 release 版本号匹配已上传的 map → 服务端还原 → 展示源码级堆栈
+\`\`\`
+
+为什么不能公开部署 .map：①sourcesContent 字段默认内嵌完整源码——等于源码泄露（商业逻辑、接口地址、注释里的内部信息全暴露）；②即使关掉 sourcesContent，mappings 的结构映射也能被反推出高可读的代码结构（变量名都还在）；③真实案例：2018 年某大厂被扒出全部前端源码，起因就是 devtools 能直接下载到 .map。安全准则：map 文件的可见性必须等同于源码仓库的可见性。
+
+安全分发四方案（按推荐度排序）：①Sentry/Bugsnag 类平台上传（最优）——CI 上传后删除本地 map，平台按 release 关联，支持权限管控与过期清理；②自建 map 服务——map 存内网 OSS，写一个带鉴权的还原接口（错误上报服务拿着堆栈去内网换源码位置），前端永远接触不到 map；③hidden-source-map + 浏览器白名单——map 部署到公司内网域名，只有办公网能访问（开发者 devtools 可用，外网 404）；④debug-id 方案（Sentry 新协议）——构建时往 js 和 map 同时注入唯一 debugId 注释，上报堆栈带 debugId，平台精确匹配 map 版本，解决"发版与上传时序不一致"的错配问题。
+
+坑点：①sourcemap 生成模式选错——开发用 eval-cheap-module-source-map（快但映射到 loader 后代码），生产必须 hidden 或 true（完整映射），混用会导致线上堆栈还原到 webpack 包装层；②多级压缩链路（如先 esbuild 再 terser）map 链断裂，需要 source-map 的 remap 能力合并多级 map；③上 Upload 时 --url-prefix 写错（少了 ~ 或路径不对）会导致 release 关联失败，表现为 Sentry 里堆栈"部分还原"——这是最常见的配置事故，sentry-cli 的 --validate 参数能提前发现。`,
+    keyPoints: ["map = 源码全文，可见性必须等同源码仓库；hidden-source-map + CI 上传 + 删除本地是正解", "还原链路：压缩位置 → VLQ mappings 二分查找 → 源码位置 + sourcesContent 上下文", "debug-id 解决发版与 map 上传的时序错配"],
+    followUps: ["多级构建（esbuild→terser）的 map 链如何合并？", "不想用 Sentry，自建一个最小可用的堆栈还原服务需要哪些模块？"],
+    favorited: false,
+  },
+  {
+    id: "fe-288",
+    nodeId: "frontend-monitoring",
+    question: "Web Vitals 三大指标（LCP / INP / CLS）的采集原理分别是什么？基于 PerformanceObserver 手写一个采集 SDK，并说明各指标优化的第一优先级手段。",
+    bigTech: true,
+    answer: `结论：LCP 测"最大内容绘制何时完成"（加载体验），INP 测"交互后下一帧多久画出"（交互响应，2024 年取代 FID），CLS 测"布局意外偏移的累积量"（视觉稳定性）。三者采集都基于 PerformanceObserver，但 entry 类型与聚合逻辑完全不同——LCP 取最后一条 largest-contentful-paint，INP 取所有 event 条目的 P98，CLS 累加非用户输入引发的 layout-shift session window 峰值。
+
+\`\`\`js
+function observeVitals(report: (m: { name: string; value: number }) => void) {
+  // LCP：每次更大的内容绘制都会发新条目，页面隐藏时取最后一条为准
+  new PerformanceObserver((list) => {
+    const entries = list.getEntries();
+    const last = entries[entries.length - 1];
+    report({ name: "LCP", value: last.startTime });
+  }).observe({ type: "largest-contentful-paint", buffered: true });
+
+  // INP：收集所有交互延迟，页面隐藏时上报 P98
+  const interactions: number[] = [];
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries() as PerformanceEventTiming[]) {
+      if (e.interactionId) interactions.push(e.duration); // duration = 输入延迟+处理+渲染
+    }
+  }).observe({ type: "event", durationThreshold: 16, buffered: true });
+  addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && interactions.length) {
+      interactions.sort((a, b) => a - b);
+      report({ name: "INP", value: interactions[Math.floor(interactions.length * 0.98)] });
+    }
+  });
+
+  // CLS：session window（偏移间隔<1s 且窗口总长<5s）内累加，取最大窗口值
+  let cls = 0, sessionValue = 0, sessionStart = 0, lastShift = 0;
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries() as LayoutShift[]) {
+      if (e.hadRecentInput) continue; // 用户输入后 500ms 内的偏移不算
+      if (e.startTime - lastShift > 1000 || e.startTime - sessionStart > 5000) {
+        cls = Math.max(cls, sessionValue); sessionValue = 0; sessionStart = e.startTime;
+      }
+      sessionValue += e.value; lastShift = e.startTime;
+    }
+    cls = Math.max(cls, sessionValue);
+    report({ name: "CLS", value: cls });
+  }).observe({ type: "layout-shift", buffered: true });
+}
+\`\`\`
+
+优化第一优先级（各指标投入产出比最高的手段）：①LCP——先拆四个子阶段定位（TTFB/资源发现延迟/资源加载时长/渲染阻塞），80% 的 LCP 问题出在"图片没预加载 + 被 JS 阻塞"：给 LCP 图加 fetchpriority="high" + preload，去掉懒加载，首屏 CSS 内联关键部分；②INP——长任务是元凶：拆分 >50ms 的同步任务（scheduler.yield / setTimeout 切片），事件回调里只做最小更新、把非紧急渲染塞进 startTransition，第三方脚本用 web worker（Partytown）挪出主线程；③CLS——90% 是三个原因：图片/视频没写 width height（或 aspect-ratio）、Web 字体 swap 闪动（用 size-adjust 字体描述符做兜底字体度量匹配）、异步广告位/推荐位插入顶开内容（预留固定高度容器）。
+
+真实案例：某内容站 LCP 从 4.2s 优化到 1.9s 的路径——RUM 数据按子阶段拆解发现 TTFB 只占 0.6s，大头在"LCP 图（头图）等到 JS 水合后才插入 DOM"。改法极简单：头图从 React 渲染改为 SSR 直出 <img> + fetchpriority="high"，LCP 立刻掉到 2.1s。教训：先测量子阶段再动手，别凭感觉优化。CLS 的另一个经典事故：运营在首屏顶部插入"限时活动条"，全站 CLS 从 0.05 飙到 0.31 跌出 Google 搜索良好线——监控告警拦住后改为预留占位，指标回落。
+
+坑点：①SPA 路由切换后 LCP 不再更新（largest-contentful-paint 只在首次渲染周期有意义），SPA 软导航需要框架级标记（如 Next.js 的 useReportWebVitals 配合 route change）；②INP 需要交互才有数据，首跳出用户无 INP——不能据此认为 INP 健康；③buffered: true 才能拿到 SDK 加载前已发生的条目，忘了它 SDK 就永远漏掉早期数据。`,
+    keyPoints: ["LCP 取最后一条 / INP 取交互 P98 / CLS 取 session window 峰值，聚合逻辑完全不同", "LCP 先拆子阶段再优化；INP 拆长任务；CLS 先查尺寸缺失/字体/动态插入", "SDK 必须 buffered:true 且 visibilitychange 时 flush，SPA 软导航需单独处理"],
+    followUps: ["LCP 的四个子阶段分别用什么 API 测量？", "INP 在 React 18 并发渲染下有哪些特有的优化手段？"],
+    favorited: false,
+  },
+  {
+    id: "fe-289",
+    nodeId: "frontend-monitoring",
+    question: "白屏检测有哪些主流方案？DOM 采样检测的实现与准确率优化怎么做？为什么单纯检测 #root 是否为空会大量误报？",
+    bigTech: true,
+    answer: `结论：白屏检测四代方案——①错误关联法（有 JS 致命错误 → 推断白屏，漏报多：接口挂了的白屏没有 JS 错误）；②关键节点检测（#root 为空 → 白屏，误报多：骨架屏也算有内容、弹窗遮罩场景误判）；③DOM 采样打分（视口取多个采样点看是否都有有效内容，主流方案）；④截图对比（headless 定期截图 + 图像差分，最准但成本高，用于核心页面巡检而非全量上报）。生产环境用 ③为主 + ①辅助归因 + ④抽检核心页。
+
+DOM 采样实现（以原生截图思想的纯 JS 近似——多点位内容探测）：
+
+\`\`\`js
+function detectBlank(): { blank: boolean; score: number; details: string[] } {
+  const SAMPLE_POINTS = 9; // 3×3 网格采样视口
+  const wrapperSelectors = ["#root", "#app", "#__next"]; // 框架挂载点
+  let emptyPoints = 0;
+  const details: string[] = [];
+
+  for (let i = 1; i <= SAMPLE_POINTS; i++) {
+    const x = (innerWidth / 4) * ((i - 1) % 3 + 1) / 1 * 0 + (innerWidth / 4) * (((i - 1) % 3) + 0.5) * (2 / 3);
+    // 简化：均匀取 9 个点
+    const px = innerWidth * ((i % 3) * 0.25 + 0.25);
+    const py = innerHeight * (Math.floor(i / 3) * 0.25 + 0.25);
+    const el = document.elementFromPoint(px, py);
+    if (!el) { emptyPoints++; details.push(\`point \${i}: null\`); continue; }
+    // 有效内容判定：不是挂载点本身、不是 body/html、有可见尺寸、非全透明
+    const isWrapper = wrapperSelectors.some((s) => el.matches?.(s) || el.closest?.(s) === el);
+    const style = getComputedStyle(el);
+    const visible = el.offsetWidth > 0 && el.offsetHeight > 0 &&
+      style.visibility !== "hidden" && style.opacity !== "0";
+    const hasContent = el.textContent?.trim() || el.tagName === "IMG" || el.tagName === "CANVAS" || el.tagName === "SVG";
+    if ((isWrapper && !hasContent) || !visible) { emptyPoints++; details.push(\`point \${i}: \${el.tagName}\`); }
+  }
+  // 9 个采样点 ≥ 阈值认为白屏（阈值需按业务调，骨架屏多的站点要调高）
+  const score = emptyPoints / SAMPLE_POINTS;
+  return { blank: score >= 0.7, score, details };
+}
+// 时机：load 后延迟 3s 检测一次 + 路由切换后各检测一次，SPA 需对每个软导航重做
+\`\`\`
+
+为什么 #root 判空会大量误报：①骨架屏/loading 态——内容没加载完时 #root 里有骨架屏 DOM（非空）但用户看到的是灰块，判"非白屏"是漏报；反过来首屏 SSR 直出 + JS 水合前的瞬间检测，#root 可能短暂被判为空（误报）；②全屏弹窗/引导遮罩——采样点全被遮罩覆盖，遮罩本身有内容所以不算白屏，但业务内容其实全挂了；③微前端子应用——#root 是主应用的，子应用挂载在内部节点，主应用正常但子应用白屏时 #root 检测完全无感；④整页 iframe 业务——#root 里就一个 iframe，跨域时无法探入。所以必须"多点采样 + 有效内容判定 + 结合错误/接口状态联合判据"。
+
+准确率优化三板斧：①联合判据——DOM 采样异常 + 同期有 JS 错误/关键接口失败 → 白屏置信度拉满立即告警；仅 DOM 采样异常 → 延迟 5s 复检一次再报（消除 loading 中间态误报）；②元素黑名单——把已知的遮罩/弹窗/骨架屏 class 加入"不算有效内容"名单，把广告 iframe 加入"不算空白"名单，名单运营化（误报案例每周复盘更新）；③基线对比——记录该页面历史正常时的采样分值分布，偏离基线才告警（不同页面的"正常形态"差异大，全局统一阈值必误报）。
+
+真实案例：某中台系统上线白屏检测首周告警 400+ 条，复盘 85% 是误报——全部来自"全局 loading 遮罩持续时间 > 检测时机"。加入 loading 黑名单 + 5s 复检后降到日均 3 条真白屏，且全部与接口 500 关联。另一案例：SSR 项目 hydration 失败导致白屏（服务端渲染了 HTML，客户端 JS 报错后整个应用 unmount 变真空），这类白屏 #root 判空完全抓不到时序——因为检测发生在 SSR HTML 还在的时候。解法是延迟到 hydration 窗口后检测 + 监听 unhandledrejection 联合判定。`,
+    keyPoints: ["三代方案：错误关联（漏）→ 关键点判空（误）→ 多点采样打分（主流），截图巡检做补充", "准确率靠联合判据（DOM+错误+接口）+ 黑名单运营 + 页面基线", "SPA 软导航、SSR 水合失败、微前端子应用是三大检测盲区"],
+    followUps: ["截图对比方案的服务端架构怎么设计（成本与频次权衡）？", "白屏告警的值班降噪策略怎么做？"],
+    favorited: false,
+  },
+  {
+    id: "fe-290",
+    nodeId: "frontend-monitoring",
+    question: "设计一个生产级埋点 SDK：曝光/点击/页面浏览三类埋点各自的技术实现要点？如何保证数据不丢（发送可靠性）与不重（去重语义）？",
+    bigTech: true,
+    answer: `结论：埋点 SDK 的三大工程难题不在"怎么采集"而在"数据质量"——曝光埋点用 IntersectionObserver + 停留时长阈值 + 元素级去重；点击埋点用事件委托 + 元素路径标识（防重复绑定）；PV 在 SPA 下要拦截 history API + hashchange + replaceState。可靠性靠 sendBeacon 为主 + 批量队列 + 失败持久化重试；去重靠"事件唯一 ID + 服务端 dedup"双保险。
+
+\`\`\`ts
+class Tracker {
+  private queue: object[] = [];
+  private timer: number | null = null;
+  private exposed = new WeakSet<Element>(); // 元素级曝光去重
+
+  constructor(private appId: string) {
+    // 页面隐藏时强制 flush（数据丢失的最高峰在页面关闭瞬间）
+    addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") this.flush(true);
+    });
+    addEventListener("pagehide", () => this.flush(true));
+  }
+
+  // 曝光：IO 观察 + 可见比例≥50% 且持续≥500ms 才算有效曝光
+  observeExposure(el: Element, params: object) {
+    if (this.exposed.has(el)) return;
+    const io = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (en.intersectionRatio >= 0.5 && !this.exposed.has(el)) {
+          this.exposed.add(el); // 先标记，防停留计时与重复观察竞态
+          this.track("exposure", params);
+          io.unobserve(el);
+        }
+      }
+    }, { threshold: [0.5] });
+    io.observe(el);
+  }
+
+  // 点击：全局委托，元素带 data-track 属性才采集（声明式）
+  initClick() {
+    document.addEventListener("click", (e) => {
+      const el = (e.target as Element).closest?.("[data-track]");
+      if (!el) return;
+      this.track("click", {
+        id: el.getAttribute("data-track"),
+        // 元素路径兜底：button.submit > form#login > div.page（排查定位用）
+        path: this.buildPath(el),
+      });
+    }, { capture: true }); // capture 防业务代码 stopPropagation 截断采集
+  }
+
+  // SPA 的 PV：补丁 history 两个方法 + 监听 popstate/hashchange
+  initPV() {
+    const wrap = (type: "pushState" | "replaceState") => {
+      const raw = history[type];
+      history[type] = (...args) => {
+        raw.apply(history, args);
+        this.track("pv", { url: location.href, referrer: document.referrer });
+      };
+    };
+    wrap("pushState"); wrap("replaceState");
+    addEventListener("popstate", () => this.track("pv", { url: location.href }));
+  }
+
+  track(event: string, params: object) {
+    this.queue.push({ event, params, ts: Date.now(), eid: crypto.randomUUID() }); // eid 服务端去重
+    if (this.queue.length >= 20) this.flush();
+    else if (!this.timer) this.timer = setTimeout(() => this.flush(), 5000) as unknown as number;
+  }
+
+  flush(immediate = false) {
+    if (!this.queue.length) return;
+    const batch = this.queue.splice(0);
+    const body = JSON.stringify({ appId: this.appId, events: batch });
+    // 首选 sendBeacon（页面卸载也能发出）；不支持或失败降级 fetch keepalive；再失败持久化
+    const ok = navigator.sendBeacon?.("/log", body);
+    if (!ok) {
+      if (immediate) fetch("/log", { method: "POST", body, keepalive: true });
+      else this.persist(batch); // localStorage 暂存，下次启动重发
+    }
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+  }
+
+  private persist(batch: object[]) {
+    const key = "tracker_backlog";
+    const old = JSON.parse(localStorage.getItem(key) ?? "[]");
+    localStorage.setItem(key, JSON.stringify([...old, ...batch].slice(-500))); // 上限防爆
+  }
+  private buildPath(el: Element): string {
+    const parts: string[] = [];
+    let cur: Element | null = el;
+    while (cur && cur !== document.body) {
+      parts.unshift(cur.tagName.toLowerCase() + (cur.id ? \`#\${cur.id}\` : ""));
+      cur = cur.parentElement;
+    }
+    return parts.join(" > ");
+  }
+}
+\`\`\`
+
+可靠性细节（真实数据对账踩坑史）：①页面关闭丢失占全部丢失的 80%——sendBeacon 在 pagehide 里调用成功率 99%+，但 iOS Safari 对 Beacon 有 64KB 限制且后台标签页可能延迟发，超量要分批；②sendBeacon 失败无返回值反馈网络结果（它只告诉你"是否成功入队"），关键业务事件（如支付转化）要用 fetch keepalive + 响应确认，丢失后走 localStorage 补偿重发；③批量队列的 flush 阈值（20 条/5s）是成本与实时性的平衡，大促场景调小批次防单请求过大被网关截断。
+
+去重语义：①曝光去重用"元素 × 内容版本"做 key——同一坑位内容轮换后应重新曝光（WeakSet 只解决元素级，内容变更要主动重置）；②防重放——弱网重试可能导致同一批事件发两次，每条事件带 eid（UUID），服务端 Redis SETNX 去重窗口 24h；③会话去重——PV 按 session_id（30 分钟无活动过期）聚合，刷新页面不换 session，避免把刷新统计为新访问。
+
+真实案例：某内容产品曝光数据与广告结算数据差异 12%，对账发现三个源头：①客户端 IO threshold 配 0（元素露 1px 就算曝光） vs 广告行业标准 50%——改 threshold 后差异降到 4%；②剩余 4% 是秒开秒关用户——加入"曝光后停留 ≥500ms 才上报"降到 1.5%；③最后 1.5% 是 Android 低端机 IO 回调丢失（已知 WebView bug），接受为系统误差并写入数据字典。教训：埋点第一版上线时就要和下游对账口径对齐，"先上线再修"的代价是历史数据全部不可比。`,
+    keyPoints: ["曝光=IO threshold 0.5+停留阈值+元素级去重；点击=捕获阶段委托+data-track 声明式；PV=补丁 history API", "可靠性=sendBeacon 为主+批量队列+visibilitychange 强制 flush+localStorage 补偿重试", "数据质量靠 eid 服务端去重+与下游对账口径对齐（比例/停留时长）"],
+    followUps: ["曝光埋点在虚拟列表场景（元素复用）如何正确去重？", "埋点 SDK 如何做体积控制与按需加载？"],
+    favorited: false,
+  },
+  {
+    id: "fe-291",
+    nodeId: "frontend-monitoring",
+    question: "Sentry 的核心工作原理是什么？从错误采集、堆栈还原、聚合分组到告警通知的完整链路如何设计？release 与 sourcemap 关联的关键配置有哪些坑？",
+    bigTech: true,
+    answer: `结论：Sentry 本质是一条"边缘采集 → 服务端归一化 → 指纹分组 → 告警路由"的流水线。SDK 层负责无侵入劫持（重写 onerror/console/(fetch/XHR 做 breadcrumb），Transport 层负责采样与离线缓存，服务端用 stacktrace 的函数名+文件名+行号+上下文行做指纹 hash 把同一根因的错误聚合成 issue，再按告警规则（新 issue/频率突增/影响用户数阈值）路由到 Slack/钉钉。理解这条链路的价值在于：90% 的"Sentry 不好用"问题都出在链路各环节的配置错配，而不是 Sentry 本身。
+
+\`\`\`js
+Sentry.init({
+  dsn: "https://xxx@o123.ingest.sentry.io/456",
+  release: "web@1.4.2+a1b2c3",          // 版本标识：与 sourcemap 上传时严格一致
+  environment: "production",
+  sampleRate: 1.0,                       // 错误全采（错误量小）
+  tracesSampleRate: 0.1,                 // 性能事务采 10%（量大）
+  replaysSessionSampleRate: 0.01,        // 回放采 1%
+  replaysOnErrorSampleRate: 1.0,         // 出错会话 100% 回放（关键！）
+  beforeSend(event, hint) {
+    // 1. 脱敏：密码/token/身份证绝不出网
+    if (event.request?.data) scrubSensitive(event.request.data);
+    // 2. 降噪：已知噪音直接丢弃（浏览器扩展错误、第三方脚本错误）
+    if (isBrowserExtensionError(hint?.originalException)) return null;
+    // 3. 富化：附加业务上下文（用户分层/AB 实验组/页面路由）
+    event.tags = { ...event.tags, ab: getExperimentGroups() };
+    return event;
+  },
+  ignoreErrors: [/ResizeObserver loop/, /Script error\.?$/], // 正则白名单
+});
+\`\`\`
+
+链路逐段拆解：①采集层——SDK 通过重写 window.onerror/unhandledrejection 拿错误，通过包裹 fetch/XHR/setTimeout 记录 breadcrumb（错误发生前的用户行为轨迹：点了什么、请求了什么——复现错误的黄金线索）；②Transport 层——事件先落内存队列，支持 offline 缓存（IndexedDB）与采样率控制，beforeSend 是最后的客户端干预点；③归一化层——服务端用 stacktrace-parser 解析各浏览器不同格式的堆栈（Chrome 的 at fn (url:1:2) vs Firefox 的 fn@url:1:2 vs Safari 缺列号），统一为内部 schema；④还原层——按 event.release 查找该版本上传的 sourcemap 还原源码位置；⑤分组层——指纹默认 = hash（函数名 + 文件名 + 行号 + 源码上下文行），同一指纹归为一个 issue（可通过 fingerprint 配置自定义，比如把"所有支付接口超时"强制归一组）；⑥告警层——issue 触发规则（新建/回归/10 分钟内 >100 次）→ 通知渠道。
+
+release 关联的坑（每一个都对应真实工单）：①release 名不一致——构建时 SENTRY_RELEASE 环境变量在 webpack DefinePlugin 里注了一份、sentry-cli 上传时用了另一份（比如一个带 git hash 一个不带），表现为 Sentry 收到错误但堆栈全是压缩后的——用 debug-id 新协议可根治（构建插件自动往产物和 map 里注入同一个 id，不依赖人肉对齐字符串）；②上传时序——先部署了 js 再上传 map，中间的窗口期错误永远还原失败（map 上传不追溯历史事件），正确顺序：构建 → 上传 map → 部署 js；③URL 前缀不匹配——上传时 --url-prefix ~/static/js 但实际加载路径是 https://cdn.x.com/static/js，~/ 前缀匹配域名归一化时容易配错，用 sentry-cli releases files ... upload-sourcemaps --validate 校验；④多产物项目——Monorepo 里多个应用共用一个 Sentry 项目，map 互相覆盖，应该按应用拆分 Sentry 项目或 release 名带应用前缀。
+
+告警治理（防"狼来了"）：①新 issue 告警（所有新错误第一时间知道）；②阈值告警（同一 issue 5 分钟 >50 次——线上事故信号）；③回归告警（已 resolve 的 issue 在新 release 复现——发版质量信号）；④digest 聚合（低频 issue 每天一封摘要，别一条一响）。某团队踩过的坑：把"所有错误"接到钉钉群，三天后群被免打扰——监控告警的价值 = 信噪比，宁可漏报不可滥报。`,
+    keyPoints: ["链路：SDK 劫持采集 → breadcrumb 行为轨迹 → 归一化 → map 还原 → 指纹分组 → 告警路由", "release 三大坑：名字不一致/上传时序错/url-prefix 错，debug-id 协议可根治", "告警价值=信噪比：新 issue+阈值突增+回归三级，digest 聚合低频"],
+    followUps: ["Sentry 的 fingerprint 自定义规则在什么场景必须用？", "前端性能事务（tracing）的采样率如何按页面价值分层设计？"],
+    favorited: false,
+  },
+  {
+    id: "fe-292",
+    nodeId: "frontend-monitoring",
+    question: "RUM（真实用户监控）与合成监控（Synthetic）的本质差异是什么？如何设计性能指标体系与劣化告警（基线、分位数、维度下钻）？",
+    bigTech: true,
+    answer: `结论：RUM 采集真实用户的全部分布（长尾真实但噪声大），合成监控用固定环境主动探测（稳定可对比但覆盖不了真实长尾）。两者是互补关系：合成监控定"基线回归"（每次发版对比，防劣化上线），RUM 定"真实水位"（P75/P95 分位数看用户真实体验）。只用 RUM 会在发版评审时吵不清"到底是这次发版劣化还是流量结构变了"；只用合成监控会对低端机+弱网的真实劣化完全无感。
+
+指标体系设计（三层）：①核心层——Web Vitals（LCP/INP/CLS）按 P75 对齐 Google 标准，这是 SEO 与体验的行业共同语言；②业务层——自定义关键节点：首屏可用时间（FMP 近似）、关键接口完成时间（performance.mark("api:list:done")）、路由切换耗时（SPA 软导航 startTransition 前后 mark）；③资源层——慢资源 TOP 榜（>3s 的 js/img/api 按 URL 聚合）、错误率、缓存命中率。上报用 PerformanceObserver + 自定义 mark，聚合在服务端按"分位数"而非均值——均值在长尾分布下毫无意义（一个 30s 的极端值能把均值拉高 10 倍，P75 才代表"大多数用户"）。
+
+\`\`\`ts
+// 分位数统计（服务端 ClickHouse 近似算法 t-digest，客户端只负责原始上报）
+// 客户端上报维度设计（下钻能力的关键在维度而非指标）：
+{
+  metric: "LCP", value: 2340, ts: 1721...,
+  dims: {
+    page: "/detail",            // 页面（必须）
+    release: "1.4.2",           // 版本（发版对比必须）
+    device: "android-low",      // 设备分档（按内存/核数/UA 打分）
+    network: "4g",              // navigator.connection.effectiveType
+    geo: "cn-east",             // 地域（CDN 排查必须）
+    ab: "exp101:b",             // 实验组（实验对性能的影响常被忽略）
+  }
+}
+// 查询：P75(LCP) WHERE page='/detail' GROUP BY release → 发版回归一目了然
+\`\`\`
+
+劣化告警的基线设计（三道防线）：①发版防线（合成监控）——CI 里跑 Lighthouse/WebPageTest 对核心页面采样 N 次取中位数，与上一 release 基线对比，LCP 回退 >10% 阻塞发布（这就是"性能预算"的执法环节）；②天级防线（RUM 同比）——今日 P75 vs 昨日同期 vs 上周同期，三口径同时劣化 >15% 触发告警（单口径容易因为流量结构误报，比如周末低端机占比天然升高）；③实时防线（RUM 滑动窗口）——5 分钟窗口内指标均值 vs 过去 7 天同时段均值，偏移 >3σ（三倍标准差）触发，用于抓突发性事故（CDN 故障/接口劣化）。
+
+维度下钻定位法（告警后 10 分钟定位的套路）：指标劣化 → 先按 release 分组（是发版引入还是线上渐变）→ 再按 geo/network 分组（是不是某 CDN 节点或运营商故障）→ 再按 device 分组（是不是只对低端机劣化——多半是包了太大 JS）→ 最后按 page 分组定位到具体页面。真实案例：某次 LCP 全站劣化 18%，release 分组无差异（排除发版），geo 分组发现集中在某省 4G 用户——最终定位是该省 CDN 节点证书过期导致回源。没有维度下钻的告警只是"告诉你疼了"，有下钻才是"告诉你哪疼"。
+
+坑点：①指标口径漂移——SPA 软导航的 LCP 需要框架打点重新定义，否则"页面切换后 LCP 不再更新"导致新页面看起来指标很好（其实根本没采到）；②维度爆炸——dims 组合基数太大会拖垮聚合查询（user_id 这种高基数字段绝不能进 dims，进 tags 或单独存储）；③告警疲劳——阈值拍脑袋定 ±20% 必然天天误报，基线必须用历史数据统计出来（7 天同时段 ±3σ 是起步配置）；④合成监控的环境漂移——探测机性能自身变化会被误判为站点劣化，探测任务要跑"参照站点"做对照组（同时探测 google.com，两边都劣化=探测机问题）。`,
+    keyPoints: ["RUM 看真实长尾（P75/P95），合成监控看发版回归（同环境对比），缺一不可", "指标用分位数不用均值；告警三道防线：CI 预算阻塞/天级同比/实时 3σ", "下钻路径：release→geo/network→device→page，10 分钟定位套路"],
+    followUps: ["性能预算（performance budget）指标怎么定才既有约束力又不误伤创新？", "SPA 软导航的体验指标（如 INP 后的路由切换耗时）如何标准化采集？"],
+    favorited: false,
+  },
+  {
+    id: "fe-293",
+    nodeId: "frontend-monitoring",
+    question: "Session Replay（用户行为回放）的实现原理是什么？rrweb 的 DOM 快照 + 增量变更记录如何工作？隐私脱敏与性能成本控制的关键设计是什么？",
+    bigTech: true,
+    answer: `结论：Session Replay 不录屏（视频），而是"录 DOM"——rrweb 的方案：首次全量快照把 DOM 树序列化成带节点 id 的 JSON，之后用 MutationObserver 监听增量变更（节点增删/属性变化/文本变化），配合输入事件、滚动、鼠标位置、样式变更按时间轴记录为事件流；回放时在 iframe 里重建快照 DOM，再按时间戳回放增量事件。同等时长下数据量是视频的 1/100 量级，且可检索可脱敏。
+
+\`\`\`
+首次快照（全量序列化）：
+<html id=1> → <body id=2> → <div id=3 class="card"> → "商品A"
+序列化为：[{id:1,type:"Element",tag:"html"},{id:2,...},{id:3,attrs:{class:"card"}},...]
+
+增量事件流（时间轴）：
+t=0.5s  [mutation] added: <button id=47>, removed: none, attrs: [{id:3, class:"card active"}]
+t=1.2s  [input] id=47 text: "用户输入..."
+t=1.3s  [scroll] id=2 (0, 520)
+t=1.5s  [mouse] (320, 480)  ← 鼠标轨迹 50ms 节流采样
+t=2.0s  [viewport] resize 390×844
+
+回放：iframe 重建 t=0 快照 → 按时间轴依次 apply 事件 → 用户看到"视频"
+\`\`\`
+
+rrweb 的技术要点：①快照序列化——遍历 DOM 为每个节点分配自增 id，序列化 tag/attrs/children，同时记录 CSSOM（外链样式表内容要内联进快照，否则回放时样式表已发版变了导致回放走样——这是回放失真的头号原因）；②增量监听——MutationObserver 捕获 DOM 变化，输入事件监听 input/change，鼠标用 mousemove 节流，滚动用 scroll 节流；③sandbox 回放——回放页把快照 DOM 放进 iframe + sandbox 属性，禁掉脚本执行（否则回放里的 <script> 会真的执行）、拦截表单交互与跳转。
+
+隐私脱敏（合规红线，GDPR/个保法必查）：①输入脱敏——rrweb 的 maskAllInputs 把所有 input 值替换为 ***（密码框默认强制），更细粒度用 data-rrweb-mask 属性标记元素级脱敏（手机号/身份证字段）；②文本脱敏——maskTextSelector 对匹配选择器的文本内容整体替换（如 .user-phone 显示为 ****）；③采集前阻断——blockSelector 命中的元素完全不进快照（支付密码键盘、人脸识别区域）；④服务端二次清洗——敏感正则（手机号/卡号模式）在入库前对全文扫描替换，客户端脱敏只是第一道（客户端可被绕过，服务端清洗是兜底）。真实教训：某公司回放里泄露了用户银行卡号（前端忘记给自定义金额输入框加 mask，它不是一个 <input> 而是 contenteditable div），被罚后整改为"默认全脱敏 + 白名单放行"——隐私设计的安全默认值必须是 deny by default。
+
+性能与成本三板斧：①采样——全量回放成本扛不住，典型策略：错误会话 100% 回放（排障价值最高）+ 普通会话 1-5% 抽样 + 关键漏斗页面（支付/注册）加权重；②数据压缩——事件流按 10s 或 200 事件切片，gzip 后上报（文本压缩率 ~90%），鼠标轨迹抽稀（50ms→200ms 精度够用数据量降 75%）；③主线程保护——MutationObserver 回调和序列化都在主线程跑，大列表场景（虚拟滚动一次增删千级节点）会卡顿，要开 worker 化序列化（rrweb 的 pack 压缩移入 worker）+ 单次 mutation 数量熔断（超过阈值放弃本帧记录，保性能优先保不了就丢回放不能丢体验）。
+
+真实案例：某客服系统接入回放后，"用户说按钮点了没反应"类工单的平均定位时间从 40 分钟降到 5 分钟——回放直接看到用户点击时按钮被 loading 遮罩盖住（UI bug）。成本账单：DAU 50 万的站点，1% 采样 + 错误会话全量，日均回放数据 80GB（gzip 后），存储 30 天生命周期约 2.4TB，成本可接受。另一个坑：回放与 Sentry 错误关联靠 session id 打通——错误发生时能一键跳到该用户当时的回放，这个关联是回放价值最大化的关键设计，没做关联的回放只是一堆没人看的视频。`,
+    keyPoints: ["录 DOM 不录屏：全量快照+MutationObserver 增量事件流，数据量约视频 1/100", "脱敏 deny by default：input 默认 mask，文本/区域选择器控制，服务端正则二次清洗兜底", "成本控制：错误会话全量+普通 1-5% 采样+gzip 切片+鼠标抽稀+worker 化序列化"],
+    followUps: ["回放保真度问题（样式漂移/字体缺失/ canvas 内容）各怎么解？", "回放数据与错误监控/性能监控如何打通形成完整排障链路？"],
+    favorited: false,
+  },
+  {
+    id: "fe-294",
+    nodeId: "cicd-frontend",
+    question: "设计一个前端 PR 的 CI 流水线：应该包含哪些环节、顺序如何编排、如何把总时长控制在 10 分钟以内？哪些检查该阻塞合并、哪些只做提示？",
+    bigTech: true,
+    answer: `结论：CI 流水线的设计哲学是"快速失败 + 分层反馈"——便宜的检查放前面（秒级挂掉不浪费资源），昂贵的检查并行跑（test/build 不同 stage 并行而非串行），总时长预算 10 分钟（超过则开发者开始绕过 CI）。阻塞合并的只放"客观可判定"的检查（lint/typecheck/test/build/guard），"主观或波动"的（性能分数、覆盖率绝对值）只做评论提示。
+
+\`\`\`yaml
+# .github/workflows/ci.yml（典型编排，注意 needs 形成的并行 DAG）
+jobs:
+  install:                      # 阶段0：依赖安装 + 缓存（后续 job 复用）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { cache: pnpm }
+      - run: pnpm install --frozen-lockfile   # frozen 保证 CI 与 lockfile 一致
+
+  static-check:                 # 阶段1：秒级静态检查（并行三件套）
+    needs: install
+    strategy:
+      matrix: { task: [lint, typecheck, format-check] }
+    steps:
+      - run: pnpm \${{ matrix.task }}
+      # lint: eslint --max-warnings 0（warning 也视为失败，防渐进腐化）
+      # typecheck: tsc --noEmit
+      # format: prettier --check（只校验不改写，改写交给 lint-staged 本地钩子）
+
+  guard-test:                   # 阶段1b：架构守护测试（自定义规则，秒级）
+    needs: install
+    steps:
+      - run: pnpm vitest run __tests__/no-native-form-elements.test.ts __tests__/ui-design-system-guard.test.ts
+      # 防"原生 button 混进组件库"、"缺 dark: 配对"这类架构腐化
+
+  unit-test:                    # 阶段2：单元测试（分片并行）
+    needs: install
+    strategy:
+      matrix: { shard: [1, 2, 3, 4] }   # vitest --shard=x/4
+    steps:
+      - run: pnpm vitest run --shard=\${{ matrix.shard }}/4 --coverage
+
+  build:                        # 阶段2b：构建（与 test 并行）
+    needs: install
+    steps:
+      - run: pnpm build
+      - run: pnpm size-limit    # 包体积预算检查（超预算失败）
+
+  e2e-smoke:                    # 阶段3：E2E 冒烟（只跑核心路径 5-10 条，不是全量）
+    needs: build
+    steps:
+      - run: pnpm playwright test --grep @smoke
+\`\`\`
+
+时长控制手段（20 分钟压到 8 分钟的实战清单）：①依赖缓存——setup-node 的 cache + pnpm store 缓存，安装从 90s → 15s；②测试分片——vitest/jest 的 shard 或 Playwright 的 shard，4 分片通常把 12 分钟测试压到 4 分钟；③构建缓存——Turborepo 远程缓存或 actions/cache 存 .next/cache，增量构建 60-80% 时间节省；④E2E 分层——PR 只跑 @smoke（10 条核心路径 3 分钟），全量 100 条放 nightly；⑤条件执行——paths-filter 让只改文档的 PR 跳过测试和构建；⑥并发取消——concurrency: { group: pr-\${{ github.event.number }}, cancel-in-progress: true }，同一 PR 新 push 自动取消旧运行（省钱又省时）。
+
+阻塞 vs 提示的分层（这是团队协作的政治学）：①阻塞——lint 0 warning、typecheck、单测 100% 通过、构建成功、守护测试、lockfile 完整性（frozen-lockfile 失败=有人手改依赖）、包体积预算；②评论提示不阻塞——覆盖率变化（Codecov 评论 "-2.3%"）、Lighthouse 分数波动、bundle 分析报告链接；③灰度阻塞——新引入的检查规则先跑两周"只警告"期，修复存量问题后转阻塞（否则一次引入几百个历史违规永远合不了并）。某团队的教训：覆盖率硬门禁定 80% 导致开发者写大量"为覆盖而覆盖"的无断言测试，改为"覆盖率不下降"（diff coverage）后测试质量反而上升。
+
+坑点：①CI 与本地环境不一致——Node 版本用 .nvmrc + packageManager 字段钉死，CI 镜像与本地一致；②flaky test（偶发失败）是 CI 信任的头号杀手——发现即隔离（quarantine 标签单独跑），重试机制只是止痛药不是治疗方案；③secret 泄漏——CI 日志里 echo $TOKEN 类调试语句要 code review 拦住，fork PR 默认拿不到 secrets（GitHub 默认行为，别改）；④CI 配置本身要进 review——workflow 文件改动要 CODEOWNERS 保护，防有人改 CI 跳过检查。`,
+    keyPoints: ["快速失败：秒级检查前置，昂贵检查并行（test/build 分片），总预算 10 分钟", "阻塞只放客观判定项；覆盖率/性能分用评论提示；新规则先警告期再转阻塞", "时长优化：依赖缓存+测试分片+构建远程缓存+E2E 分层+同 PR 并发取消"],
+    followUps: ["flaky test 的系统治理流程（发现/隔离/修复/防复发）怎么设计？", "Monorepo 中 PR 只改一个包时 CI 如何做 affected 检测？"],
+    favorited: false,
+  },
+  {
+    id: "fe-295",
+    nodeId: "cicd-frontend",
+    question: "前端静态资源的版本管理机制：contenthash 与 chunkhash 的区别？为什么 HTML 入口必须 no-cache 而静态资源可以 immutable 强缓存一年？灰度时新旧版本资源共存的坑有哪些？",
+    bigTech: true,
+    answer: `结论：现代前端缓存架构的基石是"内容寻址 + 双层缓存策略"——静态资源（js/css/img）文件名带 contenthash（内容变则文件名变），配 Cache-Control: public, max-age=31536000, immutable 让浏览器一年内零请求直接用；HTML 入口文件配 no-cache（每次协商验证）或 max-age=0，保证发版后用户立刻拿到新 HTML、新 HTML 引用新 hash 资源。这套组合让"发版即时生效"与"资源永久缓存"两个矛盾需求同时成立。
+
+hash 三兄弟的区别（webpack 语境，概念通用）：①hash——整个构建一次一个 hash，任何文件变所有产物 hash 全变（缓存全失效，已淘汰）；②chunkhash——按 chunk 内容算，同 chunk 内任何模块变则该 chunk hash 变（问题：chunk 内联的 runtime 或 CSS 变化会牵连 JS 的 hash）；③contenthash——按文件最终内容算，只关心这个文件自身字节（最精确，现代默认）。Vite/Rollup 默认就是 contenthash 语义（[name]-[hash].js）。真实收益：改一行业务代码，vendor 库（react 等）hash 不变，老用户只下载变化的几个 KB 业务 chunk，缓存命中率 95%+。
+
+HTML 为什么不能强缓存（发版事故的重灾区）：HTML 是资源的"引用清单"——如果 HTML 被强缓存一年，发版后用户拿到的还是旧 HTML 引用的旧 hash 资源，新功能永远不可见；更糟的是服务端如果按"HTML 里引用的资源必须存在"做清理，旧 hash 文件被删后老 HTML 直接白屏 404。正确配置：
+
+\`\`\`nginx
+# HTML：no-cache（每次都问服务端，304 省流量但保证新鲜）
+location ~* \\.html$ {
+  add_header Cache-Control "no-cache";   # 等价 max-age=0, must-revalidate
+}
+# 带 hash 的静态资源：一年强缓存 + immutable（连 304 协商都省掉）
+location ~* \\.(js|css|png|jpg|woff2)$ {
+  add_header Cache-Control "public, max-age=31536000, immutable";
+}
+\`\`\`
+
+注意 immutable 的语义：告诉浏览器"这个 URL 的内容保证永不变，刷新页面也别来验证"——普通强缓存在用户按 F5 时会发协商请求，immutable 连这个都省。前提是文件名必须 contenthash 保证 URL 唯一性，否则 immutable 就是灾难（内容变了 URL 没变，用户永远拿旧文件）。
+
+新旧版本共存（灰度/滚动发布的生死线）：发版瞬间集群里同时存在新旧两个版本的 HTML——用户 A 拿到新 HTML 引用 app.new123.js，用户 B 拿到旧 HTML 引用 app.old456.js。资源必须"只增不删"：①新资源先全量上传 CDN，再切 HTML（顺序反了=新 HTML 引用还没上传的 JS=白屏）；②旧资源保留至少一个会话周期（通常 7-30 天）再清理，防止"用户开着旧页面几天后点击触发懒加载 chunk 404"；③动态 import 的异步 chunk 是最大盲区——主包是新版本，异步 chunk 可能是旧 hash，若旧 chunk 已被删除则报错，解法：chunk 加载失败自动刷新页面（拿到新 HTML 和新引用清单）+ 旧资源延迟清理。
+
+\`\`\`js
+// 异步 chunk 404 兜底（生产必备）
+window.addEventListener("error", (e) => {
+  if (/Loading chunk \\d+ failed|Loading CSS chunk/.test(e.message)) {
+    if (!sessionStorage.getItem("chunk_reload")) {
+      sessionStorage.setItem("chunk_reload", "1"); // 防无限刷新循环
+      location.reload();
+    }
+  }
+});
+\`\`\`
+
+真实案例：某公司大促前发版，CDN 配置把 index.html 也设了一年缓存——运营后台切换了活动配置但用户端两天没变，紧急联系 CDN 厂商全网刷新才解决，之后 HTML 缓存策略进发布检查清单。另一个案例：清理脚本"删除 7 天前的旧资源"误删了还有用户会话的 hash 文件，导致大面积 chunk 404，上线 chunk_reload 兜底 + 清理窗口延长到 30 天才根治。`,
+    keyPoints: ["contenthash 按文件内容定名+immutable 一年缓存；HTML no-cache 保证引用清单新鲜", "发版顺序：资源先传 CDN→再切 HTML；旧资源保留 7-30 天防懒加载 chunk 404", "chunk 404 兜底：检测加载失败自动刷新（带防循环锁）"],
+    followUps: ["SSR 场景下 HTML 不再是静态文件，缓存策略怎么调整？", "Service Worker 缓存与 HTTP 缓存的优先级冲突怎么协调？"],
+    favorited: false,
+  },
+  {
+    id: "fe-296",
+    nodeId: "cicd-frontend",
+    question: "前端灰度发布有哪些实现方案（按用户分流 / 按比例分流 / Feature Flag）？纯静态站点没有服务端时怎么做灰度？Feature Flag 系统的工程要点是什么？",
+    bigTech: true,
+    answer: `结论：灰度的本质是"入口分流"——在用户拿到 HTML 的那一刻决定给他哪个版本。三条路线按控制力排序：①服务端分流（SSR/BFF 按用户 ID hash 渲染不同版本，最精确）；②边缘分流（CDN 边缘函数按 cookie/比例改写回源，静态站点可用）；③客户端分流（一个 HTML 内置双版本或远程配置，用 Feature Flag 控制显隐，成本最低但包体积代价）。Feature Flag 与前两者正交——它控制的不是"版本"而是"功能开关"，粒度更细。
+
+\`\`\`ts
+// 方案一：边缘分流（Cloudflare Worker 伪代码，静态站灰度标准方案）
+export default {
+  async fetch(req: Request) {
+    const cookie = req.headers.get("cookie") ?? "";
+    let bucket = /gray_bucket=(\\d+)/.exec(cookie)?.[1];
+    if (!bucket) {
+      // 首次访问：按 0-99 随机分桶，写 cookie 保持粘性（同一用户始终同版本）
+      bucket = String(Math.floor(Math.random() * 100));
+      return withCookie(await route(bucket), "gray_bucket=" + bucket);
+    }
+    return route(bucket);
+  },
+};
+function route(bucket: string) {
+  // 灰度 5%：桶号 <5 走新版本源站，其余走稳定版
+  const origin = Number(bucket) < 5 ? "https://new.origin" : "https://stable.origin";
+  return fetch(origin + new URL(req.url).pathname, req);
+}
+
+// 方案二：Feature Flag 客户端评估
+interface Flag { key: string; enabled: boolean; rollout?: number; allowList?: string[] }
+function isOn(flag: Flag, userId: string): boolean {
+  if (!flag.enabled) return false;
+  if (flag.allowList?.includes(userId)) return true;          // 白名单先行
+  if (flag.rollout == null) return true;
+  // 一致性 hash：同一用户每次评估结果稳定（不能像 Math.random 每次变）
+  const h = hash(flag.key + userId) % 100;
+  return h < flag.rollout;
+}
+\`\`\`
+
+一致性 hash 是 Flag 系统的命门——如果用随机数评估，用户刷新一次页面功能就时有时无，必然引发客诉；用 hash(flagKey + userId) % 100 保证同一用户对同一 Flag 结果恒定，且 rollout 从 5% 调到 10% 时原来的 5% 用户仍在灰度内（单调扩大，不会让已灰度用户退出）。
+
+Feature Flag 系统工程要点：①Flag 生命周期管理——Flag 是技术债的显性形式，每个 Flag 带 owner + 创建时间 + 预期移除日期，超过 90 天的 Flag 进周报催清理（某公司审计发现代码里 40% 的 Flag 对应的功能早已 100% 上线，分支逻辑成了死代码炸弹）；②配置下发——Flag 配置走"启动拉取 + 长轮询更新"，客户端本地缓存兜底（配置服务挂了用上次缓存，绝不能让 Flag 服务故障导致功能全灭或全开——默认值设计：新功能默认 off，核心功能 flag 挂了的 fallback 应该是 on 还是 off 要逐个评估）；③与实验平台打通——Flag 的曝光事件进埋点（isOn 评估时上报 flag_key + 结果），才能分析"开 Flag 的用户 vs 没开的"转化差异；④代码层面——Flag 判断收敛到 getFlag(key) 单点，禁止散落各处的 if (config.xxx) 直读配置，否则移除 Flag 时改不干净。
+
+灰度发布完整流程（防事故 SOP）：内部白名单（员工 1 天）→ 1% 随机（观察核心指标 2 小时）→ 10%（半天）→ 50%（半天）→ 100%（Flag 保留一周作为回滚开关）→ 移除 Flag 代码。每个阶段设"自动熔断"：错误率或核心指标劣化超阈值自动把 rollout 调回 0（Flag 平台配告警联动），别等人工发现。
+
+真实案例：某电商新结算页用 Flag 灰度，5% 阶段监控发现支付成功率降 0.3%（绝对值小但相对值大），自动熔断回滚后排查是新版地址组件在 iOS 12 的兼容问题——灰度 5% 挡下了估计数百万的资损。反面案例：某团队客户端灰度用"版本号比较"（新版本 App 才有新功能），结果 Web 端学这个思路用"随机刷新出不同 UI"，用户每次刷新界面都不一样，客诉爆炸后紧急下线——客户端（版本天然隔离）与 Web（每次访问都是新会话）的灰度模型完全不同，不能照抄。`,
+    keyPoints: ["入口分流三层：服务端渲染分流 > 边缘 Worker 分流 > 客户端 Flag；静态站用边缘方案", "Flag 评估必须一致性 hash（粘性+单调扩大），生命周期管理防 Flag 烂尾", "灰度 SOP：白名单→1%→10%→50%→100%，每阶段自动熔断回滚"],
+    followUps: ["Feature Flag 与 AB 实验平台的关系是什么（同一个系统还是两个）？", "微前端架构下主子应用的灰度如何协同（主应用灰度时子应用版本怎么锁）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-297",
+    nodeId: "cicd-frontend",
+    question: "CDN 缓存策略实战：max-age / s-maxage / immutable / stale-while-revalidate 的分工？发版瞬间如何保证全球用户平滑拿到新版本？CDN 缓存刷新（Purge）的正确姿势是什么？",
+    bigTech: true,
+    answer: `结论：四个指令解决四个不同问题——max-age 控制浏览器缓存时长，s-maxage 覆盖 CDN 边缘节点的缓存时长（共享缓存专用），immutable 告诉浏览器"刷新也别来验证"（配合 contenthash 使用），stale-while-revalidate 允许边缘节点在缓存过期后先返回旧内容同时后台回源更新（用短暂的内容滞后换零回源尖峰）。发版平滑性的核心不是"刷新 CDN"而是"架构上避免需要刷新"——HTML 短缓存自然过期 + 资源 contenthash 天然新旧共存。
+
+\`\`\`nginx
+# 静态资源（带 hash）：浏览器一年 + CDN 一年 + immutable
+location /static/ {
+  add_header Cache-Control "public, max-age=31536000, immutable";
+}
+# HTML 入口：浏览器每次协商（no-cache），CDN 短缓存 60s 扛源站压力
+location ~* /(index\\.html|)$ {
+  add_header Cache-Control "no-cache";              # 给浏览器
+  # CDN 层单独配 s-maxage=60, stale-while-revalidate=300
+  # 含义：CDN 缓存 60s，过期后 300s 内允许先吐旧版同时后台回源
+}
+# API 响应（可缓存的列表类）：浏览器不缓存，CDN 缓存 30s + swr 300s
+location /api/public/ {
+  add_header Cache-Control "no-cache, s-maxage=30, stale-while-revalidate=300";
+}
+\`\`\`
+
+发版平滑的三层机制（按可靠性排序）：①contenthash 架构（根治）——资源新旧共存不需要任何刷新，HTML 的 60s CDN 缓存意味着发版后全球最多 60s 收敛（用户拿到新 HTML → 引用新 hash 资源 → CDN 未命中回源拿到新文件）；②主动预热——发版后脚本立即请求核心 URL 列表（含各区域 POP 节点探测），让边缘节点提前回源拉新文件，把"第一个用户触发回源的慢请求"消灭在监控前；③Purge 兜底——只对"必须立即生效且被长缓存"的资源用（如配错的缓存头、紧急安全修复），Purge 是手术刀不是常规武器。
+
+Purge 的正确姿势（用错的代价是源站被打爆）：①按 URL 精确 Purge 优先，目录/通配符 Purge 是双刃剑——purge /static/* 会导致百万级 URL 同时回源（缓存击穿风暴），源站 QPS 瞬间放大百倍；②Purge 后立刻预热——先 purge 再马上用脚本请求一遍让 CDN 重新回源拉取，避免用户流量成为第一批回源请求；③软 Purge（soft purge）——部分 CDN 支持"标记过期但继续服务旧内容直到新内容拉取完成"（本质是服务端版 stale-while-revalidate），比硬删除安全；④Purge 传播延迟——全球数百个 POP 节点的 Purge 指令传播需要数秒到数分钟，"Purge 完立刻验证"要用多地域探测节点，别只测你本地。
+
+真实案例三连：①某公司发版后客服炸锅"界面没变"——排查是 HTML 被某运营商透明缓存（非 CDN 的 HTTP 代理）缓存了 2 小时，这种缓存不受你的响应头控制（违规实现），终极解法：HTML 加版本号查询串兜底（/?v=1.4.2 只在故障时人工切换）+ 重要发布走双域名切换；②紧急修复一个 XSS 漏洞，Purge 了全部 JS——源站带宽瞬间打满 10G 触发限流，正确做法是只 Purge 受影响的一个 chunk（contenthash 架构下漏洞文件天然只有一两个）；③stale-while-revalidate 救场：某次源站宕机 40 分钟，因为 CDN 配置了 swr 300s + 长 stale-if-error，边缘节点持续用旧内容服务，全站用户无感知——swr 不只是性能优化，更是可用性保险。`,
+    keyPoints: ["max-age=浏览器 / s-maxage=CDN / immutable=免验证 / swr=先旧后新后台更新，各司其职", "发版平滑靠 contenthash 架构+HTML 短缓存收敛，Purge 只是兜底手段", "Purge 三原则：精确 URL 优先、purge 后立刻预热、用 soft purge 防击穿风暴"],
+    followUps: ["stale-if-error 与 stale-while-revalidate 的区别和组合用法？", "多 CDN 厂商容灾架构下缓存策略如何统一？"],
+    favorited: false,
+  },
+  {
+    id: "fe-298",
+    nodeId: "cicd-frontend",
+    question: "前端发布回滚策略：纯静态站点如何实现秒级回滚？版本目录保留、HTML 入口切换、CDN 回源切换三种方案的差异？微前端场景下主子应用如何独立回滚？",
+    bigTech: true,
+    answer: `结论：回滚速度的本质取决于"回滚动作改了什么"——改文件内容（重新构建部署旧代码）是分钟级且依赖 CI 状态；改入口指向（把 index.html 换回旧版本）是秒级且不依赖构建。所以现代前端架构把"版本保留"做成一等公民：每次发布的完整产物按版本目录保留 N 份，回滚 = 把入口软链/配置指回旧版本，把"重新构建"从回滚路径上彻底剔除。
+
+\`\`\`
+三种方案对比：
+
+方案 A：版本目录 + 入口切换（推荐）
+/releases/
+  ├── v1.4.0/  (index.html + assets/*)
+  ├── v1.4.1/  (index.html + assets/*)
+  └── v1.4.2/  (index.html + assets/*)   ← 当前
+回滚动作：对象存储/CDN 回源配置从 v1.4.2 切到 v1.4.1（或 nginx 软链切换）
+耗时：秒级    依赖：只需存储服务可用
+
+方案 B：HTML 覆盖式（简单项目）
+index.html 每次发布覆盖，assets/ 按 hash 累积（contenthash 天然新旧共存）
+回滚动作：从版本管理系统取回旧 index.html 重新上传 + Purge CDN
+耗时：分钟级（受 Purge 传播延迟影响）  风险：回滚的是"引用清单"，资产还在
+
+方案 C：双活切换（蓝绿）
+blue.example.com / green.example.com 两套完整环境，DNS 或 LB 切换
+耗时：秒级   成本：双倍基础设施   适用：超高可用核心站
+\`\`\`
+
+方案 A 的工程细节（为什么是主流）：①assets 跨版本共享——contenthash 让不同版本间相同内容的文件天然同名，版本目录可以用硬链接/去重存储，保留 20 个版本的存储成本远低于想象（通常只增 10-20%）；②切换动作原子化——用对象存储的"入口文件复制"（把 v1.4.1/index.html 复制为根 index.html）或 CDN 的"回源路径改写规则"切换，这两个都是单操作，不存在"切一半"的中间态；③自动化——发布系统记录版本时间线，回滚按钮 = 选版本 + 执行切换 + 验证探测（自动请求首页校验版本标识 meta 标签），全程 30 秒内完成。
+
+微前端独立回滚（复杂度上一个台阶）：主应用通过"子应用清单"（manifest）决定加载每个子应用的哪个版本——回滚单元从"整个站"细化为"单个子应用"。正确架构：子应用清单存配置中心（如 {"subapp-order": "1.3.2", "subapp-user": "2.1.0"}），主应用启动时拉取。回滚子应用 = 配置中心把 subapp-order 指回 1.3.1 + 主应用侧短缓存过期，其他子应用完全不动。坑点：①主子应用有隐式协议耦合（主应用的通信 SDK 升级到 2.0，子应用 1.3.1 用的是 1.0 协议）——回滚子应用前必须确认协议兼容矩阵， manifest 里要声明每个版本依赖的宿主能力版本；②共享依赖版本锁定（主应用通过 import map 提供 react@18，回滚子应用到依赖 react@17 的旧版本会导致两个 React 实例共存报错）——子应用版本的依赖约束也要进 manifest 做兼容性校验；③回滚的爆炸半径测试——每次发布记录"可回滚窗口"（本次发布改了哪些协议/依赖，决定了能安全回滚到哪个历史版本）。
+
+真实案例：某金融站大促期间新版本导致支付页样式错乱，值班同学用版本目录切换 18 秒回滚——同一天另一团队用"git revert + 重新跑 CI 部署"回滚他们的后台系统，花了 23 分钟（CI 排队 8 分钟）。教训：回滚路径上每多一个依赖（CI 可用性、构建缓存、排队），MTTR 就不可控一分。回滚方案要定期演练（每月一次"回滚消防演习"），没演练过的回滚方案等于没有方案——某公司真出事时发现"版本保留脚本"三个月前就坏了，20 个版本目录里 19 个是空壳。`,
+    keyPoints: ["回滚速度=改入口指向（秒级）>改文件内容（分钟级）；版本目录保留让回滚不依赖 CI", "contenthash 让多版本 assets 去重共存，保留 20 版成本极低", "微前端回滚=配置中心改 manifest 版本指向；协议兼容矩阵与共享依赖锁定是前置条件"],
+    followUps: ["回滚后用户已加载的新版本页面（懒加载 chunk 引用已删资源）如何兜底？", "数据库变更参与的发版如何设计可回滚性（前向兼容的 schema 演进）？"],
+    favorited: false,
+  },
+  {
+    id: "fe-299",
+    nodeId: "cicd-frontend",
+    question: "CI 构建从 20 分钟优化到 3 分钟的系统方法论：如何定位瓶颈（度量先行），以及缓存、并行、增量、依赖瘦身四类手段的优先级与预期收益？",
+    bigTech: true,
+    answer: `结论：构建优化第一原则——先度量再动手，80% 的构建时间通常花在 20% 的环节，凭感觉优化（上来就换 esbuild）经常事倍功半。方法论四步：①给流水线每个阶段打耗时标签（install/lint/typecheck/test/build/deploy 分开统计）；②构建工具内部用 profiler（webpack 的 speed-measure-webpack-plugin、vite --profile）定位到 loader/plugin 级；③按"消除 > 缓存 > 并行 > 换工具"的优先级动手；④把构建时长本身做成监控指标（趋势劣化告警），防优化成果被日常提交蚕食。
+
+\`\`\`bash
+# 度量示例（GitHub Actions 各 step 自带耗时，汇总到看板）
+# webpack 内部定位：
+npx webpack --profile --json > stats.json && npx webpack-bundle-analyzer stats.json
+# 或 speed-measure-webpack-plugin 直接输出每个 loader/plugin 耗时：
+#  Typical output:
+#   babel-loader: 312s  ← 大头！
+#   ts-loader (transpileOnly: false): 188s  ← 类型检查混在构建里
+#   TerserPlugin: 95s
+#   css-loader+postcss: 76s
+\`\`\`
+
+四类手段按优先级（预期收益基于真实项目数据）：①消除不必要的工作（收益 30-50%，成本最低）——typecheck 从构建剥离（ts-loader 开 transpileOnly，类型检查交给独立 CI job 并行跑，构建不再等它）；babel 换 swc/esbuild（同一件事快 20 倍，这不是换工具是消除冗余转译层）；移除被遗忘的 plugin（某项目发现一个 2019 年加的 BundleAnalyzerPlugin 每次构建都在跑，白送 40s）；②缓存（收益 40-70% 对增量构建）——依赖层缓存（pnpm store + lockfile hash 做 key，安装 90s→10s）；构建层缓存（Turborepo 远程缓存或 webpack filesystem cache，未变更包构建直接命中 0s）；测试缓存（vitest 只跑变更相关测试）；③并行（收益 50-75% 对可拆分任务）——test 按 shard 分 4 片、lint/typecheck/test/build 四 job 并行、Terser 多进程（parallel: true 默认开）；④换工具/架构（收益不确定，成本最高）——webpack→Vite（dev 10 倍，build 2-3 倍）、单仓→Turborepo 编排（多包拓扑并行）。
+
+真实优化案例（某中后台 Monorepo，20min → 3min 清单）：起点分析——install 2min、lint+typecheck 4min（串行）、test 8min（单线程）、build 6min。优化动作按序：①install 加 pnpm 缓存 → 20s（-100s）；②lint/typecheck 拆成独立 job 与 test 并行 → 有效时长归零（-4min）；③test 4 分片 + 删除 3 个 flaky 后重跑率归零 → 2.5min（-5.5min）；④build 接 Turborepo 远程缓存（命中率 85%）+ babel→swc → 1min（-5min）；⑤加条件执行（docs-only PR 全跳过）。最终 P50 构建 2min40s。关键洞察：最大的单项收益来自"test 分片"和"远程缓存"，而这两件事都不需要改业务代码——构建优化的高杠杆区几乎都在工程配置层。
+
+防劣化机制（优化成果一周就回潮是常态）：①构建时长进监控——每次 CI 记录各阶段耗时到时序数据库，周环比劣化 >20% 告警；②依赖添加评审——新依赖必须说明理由（bundle size bot 评论 +X KB 是基本配置），依赖数量增长是构建变慢的慢性毒药；③定期"构建审计"——每季度跑一次全量无缓存构建（缓存会掩盖结构性劣化），对比基线。卡帕西视角：构建时长是一个系统的"代谢率"指标——代谢变慢意味着系统复杂度在失控，优化的本质不是让构建变快，而是逼系统保持简单。`,
+    keyPoints: ["度量先行：阶段耗时看板+profiler 定位 loader 级瓶颈，先找 80/20 再动手", "优先级：消除冗余工作 > 缓存 > 并行 > 换工具；transpileOnly 剥离 typecheck 是经典第一刀", "防劣化：构建时长趋势告警+依赖添加评审+季度无缓存审计"],
+    followUps: ["webpack filesystem cache 与 Turborepo 远程缓存的适用边界？", "测试分片后总时长被最慢分片拖住（长尾分片）怎么均衡？"],
+    favorited: false,
+  },
+  {
+    id: "fe-300",
+    nodeId: "cicd-frontend",
+    question: "前端多环境配置管理：构建时注入（环境变量编译进包）与运行时注入（config.json / window.__CONFIG__）的本质差异？为什么\"一次构建，多处部署\"是发布工程的最佳实践？密钥泄露的边界在哪里？",
+    bigTech: true,
+    answer: `结论：构建时注入把环境差异编译进产物（每个环境一份包），运行时注入产物唯一、环境差异在启动时加载（一份包走天下）。后者是最佳实践，因为它把"构建产物"与"部署环境"解耦——你在 staging 验证过的那一份字节，就是上生产的那一份字节（哈希值都一样），消除了"staging 好的生产挂了"的一个完整故障类别（构建机环境漂移、环境变量打错）。
+
+\`\`\`ts
+// ❌ 构建时注入（Vite/webpack 通病）
+// .env.production: VITE_API_URL=https://api.prod.com
+const api = import.meta.env.VITE_API_URL; // 编译时被字符串替换，产物与 env 绑定
+// 问题：staging 验证的包 ≠ 生产的包；紧急切环境要重新构建 20 分钟
+
+// ✅ 运行时注入方案一：config.json（推荐，静态站通用）
+// public/config.json（不进构建，部署时由运维/启动脚本生成）
+// { "API_URL": "https://api.prod.com", "SENTRY_DSN": "...", "FEATURE_NEW_CHECKOUT": true }
+// index.html 里同步阻塞加载（或应用启动时 await fetch）：
+async function bootstrap() {
+  const config = await fetch("/config.json?v=" + Date.now()).then((r) => r.json());
+  (window as any).__CONFIG__ = config; // 挂全局，业务代码统一从 Config 模块读
+  const { createApp } = await import("./main");
+  createApp(config).mount("#root");
+}
+
+// ✅ 运行时注入方案二：HTML 模板注入（有服务端时）
+// 服务端渲染 index.html 时把 <script>window.__CONFIG__ = {...}</script> 内联进去
+// 优势：零额外请求；劣势：需要服务端参与
+\`\`\`
+
+运行时注入的工程细节：①config.json 必须 no-cache（每次协商），且建议加 ?v= 版本参数防运营商透明缓存；②启动时序——config 加载失败要有兜底（用打包时的默认配置 + 错误上报，绝不能白屏无提示）；③类型安全——Config 定义 TS 接口 + 启动时 zod 校验（运维写错类型立刻报错而不是运行到一半崩）；④与 K8s 集成——ConfigMap 挂载为 config.json 文件，改配置 = 更新 ConfigMap + 重启 Pod（不用重新构建镜像），这是云原生前端的标准姿势。
+
+密钥边界（高频面试陷阱）：前端代码里的所有"密钥"都是公开的——VITE_/NEXT_PUBLIC_ 前缀的环境变量会被编译进产物，任何用户都能在 devtools 里看到。所以：①第三方服务的"公开 key"（如 Google Maps browser key、Sentry DSN）可以放，这些 key 设计上就是公开的，安全靠服务端域名校验/配额限制；②任何能写数据/调内部 API/访问用户数据的密钥（如 AWS SecretKey、内部 API token、数据库连接串）绝不能进前端产物，必须放 BFF/服务端，前端只持有用户会话凭证；③真实事故：某团队把 Algolia 的 Admin API Key 写进 .env.production 编译上线，被爬虫扫到后索引数据被恶意清空——正确做法是用 Search-Only Key（公开安全）+ 服务端代理管理操作。自检清单：CI 加一道"产物扫描"（grep 常见密钥正则模式，如 AKIA[0-9A-Z]{16} 是 AWS AccessKey 模式），泄密事故防在构建阶段。
+
+"一次构建多处部署"的反模式识别：如果你发现自己在为每个环境跑 npm run build:xxx，或者 Dockerfile 里写 ARG ENV=staging，那就是构建时注入的味道——迁移路径：先把所有环境变量收敛到一个 Config 模块（业务代码不许直接读 import.meta.env），再把 Config 模块的实现从编译时换成运行时 fetch，最后删掉各环境的构建脚本。某团队迁移后的收益：发版流水线从"每个环境构建 3 次共 45 分钟"变成"构建 1 次 15 分钟 + 部署 3 次各 2 分钟"，且 staging→prod 的"环境差异导致的事故"归零。`,
+    keyPoints: ["运行时注入（config.json/window.__CONFIG__）实现一份产物多环境部署，消除构建环境漂移事故类", "前端无秘密：产物内 key 全公开，管理类密钥必须放 BFF，CI 加产物密钥扫描", "迁移路径：收敛 Config 模块→运行时 fetch 替换编译时→删除多环境构建脚本"],
+    followUps: ["SSR/Next.js 场景下运行时配置与 SSR 水合的一致性问题怎么处理？", "config.json 的版本灰度（不同用户拿到不同配置）怎么做？"],
+    favorited: false,
+  },
+  {
+    id: "fe-301",
+    nodeId: "cicd-frontend",
+    question: "质量门禁体系：如何用自定义 ESLint 规则、依赖边界检查、包体积预算把架构规范固化进 CI，防止架构腐化？新规则引入存量代码时的落地策略是什么？",
+    bigTech: true,
+    answer: `结论：架构腐化的本质是"规范靠口口相传，违反零成本"——质量门禁的核心思想是把每条架构规则翻译成可自动执行的检查（lint 规则/测试/CI 脚本），让违反规则在 PR 阶段就失败。规则没有测试守护等于建议，门禁没有 CI 阻塞等于装饰。三类门禁覆盖三个腐化方向：自定义 lint 规则管代码写法、依赖边界管模块关系、体积预算管产物质量。
+
+\`\`\`js
+// 一、自定义 ESLint 规则（管写法）示例：禁止在 components/ui/ 外使用原生表单元素
+// eslint-rules/no-native-form-elements.js
+module.exports = {
+  create(context) {
+    const filename = context.getFilename();
+    if (filename.includes("components/ui/")) return {}; // 组件库内部豁免
+    const BANNED = new Set(["input", "select", "textarea", "button"]);
+    return {
+      JSXOpeningElement(node) {
+        if (node.name.type === "JSXIdentifier" && BANNED.has(node.name.name)) {
+          context.report({
+            node,
+            message: \`禁止原生 <\${node.name.name}>，请使用 @/components/ui 的统一组件\`,
+          });
+        }
+      },
+    };
+  },
+};
+
+// 二、依赖边界检查（管模块关系）：eslint-plugin-boundaries 或 dependency-cruiser
+// .dependency-cruiser.js：领域层不许依赖基础设施层，app 不许 import 其他 app
+module.exports = {
+  forbidden: [
+    { name: "no-cross-app-import",
+      from: { path: "^apps/([^/]+)/" },
+      to:   { path: "^apps/(?!\\1)[^/]+/" },
+      comment: "app 之间禁止直接 import，共享代码下沉到 packages/" },
+    { name: "no-domain-to-infra",
+      from: { path: "^src/domain/" },
+      to:   { path: "^src/infra/" },
+      comment: "领域层保持纯净，基础设施通过接口注入" },
+  ],
+};
+
+// 三、包体积预算（管产物）：size-limit
+// .size-limit.json
+// [{ "path": "dist/assets/index-*.js", "limit": "150 KB" },   ← 首屏 JS 预算
+//  { "path": "dist/assets/vendor-*.js", "limit": "300 KB" }]  ← vendor 预算
+// CI 中 size-limit 超限即失败，PR 评论展示体积 diff
+\`\`\`
+
+存量代码落地策略（直接上新规则 = 几百个历史违规 = 永远合不了并）：①基线豁免法——lint 用 eslint-baseline 或把存量违规逐一加 eslint-disable-next-line + TODO 注释（带清理截止日期），新增代码立即受约束，存量按排期消化；②警告期过渡——规则先设 warn 跑 2-4 周，团队周报公示违规数趋势（向下的曲线是最好的推进器），归零或接近零后转 error 阻塞；③增量检查法——只对 PR 变更的文件行做检查（lint-staged + betterer），"你碰过的代码必须合规，没碰的暂时不管"，类似"军营规则：离开营地时比来时更干净"；④守护测试代替全量扫描——把规则写成 vitest 单测（读源码文件扫描正则），与单测一起跑，天然享受测试分片和缓存。
+
+防绕过机制（门禁最大的敌人是"聪明人"）：①eslint-disable 注释要审批——配 eslint-plugin-eslint-comments 要求 disable 必须带理由注释（--report-unused-disable-directives 清理失效 disable）；②CI 环境一致性——lint 结果本地与 CI 必须一致（版本钉死 + .eslintcache 不进 git 防状态污染），"我本地过了"不是绕过 CI 失败的理由；③CODEOWNERS 保护门禁配置本身——.eslintrc、dependency-cruiser 配置、CI workflow 的修改需要架构组 owner 批准；④定期审计例外——每季度 review 所有 baseline/disable 清单，防止"临时豁免"变成永久法外之地。
+
+真实案例：本项目（devpath-ai）就是这套体系的实践者——no-native-form-elements.test.ts 和 ui-design-system-guard.test.ts 两个守护测试把"统一组件库"和"暗色配对"两条规范固化进 CI，任何违反直接 CI red，规则从此不再依赖 review 时的肉眼。另一个经典案例：某公司用 dependency-cruiser 拦住了一次"新人从业务代码直接 import 数据库 SDK"的 PR（绕过了 BFF 层）——门禁的价值在拦截"少数人少数时刻的危险操作"，而不是给大多数人的日常添堵。度量门禁健康度的指标：拦截次数（太少=规则可能太松或没人写代码）、绕过次数（disable 增长趋势）、误报率（误报高的规则会被团队恨屋及乌，必须快速修）。`,
+    keyPoints: ["三类门禁：自定义 lint 管写法 / dependency-cruiser 管模块边界 / size-limit 管产物体积", "存量落地：基线豁免+警告期+增量检查（军营规则），别指望一次清零历史违规", "防绕过：disable 要带理由、门禁配置 CODEOWNERS 保护、季度审计例外清单"],
+    followUps: ["如何度量门禁的 ROI（拦截的缺陷 vs 增加的开发摩擦）？", "AI 编程助手时代的门禁设计有什么新变化（机器生成代码更需要护栏）？"],
     favorited: false,
   },
 ];
