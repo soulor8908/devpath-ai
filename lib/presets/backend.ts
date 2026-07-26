@@ -12618,6 +12618,765 @@ DPDK 路径（100M+ pps）：
     followUps: ["XDP 和 DPDK 的取舍（内核兼容性）？", "百万连接下 GC 选型为什么是 ZGC？"],
     favorited: false,
   },
+  // ===== 计算机基础：设计模式与 SOLID（be-244 ~ be-249）=====
+  {
+    id: "be-244",
+    nodeId: "be-design-pattern",
+    question: "手写线程安全单例：五种写法对比？为什么枚举单例是「最安全」的？（面试必手写）",
+    bigTech: true,
+    answer: `结论：五种写法——饿汉式、懒汉同步、双重检查锁（DCL）、静态内部类、枚举。面试标准答案是 DCL 或静态内部类，追问到反射/序列化攻击时祭出枚举。
+
+\`\`\`java
+// 1. 饿汉式：类加载即创建，天生线程安全；缺点是没用到也创建
+public class Singleton { private static final Singleton I = new Singleton(); }
+
+// 2. 双重检查锁 DCL（手写必考，volatile 是灵魂）
+public class Singleton {
+    private static volatile Singleton instance;  // volatile 禁止指令重排序!
+    public static Singleton getInstance() {
+        if (instance == null) {                  // 第一查：避免每次抢锁
+            synchronized (Singleton.class) {
+                if (instance == null) {          // 第二查：防并发重复创建
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+// volatile 为什么必须：new 分三步——分配内存→初始化→引用赋值，
+// 1.5 之前重排序会导致别的线程拿到「未初始化的半成品对象」
+
+// 3. 静态内部类（推荐：懒加载+无锁+天然安全）
+public class Singleton {
+    private static class Holder { static final Singleton I = new Singleton(); }
+    public static Singleton getInstance() { return Holder.I; }
+    // 靠类加载机制保证：内部类首次被引用时才初始化，JVM 保证线程安全
+}
+
+// 4. 枚举单例（Effective Java 推荐，终极方案）
+public enum Singleton {
+    INSTANCE;
+    public void doWork() {}
+}
+\`\`\`
+
+枚举为什么最安全——防住三种攻击：
+\`\`\`text
+攻击          DCL/静态内部类          枚举
+反射攻击      可 setAccessible 强new   反射 newInstance 枚举直接抛异常
+序列化攻击    反序列化生成新对象       JVM 保证枚举反序列化返回同一实例
+             (要加 readResolve)      （枚举的序列化由 JVM 特殊处理）
+克隆攻击      需禁 clone             枚举不可克隆
+\`\`\`
+
+案例：Spring 的 Bean 默认单例——但不是用上述任何写法，而是 ConcurrentHashMap（singletonObjects）+ synchronized 双重检查，因为 Spring 单例是「容器级单例」不是「JVM 级单例」，一个类可以有多个不同 name 的单例 Bean。
+
+踩坑：DCL 忘了 volatile 是最常见的扣分点；静态内部类Holder被显式 Class.forName 会提前初始化；枚举单例不能被 Spring 管理成普通 Bean（枚举不能实例化）；单例持有可变成员变量=全局状态，并发下是灾难，单例必须无状态或状态不可变；Android/多 ClassLoader 环境下「单例」可能不唯一（每个 ClassLoader 一份）。`,
+    keyPoints: ["DCL 必加 volatile 防重排序", "静态内部类靠类加载锁", "枚举防反射/序列化/克隆三攻击"],
+    followUps: ["Spring 单例和 JVM 单例区别？", "双重检查锁定在 C++ 里为什么失效（memory order）？"],
+    favorited: false,
+  },
+  {
+    id: "be-245",
+    nodeId: "be-design-pattern",
+    question: "简单工厂、工厂方法、抽象工厂三种工厂模式的区别？各自在 JDK/框架里的真实应用？",
+    bigTech: true,
+    answer: `结论：三者解决的问题逐层递进——简单工厂用「一个类+if-else」封装创建；工厂方法把创建延迟到子类（一个工厂一个产品）；抽象工厂解决「一族相关产品」的成套创建。
+
+\`\`\`text
+对比表：
+模式        结构                        扩展新产品      扩展产品族    真实应用
+简单工厂    一个工厂类+switch           违反开闭原则    不支持        Calendar.getInstance
+工厂方法    抽象工厂接口+每产品一实现    加类即可(开闭)   不支持        Collection.iterator
+抽象工厂    工厂接口=一族产品的成套方法  违反开闭        加工厂类即可   MyBatis SqlSessionFactory
+\`\`\`
+
+\`\`\`java
+// 1. 简单工厂（静态方法+分支，违反开闭但够用）
+public static PayChannel create(String type) {
+    return switch (type) {
+        case "alipay" -> new Alipay();
+        case "wechat" -> new WechatPay();
+        default -> throw new IllegalArgumentException(type);
+    };
+}
+
+// 2. 工厂方法（每产品一个工厂，新增产品不改老代码）
+interface PayFactory { PayChannel create(); }
+class AlipayFactory implements PayFactory {
+    public PayChannel create() { return new Alipay(); }
+}
+
+// 3. 抽象工厂（成套创建：订单场景=支付+消息+对账三件套）
+interface OrderServiceFactory {
+    PayChannel pay();       // 产品A
+    Notifier notifier();    // 产品B
+    Reconciler reconciler();// 产品C
+}
+class CnOrderFactory implements OrderServiceFactory { /* 国内三件套 */ }
+class IntlOrderFactory implements OrderServiceFactory { /* 海外三件套 */ }
+\`\`\`
+
+真实应用：
+- JDK Calendar.getInstance()：按 Locale/TimeZone 返回 BuddhistCalendar/JapaneseImperialCalendar 等——简单工厂
+- JDBC DriverManager.getConnection(url)：各数据库厂商实现 Driver 接口，SPI 加载——工厂方法变体
+- MyBatis 的 SqlSessionFactoryBuilder→SqlSessionFactory→SqlSession：三级创建链，Executor/StatementHandler 由 Configuration 成套装配——抽象工厂
+- Spring 的 BeanFactory/ApplicationContext：本质是超级工厂
+
+案例：美团支付中台的渠道路由——早期简单工厂 switch 20 个 case，每次接新渠道改主干代码出过一次资损；重构为「工厂方法+Spring Map 注入」（Map<String, PayChannel> 按渠道码自动装配），新渠道只需加一个 @Component，主干零改动。
+
+踩坑：过度设计——只有两个实现类时上抽象工厂是自找麻烦；简单工厂配合枚举/SPI 已经能覆盖 80% 场景；抽象工厂的「产品族」概念强行套业务（支付渠道之间其实互相独立，不是族）；工厂里塞业务逻辑，创建逻辑和业务逻辑不分层。`,
+    keyPoints: ["简单工厂违反开闭/工厂方法符合/抽象工厂管产品族", "MyBatis 三级创建链", "美团渠道重构案例"],
+    followUps: ["Spring 的 FactoryBean 和 BeanFactory 区别？", "建造者模式和工厂怎么分工（复杂对象组装）？"],
+    favorited: false,
+  },
+  {
+    id: "be-246",
+    nodeId: "be-design-pattern",
+    question: "JDK 动态代理和 CGLIB 代理的底层区别？Spring AOP 怎么选？",
+    bigTech: true,
+    answer: `结论：JDK 动态代理基于接口——运行时生成实现接口的代理类，通过反射分发调用；CGLIB 基于继承——ASM 字节码生成目标类的子类，方法重写拦截。Spring AOP 默认策略：有接口用 JDK 代理，无接口用 CGLIB（Spring Boot 2.x 起默认强制 CGLIB）。
+
+\`\`\`text
+对比表：
+维度        JDK 动态代理              CGLIB
+原理        实现接口+InvocationHandler  继承目标类+MethodInterceptor
+生成方式    Proxy.newProxyInstance     Enhancer + ASM 字节码
+目标要求    必须有接口                 不能是 final 类/final 方法
+调用开销    反射 invoke                FastClass 索引直调（更快）
+生成成本    低                        高（字节码生成+加载）
+JDK 版本    内置                      需引入（Spring 已内嵌）
+\`\`\`
+
+\`\`\`java
+// JDK 动态代理手写（理解原理必考）
+interface OrderService { void create(); }
+class OrderServiceImpl implements OrderService { public void create() {} }
+
+OrderService proxy = (OrderService) Proxy.newProxyInstance(
+    loader, new Class[]{OrderService.class},
+    (proxy1, method, args) -> {
+        System.out.println("before");           // 增强逻辑
+        Object r = method.invoke(target, args); // 反射调真实对象
+        System.out.println("after");
+        return r;
+    });
+// 生成的代理类：class $Proxy0 extends Proxy implements OrderService
+
+// CGLIB 手写
+Enhancer enhancer = new Enhancer();
+enhancer.setSuperclass(OrderServiceImpl.class);  // 继承!
+enhancer.setCallback((MethodInterceptor) (obj, method, args, methodProxy) -> {
+    System.out.println("before");
+    return methodProxy.invokeSuper(obj, args);   // FastClass 索引调用，无反射
+});
+\`\`\`
+
+案例：阿里 Pandaboot 启动优化——数万个 Bean 的 AOP 代理创建阶段，CGLIB 字节码生成占了启动时间 30%，切换部分场景回 JDK 代理+减少切面后启动快 20%。另一个方向的优化是 GraalVM Native Image 下 CGLIB 完全不可用（不能运行时生成字节码），Spring Boot 3 的 AOT 处理把代理提前到编译期生成。
+
+\`\`\`text
+Spring AOP 失效三大坑（代理模式的副作用）：
+1. this 自调用：方法A内部直接调this.B() → 不经过代理 → 事务/切面失效
+   解法：注入自身代理 / AopContext.currentProxy()
+2. final 方法：CGLIB 无法重写 → 静默失效（不报错!）
+3. 非 public 方法：JDK 代理只代理接口方法，private/protected 天生不可代理
+\`\`\`
+
+踩坑：Spring Boot 2.x 默认 proxyTargetClass=true（全 CGLIB），导致注入时按接口 @Autowired 找不到 Bean 的 NoSuchBeanDefinition 异常——按类型注入即可；CGLIB 代理类会使 jstack 里的类名变成 Target$$EnhancerBySpringCGLIB$$a1b2c3，排查时要认得；Mockito mock 老版本用 CGLIB，mock final 类需要 mockito-inline（ByteBuddy）；动态代理栈深，排查 NPE 时代理帧会干扰视线。`,
+    keyPoints: ["JDK=接口+反射/CGLIB=继承+ASM", "SB2 默认全 CGLIB", "自调用/final/非 public 三失效坑"],
+    followUps: ["ByteBuddy 比 CGLIB 强在哪？", "Spring Boot 3 AOT 怎么处理动态代理？"],
+    favorited: false,
+  },
+  {
+    id: "be-247",
+    nodeId: "be-design-pattern",
+    question: "观察者模式在 Spring Event 和消息队列里怎么用的？同步事件和异步事件怎么选？",
+    bigTech: true,
+    answer: `结论：观察者模式 = 发布订阅解耦——「我干事，不关心谁听」。三种形态：代码内回调（Listener）、JVM 内事件总线（Spring Event/Guava EventBus）、跨进程消息队列（RocketMQ）。复杂度递增，解耦程度递增。
+
+\`\`\`java
+// Spring Event 三件套（JVM 内观察者）
+// 1. 事件
+public record OrderCreatedEvent(Long orderId, Long userId) {}
+
+// 2. 发布
+@Service
+public class OrderService {
+    @Resource ApplicationEventPublisher publisher;
+    public void createOrder(Order o) {
+        orderMapper.insert(o);
+        publisher.publishEvent(new OrderCreatedEvent(o.getId(), o.getUserId()));
+        // 主流程只负责发事件，积分/通知/风控各自订阅
+    }
+}
+
+// 3. 监听（同步：同事务内执行）
+@EventListener
+public void onOrderCreated(OrderCreatedEvent e) { /* 加积分 */ }
+
+// 异步版本：@Async + @EventListener（独立线程，主流程不等）
+// 事务安全版本：@TransactionalEventListener(AFTER_COMMIT)
+// —— 事务提交后才执行，避免「积分发了但订单回滚了」
+\`\`\`
+
+\`\`\`text
+三种形态对比：
+维度        Spring Event(同步)  Spring Event(异步)   RocketMQ
+耦合        JVM内解耦           JVM内解耦            跨进程解耦
+可靠性      与主流程同生共死     线程池满会丢         持久化+重试，不丢
+事务一致性  同事务              @TransactionalEvent  最终一致(本地消息表)
+性能        最快(方法调用)       快(线程切换)          慢(网络+持久化)
+适用        强一致紧关联逻辑     可容忍延迟的旁路     跨服务/削峰/最终一致
+\`\`\`
+
+案例：淘宝下单链路的演进——早期 OrderService 里顺序调积分/通知/风控/推荐更新 8 个系统，接口 RT 2s+；第一步改 Spring Event 异步，RT 降到 300ms 但大促线程池打满丢事件；第二步核心链路（积分/库存）保留同步事件，非核心（通知/推荐）全部上 RocketMQ——RT 稳定 80ms，可靠性靠 MQ 持久化保证。
+
+踩坑：@EventListener 默认同步且在同一事务——监听者抛异常会导致主事务回滚（积分服务 bug 拖死下单！）；@Async 事件监听在多实例部署时每台机器都消费一次（发通知发 8 遍），需要 MQ 或分布式锁去重；@TransactionalEventListener 默认 AFTER_COMMIT，如果事务没提交事件就丢了（监控盲区）；事件对象必须不可变（用 record），否则异步线程读到被主线程改了一半的数据。`,
+    keyPoints: ["同步事件同事务会互相拖死", "@TransactionalEventListener 防回滚不一致", "JVM 事件→MQ 是量级跃迁"],
+    followUps: ["Guava EventBus 和 Spring Event 差异？", "事件溯源（Event Sourcing）和事件驱动什么关系？"],
+    favorited: false,
+  },
+  {
+    id: "be-248",
+    nodeId: "be-design-pattern",
+    question: "如何用「策略模式+模板方法」干掉一坨 if-else？给一个真实的重构案例。",
+    bigTech: true,
+    answer: `结论：策略模式解决「算法可替换」（运行时按类型选实现），模板方法解决「流程固定、步骤可变」（骨架父类定死，步骤子类实现）。两者合体是消灭「类型分支+重复流程」屎山的组合拳。
+
+重构前（真实屎山：结算系统按渠道算价）：
+\`\`\`java
+public BigDecimal settle(String channel, Order order) {
+    if ("alipay".equals(channel)) {
+        // 校验→算价→手续费→打款→记账（70行，和微信80%重复）
+    } else if ("wechat".equals(channel)) {
+        // 几乎一样但手续费率不同、打款接口不同
+    } else if ("unionpay".equals(channel)) { ... }
+    // 8 个渠道，500 行，每次加渠道要改这个类 → 改出过一次资损
+}
+\`\`\`
+
+重构后（策略处理差异 + 模板固定流程）：
+\`\`\`java
+// 模板方法：结算流程五步定死，差异步骤留给子类
+public abstract class AbstractSettleStrategy {
+    public final BigDecimal settle(Order order) {   // final 防重写
+        validate(order);          // 通用校验（模板实现）
+        BigDecimal price = calcPrice(order);        // 子类实现
+        BigDecimal fee = price.multiply(feeRate()); // 子类实现
+        doPayout(order, price.subtract(fee));       // 子类实现
+        record(order);            // 通用记账（模板实现）
+        return price.subtract(fee);
+    }
+    protected abstract BigDecimal calcPrice(Order o);
+    protected abstract BigDecimal feeRate();
+    protected abstract void doPayout(Order o, BigDecimal amount);
+    protected void validate(Order o) { /* 通用 */ }
+    protected void record(Order o) { /* 通用 */ }
+}
+
+@Component("alipay")
+class AlipaySettle extends AbstractSettleStrategy { /* 只填3个差异点 */ }
+
+// 策略选择：Spring 自动注入 Map，彻底消灭 if-else
+@Service
+public class SettleRouter {
+    private final Map<String, AbstractSettleStrategy> strategies; // key=bean名
+    public BigDecimal settle(String channel, Order o) {
+        return strategies.get(channel).settle(o);  // 新渠道=新加一个Component
+    }
+}
+\`\`\`
+
+效果：新接第 9 个渠道只新增一个类，主干零改动（开闭原则）；单测从「500 行巨型类难以下手」变成「每个策略独立测 3 个方法」。
+
+\`\`\`text
+什么时候不要上这套：
+- 分支只有 2-3 个且稳定不变 → 直接 if-else，模式是成本不是荣誉
+- 差异点之间互相穿插（A渠道的步骤2=B渠道的步骤5）→ 先梳理流程再抽象
+- 一次性的脚本/迁移代码 → 不值得
+\`\`\`
+
+案例：字节营销引擎的优惠计算——满减/折扣/券/积分 12 种玩法用「策略+责任链」：每种优惠一个策略，责任链按优先级串联（先券后满减再积分），新玩法上线不改主干。对比早期 if-else 版本，需求交付从 2 周缩到 2 天。
+
+踩坑：策略类的公共依赖（Mapper/Client）通过构造器注入，别在策略里再 new；Map<String, Strategy> 注入的 key 是 bean 名，团队要约定命名规范；模板方法里调用了子类抽象方法的流程必须是 final，否则子类重写整个 settle() 模板就形同虚设；策略选择失败的兜底（get 返回 null）要显式处理，NPE 在生产是资损。`,
+    keyPoints: ["策略消灭类型分支/模板固化流程", "Spring Map 注入消灭 if-else", "分支少且稳定时别过度设计"],
+    followUps: ["责任链和策略链怎么配合（Dubbo Filter）？", "状态模式和策略模式长得像，怎么区分？"],
+    favorited: false,
+  },
+  {
+    id: "be-249",
+    nodeId: "be-design-pattern",
+    question: "责任链和装饰器模式怎么区分？Dubbo Filter、MyBatis Plugin、Spring Interceptor 用的是哪个？",
+    bigTech: true,
+    answer: `结论：责任链是「请求沿着链条传递，每个节点决定是否处理/继续」——强调流程路由；装饰器是「层层包裹，每层加一层增强」——强调功能叠加。结构上像（都是链式），意图完全不同。三大框架用的都是责任链思想，但实现细节各异。
+
+\`\`\`text
+对比表：
+维度        责任链                      装饰器
+意图        传递请求，节点决定处理与否    包裹对象，叠加功能
+方向        可中断（某节点吃掉请求）      必然传递到最内层
+经典实现    链表 next 指针              组合持有被装饰者引用
+JDK 例子    Servlet FilterChain         InputStream 套娃
+           （chain.doFilter 决定是否继续）(BufferedInputStream 包 FileInputStream)
+\`\`\`
+
+三大框架的责任链实现：
+\`\`\`java
+// 1. Servlet Filter（标准责任链：容器穿链，doFilter 决定是否放行）
+public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain) {
+    if (!authed(req)) { return; }          // 中断：不放行
+    chain.doFilter(req, resp);              // 放行：交给下一个 Filter
+    // 回来还能做后置处理（try-finally 语义）
+}
+
+// 2. Dubbo Filter（AOP 式责任链：Invoker 层层包装）
+// 调用链：ConsumerInvoker → MockFilter → MonitorFilter
+//         → TimeoutFilter → ExceptionFilter → 网络发送
+// 每个 Filter 拿到下一个 Invoker，前置+invoke+后置
+
+// 3. MyBatis Plugin（动态代理套娃：拦截器层层代理四大对象）
+// Executor → CachingExecutor
+//   → PageInterceptor 代理 → LogInterceptor 代理 → 真实执行
+// 注意：这是「装饰器+责任链」混合——代理包装是装饰器，拦截点串联是责任链
+\`\`\`
+
+案例：Spring Cloud Gateway 的 Filter 链——一个请求过 20+ 个 GatewayFilter（鉴权→限流→熔断→改写→路由→重试），按 order 排序。早期版本所有 Filter 都执行，一个慢鉴权拖死全链路；后来支持「短路 Filter」（鉴权失败直接 401 不往下走），P99 降 40%。
+
+\`\`\`text
+选型口诀：
+要「审批/拦截/路由」语义 → 责任链（节点有权说"到此为止"）
+要「增强/包装」语义 → 装饰器（无论包几层，最终都要调到本尊）
+两个都要（如 Netty Pipeline：入站责任链+出站装饰） → 混合，但节点职责要单一
+\`\`\`
+
+踩坑：责任链顺序是 P0 级配置——鉴权放在限流后面，被刷接口时先烧鉴权服务（顺序反了）；Dubbo Filter 的 activate 按 SPI 文件顺序，自定义 Filter 不标 order 会插错位置；装饰器套太多层栈深难排查（jstack 里 15 层代理帧）；责任链节点里做耗时操作要慎重——链条是串行的，一个慢节点拖全链（Netty 的 Handler 禁止阻塞就是这个道理）。`,
+    keyPoints: ["责任链=可中断的路由/装饰器=必达的增强", "MyBatis Plugin 是两者混合", "链顺序是 P0 配置"],
+    followUps: ["Netty Pipeline 的入站出站设计妙在哪？", "Spring Security 的 FilterChainProxy 怎么动态组装链条？"],
+    favorited: false,
+  },
+  // ===== Java 框架：MyBatis 与 ORM（be-250 ~ be-256）=====
+  {
+    id: "be-250",
+    nodeId: "be-mybatis",
+    question: "MyBatis 的 #{} 和 \${} 有什么区别？为什么 \${} 会导致 SQL 注入？哪些场景不得不用 \${}？",
+    bigTech: true,
+    answer: `结论：#{} 是预编译参数占位符（JDBC PreparedStatement 的 ?），值以参数形式传入，天然防注入；\${} 是字符串原样拼接，值直接拼进 SQL 文本，可注入。能用 #{} 的地方绝不用 \${}，只有「表名/列名/ORDER BY」等不能预编译的场景才用 \${}，且必须白名单校验。
+
+\`\`\`xml
+<!-- #{}：预编译，安全 -->
+<select id="getUser" resultType="User">
+    SELECT * FROM user WHERE name = #{name}
+    <!-- 实际执行：PreparedStatement: SELECT * FROM user WHERE name = ?
+         参数: "张三"  → 值永远不会被解析成 SQL 语法 -->
+</select>
+
+<!-- \${}：字符串拼接，危险 -->
+<select id="getUser2" resultType="User">
+    SELECT * FROM user WHERE name = '\${name}'
+    <!-- 输入 ' OR '1'='1 后变成：
+         SELECT * FROM user WHERE name = '' OR '1'='1'  → 全表拖库 -->
+</select>
+\`\`\`
+
+注入攻击实例：
+\`\`\`text
+入参: x' OR '1'='1' --
+拼接后: SELECT * FROM user WHERE name = 'x' OR '1'='1' --'
+结果: 全表返回；进阶可 UNION SELECT 拖出密码字段
+\`\`\`
+
+不得不用 \${} 的三个场景 + 安全姿势：
+\`\`\`xml
+<!-- 1. 动态表名（分表场景）——白名单校验 -->
+SELECT * FROM order_\${tableSuffix}   <!-- tableSuffix 只允许 [0-9]{4} -->
+
+<!-- 2. ORDER BY 动态排序字段——白名单映射 -->
+ORDER BY \${orderColumn} \${orderDir}
+<!-- Java 侧：orderColumn = ALLOWED_COLUMNS.getOrDefault(input, "id") -->
+
+<!-- 3. LIKE 的陷阱：CONCAT 里用 #{}，别用 \${} -->
+WHERE name LIKE CONCAT('%', #{keyword}, '%')   <!-- 正确 -->
+WHERE name LIKE '%\${keyword}%'                <!-- 注入! -->
+\`\`\`
+
+案例：某金融公司 2023 年真实泄漏事件——导出报表接口的「排序字段」直接 \${sort} 拼接，攻击者构造 sort=(SELECT password FROM admin LIMIT 1) 拖出管理员密码哈希。修复：所有动态字段走枚举白名单，Code Review 加 Checkstyle 规则禁止 \${} 出现在 WHERE 值位置。
+
+\`\`\`java
+// 防御代码模板（所有 \${} 入参必须过这层）
+private static final Set<String> ALLOWED_SORT = Set.of("id", "create_time", "amount");
+public List<Order> list(String sort, String dir) {
+    if (!ALLOWED_SORT.contains(sort)) throw new IllegalArgumentException();
+    if (!"asc".equals(dir) && !"desc".equals(dir)) dir = "asc";
+    return orderMapper.listSorted(sort, dir);
+}
+\`\`\`
+
+踩坑：MyBatis-Plus 的 QueryWrapper.orderBy(true, true, column) 同样是拼接，column 不可信时一样注入；LIKE 用 \${} 是国产系统重灾区；预编译只防「值注入」，防不了「结构注入」（表名/列名/SQL 关键字位置无法参数化）；ORM 不是免死金牌——JPA 的 createQuery 字符串拼接照样注入，要用 Criteria API 或参数绑定。`,
+    keyPoints: ["#{}=预编译防注入/\${}=拼接可注入", "表名/列名/ORDER BY 才用 \${}+白名单", "LIKE 用 CONCAT+#{} "],
+    followUps: ["预编译为什么能防注入（词法分析阶段）？", "MyBatis 的 SqlInjector 在企业里怎么统一收口？"],
+    favorited: false,
+  },
+  {
+    id: "be-251",
+    nodeId: "be-mybatis",
+    question: "MyBatis 一级缓存和二级缓存的机制？生产环境为什么说二级缓存「坑比收益多」？",
+    bigTech: true,
+    answer: `结论：一级缓存是 SqlSession 级的 HashMap（默认开，同一会话内相同查询直接命中）；二级缓存是 Mapper 命名空间级（默认关，跨 SqlSession 共享）。一级缓存基本无害，二级缓存在分布式环境下是「数据一致性的定时炸弹」——生产建议关闭，用 Redis 替代。
+
+\`\`\`text
+对比表：
+维度        一级缓存                二级缓存
+作用域      SqlSession              Mapper namespace（跨会话）
+默认状态    开启（LOCAL）           关闭（要 <cache/> 显式开）
+存储        PerpetualCache HashMap   可插拔（默认内存/可接 Redis/Ehcache）
+失效        会话结束/执行增删改      同 namespace 任何写操作清空
+分布式安全  安全（会话私有）         不安全（多实例各自缓存，数据不一致!）
+\`\`\`
+
+\`\`\`xml
+<!-- 开启二级缓存（看着很美） -->
+<cache eviction="LRU" flushInterval="60000" size="512" readOnly="true"/>
+\`\`\`
+
+二级缓存三大坑：
+1. 多实例不一致：服务部署 8 个实例，A 实例缓存了用户余额=100，B 实例更新了余额=80，A 的缓存还活得好好的——用户看到自己余额在 100 和 80 之间横跳。MyBatis 二级缓存没有跨实例同步机制。
+2. 粒度太粗：一个 namespace 里任何写操作清空整个 namespace 缓存——订单表更新一条，几百个查询缓存全失效，命中率形同虚设。
+3. 多表关联污染：UserMapper 的查询 JOIN 了 order 表，order 表更新不会清 UserMapper 的缓存（缓存按 namespace 隔离）——脏数据。
+
+案例：某电商商品详情页用 MyBatis 二级缓存，运营后台改价后前台半小时不变价（flushInterval 没到期），大促期间价格不一致直接客诉+资损。修复：关二级缓存，商品读路径改「Redis 缓存 + Cache Aside + 变更消息失效」——改价后发 MQ 消息精确删除对应 key。
+
+一级缓存也有坑（虽然轻）：
+\`\`\`java
+// 同一 SqlSession 里，查询→更新→再查询，第二次查询还是旧数据？
+// 不会——增删改会清一级缓存。但：
+sqlSession.selectOne("getUser", 1);   // 缓存
+user.setName("改了内存对象");           // 直接改返回的对象!
+sqlSession.selectOne("getUser", 1);   // 命中缓存，拿到的是被改过的对象
+// 一级缓存存的是对象引用不是副本，改返回对象=污染缓存
+\`\`\`
+
+\`\`\`text
+生产最佳实践：
+- 二级缓存：<setting name="cacheEnabled" value="false"/> 全局关
+- 一级缓存：保持默认（会话内），但别依赖它做性能优化
+- 真正的缓存层：Redis + Cache Aside 模式，精确到 key 的失效控制
+- Spring 整合下 SqlSession 是方法级的（Mapper 代理每次新建），
+  一级缓存在非事务环境下≈不存在，别指望它
+\`\`\`
+
+踩坑：Spring 托管下只有「同一事务内」一级缓存才生效（事务内复用 SqlSession），无事务时每次查询都是新 SqlSession——很多人以为一级缓存没生效是 bug；readOnly="false" 时二级缓存靠序列化深拷贝，性能差且要求实体 Serializable；想用 Redis 当二级缓存（mybatis-redis 包）依然有多实例通知失效问题，不如直接业务层缓存。`,
+    keyPoints: ["一级=会话级引用缓存/二级=命名空间级", "二级缓存分布式必不一致", "生产用 Redis+Cache Aside 替代"],
+    followUps: ["Spring 事务如何影响一级缓存生效范围？", "Cache Aside 的读穿/写穿策略怎么选？"],
+    favorited: false,
+  },
+  {
+    id: "be-252",
+    nodeId: "be-mybatis",
+    question: "MyBatis 一次查询的完整执行流程？四大核心对象各自干什么？",
+    bigTech: true,
+    answer: `结论：执行链 SqlSession → Executor → StatementHandler → ParameterHandler/ResultSetHandler。四大对象：Executor（调度+缓存）、StatementHandler（JDBC 语句管理）、ParameterHandler（参数设置）、ResultSetHandler（结果映射）。插件（Interceptor）只能拦截这四个对象的方法。
+
+\`\`\`text
+全流程（以 mapper.selectList 为例）：
+1. MapperProxy.invoke         JDK 动态代理入口，方法→MappedStatement
+2. SqlSession.selectList      门面，委托 Executor
+3. Executor.query             先查一级缓存 → 未命中走 DB
+4. StatementHandler.prepare   创建 JDBC Statement，设超时/ fetchSize
+5. ParameterHandler.setParameters  TypeHandler 把 Java 参数→JDBC 类型，setXxx
+6. statement.execute()        真正执行 SQL
+7. ResultSetHandler.handleResultSets  按 resultMap 逐行映射：TypeHandler
+                                JDBC 类型→Java 类型，嵌套映射/懒加载代理
+\`\`\`
+
+\`\`\`java
+// 核心源码链路（简化）
+public <E> List<E> query(MappedStatement ms, Object parameter) {
+    BoundSql boundSql = ms.getBoundSql(parameter);      // 解析 SQL+参数映射
+    CacheKey key = createCacheKey(ms, parameter, boundSql);
+    List<E> list = localCache.getObject(key);           // 一级缓存
+    if (list == null) {
+        list = queryFromDatabase(ms, parameter, boundSql);
+        localCache.putObject(key, list);
+    }
+    return list;
+}
+\`\`\`
+
+四大对象与可拦截点：
+\`\`\`text
+对象                职责                      典型拦截场景
+Executor           调度、一二级缓存、批处理    分页/读写分离/慢查询统计
+StatementHandler   Statement 创建与执行       SQL 改写（加租户条件/脱敏字段）
+ParameterHandler   参数装配                    参数加密（手机号落库加密）
+ResultSetHandler   结果集映射                  结果脱敏（返回前打码）
+\`\`\`
+
+案例：某 SaaS 平台的多租户改造——所有 SQL 自动追加 tenant_id 条件，方案就是 Interceptor 拦截 StatementHandler.prepare，用 JSqlParser 解析 SQL AST 注入 tenant_id 谓词，2000 个 Mapper 零改动上线。同类应用：Seata 的 SQL 解析代理、ShardingSphere 的分片改写、敏感字段加解密。
+
+TypeHandler 的角色（容易被忽略）：
+\`\`\`java
+// Java 的 Instant ↔ DB 的 TIMESTAMP 互转就发生在这
+// 自定义枚举/JSON 字段/加密字段都是实现 TypeHandler
+@MappedTypes(Instant.class)
+public class InstantTypeHandler extends BaseTypeHandler<Instant> {
+    public void setNonNullParameter(PreparedStatement ps, int i,
+            Instant v, JdbcType t) throws SQLException {
+        ps.setTimestamp(i, Timestamp.from(v));
+    }
+}
+\`\`\`
+
+踩坑：Executor 有三种——Simple（每次新 Statement）/Reuse（复用 Statement）/Batch（攒批 executeBatch），批处理性能差十倍；拦截 Executor.query 改 SQL 时要重建 BoundSql 和 CacheKey，否则缓存错乱；ResultSetHandler 处理嵌套 collection 时 N+1 查询就发生在这里；插件拦截顺序=配置顺序的反向（后配置的先执行），多插件叠加要画清楚套娃图。`,
+    keyPoints: ["SqlSession→Executor→StatementHandler→两 Handler", "插件只能拦四大对象", "多租户/分片都靠 StatementHandler 改 SQL"],
+    followUps: ["Batch 模式为什么快十倍（rewriteBatchedStatements）？", "Interceptor 怎么拦截嵌套查询的懒加载？"],
+    favorited: false,
+  },
+  {
+    id: "be-253",
+    nodeId: "be-mybatis",
+    question: "MyBatis 插件（Interceptor）原理？分页插件 PageHelper 是怎么实现的？它的坑在哪？",
+    bigTech: true,
+    answer: `结论：插件机制 = JDK 动态代理 + 责任链——Plugin.wrap() 把四大对象层层包成代理，每个 Interceptor 声明拦截签名（对象+方法）。PageHelper 拦截 Executor.query，解析 SQL 重写为分页 SQL（LIMIT n,m），并先执行 COUNT 查询。
+
+\`\`\`java
+// 手写一个分页插件（理解原理）
+@Intercepts(@Signature(type = Executor.class, method = "query",
+    args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+public class PageInterceptor implements Interceptor {
+    public Object intercept(Invocation inv) throws Throwable {
+        MappedStatement ms = (MappedStatement) inv.getArgs()[0];
+        BoundSql boundSql = ms.getBoundSql(inv.getArgs()[1]);
+        // 1. 先执行 COUNT：SELECT COUNT(*) FROM (原SQL)
+        // 2. 改写 SQL：原SQL + " LIMIT ?, ?"
+        BoundSql newBoundSql = new BoundSql(ms.getConfiguration(),
+            boundSql.getSql() + " LIMIT " + offset + "," + size,
+            boundSql.getParameterMappings(), boundSql.getParameterObject());
+        // 3. 用新 BoundSql 重建 MappedStatement 继续执行
+        return inv.proceed();
+    }
+    public Object plugin(Object target) { return Plugin.wrap(target, this); }
+}
+\`\`\`
+
+\`\`\`text
+代理套娃结构（两个插件时）：
+Executor 真实对象
+  ← LogInterceptor 代理（先配的后执行）
+    ← PageInterceptor 代理（后配的先执行）
+      ← 调用入口
+执行顺序：Page → Log → 真实（后配置的先执行，像洋葱）
+\`\`\`
+
+PageHelper 的用法与原理：
+\`\`\`java
+PageHelper.startPage(1, 10);   // ThreadLocal 存分页参数
+List<Order> list = orderMapper.list();  // 紧挨着的下一个查询被分页
+// 原理：ThreadLocal<Page> → Interceptor 取出参数改写 SQL → finally 清除
+\`\`\`
+
+PageHelper 的经典坑（生产事故常客）：
+1. ThreadLocal 泄漏串页：startPage 后查询抛异常，Page 没清除，下一个无关查询被错误分页——某报表系统查出 10 条就以为没数据，业务丢单。新版加了 clearPage 兜底，但「startPage 和查询之间不能有任何其他 Mapper 调用」仍是铁律。
+2. 深分页性能：LIMIT 1000000, 10 要扫描并丢弃前 100 万行，DB CPU 打满——深度分页要改「WHERE id > 上次最大id LIMIT 10」（游标式）。
+3. COUNT 查询灾难：原 SQL 含 GROUP BY/大 JOIN 时，COUNT 包裹后比原查询还慢——复杂报表要自定义 COUNT SQL。
+
+\`\`\`text
+深分页优化对比：
+LIMIT 1000000, 10              扫描 1000010 行，10s+
+WHERE id > 1000000 LIMIT 10    走主键索引，毫秒级
+业务约束：游标式不能跳页（只能"下一页"），管理后台跳页场景
+        用 ES/ClickHouse 扛，别让 MySQL 深分页
+\`\`\`
+
+案例：美团订单列表迁移——骑手端订单列表从「offset 分页」改「游标分页」（WHERE id < lastSeenId），DB 慢查询从日均 3000 次降到 0；管理端需要跳页的用 ES 同步 binlog 扛。
+
+踩坑：插件里改 SQL 用字符串拼接是大忌（JSqlParser 解析 AST 才可靠）；分页插件和 ShardingSphere 分片改写同时用时，执行顺序决定 LIMIT 加在分片前还是分片后（加错位置每个分片都 LIMIT 一遍）；RowBounds 内存分页（查出全部再截取）在大结果集下直接 OOM，千万别用它代替物理分页。`,
+    keyPoints: ["插件=代理+责任链，签名单拦四大对象", "PageHelper=ThreadLocal+SQL改写", "ThreadLocal 串页+深分页两大坑"],
+    followUps: ["ShardingSphere 的分页改写和 PageHelper 冲突怎么解？", "游标分页在有筛选条件时怎么保证稳定排序？"],
+    favorited: false,
+  },
+  {
+    id: "be-254",
+    nodeId: "be-mybatis",
+    question: "MyBatis 的 Mapper 接口没有实现类，为什么能直接调？动态代理全过程是什么？",
+    bigTech: true,
+    answer: `结论：Mapper 接口由 MapperProxyFactory 用 JDK 动态代理生成代理对象，所有方法调用被路由到 MapperProxy.invoke → MapperMethod.execute，按 SQL 命令类型（SELECT/INSERT/...）转发给 SqlSession 对应方法。XML 里的 statement 和注解 SQL 在启动时注册成 MappedStatement，以「namespace.id」为 key 存 Configuration。
+
+\`\`\`text
+全链路：
+1. 启动解析：XML/注解 → MappedStatement 注册进
+   Configuration.mappedStatements（Map<String, MappedStatement>）
+   key = "com.x.OrderMapper.list"
+2. 注入代理：Spring 扫描 @MapperScan → 每个 Mapper 接口注册
+   MapperFactoryBean → getObject() 返回
+   mapperRegistry.getMapper(OrderMapper.class, sqlSession)
+3. 生成代理：Proxy.newProxyInstance(loader, [OrderMapper.class],
+   new MapperProxy(sqlSession, OrderMapper.class, methodCache))
+4. 调用分发：orderMapper.list() → MapperProxy.invoke
+   → 缓存方法为 MapperMethod → execute() 按类型分发：
+   SELECT → sqlSession.selectList("com.x.OrderMapper.list", param)
+   INSERT → sqlSession.insert(...)（返回影响行数）
+5. 参数处理：MethodSignature 解析 @Param，把方法参数转成
+   Map（param1/arg0 或命名参数）
+\`\`\`
+
+\`\`\`java
+// 关键源码（简化）
+public class MapperProxy<T> implements InvocationHandler {
+    public Object invoke(Object proxy, Method method, Object[] args) {
+        // Object 方法（toString/hashCode）直接本地执行
+        if (Object.class.equals(method.getDeclaringClass())) {
+            return method.invoke(this, args);
+        }
+        // 其他方法 → MapperMethod 缓存后执行
+        MapperMethod mapperMethod = cachedMapperMethod(method);
+        return mapperMethod.execute(sqlSession, args);
+    }
+}
+\`\`\`
+
+为什么用接口而不写实现类：
+- SQL 与代码解耦：实现类的「实现」就是 XML/注解里的 SQL，手写实现类纯属样板代码
+- 代理统一做：参数映射、结果映射、缓存、插件拦截——这些横切逻辑手写实现类根本没法优雅塞进去
+
+\`\`\`text
+同名不同参数的重载为什么报错：
+MappedStatement 的 key 是 "namespace.methodName"，
+不含参数签名 → 同一 Mapper 里方法名不能重载
+（Java 语法允许，MyBatis 注册时后者覆盖/启动报错）
+\`\`\`
+
+案例：自研轻量 ORM 的踩坑——团队模仿 MyBatis 写了个动态代理 ORM，Method 到 SQL 的映射每次调用都反射解析注解，QPS 3000 时反射占 CPU 25%。修复：照抄 MyBatis 的 methodCache（启动时预解析全部 MapperMethod），CPU 降到 2%。教训：动态代理的 invoke 是热路径，反射元数据必须缓存。
+
+踩坑：Mapper 接口方法加 default 实现会绕过代理直接执行（default 方法有方法体，MyBatis 特殊处理）；@Param 不写时参数名依赖 -parameters 编译参数，老项目只有 arg0/param1；多数据源场景 Mapper 代理绑定的是单一 SqlSessionTemplate，跨库 Mapper 要配独立 SqlSessionFactory；代理对象是线程安全的（方法级 SqlSession），可以单例注入。`,
+    keyPoints: ["JDK 代理+MappedStatement 注册表", "调用按命令类型分发 SqlSession", "Mapper 方法不可重载（key 不含签名）"],
+    followUps: ["MyBatis-Spring 的 SqlSessionTemplate 怎么保证线程安全？", "为什么接口代理比 CGLIB 类代理更适合 Mapper？"],
+    favorited: false,
+  },
+  {
+    id: "be-255",
+    nodeId: "be-mybatis",
+    question: "MyBatis-Plus 相比原生 MyBatis 增强了什么？哪些「方便」功能在生产里会变成坑？",
+    bigTech: true,
+    answer: `结论：MP 在 MyBatis 之上做「增强不做改变」——BaseMapper 通用 CRUD、QueryWrapper 条件构造器、自动分页、代码生成器、逻辑删除、自动填充、多租户/动态表名插件。收益是单表操作零 XML，代价是「方便的糖」用过头会绕过架构约束。
+
+增强清单：
+\`\`\`java
+// 1. BaseMapper：单表 CRUD 零 SQL
+public interface UserMapper extends BaseMapper<User> {}
+userMapper.selectById(1L);
+userMapper.updateById(user);
+
+// 2. QueryWrapper：链式条件（免 XML）
+userMapper.selectList(new QueryWrapper<User>()
+    .eq("status", 1).gt("age", 18).orderByDesc("create_time").last("LIMIT 10"));
+
+// 3. 逻辑删除：@TableLogic 标记，delete 变 update，查询自动带 deleted=0
+// 4. 自动填充：创建/更新时间自动赋值（MetaObjectHandler）
+// 5. 分页插件：PaginationInnerInterceptor（比 PageHelper 稳）
+\`\`\`
+
+生产四大坑：
+1. selectById 全家桶惯坏了团队：单表 CRUD 顺手后，复杂查询也硬拆成多次单表查询在内存里 JOIN——QPS 放大 10 倍打挂 DB。复杂关联必须回 XML 写 JOIN。
+2. QueryWrapper 的 last() 拼接注入：.last("ORDER BY " + userInput) 就是 SQL 注入；column 字符串同样拼进 SQL，前端传列名必须白名单。
+3. 逻辑删除的唯一索引冲突：deleted 标记后，「手机号唯一索引」照样被已删记录占用——唯一索引要建成 (phone, deleted) 或 deleted 用时间戳代替 0/1。
+4. updateById 的 null 不更新陷阱：MP 默认「字段为 null 不更新」（非空策略），想置空某字段要用 UpdateWrapper.set("col", null)——无数人以为更新成功了实际没生效。
+
+\`\`\`java
+// 坑 4 的正确写法
+// 目标：把用户的 profile 清空
+user.setProfile(null);
+userMapper.updateById(user);  // profile 不会被更新（null 被忽略）!
+
+// 正确：
+userMapper.update(null, new UpdateWrapper<User>()
+    .eq("id", user.getId()).set("profile", null));
+\`\`\`
+
+案例：某 SaaS 公司多租户插件误用——MP 的 TenantLineInnerInterceptor 自动加 tenant_id，但一条跨租户统计 SQL 忘加 @InterceptorIgnore，被自动拼了 tenant_id 条件，全平台统计数据只算了当前租户，财报偏差 30% 才被发现。修复：跨租户 SQL 统一注解豁免+代码评审清单。
+
+\`\`\`text
+MP 使用军规（团队规范模板）：
+□ 单表 CRUD 用 BaseMapper；两表以上 JOIN 回 XML
+□ QueryWrapper 的列名/last() 禁止接前端原始输入
+□ 逻辑删除表的唯一索引必须含 deleted 列
+□ 置空操作用 UpdateWrapper.set，不用 updateById
+□ 批量操作用 saveBatch（JDBC batch），别 for 循环 insert
+\`\`\`
+
+踩坑：saveBatch 要 JDBC URL 加 rewriteBatchedStatements=true 才是真批处理，否则还是逐条；MP 分页插件和 PageHelper 混用会双重分页；自动填充在 update(wrapper) 方式下不触发（拿不到实体）；代码生成器生成的 CRUD 直接暴露成 Controller 是安全灾难（水平越权重灾区）。`,
+    keyPoints: ["增强=BaseMapper+Wrapper+插件，不改变 MyBatis", "null 不更新/逻辑删除索引冲突是重灾区", "单表糖的尽头是复杂查询回 XML"],
+    followUps: ["MP 的多租户插件原理和豁免机制？", "JPA/Hibernate 和 MP 在企业里怎么选？"],
+    favorited: false,
+  },
+  {
+    id: "be-256",
+    nodeId: "be-mybatis",
+    question: "什么是 ORM 的 N+1 问题？MyBatis 里怎么产生的？怎么发现和根治？",
+    bigTech: true,
+    answer: `结论：N+1 = 查询 1 次主表拿到 N 条记录，再为每条记录各查 1 次关联表，总查询数 = 1+N。100 个订单各查一次用户信息就是 101 次 DB 往返——RT 从 5ms 变 500ms，DB 连接池被打爆。根治方案：JOIN 一次查出 / 批量 IN 查询。
+
+\`\`\`xml
+<!-- MyBatis 产生 N+1 的典型写法：嵌套查询 select -->
+<resultMap id="orderMap" type="Order">
+    <id property="id" column="id"/>
+    <!-- 每个订单都会执行一次 selectUserById！-->
+    <association property="user" column="user_id" select="selectUserById"/>
+</resultMap>
+<select id="listOrders" resultMap="orderMap">SELECT * FROM orders</select>
+<select id="selectUserById" resultType="User">
+    SELECT * FROM user WHERE id = #{userId}
+</select>
+<!-- 100 个订单 = 1 + 100 次查询 -->
+\`\`\`
+
+\`\`\`xml
+<!-- 根治 1：嵌套结果（JOIN 一次查）——推荐 -->
+<resultMap id="orderMapJoin" type="Order">
+    <id property="id" column="id"/>
+    <association property="user">
+        <id property="id" column="uid"/>
+        <result property="name" column="uname"/>
+    </association>
+</resultMap>
+<select id="listOrdersJoin" resultMap="orderMapJoin">
+    SELECT o.*, u.id AS uid, u.name AS uname
+    FROM orders o LEFT JOIN user u ON o.user_id = u.id
+</select>
+
+<!-- 根治 2：批量 IN（不适合 JOIN 的跨库场景） -->
+<!-- 先查 orders，再 SELECT * FROM user WHERE id IN (ids) 内存组装 -->
+\`\`\`
+
+\`\`\`text
+三种方案对比：
+方案          查询次数  适用
+嵌套 select    1+N       懒加载（要用时才查），但默认就踩坑
+JOIN 嵌套结果  1         关联少、数据量可控（笛卡尔积爆炸风险）
+批量 IN        2         跨库/分库场景，内存组装
+\`\`\`
+
+发现 N+1 的手段（别等出事）：
+1. 日志：mybatis 配置 log-impl=org.apache.ibatis.logging.stdout.StdOutImpl，压测时数 SQL 条数
+2. APM：SkyWalking/Arthas 的 DB 拓扑，一个接口产生几十条相同 SQL 必现 N+1
+3. 熔断指标：Druid 监控「单请求 SQL 数」超阈值告警
+
+案例：拼多多商家后台商品列表——每个商品嵌套 select 查店铺+类目，一页 50 条商品产生 101 次查询，分页接口 P99 3s+，DB CPU 90%。修复：改 JOIN + 店铺信息走 Redis 缓存（命中率 99%），P99 降到 60ms。
+
+\`\`\`java
+// 懒加载的正确姿势：fetchType=lazy + 按需触发，但生产慎用
+<association property="user" column="user_id"
+    select="selectUserById" fetchType="lazy"/>
+// 全局开关：mybatis.configuration.lazy-loading-enabled=true
+// 坑：序列化（JSON 返回）会触发全部懒加载 → 还是 N+1
+//     配 lazy-load-trigger-methods="" 或 VO 层只取需要的字段
+\`\`\`
+
+踩坑：懒加载开着 + Jackson 序列化 = 全量触发 N+1（getter 被序列化器调了个遍）；JOIN 方案对一对多（订单+订单项）会产生主表行重复，大结果集放大数据量（要去重或用 collection 映射）；批量 IN 超过 1000 个元素 Oracle 报错（MySQL 没事但有 max_allowed_packet）；JPA 的 @OneToMany 默认 LAZY 但 OpenSessionInView 开着时在视图层悄悄 N+1，关 OSIV 是 Spring Boot 2.x 的推荐姿势。`,
+    keyPoints: ["1 次主查+N 次关联查", "根治=JOIN 嵌套结果或批量 IN", "懒加载+JSON 序列化=全量触发"],
+    followUps: ["一对多 collection 映射怎么去重？", "GraphQL 的 DataLoader 怎么批量解决 N+1？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
