@@ -1,0 +1,149 @@
+id: frontend.ai-sdk-ts
+title: Vercel AI SDK 与 TypeScript 全栈（useChat / streamText / generateObject / tool calling）
+summary: Vercel AI SDK 是 TS 全栈做 AI 应用的事实标准中间层：服务端 streamText/generateObject 统一二十多家模型，客户端 useChat 把流式状态机封成 hook。面试考点不在 API 怎么调，而在它抽象掉了什么、类型安全的结构化输出与工具调用怎么落地。
+tracks: [frontend-to-ai-engineer]
+phase: 1
+prerequisites: [frontend.streaming-ux]
+estimatedMinutes: 90
+difficulty: 2
+frontendBridge: >-
+  useChat ≈ SWR/React Query 的数据流范式：你声明"数据源 + key"，它给你
+  isLoading、error、增量数据、乐观更新的一整套状态机——区别只是数据源
+  是流式的 LLM 而不是 REST。generateObject ≈ 前后端共享 zod schema 的
+  tRPC 体验：schema 一处定义，运行时校验 + TS 类型推导同时生效。
+  这是前端工程师最顺手的 AI 切入点。
+concepts:
+  - streamText：服务端统一入口，返回流式结果；toDataStreamResponse 直接对接 Next.js Route Handler
+  - Data Stream Protocol：AI SDK 自定义的流格式，文本块、工具调用、用量数据分类型前缀传输——客户端 useChat 靠它还原结构化事件
+  - useChat：客户端状态机 hook，管 messages、isLoading、error、reload/stop/append——流式解析、中断、重试全内置
+  - generateObject：结构化输出 API，传 zod schema 拿强类型对象——底层走提供商的 JSON mode/function calling，外加运行时校验
+  - tool() + zod：工具定义用 zod 描述参数，TS 类型自动推导到执行函数——模型产出的参数先过 zod 再进你的代码
+  - maxSteps：SDK 内置的多步工具循环，模型调工具 → 执行 → 结果回填 → 继续生成，无需手写 agent loop
+  - Provider 抽象：openai/anthropic/deepseek 切换只改一行 model 引用——统一层屏蔽各家 API 方言
+sourceIds: [vercel-ai-sdk, openai-docs]
+gotchas:
+  - useChat 的 messages 是客户端状态：刷新即丢，持久化要在 onFinish 里落库，多标签页还要自己同步
+  - streamObject 的流式部分对象是不完整的：流式渲染结构化输出时字段可能缺一半——UI 必须按可选字段设计
+  - 工具执行是"模型建议、代码决定"：别在工具执行函数里省参数二次校验，模型填的参数过了 zod 也只代表结构对、不代表业务对
+  - SDK 抽象不等于零泄漏：各家模型的 system prompt 处理、tool calling 细节、限流错误格式仍有差异——跨模型上线前要逐家回归
+interview:
+  - q: useChat 到底帮你封装了什么？相比手写 fetch 流式解析，它解决的核心问题是什么？
+    answerSkeleton: >-
+      【分层原理】手写流式聊天要自己管五件事：SSE 分块解析（粘包/半包）、
+      messages 数组的增量更新、加载与错误状态机、中断（AbortController）、
+      重试与历史恢复。useChat 把这五件事封成一个声明式 hook：你给它 API
+      地址，它返回 messages、input、isLoading、error 和 append/reload/stop
+      一组动作。关键设计是 Data Stream Protocol——服务端 streamText 输出
+      的不只是文本流，而是带类型前缀的事件流（文本增量、工具调用、用量
+      数据、错误帧），客户端按协议还原成结构化事件驱动状态机，所以工具
+      调用进度、token 用量都能直接进 UI。协议还给会话留了 id 与消息 id
+      体系，reload 一条历史消息时知道从哪截断重发。【实际案例】我做内部
+      AI 助手时第一版手写 fetch + ReadableStream，联调三天才稳住粘包和
+      中断；第二个产品直接用 useChat，流式 UI 半天接完，省下的时间花在
+      了真正的业务难点——工具调用进度展示上（协议自带 tool-call 事件帧，
+      我只需要渲染）。但抽象有代价：产品要"消息编辑后分叉对话"时，
+      useChat 的线性 messages 模型不够用，最终是拿它的协议做传输层、
+      状态自己管。【举一反三】这就是 React Query vs 手写 fetch 的翻版：
+      库吃掉的是状态机和边界情况（竞态、缓存、重试），你付出的是按它的
+      数据模型思考——先用熟默认范式，遇到模型不匹配再下沉一层。
+      【扣分点对照】说"useChat 就是封装了 SSE"的是只看过 README；能
+      讲出 Data Stream Protocol 的事件类型、消息 id 体系对 reload 的
+      意义、以及什么时候该突破抽象自己管状态的，才是深度使用者。
+    followups:
+      - useChat 的消息持久化该怎么做？onFinish 里落库有什么时序坑？
+      - 什么交互需求会撑破 useChat 的线性消息模型？
+      - 多人协作编辑同一个会话，useChat 的架构要怎么改？
+  - q: streamText 的服务端链路是怎么工作的？Data Stream Protocol 和裸 SSE 有什么区别？
+    answerSkeleton: >-
+      【分层原理】服务端链路三步：Route Handler 里调 streamText（传 model、
+      messages、tools），SDK 向提供商发请求拿到原始流，再转译成统一的
+      Data Stream Protocol 输出；toDataStreamResponse() 把它包成标准
+      Response 直接 return。协议与裸 SSE 的本质区别在"事件有类型"：裸
+      OpenAI 流只有文本增量一种载荷，工具调用要客户端自己解析 function
+      call 的 JSON 碎片；Data Stream 里每种事件有类型前缀（文本增量、
+      工具调用开始/参数/结果、完成原因、token 用量、错误），客户端按
+      类型分发，不用自己拼 JSON。协议还支持多步：工具执行结果回填后
+      继续生成，整个循环在同一条流里完成。v5 进一步转向 UI Message
+      Stream，面向"渲染消息"而不是"传输 delta"做设计。【实际案例】我
+      做报销助手时这个协议的价值很具体：模型要调"查发票"工具，手写
+      方案里我得上一个状态机解析 function_call 的增量 JSON（参数可能
+      分 5 个 chunk 到齐），拼完才能执行；换 streamText 后服务端
+      maxSteps 自动跑完"调用-执行-回填-续写"，前端 useChat 直接收到
+      结构化的 tool-invocation 部分，我渲染了个"正在查询发票…"的
+      进度卡片，全流程零 JSON 碎片处理。【举一反三】这就是 REST 返回
+      裸字节 vs GraphQL 返回类型化响应的差别——传输层之上多一层事件
+      类型系统，客户端从"解析协议"升级成"消费事件"，和你从原生
+      WebSocket 帧到 Socket.IO 事件的跃迁同构。【扣分点对照】以为
+      "SDK 就是转发 SSE"的说不出协议层价值；能讲出事件类型、多步
+      循环在同一条流内完成、与裸 function_call 碎片解析的对比的，
+      才是真的在协议层工作过的人。
+    followups:
+      - 工具执行耗时 10 秒，这条流上用户体验怎么设计？（提示：协议支持中间状态帧）
+      - streamText 怎么透传自定义数据给前端？（提示：data 帧 / message annotations）
+      - 服务端想把流同时广播给多个客户端，协议层要注意什么？
+  - q: 用 generateObject + zod 实现一个"从简历提取结构化信息"的功能，完整设计是什么？tool calling 的 TS 实现又怎么做类型安全？
+    answerSkeleton: >-
+      【分层原理】generateObject 的设计核心是"schema 即契约"：用 zod
+      定义目标结构（姓名、工作年限、技能数组、项目经历嵌套对象），SDK
+      把 schema 编译成提供商的 JSON mode 或 function calling 约束，模型
+      输出先过 schema 校验再返回——拿到手的就是类型推导过的 TS 对象，
+      不存在 JSON.parse 加 any 断言的裸奔。工程上要配三件套：schema
+      字段带 describe() 写清提取规则（模型的字段级指令）、失败重试
+      策略（校验不过时把错误喂回模型让它修）、枚举字段收窄（技能
+      等级用 z.enum 而不是 free text）。tool calling 的类型安全同理：
+      tool() 的 parameters 用 zod 定义，execute 函数的入参类型自动
+      推导——模型给的参数过了 zod 才进 execute，编译期与运行时双层
+      保险；多步循环交给 maxSteps。【实际案例】我做过简历解析器：
+      首版 prompt 让模型"返回 JSON"，字段缺失率 12%，日期格式
+      五花八门；切 generateObject 加 zod 后，结构错误归零，但踩了
+      两个新坑——一是"工作年限"模型时而返回"三年"字符串，schema
+      改成 z.number().or(z.string().transform(解析)) 才稳；二是
+      嵌套过深（项目经历里再嵌套技术栈对象数组）时小模型遵循度
+      骤降，拍平成两层后 8B 级模型也能稳定输出。最终接进招聘
+      系统，日均 2000 份，人工复核率从 100% 降到 15%。【举一反三】
+      这就是 tRPC/前后端共享 schema 的思维搬到了人与模型之间：
+      zod 一处定义，类型推导加运行时校验双生效——你把表单的
+      zod 校验经验平移过来就是 80 分的结构化输出工程。【扣分点
+      对照】答案停在"prompt 里写返回 JSON"的是 demo 级；能讲出
+      describe 字段指令、校验失败回喂重试、嵌套深度与模型能力
+      关系的，才是上过生产的。
+    followups:
+      - streamObject 流式渲染结构化输出，UI 怎么容忍半成品对象？
+      - 工具的 execute 抛错时，模型会收到什么？错误信息怎么写模型才会自我修正？
+      - 什么时候该用 generateObject，什么时候该用 tool calling 拿结构？
+  - q: AI SDK 在 Next.js 项目里落地时你踩过哪些坑？React 集成层面的坑有哪些？
+    answerSkeleton: >-
+      【分层原理】坑分四层。边界层：AI SDK 的服务端 API 必须跑在
+      Node/Edge Runtime 的 Route Handler 里，Server Component 里
+      直接 await streamText 是误用——流式属于请求响应边界不属于
+      RSC 渲染边界。状态层：useChat 的 messages 是纯客户端状态，
+      刷新丢失、多标签页不同步、与服务端会话存储的合并时机（通常
+      onFinish 落库）都要自己设计；会话 id 要在 URL 或存储里显式
+      管理，SDK 不替你路由。流式渲染层：useChat 每次增量更新都
+      触发 React 重渲染，长消息加 Markdown 渲染时要做节流与 memo，
+      否则低端机输入框都卡；流式工具调用部分（tool-invocation）
+      的 UI 要按"参数可能流式到一半"设计容错。版本层：SDK 主版本
+      迭代快（v4 → v5 消息结构与协议都有 breaking change），锁
+      版本加升级回归是纪律。【实际案例】我们的 AI 客服台踩过三个
+      实坑：一是 onFinish 落库时机——流式完成与落库完成之间用户
+      刷新，最后一条消息丢失，改成服务端流结束时同步落库加客户端
+      拉取对账才稳；二是长回答渲染卡顿，5000 字 Markdown 逐 token
+      重渲染，把消息体拆成 memoized 组件加 100ms 节流后帧率从
+      24 回到 50+；三是 v4 升 v5 时 assistant 消息的 parts 结构
+      变了，历史消息渲染全挂——此后升级前先用生产会话回放做
+      回归。【举一反三】这些坑全是前端老本行换了件 AI 外套：
+      RSC 边界 ≈ 你划分服务端/客户端组件的既有心智，流式渲染
+      节流 ≈ scroll/resize 防抖，消息对账 ≈ 乐观更新与服务端
+      状态 reconcile。【扣分点对照】只说"按文档接就行"的是
+      教程级用户；能报出落库时序、渲染节流、主版本升级回归
+      这三类坑的，才是真把 SDK 接进过生产的人。
+    followups:
+      - useChat 的实验性 throttle 选项能解决什么问题？为什么默认不开？
+      - 服务端落库和客户端状态不一致时，对账逻辑怎么设计？
+      - AI SDK 的抽象会不会锁死你在 Vercel 生态？迁移成本高吗？
+masteryCheck:
+  level: V2
+  type: code-challenge
+  description: 用 Next.js + AI SDK 实现"简历解析助手"：useChat 流式对话 + generateObject 结构化提取 + 一个带 zod 参数的工具调用，处理落库时序与流式渲染节流
+status: reviewed
+lastVerified: "2026-07-26"

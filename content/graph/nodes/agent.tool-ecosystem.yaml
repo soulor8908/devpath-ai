@@ -66,6 +66,52 @@ interview:
     followups:
       - 工具返回的"摘要"由谁生成？工具侧规则摘要和模型侧二次摘要各有什么坑？
       - 工具权限最小化具体怎么落地（按角色？按会话？）？
+  - q: 给 LLM 设计的工具接口和给程序员设计的 API 有什么不同？怎么设计 Agent 才用得对？
+    answerSkeleton: >-
+      【分层原理】消费者不同决定设计目标不同：程序员容忍歧义、会看源码兜底；LLM 只看你给的
+      description 和 JSON Schema，歧义不会发问、只会 silently 用错。四条军规。description
+      写成使用说明书：干什么、什么时候该用、什么时候不该用、常见误用反例——"不该用"比
+      "该用"更防误用，因为模型倾向过度自信地调工具。参数 schema 带语义约束：不只写类型，
+      写清取值范围、格式示例、单位（Unix 秒还是毫秒），能在 schema 枚举的别留给模型自由
+      发挥。错误返回可被模型消化：HTTP 500 和 stack trace 模型读不懂，返回结构化错误
+      （error_type + 人话说明 + 建议下一步），模型才能决定重试、换工具还是认输。粒度按任务
+      不按资源：给 LLM 的应是"完成一个语义任务"的接口（search_and_summarize 优于
+      search+fetch 两次调用），每少一次往返少一次出错机会和几百 ms 延迟。【实际案例】我在
+      数据平台 Agent 重构过工具集：12 个 CRUD 风格工具改成 6 个任务导向工具，误用率从 14%
+      降到 5%，平均任务步数从 8.2 降到 5.1。最深的坑是日期参数：query(start, end) 没写
+      单位，模型 30% 的调用传毫秒时间戳（服务端按秒解析），返回空结果后模型还编了一段数据
+      糊弄——schema 加 format 说明 + 服务端双格式兼容 + 空结果返回"时间格式疑似错误"提示
+      后才根治。错误从抛异常改结构化返回后，模型自我恢复率从 20% 涨到 75%。【举一反三】
+      这是给 junior 写 onboarding 文档 vs 给 senior 写 API reference：LLM 是那个能力极强
+      但零上下文、不问问题的新人——文档即全部，歧义即 bug。【扣分点对照】把内部 REST API
+      直接包一层丢给模型是最常见翻车姿势；能讲出反例式 description、schema 语义约束、
+      结构化错误、任务导向粒度的，才是真爱过工具设计的人。
+    followups:
+      - 工具数量多到几十个时怎么让模型选对？（提示：工具检索/分层加载）
+      - 工具的 description 改动影响所有用它的 Agent，怎么灰度和回归？
+  - q: MCP server 是独立进程，生产上怎么管它的生命周期与稳定性？授权边界怎么控？
+    answerSkeleton: >-
+      【分层原理】MCP 传输层两种形态：stdio——server 是 Host 子进程，走标准输入输出，适合
+      本地桌面场景，生命周期跟 Host 绑定、零网络面；HTTP 远程传输——server 是独立网络
+      服务，适合团队共享工具，但要自己管鉴权、部署、扩缩容。进程模型带来三个生产问题。
+      生命周期：stdio 下 server 崩溃后 Host 侧报"工具不存在"——要健康检查、自动重启、
+      Agent 侧可用性兜底（工具不可用时优雅降级而不是死循环重试）。性能：每次调用是 IPC 或
+      网络往返，冷启动还要加进程拉起时间，延迟敏感路径要常驻进程与连接复用。授权边界是最大
+      安全面：server 暴露的工具默认对连接它的 Host 全部可见，危险工具必须显式授权——首次
+      调用用户 consent、按会话 scope 授予、远程 server 自身要鉴权（不然谁都能连你的数据库
+      工具）。隐性风险还有工具投毒：恶意 server 的 description 里藏注入指令，接第三方 server
+      要像审 npm 包一样审来源。【实际案例】我在内部数据平台治理过全套：server 容器化 +
+      supervisor 保活，崩溃 P95 恢复 8 秒；Agent 侧加可用性缓存，server 挂了降级到只读回答
+      模式。授权踩过坑：实习生把带写权限的 server 接进全员客服 Agent，写工具在 list_tools
+      里对所有会话可见，幸好审计发现早。之后立规：server 按风险分级注册，dangerous 级连接
+      要走审批 + 按会话 scope 授予，list_tools 按调用方角色过滤。【举一反三】这是微服务
+      治理老三样换层皮：保活 ≈ restart policy，健康检查与降级 ≈ readiness probe + circuit
+      breaker，按角色过滤 ≈ RBAC——MCP 把函数调用变成服务，治理思维必须同步升级。
+      【扣分点对照】以为 MCP server 和本地函数一样可靠的是没运维过；能讲出 stdio/HTTP
+      适用面、工具投毒、按角色过滤 list_tools 的，才是真把 MCP 当过服务治理的人。
+    followups:
+      - 第三方 MCP server 的工具投毒（description 藏注入指令）怎么审？
+      - 远程 MCP server 的鉴权方案有哪些？OAuth 在 MCP 里怎么落？
 masteryCheck:
   level: V2
   type: code-challenge
