@@ -128,6 +128,26 @@ const FRONTEND_NODES: KnowledgeNode[] = [
     summary: "多进程架构、V8 执行机制（JIT/隐藏类/内联缓存）、分代垃圾回收、内存泄漏排查、事件循环完整模型。",
     mastery: 0,
   },
+  {
+    id: "network-http",
+    title: "HTTP/HTTPS 协议",
+    difficulty: 4,
+    prerequisites: ["js-api"],
+    frequency: "高",
+    bigTech: true,
+    summary: "HTTP/1.1 队头阻塞、HTTP/2 多路复用与 HPACK、HTTP/3 QUIC、TLS 握手与证书链、状态码语义、方法幂等性。",
+    mastery: 0,
+  },
+  {
+    id: "network-advanced",
+    title: "网络进阶：缓存、跨域与实时通信",
+    difficulty: 4,
+    prerequisites: ["network-http"],
+    frequency: "高",
+    bigTech: true,
+    summary: "强缓存/协商缓存全链路、CORS 预检机制、跨域方案对比、TCP 可靠传输、CDN 回源、WebSocket/SSE 选型。",
+    mastery: 0,
+  },
   // ===== 进阶层（10 个节点） =====
   {
     id: "ts-types-basic",
@@ -7230,6 +7250,550 @@ await processInSlices(rows, validateRow);
 踩坑：①切片后总耗时变长（调度开销），要对用户显示进度；②scheduler.yield 兼容性（Chrome 129+），降级链 yield → MessageChannel → setTimeout；③长任务也可能在框架内部（React 大列表调和），这时要用并发特性而非手动切片；④PerformanceObserver 的 longtask 类型可在生产环境采集长任务归因（attribution 字段指出哪个容器）。`,
     keyPoints: [">50ms 即长任务，阻塞 INP", "按时间预算切片 + MessageChannel 让出", "微任务让出是假让出，不触发渲染"],
     followUps: ["React 并发渲染的调度与手动时间切片如何配合？", "scheduler.postTask 的优先级队列怎么用？"],
+    favorited: false,
+  },
+  // ===== 33. network-http HTTP/HTTPS 协议 =====
+  {
+    id: "fe-230",
+    nodeId: "network-http",
+    question: "HTTP/1.1 的队头阻塞是什么？HTTP/2 如何用多路复用解决？为什么还需要 HTTP/3？",
+    bigTech: true,
+    answer: `结论：队头阻塞分两层——HTTP/1.1 的"应用层队头阻塞"（同一 TCP 连接上请求必须排队等前一个响应回来）和 TCP 的"传输层队头阻塞"（一个包丢失，后续所有包都要等重传）。HTTP/2 解决了前者，HTTP/3 解决后者。
+
+HTTP/1.1 的困局：keep-alive 复用连接但请求是串行的；pipelining 试图并行但响应必须按序返回（前一个慢响应堵死后面全部），浏览器默认禁用。于是浏览器只能开 6 个并发连接"绕开"，开发者用域名发散、雪碧图、资源内联来"骗"浏览器多下载——这些都是为协议缺陷打的补丁。
+
+HTTP/2 的二进制分帧：请求/响应被切成带流 ID 的帧，多个流在同一 TCP 连接上交错传输、互不阻塞（多路复用）。配合 HPACK 头部压缩（静态表 + 动态表 + Huffman 编码，重复 UA/Cookie 不再每次都发）和流优先级。一个连接搞定一切，域名发散反而成了负优化。
+
+但 HTTP/2 仍跑在 TCP 上：一个流丢包，TCP 重传期间所有流都被卡住（传输层队头阻塞），弱网丢包率 2% 时 HTTP/2 可能比 HTTP/1.1 还慢。HTTP/3 换 QUIC（基于 UDP）：每个流独立可靠传输，丢包只堵自己的流；连接用 Connection ID 标识，Wi-Fi 切 4G 不断连（TCP 换 IP 必须重连）；TLS 1.3 内置于 QUIC，握手 1-RTT 甚至 0-RTT。
+
+在快手直播间的弱网优化中，开启 HTTP/3 后弱网用户（丢包 >3%）的接口 P95 延迟从 2.1s 降到 900ms，就是吃到了"流级独立重传 + 连接迁移"的红利。
+
+\`\`\`nginx
+# Nginx 开启 HTTP/3（1.25+）并广播 Alt-Svc 让浏览器升级
+listen 443 quic reuseport;
+listen 443 ssl;
+add_header Alt-Svc 'h3=":443"; ma=86400'; # 首次 HTTP/2 响应里告知支持 h3
+\`\`\`
+
+踩坑：①HTTP/2 多路复用有默认 100 并发流上限，超了照样排队；②服务端推送（Server Push）已被 Chrome 移除，别再用，改 103 Early Hints；③HTTP/3 依赖 UDP，企业网关/防火墙可能拦 UDP 443，必须保留 HTTP/2 回退（Alt-Svc 机制天然支持）；④Nginx/CDN 开了 h3 但 LB 没透传 UDP，等于没开，用 curl --http3 实测验证。`,
+    keyPoints: ["HTTP/1.1 应用层队头阻塞，TCP 传输层队头阻塞", "HTTP/2 二进制分帧多路复用 + HPACK", "HTTP/3 QUIC：流级独立重传 + 连接迁移 + 1-RTT"],
+    followUps: ["HPACK 的动态表是怎么工作的？", "QUIC 的连接迁移如何实现，NAT 超时怎么办？"],
+    favorited: false,
+  },
+  {
+    id: "fe-231",
+    nodeId: "network-http",
+    question: "HTTPS 的 TLS 握手过程是怎样的？对称加密和非对称加密如何配合？TLS 1.3 优化了什么？",
+    bigTech: true,
+    answer: `结论：TLS 的设计是"用非对称加密安全地协商出对称密钥，之后通信全走对称加密"——非对称加密安全但慢（RSA 比 AES 慢千倍），对称加密快但密钥没法安全分发，两者各取所长。
+
+TLS 1.2 握手（2-RTT）：
+1. Client Hello：客户端随机数 + 支持的密码套件 +  TLS 版本。
+2. Server Hello + 证书：服务端随机数 + 选定套件 + 证书链（含公钥）。
+3. 客户端用 CA 根证书逐级验证证书链（域名匹配、有效期、吊销状态），生成预主密钥（Pre-Master Secret），用服务器公钥加密发送。
+4. 双方用两个随机数 + 预主密钥算出会话密钥，切换对称加密通信。
+
+TLS 1.3 的优化（1-RTT / 0-RTT）：
+- 1-RTT：客户端在第一条消息就附带密钥协商参数（ECDHE 公钥分片），服务端一条响应就完成协商，砍掉一个往返。
+- 废除不安全的 RSA 密钥交换，强制前向保密（PFS）：每次会话用临时 DH 密钥，私钥泄露也无法解密历史流量。
+- 0-RTT：复用上次会话的 PSK，首条请求数据直接加密发出——但可被抓包重放，只能用于幂等请求。
+
+在滴滴出行的端上网络库升级 TLS 1.3 后，海外高延迟地区（RTT 300ms+）的首接口耗时直接省出 300-600ms（少一个 RTT），超时率降了 40%。
+
+\`\`\`nginx
+# 生产配置：TLS1.3 + 前向保密套件 + OCSP Stapling（省客户端吊销查询）
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+ssl_prefer_server_ciphers off; # 1.3 不需要
+ssl_stapling on;
+ssl_stapling_verify on;
+\`\`\`
+
+踩坑：①证书链不完整（缺中间证书）桌面浏览器能自动补（AIA fetching），但安卓老版本直接握手失败——上线前用 SSL Labs 全绿才算完；②0-RTT 有重放攻击风险，支付/转账类接口必须禁用；③HSTS 一旦开启且 max-age 很长，证书配错用户将无法访问（连跳过按钮都没有），先短 max-age 灰度；④TLS 终止在 LB/CDN 层时，到源站的回源流量也要加密（Full SSL Strict），否则中间链路是明文。`,
+    keyPoints: ["非对称协商 + 对称通信，各取所长", "TLS1.3：1-RTT、强制 PFS、0-RTT 可重放", "证书链完整性是移动端大坑"],
+    followUps: ["ECDHE 为什么能提供前向保密？", "ESNI/ECH 加密 SNI 解决什么隐私问题？"],
+    favorited: false,
+  },
+  {
+    id: "fe-232",
+    nodeId: "network-http",
+    question: "301/302/304/307/308 的区别是什么？401/403/404/429/502/504 在排查线上问题时各自指向什么？",
+    bigTech: true,
+    answer: `结论：3xx 是重定向家族（区别在于"是否永久"和"能否改方法"），4xx 是客户端问题（鉴权/权限/限流），5xx 是服务端/网关问题。记住语义就能在 10 秒内把线上故障定位到正确的层。
+
+重定向四兄弟：
+- 301（永久）：资源搬家了，浏览器/搜索引擎会缓存这个跳转。换域名用它，SEO 权重会传递。
+- 302（临时）：临时跳转，每次都来问。大促会场临时导流到备用页用它。
+- 307（临时）/308（永久）：HTTP/1.1 补充，严格禁止改变请求方法和 Body——302 的坑在于浏览器历史实现会把 POST 变 GET，表单提交跳转后数据丢了；307/308 保证 POST 重定向后还是 POST。
+- 304（未修改）：不是跳转！是协商缓存命中——客户端带 If-Modified-Since/If-None-Match，服务端说"没变，用你缓存的"，响应无 body。
+
+错误码排障速查（阿里客服工单系统排障 SOP）：
+- 401 Unauthorized：没带凭证或凭证失效（token 过期）→ 查登录态。
+- 403 Forbidden：有凭证但没权限（或 WAF/防盗链拦截）→ 查权限系统和防火墙规则。
+- 404：路径错或资源被删；线上大面积 404 先看发布是否把静态资源删了。
+- 429 Too Many Requests：被限流（带 Retry-After）→ 客户端要做退避重试。
+- 502 Bad Gateway：网关收到上游非法响应（上游进程崩了/返回格式错）→ 查上游服务健康。
+- 504 Gateway Timeout：上游超时（慢查询/死锁）→ 查上游 P99。
+
+\`\`\`ts
+// 前端按语义处理：401 跳登录，429 退避重试，5xx 提示稍后
+async function fetchWithPolicy(url: string) {
+  const res = await fetch(url);
+  if (res.status === 401) return redirectLogin();
+  if (res.status === 429) {
+    const wait = Number(res.headers.get("Retry-After") ?? 2);
+    await sleep(wait * 1000 * (1 + Math.random())); // 加抖动防重试风暴
+    return fetchWithPolicy(url);
+  }
+  if (res.status >= 500) throw new Error("服务开小差，请稍后重试");
+  return res;
+}
+\`\`\`
+
+踩坑：①301 会被浏览器硬缓存，配错后用户侧长期跳错地址，服务端改配置也救不回来——上线 301 前先 302 验证；②302 丢失 POST body 的坑在低版本浏览器仍偶发，API 重定向一律 307/308；③404 页面也消耗 CDN 流量，被刷量时给 404 配短缓存；④502 和 504 经常交替出现——上游半死不活，别只盯着网关日志。`,
+    keyPoints: ["301/308 永久会缓存，302/307 临时每次问", "307/308 保证不改方法和 body，304 是协商缓存", "401 凭证失效、403 权限不足、429 限流、502 上游崩、504 上游慢"],
+    followUps: ["303 See Other 的设计意图是什么（PRG 模式）？", "Retry-After 与指数退避如何配合防重试风暴？"],
+    favorited: false,
+  },
+  {
+    id: "fe-233",
+    nodeId: "network-http",
+    question: "GET 和 POST 的本质区别是什么？什么是幂等性？RESTful 中 PUT/PATCH/DELETE 该如何正确使用？",
+    bigTech: true,
+    answer: `结论：GET/POST 在 HTTP 报文层面没有本质区别（都是 TCP 上的文本协议），区别在于语义约定——而语义会驱动浏览器、CDN、网关、爬虫的行为，这才是真正的差异：
+1. 安全性：GET 是安全的（safe），不改服务端状态，所以浏览器敢预取、爬虫敢抓、CDN 敢缓存；POST 不行。
+2. 幂等性：GET 幂等（执行 N 次 = 执行 1 次的效果），POST 不幂等（重复提交创建多条）。所以浏览器刷新 POST 页面会弹"确认重新提交"，刷新 GET 页面不会。
+3. 缓存：GET 响应可被缓存，POST 默认不缓存。
+4. 参数位置：GET 参数在 URL（有长度限制、会进浏览器历史和服务器日志——别放敏感数据），POST 在 body。
+
+幂等性是分布式系统设计基石：PUT（整体替换，幂等）、DELETE（删除，幂等——删一次和删十次结果一样：资源不存在）、PATCH（局部修改，不保证幂等——取决于补丁语义，"quantity+1" 不幂等，"quantity=5" 幂等）。
+
+在美团外卖下单接口的重构中，把"创建订单"从 POST 改为"POST + 幂等键"（客户端生成 Idempotency-Key 头，服务端 24h 内同键返回首次结果），彻底解决了弱网下用户重复点击 + 客户端自动重试产生的重复单问题（日均重复单从 300+ 降到 0）：
+
+\`\`\`ts
+// 幂等提交：同一操作复用同一 key，服务端去重
+async function createOrder(payload: OrderPayload) {
+  const key = crypto.randomUUID(); // 一次"下单意图"生成一次，重试复用
+  return fetch("/api/orders", {
+    method: "POST",
+    headers: { "Idempotency-Key": key, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+\`\`\`
+
+RESTful 正确姿势：GET /orders 列表、GET /orders/123 详情、POST /orders 创建、PUT /orders/123 整体更新、PATCH /orders/123 局部更新、DELETE /orders/123 删除。资源是名词，动作用方法表达，别在 URL 里写动词（/api/getOrder 是 RPC 风格不是 REST）。
+
+踩坑：①GET 带 body 技术上合法但许多框架/代理直接丢弃，别用；②"幂等键"要在用户连续点击/断线重试间复用，每次点击都新生成等于没做；③DELETE 响应体经常被 CDN 吃掉，返回删除后的资源摘要放 header 或干脆 204；④浏览器 form 只支持 GET/POST，PUT/DELETE 要靠 fetch 或隐藏字段 _method（老框架惯例）。`,
+    keyPoints: ["本质无区别，语义驱动基础设施行为", "GET 安全幂等可缓存，POST 都不", "幂等键解决重复提交，PUT/DELETE 天然幂等"],
+    followUps: ["PATCH 的 JSON Patch（RFC 6902）和 JSON Merge Patch 区别？", "HTTP 条件请求（If-Match）如何实现乐观锁更新？"],
+    favorited: false,
+  },
+  {
+    id: "fe-234",
+    nodeId: "network-http",
+    question: "HTTP/2 的头部压缩（HPACK）和流优先级是如何实现的？服务端推送为什么被废弃？",
+    bigTech: true,
+    answer: `结论：HPACK 用"静态表 + 动态表 + Huffman 编码"三级压缩干掉 HTTP/1.1 里每次原样重发的头部（Cookie/UA 动辄几百字节）；流优先级用依赖树 + 权重让浏览器告诉服务器先发谁。Server Push 因缓存协调难题和实际负收益被 Chrome 废弃。
+
+HPACK 三级机制：
+1. 静态表：RFC 7541 预定义 61 个常见头字段（:method: GET、:status: 200 等），发索引号即可。
+2. 动态表：连接期内双方各维护一张 LRU 表，第一次发过的头（如长 Cookie）后续只发索引 + 增量更新，同连接内越压越小。
+3. Huffman 编码：对剩余字面量按字符频率变长编码，再省 20-30%。
+
+流优先级：每个流声明依赖父流和权重（1-256），同一父流下按权重分配带宽。浏览器用这套告诉服务器"先传 CSS/JS（阻塞渲染），图片靠后"。Chrome 实际实现是 FIFO 队列（简单但有效），Firefox 真的构建了复杂的依赖树。
+
+Server Push 的失败（2022 年 Chrome 移除）：理论上服务器可以"未请求先推送"关键资源，但现实中——推送的资源浏览器缓存里可能已有（白推浪费带宽，Cache-Digest 提案没落地）；推送流与页面正常请求竞争带宽（反而拖慢首屏）；实现复杂且收益难量化。继任者是 103 Early Hints：服务器在最终响应前先回一个"提示响应"带上 preload 链接，浏览器拿到后自己决定要不要拉（有缓存就不拉），把决策权还给最懂缓存状态的一方。
+
+\`\`\`http
+# 103 Early Hints：最终响应还没算完，先给浏览器一点提示
+HTTP/1.1 103 Early Hints
+Link: </app.css>; rel=preload; as=style
+Link: </hero.webp>; rel=preload; as=image
+
+HTTP/1.1 200 OK
+Content-Type: text/html
+\`\`\`
+
+踩坑：①HPACK 动态表是会话状态，中间代理要正确转发维护，错误的网关实现会导致头部解码错乱（间歇性 400）；②HTTP/2 头部字段必须全小写（:method、:path 是伪头），网关从 1.1 翻译时要规范化；③优先级只是"建议"，多路复用下大文件流照样可能挤占带宽——关键 API 走独立域名/连接隔离更稳；④103 Early Hints 需要 CDN/网关支持链路透传，Cloudflare 已支持，自建 Nginx 1.25+ 可用 early_hints 指令。`,
+    keyPoints: ["HPACK：静态表索引 + 动态表增量 + Huffman", "优先级=依赖树+权重，指导带宽分配", "Push 死于缓存协调，103 Early Hints 接管"],
+    followUps: ["HPACK 动态表的安全问题（CRIME 类攻击）如何规避？", "为什么 Chrome 用 FIFO 替代复杂的优先级树？"],
+    favorited: false,
+  },
+  {
+    id: "fe-235",
+    nodeId: "network-http",
+    question: "HTTPS 如何防御中间人攻击？HSTS 和证书固定（Pinning）分别解决什么残留风险？",
+    bigTech: true,
+    answer: `结论：HTTPS 防中间人（MITM）的核心是证书体系——客户端只信任 CA 签发的证书，攻击者伪造不了合法证书就建立不了加密通道。残留风险在"首次连接是 HTTP"和"CA 被攻破/误签发"两个口子，分别由 HSTS 和证书固定来堵。
+
+证书如何堵 MITM：服务端证书绑定域名 + CA 数字签名。中间人想代理解密，必须出示目标域名的证书——去正规 CA 申请不到（要验证域名所有权），自签的证书浏览器直接红色警告。校验链：服务器证书 → 中间 CA → 根 CA（内置在 OS/浏览器信任库），任何一环对不上就断连。
+
+口子 1 → HSTS（HTTP Strict Transport Security）：首次通过 HTTPS 访问后，服务器响应 Strict-Transport-Security: max-age=31536000; includeSubDomains，浏览器之后在 max-age 内对该域名的所有请求强制走 HTTPS——即使用户手敲 http:// 也在浏览器内部改写成 https://（307 内部跳转），不给"SSL Stripping"（把 HTTPS 降级成 HTTP 的攻击）留机会。preload 列表把域名硬编码进浏览器，连第一次都堵上。
+
+口子 2 → 证书固定（Certificate Pinning）：App/Hybrid 内把"只接受某个 CA 或某张证书的公钥指纹"写死在客户端，即使攻击者拿到任意 CA 误签发的证书（DigiNotar 事件）也无法通过校验。Web 端曾用 HPKP 头，但因"配错=自杀"（把合法新证书也拒了，站点直接瘫痪）被废弃；App 端 pinning 仍是金融级标配。
+
+\`\`\`ts
+// 客户端指纹校验示意（App/WebView 内）
+const PINNED_SPKI = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+function verifyPin(certDer: ArrayBuffer) {
+  const spki = extractPublicKey(certDer);
+  if (sha256Base64(spki) !== PINNED_SPKI) throw new Error("cert pin mismatch");
+}
+\`\`\`
+
+在招商银行 App 的渗透测试整改中，加上 SPKI pinning + 备用 pin（pin 当前证书 + 下一张备用证书，防换证锁死）后，Burp/Fiddler 类代理抓包全部失效。
+
+踩坑：①HSTS 误开 includeSubDomains 会波及未上 HTTPS 的子域（如内部测试域），先不带子域灰度；②pinning 必须配备用 pin 且 pin 公钥而非证书（证书年年换，公钥可以不变）；③企业内网代理（Zscaler 类）会合法做 MITM—— pinning 的 App 在员工网络里会挂，要留白名单或企业证书通道；④Charles 抓包失败时先怀疑 pinning 而不是网络。`,
+    keyPoints: ["证书链校验堵 MITM 主路", "HSTS 堵 SSL Stripping 降级，preload 连首次都堵", "Pinning 堵 CA 误签发，必须配备用 pin"],
+    followUps: ["HPKP 为什么被废弃，教训是什么？", "证书透明度（CT Log）如何让误签发可被发现？"],
+    favorited: false,
+  },
+  {
+    id: "fe-236",
+    nodeId: "network-http",
+    question: "Cookie 的 HttpOnly、Secure、SameSite、Domain、Path 属性各自防什么？SameSite 三种模式的实战影响？",
+    bigTech: true,
+    answer: `结论：Cookie 属性的本质是"最小化凭证的暴露面"——HttpOnly 防 XSS 偷 Cookie，Secure 防明文窃听，SameSite 防 CSRF 跨站携带，Domain/Path 限制作用域防跨子域泄露。
+
+属性逐个拆解：
+- HttpOnly：document.cookie 读不到，XSS 注入的脚本偷不走会话（只能服务端 Set-Cookie 时设置）。
+- Secure：仅 HTTPS 发送，防中间人在 HTTP 链路上嗅探。
+- SameSite=Lax（默认）：跨站请求不携带，但"顶级导航 + 安全方法"（点链接 GET 跳转）放行——微信里点开链接能保持登录态靠的就是它。
+- SameSite=Strict：一切跨站都不带，连点链接都不带（银行级，体验差）。
+- SameSite=None：跨站携带，必须配 Secure——OAuth 回调、第三方嵌入（如支付收银台 iframe）必须用它。
+- Domain：默认仅当前主机（不含子域）；设 Domain=.example.com 则所有子域共享——攻击者拿下任何一个子域就能读到主站 Cookie，作用域能小则小。
+- Path=/admin：限制路径前缀，管理后台 Cookie 不带到前台页面。
+
+在拼多多第三方登录接入时，微信 OAuth 回调后 session 丢失——回调是跨站 GET 顶级导航，Lax 本应放行，但我们在 SameSite 默认值变更前的老 Chrome 上显式设了 SameSite=None 却忘了 Secure，Chrome 直接拒收这个 Cookie。修复：SameSite=None; Secure 配对出现。
+
+\`\`\`http
+# 会话 Cookie 的黄金配置
+Set-Cookie: sid=xxx; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800
+# 跨站场景（支付 iframe）
+Set-Cookie: pay_token=yyy; HttpOnly; Secure; SameSite=None; Path=/pay
+\`\`\`
+
+踩坑：①前后端分离跨域 fetch 必须 credentials: "include" + 服务端 Access-Control-Allow-Credentials: true，且 Allow-Origin 不能是 *；②Cookie 的 key 同名但 Domain/Path 不同时是两个 Cookie，会并发发送两个，排查"莫名串号"时先看这个；③Max-Age 和 Expires 同时出现时 Max-Age 优先；④第三方 Cookie 正在被 Chrome 逐步淘汰（Privacy Sandbox），依赖它的广告/埋点方案要迁 CHIPS（分区 Cookie）或第一方。`,
+    keyPoints: ["HttpOnly 防 XSS 窃取，Secure 防嗅探", "SameSite=Lax 默认，None 必须配 Secure", "Domain 作用域能小则小，防子域沦陷连坐"],
+    followUps: ["CHIPS 分区 Cookie 如何解决第三方 Cookie 淘汰后的嵌入场景？", "Token 放 localStorage vs Cookie 的安全辩论双方论据？"],
+    favorited: false,
+  },
+  {
+    id: "fe-237",
+    nodeId: "network-http",
+    question: "如何实现大文件下载的断点续传和多线程并发下载？Range 请求的协议细节是什么？",
+    bigTech: true,
+    answer: `结论：HTTP Range 请求让客户端只拉取资源的字节区间（Range: bytes=start-end），服务端回 206 Partial Content 带 Content-Range。断点续传 = 记录已下载偏移，中断后从偏移续拉；并发下载 = 按区间切成 N 段并行拉取再拼接，前提是服务端支持 Range（响应头 Accept-Ranges: bytes）。
+
+协议细节：
+- 探测：HEAD 请求拿 Content-Length 和 Accept-Ranges，确认支持分段。
+- 单段：Range: bytes=0-1048575 → 206 + Content-Range: bytes 0-1048575/52428800。
+- 多段一次请求：Range: bytes=0-99,200-299 → 206 + multipart/byteranges 边界分隔（实际客户端多为每段单独请求，好重试）。
+- 服务端不支持会回 200 全量——代码里必须判断状态码，206 才按段处理。
+- If-Range 配合 ETag：文件在两次续传间被改了，重新全量下载，防止拼出"一半旧一半新"的损坏文件。
+
+在百度网盘 Web 版的下载器实现中，50MB 安装包切 8 段并发（浏览器对单域名 6 连接限制，6-8 段是甜点），弱网下速度提升 4 倍，且每段失败独立重试：
+
+\`\`\`ts
+async function downloadChunk(url: string, start: number, end: number): Promise<ArrayBuffer> {
+  const res = await fetch(url, { headers: { Range: \`bytes=\${start}-\${end}\` } });
+  if (res.status !== 206) throw new Error("server does not support range");
+  return res.arrayBuffer();
+}
+
+async function parallelDownload(url: string, workers = 6) {
+  const head = await fetch(url, { method: "HEAD" });
+  const size = Number(head.headers.get("Content-Length"));
+  const etag = head.headers.get("ETag"); // 续传校验
+  const chunkSize = Math.ceil(size / workers);
+  const parts = await Promise.all(
+    Array.from({ length: workers }, (_, i) =>
+      downloadChunk(url, i * chunkSize, Math.min((i + 1) * chunkSize, size) - 1))
+  );
+  return new Blob(parts); // 顺序拼接
+}
+\`\`\`
+
+踩坑：①分段不是越多越好——每段一次 TLS 慢启动，小文件分段反而慢，<2MB 直接全量；②断点记录要用 (url + etag) 做 key，文件变了旧偏移作废；③iOS Safari 对 Range + Blob 大文件容易内存爆，要改 IndexedDB 分段落盘；④CDN 边缘节点要支持 Range 透传，源站支持但 CDN 回源时吃掉 Range 头等于白搭；⑤暂停恢复时先 HEAD 校验 ETag 变了没。`,
+    keyPoints: ["Range 请求 → 206 Partial Content + Content-Range", "并发分段甜点 6-8 段，失败独立重试", "If-Range/ETag 防跨版本拼接损坏"],
+    followUps: ["视频流的 Range 请求（206 拖放播放）和下载场景有何不同？", "HTTP/2 下并发分段还有必要吗？"],
+    favorited: false,
+  },
+  // ===== 34. network-advanced 网络进阶：缓存、跨域与实时通信 =====
+  {
+    id: "fe-238",
+    nodeId: "network-advanced",
+    question: "浏览器缓存的完整决策链路是什么？Cache-Control 各指令如何组合？为什么 HTML 用协商缓存、静态资源用强缓存？",
+    bigTech: true,
+    answer: `结论：缓存决策链 = 先看强缓存（不发请求，200 from disk/memory cache）→ 过期则走协商缓存（发请求带验证器，没变回 304 用缓存，变了回 200 新内容）。
+
+决策链详解：
+1. 强缓存：响应头 Cache-Control: max-age=31536000 或 Expires（HTTP/1.0 遗留，max-age 优先）。未过期直接用，连请求都不发——Network 面板显示 (disk cache)/(memory cache)。
+2. 协商缓存：强缓存过期后，浏览器带 If-None-Match（存上次 ETag）和 If-Modified-Since（存上次 Last-Modified）发请求。服务端比对：没变 → 304（无 body，极省流量）；变了 → 200 + 新内容 + 新缓存头。
+3. 验证器对比：ETag（内容哈希，精确）优先于 Last-Modified（秒级精度，1 秒内多次修改识别不出，且 CDN 回源可能改写 mtime）。
+
+黄金组合（字节跳动静态资源发布规范）：
+- HTML：Cache-Control: no-cache（每次协商，必须拿到最新 HTML，因为它引用了带 hash 的静态资源 URL）→ max-age=0 + ETag。
+- 带内容 hash 的 JS/CSS/图片（app.a1b2c3.js）：Cache-Control: max-age=31536000, immutable（一年强缓存，内容变 = 文件名变 = 新 URL，旧缓存永不被请求）。
+- no-cache ≠ 不缓存！是"每次用前先协商"；真不缓存是 no-store（敏感数据如银行页面）。
+
+\`\`\`nginx
+# HTML：每次协商（保证新版本立即生效）
+location ~* \\.html$ {
+  add_header Cache-Control "no-cache";
+  etag on;
+}
+# hash 静态资源：一年强缓存（immutable 阻止刷新时协商）
+location ~* \\.(js|css|png|webp|woff2)$ {
+  add_header Cache-Control "public, max-age=31536000, immutable";
+}
+\`\`\`
+
+踩坑：①immutable 防止"用户按 F5 时浏览器对所有资源发协商请求"——没它，F5 一次几百个 304 请求照样慢；②heuristic caching（无缓存头时浏览器按 Last-Modified 的 10% 时间猜一个缓存期）行为不可控，必须显式写头；③Service Worker 的 Cache API 优先级高于 HTTP 缓存，SW 缓存不更新会让 HTTP 缓存策略失效（版本升级要配套 SW 更新机制）；④private vs public：带用户态的响应（Set-Cookie）要 private，防 CDN 把 A 的页面缓存给 B。`,
+    keyPoints: ["强缓存不发请求，协商缓存发请求验证", "HTML no-cache 协商 + hash 资源一年强缓存 immutable", "no-cache=每次协商，no-store=真不存"],
+    followUps: ["ETag 在分布式集群（多机 mtime/哈希不一致）下怎么生成才可靠？", "stale-while-revalidate 和 stale-if-error 指令的价值？"],
+    favorited: false,
+  },
+  {
+    id: "fe-239",
+    nodeId: "network-advanced",
+    question: "CORS 预检请求（preflight）什么时候触发？服务端如何正确配置？如何减少预检带来的延迟？",
+    bigTech: true,
+    answer: `结论：跨域请求分两类——简单请求直接发（浏览器事后校验响应头），非简单请求先发 OPTIONS 预检探权限，通过后才发真实请求。预检的目的是"先问清楚再动手"，防止跨域写操作在服务端生效后才发现没权限。
+
+简单请求三条件（全满足才算）：①方法是 GET/HEAD/POST；②头部只含安全清单（Accept、Accept-Language、Content-Language、Content-Type）；③Content-Type 仅为 text/plain、application/x-www-form-urlencoded、multipart/form-data 之一。——所以 application/json 的 POST 必触发预检，这是最常见的"为什么我的请求发了两次"。
+
+服务端正确配置（Node 示例，滴滴顺风车 API 网关的 CORS 中间件）：
+
+\`\`\`ts
+function cors(req: IncomingMessage, res: ServerResponse) {
+  const origin = req.headers.origin;
+  // 白名单精确匹配，别反射任意 origin（等于没防护）
+  if (origin && ALLOW_LIST.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin); // 不能用 *（带凭证时）
+    res.setHeader("Vary", "Origin"); // 关键：防 CDN 把 A 域的缓存给 B 域
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Trace-Id");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.setHeader("Access-Control-Max-Age", "86400"); // 预检结果缓存一天
+  }
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return true; }
+  return false;
+}
+\`\`\`
+
+预检延迟优化：①Access-Control-Max-Age 拉长（Chrome 上限 2h，部分浏览器 24h），把 OPTIONS 从每次请求变成每天一次；②接口归并——把 application/json 的简单 GET 参数化改造（能进安全清单就不预检）；③同域部署用 nginx 反代把 /api 收编，从源头消灭跨域；④CDN 边缘节点应答 OPTIONS（边缘缓存预检结果），不用回源。
+
+踩坑：①Allow-Origin 用 * 且 Allow-Credentials: true 会被浏览器拒绝（两者互斥）；②自定义头（X-Token 之类）忘记加进 Allow-Headers 是"预检 403"头号原因；③预检响应没有正确返回 204/200 而是 302 到登录页（SSO 拦截了 OPTIONS）——鉴权中间件必须放行 OPTIONS；④Vary: Origin 缺失会让 CDN 缓存错串，A 域能访问 B 域报错。`,
+    keyPoints: ["json POST 必预检：非简单请求三条件", "Allow-Origin 精确值+Vary: Origin，带凭证不能 *", "Max-Age 缓存预检结果消灭重复 OPTIONS"],
+    followUps: ["CORS 响应头 Access-Control-Expose-Headers 管什么？", "为什么 form 表单提交（text/plain）从不触发预检——历史兼容设计？"],
+    favorited: false,
+  },
+  {
+    id: "fe-240",
+    nodeId: "network-advanced",
+    question: "跨域解决方案有哪些？CORS、JSONP、postMessage、反向代理、WebSocket 各自适用什么场景？",
+    bigTech: true,
+    answer: `结论：现代首选 CORS（标准、安全、细粒度），开发期用反向代理消灭跨域，JSONP 只用于老浏览器/只读场景，postMessage 解决 iframe/窗口间通信，WebSocket 不受同源限制天然跨域。按"控制权和实时性"选型。
+
+方案对比与选型（新浪微博历史架构演进实例）：
+1. CORS：服务端加响应头授权，支持全部方法/自定义头/凭证。适用：你有服务端控制权的一切 API 场景。短板：老 IE 不支持、首次预检多一个 RTT。
+2. JSONP：利用 script 标签无跨域限制，服务端把 JSON 包进回调函数名返回（callback({...})）。只支持 GET、无错误处理、XSS 面大（返回的 JS 直接执行）。适用：只读公开数据 + 古董浏览器。2026 年的今天基本只存在于面试题和老系统。
+3. 反向代理：开发期 webpack/vite devServer.proxy 把 /api 转发到后端，生产用 nginx 把 /api 反代到 API 服务——浏览器看到的是同域，CORS 根本不存在。适用：前后端同团队、BFF 架构。
+4. postMessage：iframe 父子窗口、window.open 打开的新窗口之间安全通信（要校验 event.origin！）。适用：支付收银台、第三方 SDK 嵌入、微前端主子应用隔离通信。
+5. WebSocket：握手用 HTTP 但不受同源策略约束（服务端校验 Origin 头即可）。适用：实时推送、协同编辑。
+
+\`\`\`ts
+// postMessage 正确姿势：双向校验 origin 和 source
+// 父页面（收银台宿主）
+window.addEventListener("message", (e) => {
+  if (e.origin !== "https://pay.example.com") return; // 防任意页面伪造消息
+  if (e.source !== payFrame.contentWindow) return;
+  handlePayResult(e.data);
+});
+payFrame.contentWindow!.postMessage({ order }, "https://pay.example.com"); // 精确目标，别用 *
+
+// vite 开发代理：开发期消灭跨域
+export default { server: { proxy: { "/api": { target: "http://localhost:8080", changeOrigin: true } } } };
+\`\`\`
+
+踩坑：①JSONP 没有错误回调，用 script.onerror 兜底也拿不到状态码；②postMessage 目标写 "*" = 把数据广播给任何能拿到窗口引用的页面，token 类数据直接泄露；③devServer proxy 只在开发环境存在，生产忘了配 nginx 反代会"本地好的线上跨域"；④WebSocket 不受同源限制 ≠ 不需要鉴权——握手时校验 Origin + 首包带 token；⑤document.domain 降域方案已被 Chrome 禁用（109+），老系统迁移时别踩。`,
+    keyPoints: ["CORS 是标准答案，代理从源头消灭跨域", "JSONP 只读 GET，postMessage 必须校验 origin", "WebSocket 天然跨域但握手要鉴权"],
+    followUps: ["微前端架构下子应用通信为什么倾向 CustomEvent 而非 postMessage？", "nginx 反代时 Host 头和 X-Forwarded-For 怎么正确传递？"],
+    favorited: false,
+  },
+  {
+    id: "fe-241",
+    nodeId: "network-advanced",
+    question: "TCP 三次握手和四次挥手的过程是什么？为什么握手是三次、挥手是四次？",
+    bigTech: true,
+    answer: `结论：三次握手的本质是"双方互相同步初始序列号（ISN）并确认彼此的收发能力正常"——两次握手无法让服务端确认客户端的接收能力，且会放大数据库中的历史重复连接（SYN 洪泛下资源耗尽）；四次挥手多一次是因为 TCP 全双工，两端要各自独立关闭自己的发送通道（FIN + ACK 分开），中间可能有数据没传完。
+
+三次握手：
+1. C→S：SYN=1, seq=x（我想连你，我的初始序号是 x）。
+2. S→C：SYN=1, ACK=1, seq=y, ack=x+1（收到，我的序号是 y，你的 x 我收到了）。
+3. C→S：ACK=1, seq=x+1, ack=y+1（你的 y 我也收到了，开聊）。
+两次为什么不行：服务端发完 SYN+ACK 就进入 ESTABLISHED 分配资源的话，一个延迟到达的旧 SYN（网络拥塞重发的）会让服务端白白为一个死人开连接；第三次 ACK 让服务端确认"对方真实存在且收到了我的回复"。
+
+四次挥手：
+1. C→S：FIN=1, seq=u（我没数据要发了）。
+2. S→C：ACK=1, ack=u+1（知道了，但我可能还有数据没发完——所以 ACK 和 FIN 不能合并，这是四次的关键）。
+3. S→C：FIN=1, seq=w（我也发完了）。
+4. C→S：ACK=1, ack=w+1（收到，拜拜）→ 客户端进入 TIME_WAIT 等 2MSL（防最后一个 ACK 丢失，让对方能重发 FIN）。
+
+TIME_WAIT 是高频追问：主动关闭方等待 2 倍最大报文寿命（Linux 默认 60s）。高并发短连接下 TIME_WAIT 堆积会耗尽端口（单机 6 万端口）——这就是为什么要 keep-alive 长连接复用，也是 Node 服务要调 net.ipv4.tcp_tw_reuse 的原因。
+
+在京东秒杀网关的容量治理中，压测时发现网关到上游全是 TIME_WAIT（QPS 3 万 × 60s 堆积），打开上游 keep-alive 复用后 TIME_WAIT 从 5 万降到 200，P99 延迟降 40%。
+
+\`\`\`bash
+# 查看 TIME_WAIT 堆积
+ss -s  # 或 netstat -ant | grep TIME_WAIT | wc -l
+# 复用 TIME_WAIT 端口（客户端侧有效）
+sysctl -w net.ipv4.tcp_tw_reuse=1
+\`\`\`
+
+踩坑：①SYN 洪泛攻击利用"半连接队列"——服务端收到 SYN 不回 ACK 就占着坑，靠 syncookies 缓解；②CLOSE_WAIT 堆积是服务端 bug（收到 FIN 没调 close），别和 TIME_WAIT 搞混；③tcp_tw_recycle 在 NAT 环境下会丢包，已在内核 4.12 移除，别照抄老博客；④HTTP/1.1 keep-alive 空闲超时两端不一致（客户端 60s、服务端 5s）会导致"拿到一个刚被服务端关闭的连接"偶发报错，客户端超时必须小于服务端。`,
+    keyPoints: ["三次握手互相同步 ISN + 确认收发能力", "四次挥手因全双工，FIN 与 ACK 分开", "TIME_WAIT=2MSL 防丢包，高并发靠长连接复用"],
+    followUps: ["TIME_WAIT 和 CLOSE_WAIT 分别暴露什么问题？", "TCP 快速打开（TFO）如何砍掉握手 RTT，为什么没普及？"],
+    favorited: false,
+  },
+  {
+    id: "fe-242",
+    nodeId: "network-advanced",
+    question: "TCP 如何保证可靠传输？序号确认、超时重传、滑动窗口、流量控制、拥塞控制分别解决什么？",
+    bigTech: true,
+    answer: `结论：TCP 可靠性 = 序号/确认（知道谁没收到）+ 超时重传/快速重传（丢包补救）+ 滑动窗口（批量发送提效）+ 流量控制（别撑死接收方）+ 拥塞控制（别压垮网络）。五个机制环环相扣，缺一不可。
+
+机制拆解：
+1. 序号与确认：每个字节都有 seq，接收方回 ack=下一个期望序号（累积确认，ack=1001 表示 1000 以前全收到了）。
+2. 超时重传（RTO）：发完启动计时器，超时未收到 ACK 重发。RTO 基于 RTT 动态计算（Karn 算法）。
+3. 快速重传：收到 3 个重复 ACK 说明中间丢了一个包，不等超时立即重传——把恢复时间从 RTO（秒级）压到一个 RTT。
+4. 滑动窗口：不等每个 ACK，窗口内连续发多个段，ACK 滑动窗口右移——把"停等协议"的吞吐从 1 段/RTT 提升到 窗口大小/RTT。
+5. 流量控制：接收方在 ACK 里携带 rwnd（接收窗口剩余），发送方不超发——防接收缓冲区溢出。
+6. 拥塞控制：发送方维护 cwnd，慢启动（指数爬升）→ 拥塞避免（线性）→ 丢包即减半（AIMD）。实际发送窗口 = min(rwnd, cwnd)。现代算法 BBR 不再把丢包当拥塞信号，而是测量带宽和 RTT 主动调速，高丢包网络下吞吐比 CUBIC 高 20 倍。
+
+对前端的实战意义：①首屏要传的数据量 ÷ 初始拥塞窗口（10 个 MSS ≈ 14KB）决定首屏要几个 RTT——关键资源压进 14KB 内可以 1 个 RTT 送达，这是"14KB 规则"的由来；②BBR 在 CDN 侧开启即可让全球用户受益（Google/Cloudflare 默认开）；③大文件上传把应用层分块 + 并行连接，本质是绕过单连接 cwnd 上限。
+
+\`\`\`text
+# 初始拥塞窗口下的首包容量：14KB 是黄金线
+TCP 初始 cwnd = 10 MSS ≈ 10 × 1460B ≈ 14KB
+→ HTML + 关键 CSS + 首屏数据 < 14KB 时，1 个 RTT 就能开始渲染
+\`\`\`
+
+在 YouTube 的 QUIC 落地报告里，BBR + 0-RTT 让移动弱网（丢包 2%+）视频起播时间降低 15%——传统 CUBIC 一遇丢包就把窗口砍半，BBR 按实测带宽维持发送速率。
+
+踩坑：①"TCP 不丢包"是错觉——它保证不重不漏不乱序，但代价是延迟抖动（重传时应用层干等）；实时音视频宁可丢帧也不要重传，所以走 UDP/QUIC；②Nagle 算法（攒小包）和延迟 ACK 叠加会制造 40ms 级延迟，RPC 场景要 TCP_NODELAY；③cwnd 在连接空闲一段时间后会回退（slow start after idle），长连接预热也防不住，别迷信"保活就能一直保持高吞吐"。`,
+    keyPoints: ["序号累积确认 + 快速重传补丢包", "滑动窗口提吞吐，rwnd 流量控制，cwnd 拥塞控制", "14KB 初始窗口规则 + BBR 按带宽调速"],
+    followUps: ["BBR 和 CUBIC 的本质分歧（丢包信号 vs 带宽测量）？", "队头阻塞在 TCP 层如何影响 HTTP/2？"],
+    favorited: false,
+  },
+  {
+    id: "fe-243",
+    nodeId: "network-advanced",
+    question: "CDN 的工作原理是什么？回源、缓存命中率、动态内容加速分别怎么理解和优化？",
+    bigTech: true,
+    answer: `结论：CDN = 把内容缓存到离用户最近的边缘节点，用 DNS 调度（或 Anycast）把用户导到最近节点。核心价值是消灭物理距离带来的 RTT——北京到洛杉矶光速往返就要 120ms，而本地节点只有 5ms。
+
+工作链路：①用户解析 static.example.com → DNS 返回 CNAME 到 CDN 调度域 → 调度系统按用户 IP（LocalDNS 出口）返回最优边缘节点 IP；②浏览器向边缘节点请求；③节点有缓存且未过期 → 直接返回（命中）；④未命中 → 回源（节点向源站拉取，常走 CDN 内部骨干网优化链路）→ 缓存并返回。
+
+缓存命中率优化（B 站静态资源命中率从 82% 提到 97% 的措施）：
+1. 统一 URL：同资源多 URL（参数顺序不同、带无关 query 如 ?t=123、www 和非 www）会各存一份——规范化排序 + 忽略无意义参数。
+2. 长缓存 + 内容 hash：max-age 一年，内容变 URL 变，命中率自然高。
+3. 预热：发布前主动调 CDN 预热接口把新资源推送到边缘节点，避免发布瞬间回源风暴。
+4. 分层回源：边缘 → 区域中心 → 源站三级，中心层聚合回源请求（request collapsing），1000 个边缘节点未命中也只回源 1 次。
+
+动态内容加速：API/HTML 不能长缓存，但 CDN 仍有价值——边缘节点终结 TCP/TLS（握手 RTT 减半）、回源走骨干网（比公网稳定）、智能路由选最优路径（Akamai/Cloudflare 的 Argo）、DDoS 清洗。对 HTML 可用短缓存 + stale-while-revalidate：用户先拿到 5 秒前的缓存（秒开），后台异步回源刷新。
+
+\`\`\`nginx
+# 源站侧配合：告诉 CDN 什么能缓存
+location /api/ {
+  add_header Cache-Control "private, no-store"; # 动态接口禁缓存
+}
+location ~* \\.(js|css|webp)$ {
+  add_header Cache-Control "public, max-age=31536000, immutable"; # 静态一年
+}
+\`\`\`
+
+踩坑：①"命中率低"先查 URL 里有没有时间戳/随机数参数（前端埋点 SDK 最爱加）；②源站 Response 带 Set-Cookie 默认导致 CDN 不缓存（要显式忽略）；③刷新（purge）是异步生效的（分钟级全球扩散），紧急下架要配合源站 404；④回源 Host 头要带对（节点默认带加速域名，源站 vhost 按域名分发，带错回源 404）；⑤EDNS Client Subnet 让调度看到真实用户 IP，不开的话按 LocalDNS 位置调度，跨省宽带用户会被调度到错误省份。`,
+    keyPoints: ["DNS 调度就近接入，消灭物理 RTT", "URL 规范化+hash 文件名+预热拉满命中率", "动态内容吃连接复用/骨干网/智能路由红利"],
+    followUps: ["Anycast 调度和 DNS 调度各有什么优劣？", "CDN 边缘计算（Cloudflare Workers）把缓存架构变成了什么？"],
+    favorited: false,
+  },
+  {
+    id: "fe-244",
+    nodeId: "network-advanced",
+    question: "WebSocket、SSE、长轮询的区别和选型？WebSocket 的心跳与断线重连如何设计？",
+    bigTech: true,
+    answer: `结论：三者都是"服务器主动推数据"的方案——WebSocket 全双工二进制长连接（实时双向交互选它）；SSE 是 HTTP 单向文本流（服务端推、客户端收，自动重连内置，LLM 流式输出的事实标准）；长轮询是兼容性兜底的假实时（请求挂起 30s，有数据才返回）。
+
+对比维度：
+- 方向：WebSocket 双向；SSE 仅服务端→客户端；长轮询靠反复请求模拟。
+- 协议开销：WebSocket 握手后帧头仅 2-14 字节；SSE 每次事件几个字节文本头；长轮询每条消息一次完整 HTTP 请求（头部几百字节）。
+- 基础设施亲和：SSE 就是普通 HTTP，过代理/防火墙/CDN 无障碍，还能享受 HTTP/2 多路复用；WebSocket 要处理 Upgrade 协议在老旧代理上的兼容。
+- 断线重连：SSE 浏览器原生自动重连（带 Last-Event-ID 续传）；WebSocket 必须自己实现。
+
+WebSocket 生产级心跳与重连设计（知乎私信系统的线上配置）：心跳间隔 25s（NAT 表项普遍 60s 老化，必须更短）；客户端发 ping，连续 2 次未收到 pong 判定假死主动断开重连；重连用指数退避 + 随机抖动（1s→2s→4s…上限 30s），断线期间消息走"重连后拉取离线消息"补全：
+
+\`\`\`ts
+class LiveSocket {
+  private ws!: WebSocket;
+  private missedPongs = 0;
+  private retries = 0;
+  private heartbeat?: ReturnType<typeof setInterval>;
+
+  connect() {
+    this.ws = new WebSocket(WS_URL);
+    this.ws.onopen = () => {
+      this.retries = 0;
+      this.heartbeat = setInterval(() => {
+        if (this.missedPongs >= 2) return this.ws.close(); // 假死判定
+        this.missedPongs++;
+        this.ws.send(JSON.stringify({ type: "ping" }));
+      }, 25_000); // 小于 NAT 60s 老化
+    };
+    this.ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "pong") { this.missedPongs = 0; return; }
+      this.onMessage(msg);
+    };
+    this.ws.onclose = () => {
+      clearInterval(this.heartbeat);
+      const delay = Math.min(1000 * 2 ** this.retries++, 30_000) * (0.5 + Math.random() / 2);
+      setTimeout(() => this.connect(), delay); // 指数退避 + 抖动防雪崩
+    };
+  }
+}
+\`\`\`
+
+踩坑：①"连接还在但数据不通"的假死最阴——TCP 半开（对端断电没发 FIN）下浏览器以为连接正常，必须应用层心跳检测；②移动端切后台 JS 定时器被节流，心跳停发被服务端踢掉——切回前台要立即主动检测重连（visibilitychange）；③Nginx 反代 WebSocket 要配 Upgrade/Connection 头 + proxy_read_timeout（默认 60s 无数据就断）；④SSE 在 HTTP/1.1 下单域名 6 连接限制会被流占满，多开几个 tab 页就挂——必须 HTTP/2；⑤重连风暴：服务端重启瞬间万级客户端同时重连，抖动和随机化是保命设计。`,
+    keyPoints: ["双向交互 WebSocket，服务端推流 SSE，兜底长轮询", "心跳 < NAT 老化 60s，2 次未 pong 判假死", "指数退避+抖动防重连风暴，离线消息重连补拉"],
+    followUps: ["SSE 的 Last-Event-ID 断线续传如何实现？", "WebSocket 二进制协议（protobuf）相比 JSON 文本的收益？"],
+    favorited: false,
+  },
+  {
+    id: "fe-245",
+    nodeId: "network-advanced",
+    question: "DNS 解析的完整过程是什么？DNS 预解析、HTTPDNS、DNS over HTTPS 分别解决什么问题？",
+    bigTech: true,
+    answer: `结论：DNS 是域名 → IP 的分布式目录服务。解析链：浏览器缓存 → 系统缓存 → hosts 文件 → 本地递归 DNS（运营商）→ 根 → 顶级域（.com）→ 权威 DNS，逐级查询并缓存（TTL 控制）。移动端弱网下 DNS 可能成为首个性能瓶颈（递归查询数百毫秒），且运营商劫持/污染直接影响可用性。
+
+完整过程（以 www.example.com 为例）：本地递归服务器没缓存时，先问根（返回 .com 顶级域服务器地址）→ 问 .com（返回 example.com 权威地址）→ 问权威（拿到 A 记录 IP）→ 沿途按 TTL 缓存。用户侧实际感知的是"递归服务器有没有缓存"——命中就是 1-5ms，未命中要 100-500ms。
+
+三大优化技术：
+1. DNS 预解析（dns-prefetch）：HTML 里声明 <link rel="dns-prefetch" href="//cdn.example.com">，浏览器空闲时提前解析，用户点击时省掉 100ms+。对跨域静态资源域、API 域必配。
+2. HTTPDNS：App 内绕过运营商 LocalDNS，直接 HTTP 请求 DNS 服务商（阿里云/腾讯云 HTTPDNS）拿 IP——解决运营商劫持（插广告）、解析不准（跨网调度错误，CDN 给你分到错误省份）、TTL 被运营商篡改拉长（切流量切不动）三大顽疾。手淘接入 HTTPDNS 后，因 DNS 劫持导致的失败率下降 90%。
+3. DoH（DNS over HTTPS）/DoT：把 DNS 查询加密进 HTTPS/TLS，防中间人窃听和篡改查询（隐私 + 防污染）。浏览器可在设置里开（Cloudflare 1.1.1.1、Google 8.8.8.8）。
+
+\`\`\`html
+<!-- 前端能做的两件事 -->
+<link rel="dns-prefetch" href="//api.example.com" />
+<link rel="preconnect" href="https://api.example.com" crossorigin /> <!-- 更进一步：连 TCP+TLS 都建好 -->
+\`\`\`
+
+踩坑：①TTL 设太短（<60s）递归服务器频繁回源，解析变慢且权威服务器压力大；设太长（>1天）切机房/换 IP 时老缓存不生效——灰度期调短，稳定期调长；②预解析别超过 10 个域，多了反而争抢；③HTTPDNS 拿到的 IP 直连后，HTTPS 证书校验的 SNI/Host 要手动带上原域名（不然证书不匹配）；④DoH 会让企业内网的 DNS 审计/安全网关失效，部分企业策略会封禁 DoH 域名；⑤IPv6 AAAA 记录和 A 记录并行查询，配错 AAAA（指向不可达 IPv6）会导致部分用户连接超时——Happy Eyeballs 算法能缓解但不根治。`,
+    keyPoints: ["递归链：根→顶级→权威，TTL 层层缓存", "HTTPDNS 治劫持/调度错/TTL 篡改", "dns-prefetch 预解析，preconnect 连握手都提前"],
+    followUps: ["Happy Eyeballs（RFC 8305）如何优化 IPv4/IPv6 竞速？", "ECS（EDNS Client Subnet）对 CDN 调度的意义？"],
     favorited: false,
   },
 ];
