@@ -16106,6 +16106,613 @@ LinkedIn：Pinot(实时特征) + Presto(ad-hoc) + Espresso(点查)
     followUps: ["Hologres 的 HSAP（分析服务一体）和传统 OLAP 差异？", "DuckDB 嵌入式 OLAP 对单机分析场景的颠覆？"],
     favorited: false,
   },
+  // ===== be-ddd：架构设计与 DDD（4 题） =====
+  {
+    id: "be-306",
+    nodeId: "be-ddd",
+    question: "单体→微服务→Serverless 架构演进的驱动力是什么？什么时候该拆、什么时候不该拆？",
+    bigTech: true,
+    answer: `结论：架构演进的核心驱动力是「团队规模×交付速度×系统复杂度」三者的剪刀差——单体扛不住团队并行开发，微服务扛不住运维成本，Serverless 扛不住冷启动和厂商锁定。拆不拆的判断标准不是"技术先进性"，而是"组织沟通成本"（康威定律：系统结构必然映射组织沟通结构）。
+
+\`\`\`text
+演进路线与触发条件：
+阶段          触发条件                       痛点
+单体          团队<8人，领域单一              代码耦合，发布互相阻塞
+垂直拆分       团队 8-20人，业务域清晰         跨域事务，数据一致性问题
+微服务        团队>20人，多业务线并行迭代      分布式复杂性，运维成本激增
+服务网格       服务>50个，多语言栈，治理复杂    Sidecar 性能开销
+Serverless    突发流量，事件驱动，长尾应用     冷启动，厂商锁定，调试困难
+\`\`\`
+
+\`\`\`text
+不该拆的四种场景（血泪教训）：
+1. 团队<5人拆微服务 → 80% 时间在联调运维，业务零产出
+2. 业务边界模糊时强拆 → 服务间频繁变更，分布式单体（看起来微服务，实际紧耦合）
+3. 数据强一致场景拆 → 分布式事务成本远超收益，性能断崖
+4. 流量小且稳定 → Serverless 冷启动反而拖垮 P99
+\`\`\`
+
+案例：Netflix 从单体拆到数百微服务（团队 2000+，全球化）；Amazon 的"两个披萨团队"原则（每服务对应一个可独立部署的小团队）；Uber 早期过度拆分导致"微服务地狱"（3000+ 服务，后来又合并）；LinkedIn 从单体到 SOA 再到微服务，中间经历多次架构回退。国内：阿里从"大中台小前台"到"多元化治理"（中台拆分），本质是组织架构调整驱动技术架构调整。
+
+踩坑：为了"技术先进"而拆微服务（忽视康威定律——组织没拆开，拆了也是分布式单体）；服务边界按技术层分（前端/后端/DB 各一个服务，应按业务能力分）；拆了服务没拆数据库（共享 DB 等于没拆，schema 变更互相阻塞）；没有 CI/CD 就上微服务（部署成本乘以服务数）；没有可观测性就上 Serverless（出问题全靠猜）。`,
+    keyPoints: ["康威定律：架构映射组织沟通结构", "拆分判断标准是团队规模×交付速度×复杂度", "分布式单体是最差形态——有微服务的成本没有微服务的收益"],
+    followUps: ["如何识别和治理「分布式单体」？", "中台战略为什么在阿里从集中走向多元化？"],
+    favorited: false,
+  },
+  {
+    id: "be-307",
+    nodeId: "be-ddd",
+    question: "DDD 的限界上下文（Bounded Context）怎么划分？上下文映射（Context Map）有哪几种关系？",
+    bigTech: true,
+    answer: `结论：限界上下文是 DDD 战略设计的核心——它划定的不是技术边界，而是「语言边界 + 模型边界 + 团队边界」。划分依据是「统一语言是否一致」：同一个词汇在不同业务域含义不同，就该拆成不同上下文。上下文映射描述上下文之间的协作关系，共9种，核心要掌握的是合作/共享内核/客户-供应商/跟随者/防腐层/开放主机服务/发布语言/各行其道/大泥球。
+
+\`\`\`text
+限界上下文划分四步法：
+1. 事件风暴（Event Storming）→ 列出所有领域事件
+2. 按事件聚类 → 识别聚合和业务流程
+3. 找统一语言边界 → 同名不同义的词汇是切分信号
+4. 验证团队边界 → 一个上下文对应一个可独立交付的团队
+
+判断"是否该拆"的信号词：
+- "订单"在交易域指交易凭证，在物流域指发货单 → 拆
+- "用户"在账户域指登录主体，在营销域指营销画像 → 拆
+- 同一个 Product 类被三个团队改 → 必须拆
+\`\`\`
+
+\`\`\`text
+上下文映射9种关系（面试必背核心5种）：
+关系              含义                          典型场景
+合作(Partnership)  双方依赖，共同协调              订单+支付同步迭代
+客户-供应商        上游服务下游，下游有话语权       营销(下游)←用户(上游)
+跟随者(Conformist) 下游被迫服从上游模型            接第三方SDK
+防腐层(ACL)        下游建翻译层隔离上游模型污染     对接遗留系统/第三方
+开放主机服务(OHS)  上游发布标准化API供所有下游用    对外开放平台
+共享内核           多上下文共享一部分模型（危险）   小团队过渡期
+发布语言           上游发布DTO/事件契约            消息驱动解耦
+各行其道           完全独立，无协作                无关业务域
+大泥球             烂摊子，无清晰边界              遗留系统
+\`\`\`
+
+案例：阿里交易域拆分为"交易/库存/营销/支付/物流"五个限界上下文，每个有独立的统一语言；某电商"商品"在商品中心指SPU/SKU，在搜索中心指可检索文档，在推荐中心指特征向量——三个上下文用 ACL 隔离，避免一个 Product 类被全公司改烂。
+
+踩坑：限界上下文等于微服务（错——一个上下文可以多服务，一个服务不该跨上下文）；共享内核滥用（短期省事，长期变成全公司耦合点）；ACL 建了不维护（上游一变 ACL 翻译逻辑没跟上，数据错乱）；按数据库表分上下文（应按业务语言分，不是按表分）。`,
+    keyPoints: ["限界上下文=语言边界+模型边界+团队边界", "上下文映射9种关系，核心掌握ACL/OHS/客户-供应商", "划分依据是统一语言是否一致，不是技术边界"],
+    followUps: ["事件风暴（Event Storming）怎么做？和用例分析的区别？", "防腐层（ACL）在微服务集成中的具体实现？"],
+    favorited: false,
+  },
+  {
+    id: "be-308",
+    nodeId: "be-ddd",
+    question: "充血模型 vs 贫血模型之争的本质是什么？聚合根（Aggregate Root）怎么设计？",
+    bigTech: false,
+    answer: `结论：贫血模型是"过程式编程披着OOP外衣"——数据和行为分离，业务逻辑散落在 Service 层；充血模型是"真正的OOP"——数据和操作数据的业务方法封装在一起。争论本质是「事务脚本 vs 领域模型」的范式之争。聚合根是 DDD 战术设计的核心——它是一组相关对象的一致性边界，外部只能通过聚合根访问内部对象。
+
+\`\`\`text
+贫血 vs 充血对比：
+维度        贫血模型                    充血模型
+结构        Entity只有getter/setter     Entity包含业务方法
+逻辑位置    Service层散落               Entity内聚
+可测试性    难(逻辑依赖Service)          易(纯领域逻辑)
+模型意义    失血的数据袋                真正的领域对象
+适用场景    CRUD简单业务                复杂领域规则
+\`\`\`
+
+\`\`\`text
+聚合根设计四原则：
+1. 一致性边界：聚合内强一致（事务），聚合间最终一致
+2. 引用外部聚合：只能引用ID，不能持有对象引用
+3. 通过聚合根操作：外部不能绕过根直接改内部对象
+4. 聚合要小：一个事务只改一个聚合（跨聚合用领域事件）
+
+聚合根设计示例（订单系统）：
+聚合根：Order（包含OrderItem列表）
+- 外部引用：只持有 orderId，不持有 Order 对象
+- 内部一致性：addItem() 内部校验库存、金额、数量
+- 跨聚合：库存扣减通过发 InventoryReservedEvent，库存聚合消费
+
+错误设计：
+- Order 聚合包含 User、Product、Inventory（太大，锁冲突严重）
+- 外部直接 order.items.add()（绕过聚合根校验）
+- 一个事务改 Order + Inventory（跨聚合事务，性能灾难）
+\`\`\`
+
+案例：Spring 官方从推荐贫血（早期 Spring MVC + Service + DAO）转向支持充血（Spring Data REST + DDD）；某电商把"订单金额计算"从 OrderService 搬进 Order 充血模型，单测从依赖20个mock变成纯领域逻辑测试，覆盖率从40%提到90%。
+
+踩坑：Service 层变成"上帝类"（贫血模型的必然结果，所有逻辑堆在 OrderService）；聚合设计过大（把整个对象图塞进一个聚合，锁竞争+性能差）；跨聚合强一致（用分布式事务保证，违背聚合设计原则，应该用领域事件+最终一致）；充血模型教条化（简单CRUD也硬塞充血，过度设计）。`,
+    keyPoints: ["贫血=过程式，充血=真OOP，本质是范式之争", "聚合根是一致性边界，外部只引用ID", "一个事务只改一个聚合，跨聚合用领域事件"],
+    followUps: ["领域事件（Domain Event）怎么落地？和消息队列的关系？", "Repository 模式和 DAO 的区别？"],
+    favorited: false,
+  },
+  {
+    id: "be-309",
+    nodeId: "be-ddd",
+    question: "整洁架构、六边形架构、洋葱架构的共同点和区别？落地时怎么选？",
+    bigTech: false,
+    answer: `结论：三者都是「依赖倒置」原则的架构落地——核心思想一致：领域模型在内层，基础设施在外层，依赖方向永远从外向内。区别在于隐喻和侧重点：整洁架构（Uncle Bob）强调层次和依赖规则；六边形架构（Alistair Cockburn）强调端口-适配器，应用平等对待所有外部交互；洋葱架构（Jeffrey Palermo）强调可测试性和层次像洋葱皮。落地选整洁架构最主流（Spring 生态支持好），六边形适合多通道接入（同一逻辑要接 HTTP/gRPC/MQ/CLI）。
+
+\`\`\`text
+三者共同核心：
+- 依赖方向：外层依赖内层，内层不依赖外层
+- 领域模型独立：不依赖框架、数据库、UI
+- 可测试性：领域逻辑可脱离基础设施单测
+
+三者差异：
+架构       核心隐喻        侧重点               适配器方向
+整洁架构    同心圆层次      依赖规则+层次清晰     外→内单向
+六边形     端口-适配器      对称性，多通道平等     应用←→外部双向
+洋葱架构    洋葱皮层        可测试性优先          外→内单向
+\`\`\`
+
+\`\`\`text
+整洁架构四层（最主流落地）：
+层次          职责                     依赖
+Entity        领域模型+业务规则          无
+Use Case      应用服务，编排领域逻辑      Entity
+Interface     Controller/Presenter      Use Case
+Infrastructure DB/MQ/外部API           Interface(通过接口)
+
+依赖倒置实现：
+- Infrastructure 实现 Use Case 层定义的 Port 接口
+- Spring 依赖注入把实现注入到 Use Case
+- 领域层不 import 任何 Spring/MyBatis 类
+
+六边形架构落地（多通道场景）：
+- 端口：应用定义的接口（Driving Port=API接口，Driven Port=仓储接口）
+- 适配器：HTTP Adapter/GRPC Adapter/MQ Adapter 实现 Driving Port
+- 好处：同一套应用逻辑，HTTP/MQ/CLI/gRPC 都能驱动
+\`\`\`
+
+案例：Spring 官方的 Spring Modulith 推崇模块化整洁架构；阿里 COLA 架构（Clean Object-Oriented and Layered Architecture）是整洁架构的 Java 落地；某支付系统用六边形架构，同一套支付逻辑同时接入 HTTP API、MQ 消息、定时任务、运维 CLI 四个通道，新增通道只需加适配器。
+
+踩坑：分层不彻底（Controller 直接调 DAO，绕过 Use Case，等于没分层）；Port 接口定义在 Infrastructure 层（依赖方向反了，应定义在应用层）；领域模型依赖 Spring（@Entity/@Service 注解污染领域层，无法脱离框架测试）；为了架构而架构（简单CRUD套四层整洁架构，过度设计，CRUD 用 Active Record 够了）。`,
+    keyPoints: ["三者核心都是依赖倒置，依赖方向外→内", "整洁架构最主流，六边形适合多通道接入", "领域模型必须独立于框架和基础设施"],
+    followUps: ["COLA 架构和整洁架构的关系？", "模块化单体（Modular Monolith）怎么落地？"],
+    favorited: false,
+  },
+  // ===== be-perf-troubleshoot：线上排查与性能调优（4 题） =====
+  {
+    id: "be-310",
+    nodeId: "be-perf-troubleshoot",
+    question: "线上 CPU 100% 怎么排查？给出完整的定位流程和工具链。",
+    bigTech: true,
+    answer: `结论：CPU 100% 排查的核心思路是「定位进程→定位线程→定位代码行」三步走。工具链：top 找进程 → top -Hp 找线程 → printf + jstack 找堆栈 → 代码定位。常见根因四类：死循环/无限重试、频繁 GC、正则回溯、序列化/反序列化大对象。
+
+\`\`\`text
+标准排查五步（Linux + JDK）：
+1. top 找占 CPU 最高的 Java 进程 PID
+2. top -Hp <PID> 找占 CPU 最高的线程 TID
+3. printf "%x\\n" <TID> 把十进制转十六进制（jstack 里是 nid=0x...）
+4. jstack <PID> | grep -A 30 <十六进制TID> 找到线程堆栈
+5. 看堆栈最上面的业务方法 → 定位到代码行
+
+一键脚本（生产实战）：
+\`\`\`bash
+# 找 CPU TOP1 线程的堆栈
+pid=$(top -bn1 | grep java | head -1 | awk '{print $1}')
+tid=$(top -bn1 -H -p $pid | head -8 | tail -1 | awk '{print $1}')
+nid=$(printf "%x" $tid)
+jstack $pid | grep -A 30 "nid=0x$nid"
+\`\`\`
+\`\`\`
+
+\`\`\`text
+四大常见根因与特征：
+根因            堆栈特征                     定位工具
+死循环/重试     业务方法栈顶，CPU 持续 100%   jstack 连续 dump 对比
+频繁 GC        GC 线程占 CPU，堆栈在 GC     jstat -gcutil <PID> 1000
+正则回溯        栈顶在 Pattern.matcher       检查正则表达式
+序列化         栈顶在 JSON/XML 序列化       检查序列化对象大小
+\`\`\`
+
+进阶工具：
+- Arthas（阿里）：thread -n 3 一键看 CPU TOP3 线程堆栈，dashboard 实时看 JVM 状态
+- async-profiler：生成火焰图，一眼看出 CPU 热点方法
+- JFR（Java Flight Recorder）：持续录制，事后分析，生产可用
+
+案例：某电商大促时订单服务 CPU 100%，jstack 发现是 Jackson 序列化一个 50MB 的订单对象（含全量商品快照），改为只序列化必要字段后 CPU 降到 20%；某支付系统 CPU 飙升，Arthas thread 命令看到是日志框架的 AsyncAppender 队列堆积，消费者线程死循环重试写磁盘（磁盘满了），根因是磁盘空间告警未处理。
+
+踩坑：只看 top 不看 jstack（知道 CPU 高但不知道在哪）；jstack dump 时机不对（要在 CPU 高时 dump，晚了堆栈已变）；忽视 GC 导致的 CPU 高（jstack 看到 GC 线程但误以为是业务线程）；生产用 jstack 卡住（大堆 dump 耗时，用 Arthas 替代，或加 -F 强制）。`,
+    keyPoints: ["三步走：进程→线程→堆栈→代码行", "Arthas thread -n 3 一键定位", "四大根因：死循环/GC/正则/序列化"],
+    followUps: ["频繁 Full GC 怎么排查？和 CPU 100% 的关系？", "Arthas 的 watch/trace 命令怎么用？"],
+    favorited: false,
+  },
+  {
+    id: "be-311",
+    nodeId: "be-perf-troubleshoot",
+    question: "线上 OOM 怎么排查？不同类型的 OOM 根因和定位方法分别是什么？",
+    bigTech: true,
+    answer: `结论：OOM 不是都"堆满了"——JVM 有6种 OOM，每种根因不同、排查方法不同。核心思路：先看错误信息判断 OOM 类型 → 拿 Heap Dump → MAT/jvisualvm 分析对象引用链 → 找内存泄漏点或容量不足点。生产必须预先配置 -XX:+HeapDumpOnOutOfMemoryError 自动 dump。
+
+\`\`\`text
+六种 OOM 类型与根因：
+错误信息                            根因                     排查方向
+Java heap space                     堆内存不足/内存泄漏        Heap Dump + MAT
+GC overhead limit exceeded          GC回收效率<1%持续5次       堆太小或泄漏，先dump
+Metaspace                           类元数据泄漏              检查动态生成Class
+Direct buffer memory                堆外内存未释放             检查NIO/Netty ByteBuf
+unable to create new native thread  线程数超限                检查线程池泄漏
+StackOverflowError                  栈深度超限                检查递归调用
+\`\`\`
+
+\`\`\`text
+Java heap space 排查四步：
+1. 确认 JVM 参数：-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/dump.hprof
+2. MAT 打开 dump → Leak Suspects 报告 → 看 Dominator Tree
+3. 找到占用最大的对象 → 查 GC Root 引用链
+4. 判断：泄漏（引用链指向静态变量/缓存/ThreadLocal）or 容量不足（正常业务对象太多）
+
+常见内存泄漏模式：
+- 静态集合只 put 不 remove（HashMap 当缓存，无淘汰策略）
+- ThreadLocal 没 remove（线程池复用，Entry 的 value 不释放）
+- 监听器/回调未注销（观察者模式注册后没反注册）
+- 内部类持有外部类引用（匿名内部类泄漏 Activity/大对象）
+- 连接未关闭（DB连接/HTTP连接/文件流泄漏）
+\`\`\`
+
+\`\`\`text
+Metaspace OOM 特殊排查：
+- 现象：Metaspace 持续增长不回落
+- 根因：动态生成 Class（CGLIB/字节码增强/反射Proxy）
+- 定位：jcmd <PID> GC.class_stats 查看类数量
+- 案例：某框架用 CGLIB 为每个请求生成代理类，ClassLoader 无法卸载，Metaspace 撑爆
+
+Direct buffer OOM 特殊排查：
+- 现象：堆正常但堆外内存涨
+- 根因：Netty/NIO 的 ByteBuf 未 release
+- 定位：-XX:NativeMemoryTracking=detail + jcmd <PID> VM.native_memory
+- 案例：Netty 的 ByteBuf 引用计数漏 release，堆外内存泄漏
+\`\`\`
+
+案例：某电商订单服务频繁 OOM，MAT 分析发现 OrderCache（Guava Cache）缓存了30天订单未设过期，堆里有500万 Order 对象；改成 Caffeine + W-TinyLFU + 最大容量10000后解决。某 RPC 框架 Metaspace OOM，定位到每次调用生成新的泛型擦除代理类，改为缓存代理类后解决。
+
+踩坑：OOM 后没 dump（重启就丢失现场，无法分析）；只看堆不看 Metaspace/直接内存（非堆 OOM 被忽略）；MAT 看不出问题就看 thread dump（方向错了，内存问题看 heap dump）；堆设太大掩盖问题（-Xmx 32g 让泄漏更晚暴露，应该先定位再调大）。`,
+    keyPoints: ["6种OOM类型，每种根因不同", "Heap Dump + MAT 找引用链是核心", "生产必配 HeapDumpOnOutOfMemoryError"],
+    followUps: ["ThreadLocal 内存泄漏的完整原理？", "Netty ByteBuf 的引用计数怎么排查泄漏？"],
+    favorited: false,
+  },
+  {
+    id: "be-312",
+    nodeId: "be-perf-troubleshoot",
+    question: "慢 SQL 怎么排查和优化？explain 执行计划怎么看？索引失效有哪些场景？",
+    bigTech: true,
+    answer: `结论：慢 SQL 优化核心思路是「定位慢 SQL → explain 看执行计划 → 判断扫描行数/索引/Join 方式 → 针对性优化」。优化的本质是减少"扫描的数据量"和"回表次数"。索引失效的根因是"优化器认为全表扫描比走索引成本更低"或"索引无法被使用"。
+
+\`\`\`text
+排查流程：
+1. 开启慢查询日志：slow_query_log=ON, long_query_time=1
+2. mysqldumpslow 分析 TOP N 慢 SQL
+3. EXPLAIN 看执行计划（核心）
+4. 针对性优化
+
+EXPLAIN 核心字段（面试必背）：
+字段         关注点                      好的值
+type         访问类型（扫描方式）          const/eq_ref/ref/range > index > ALL
+key          实际使用的索引                非 NULL
+rows         预估扫描行数                  越小越好
+Extra        额外信息                      Using index(覆盖索引) > Using where > Using filesort/temporary
+\`\`\`
+
+\`\`\`text
+type 字段从好到差（面试必背）：
+system > const > eq_ref > ref > range > index > ALL
+- const：主键/唯一索引等值查询（最优）
+- eq_ref：JOIN 用主键/唯一索引关联（一对一）
+- ref：非唯一索引等值查询
+- range：索引范围扫描（BETWEEN, >, <, IN）
+- index：全索引扫描（扫整棵索引树）
+- ALL：全表扫描（最差，必须优化）
+\`\`\`
+
+\`\`\`text
+索引失效十大场景（面试高频）：
+1. 函数操作：WHERE YEAR(create_time)='2024' → 改 WHERE create_time >= '2024-01-01'
+2. 隐式类型转换：phone 是 varchar，WHERE phone=13800138000（数字）→ 改 WHERE phone='13800138000'
+3. LIKE 左模糊：WHERE name LIKE '%张' → 改 '%张%' 或全文索引
+4. OR 连接非索引列：WHERE a=1 OR b=2，b无索引 → 全表扫描
+5. 联合索引非最左前缀：INDEX(a,b,c)，WHERE b=1 → 不走索引
+6. 范围查询后索引失效：INDEX(a,b)，WHERE a>1 AND b=2 → b 不走索引
+7. != / <> / NOT IN：WHERE status != 1 → 优化器可能放弃索引
+8. IS NULL / IS NOT NULL：取决于 NULL 比例
+9. 计算操作：WHERE id + 1 = 10 → 改 WHERE id = 9
+10. 字符集不匹配：JOIN 两表字符集不同 → 隐式转换失效
+\`\`\`
+
+\`\`\`text
+优化策略四象限：
+问题              优化手段                    效果
+全表扫描          加合适索引                   扫描量降90%+
+回表过多          覆盖索引(索引包含查询字段)    消除回表
+排序慢            索引有序性替代 filesort      消除 filesort
+分页深            游标分页/子查询优化           避免 LIMIT 1000000,10
+\`\`\`
+
+深分页优化示例：
+\`\`\`sql
+-- 慢：LIMIT 1000000, 10（扫1000010行）
+SELECT * FROM orders ORDER BY id LIMIT 1000000, 10;
+-- 快：游标分页（扫10行）
+SELECT * FROM orders WHERE id > ?last_id ORDER BY id LIMIT 10;
+-- 折中：子查询（扫1000010行索引，10行回表）
+SELECT * FROM orders o
+INNER JOIN (SELECT id FROM orders ORDER BY id LIMIT 1000000, 10) t ON o.id = t.id;
+\`\`\`
+
+案例：某订单列表查询从800ms优化到20ms——原 SQL 是 SELECT * + LIMIT 100000,20，优化为覆盖索引+子查询+游标分页；某报表 SQL 全表扫1亿行30秒，加 (tenant_id, create_time, status) 联合索引后降到200ms。
+
+踩坑：加索引不看基数（区分度<10%的列加索引无效甚至更慢，优化器可能不走）；忽视执行计划的 rows 预估（rows 远大于实际返回行数说明索引选错了）；只看单 SQL 不看整体（一个高频简单SQL比一个低频复杂SQL更值得优化）；优化后不复测（数据分布变化可能导致索引失效，需要定期巡检）。`,
+    keyPoints: ["EXPLAIN 核心看 type/key/rows/Extra", "type 从 const 到 ALL，ALL 必须优化", "索引失效十大场景，根因是优化器判断成本高或索引不可用"],
+    followUps: ["覆盖索引和回表的关系？怎么用覆盖索引优化？", "MySQL 优化器选错索引怎么办？FORCE INDEX 的使用场景？"],
+    favorited: false,
+  },
+  {
+    id: "be-313",
+    nodeId: "be-perf-troubleshoot",
+    question: "全链路压测怎么做？影子库/影子表是什么？压测和容量规划的关系？",
+    bigTech: true,
+    answer: `结论：全链路压测是「在仿真环境模拟真实用户流量，验证系统容量上限和瓶颈点」的工程实践。影子库/影子表是「压测数据隔离」的核心机制——压测流量打影子表，不影响真实数据。压测的产出不是"QPS 多少"，而是"容量规划曲线"——多少机器扛多少 QPS，什么时候该扩容。
+
+\`\`\`text
+全链路压测五步法：
+1. 链路梳理：梳理入口→网关→服务→DB→缓存→MQ 全链路
+2. 流量建模：基于历史峰值 × 预期增长，构造压测模型
+   - 峰值QPS = 历史峰值QPS × (1 + 增长率) × 安全系数(1.5)
+3. 数据准备：影子表/影子库/影子队列，压测数据打标记隔离
+4. 执行压测：梯度加压（10%→30%→50%→80%→100%→120%），监控全链路
+5. 结果分析：找瓶颈点→优化→复测→输出容量规划
+
+压测策略三档：
+档位      目的              加压方式
+负载测试  找日常容量上限     梯度加压到响应变慢
+压力测试  找极限容量        持续加压到系统崩溃
+稳定性测试 验证长时间运行     80%峰值跑24-48小时
+\`\`\`
+
+\`\`\`text
+影子库/影子表/影子队列（数据隔离三种方案）：
+方案          原理                          优缺点
+影子表        同库建 _shadow 表，压测写影子表  隔离弱（同库资源争抢），实现简单
+影子库        独立DB实例，压测路由到影子库     隔离强，成本高
+影子队列      MQ 用独立 Topic，消费影子消费者  适合异步链路
+
+压测流量标记与透传：
+- 入口网关给压测请求打标：X-Pressure-Test: true
+- 全链路透传（HTTP Header → Dubbo Attachment → MQ Property）
+- 各中间件识别标记，路由到影子资源
+- 日志打到独立文件/独立ES索引
+\`\`\`
+
+\`\`\`text
+容量规划核心公式：
+单机容量 = 单机QPS上限（压测得出）
+集群容量 = 单机容量 × 机器数 × 水位系数(0.7)
+扩容阈值 = 集群容量 × 告警水位(0.6)
+
+容量规划四步：
+1. 压测得出单机 QPS 上限
+2. 按业务峰值计算所需机器数
+3. 设置 60% 水位告警，80% 自动扩容
+4. 定期复测（代码变化会导致单机容量变化）
+
+全链路瓶颈定位（木桶效应）：
+- 应用层：CPU/线程池/连接池打满
+- 数据层：DB 连接数/CPU/锁等待/慢SQL
+- 缓存层：热点Key/大Value/穿透/雪崩
+- 网络层：带宽打满/连接数超限
+- 中间件：MQ堆积/限流触发
+\`\`\`
+
+案例：阿里双11 全链路压测——影子库方案，数千个影子表，压测流量全链路标记隔离，双11当天用压测数据指导弹性扩容（从压测的800万QPS推算双11峰值1200万QPS所需机器）；某金融系统压测发现 DB 连接池是瓶颈（500连接打满），从50调整到200后系统容量翻倍；某电商压测发现 Redis 集群热点Key导致单分片CPU 100%，用本地缓存+多级缓存解决。
+
+踩坑：只压单接口不压全链路（单接口OK但全链路资源争抢暴露不出）；压测数据用生产真实数据（数据污染、合规风险，必须用脱敏数据或影子表）；只看QPS不看响应时间（QPS达标但P99从50ms涨到2s，不可接受）；压测完不复盘（瓶颈点没记录，下次又踩同样坑）；忽视第三方依赖限流（压测把下游第三方压挂了，要Mock或限流保护）。`,
+    keyPoints: ["全链路压测五步：梳理→建模→数据→执行→分析", "影子库/表/队列实现压测数据隔离", "压测产出是容量规划曲线，不是单点QPS"],
+    followUps: ["怎么构造真实的压测流量模型？", "弹性扩容的自动触发条件怎么设计？"],
+    favorited: false,
+  },
+  // ===== be-cloud-native：云原生进阶（3 题） =====
+  {
+    id: "be-314",
+    nodeId: "be-cloud-native",
+    question: "Service Mesh（Istio + Envoy）解决了什么问题？Sidecar 模式的利弊？什么时候该上？",
+    bigTech: true,
+    answer: `结论：Service Mesh 把「服务间通信的治理能力」（负载均衡/熔断/重试/限流/可观测/安全）从应用代码里剥离到 Sidecar 代理（Envoy）中，让业务代码只关心业务逻辑。它解决的核心问题是「多语言栈的服务治理一致性」和「治理能力与业务解耦」。Sidecar 的代价是：每 Pod 多一个代理容器，增加资源开销（CPU+内存）和链路跳数（多一跳，延迟+1-2ms）。上不上 Service Mesh 的判断标准是"服务数量×语言种类×治理复杂度"是否超过 SDK 方案的维护成本。
+
+\`\`\`text
+Service Mesh 演进路线：
+阶段1：SDK 治理（Spring Cloud/Dubbo）
+  - 治理能力在应用 SDK 里
+  - 问题：多语言难（每个语言一套SDK），升级难（SDK版本碎片化）
+阶段2：Sidecar 代理（Istio + Envoy）
+  - 治理能力下沉到 Sidecar
+  - 优点：语言无关，业务无侵入，统一升级
+  - 代价：资源开销 + 延迟开销
+阶段3：eBPF/Sidecarless（Cilium Service Mesh）
+  - 治理能力下沉到内核 eBPF
+  - 优点：无 Sidecar 开销，性能接近原生
+  - 现状：功能不如 Istio 完善，发展中
+\`\`\`
+
+\`\`\`text
+Istio 核心能力四象限：
+能力域        具体功能                        替代的传统方案
+流量管理      负载均衡/熔断/重试/灰度/流量染色   Ribbon/Hystrix/网关规则
+安全          mTLS/授权策略/证书轮转            手动TLS/ACL
+可观测        指标/链路追踪/访问日志            Skywalking/Prometheus手动接入
+策略          限流/黑白名单                     Sentinel/网关限流
+
+Sidecar 工作原理（数据平面）：
+- 应用 Pod 内注入 Envoy 容器（istio-init 初始化 + istio-proxy 运行）
+- 所有出入流量被 iptables 劫持到 Envoy
+- Envoy 执行治理逻辑后转发（应用无感知）
+- 控制平面（istiod）下发配置到所有 Envoy
+\`\`\`
+
+\`\`\`text
+Sidecar 开销实测（生产数据）：
+- CPU：每 Pod 额外 0.1-0.5 核（取决于流量）
+- 内存：每 Pod 额外 100-200MB
+- 延迟：P99 增加 1-2ms（多一跳+代理处理）
+- 大规模集群（1000+ Pod）资源开销显著
+
+什么时候该上 Service Mesh？
+✅ 服务数>50，多语言栈，治理需求复杂
+✅ 需要统一的安全策略（mTLS、零信任）
+✅ 需要细粒度流量治理（灰度、流量染色、流量镜像）
+❌ 服务数<20，单语言栈（Spring Cloud SDK 够了）
+❌ 对延迟极其敏感（金融交易，1ms 都不能多）
+❌ 资源紧张（Sidecar 开销对小集群不可忽视）
+\`\`\`
+
+案例：字节跳动用自研 Service Mesh（基于 Envoy）统一多语言（Go/Python/Node.js/Lua）治理，从各语言自维护 SDK 解放出来；阿里巴巴的 MSE（微服务引擎）提供托管式 Istio，降低运维门槛；某金融公司评估后不上 Service Mesh——核心交易系统延迟敏感，多 1ms 不可接受，且 Java 单语言栈用 Spring Cloud 足够。
+
+踩坑：盲目上 Istio（服务<20个，SDK 维护成本远低于 Sidecar 资源开销）；上了不监控 Sidecar（Envoy OOM/超时导致全链路抖动，排查困难）；全量开启 mTLS 不灰度（证书配置错误导致全站不可用）；忽视 istiod 性能（大规模集群控制平面推送延迟，配置生效慢）；Sidecar 版本和应用不兼容（iptables 劫持规则异常导致流量黑洞）。`,
+    keyPoints: ["Service Mesh 把治理能力从 SDK 下沉到 Sidecar", "代价是资源开销+1-2ms 延迟", "判断标准是服务数×语言种类×治理复杂度"],
+    followUps: ["eBPF 怎么实现 Sidecarless Service Mesh？", "Istio 的流量染色和灰度发布怎么做？"],
+    favorited: false,
+  },
+  {
+    id: "be-315",
+    nodeId: "be-cloud-native",
+    question: "eBPF 在云原生里解决了什么问题？相比传统方案的优势？典型应用场景有哪些？",
+    bigTech: false,
+    answer: `结论：eBPF（Extended Berkeley Packet Filter）是「Linux 内核里的可编程虚拟机」——允许在不修改内核源码、不加载内核模块的前提下，在内核态运行沙箱程序。它解决了云原生场景下「内核态观测和网络处理的高性能需求」——传统用户态方案需要数据穿越内核态/用户态边界，开销大；eBPF 直接在内核态处理，性能提升一个数量级。
+
+\`\`\`text
+eBPF 核心价值：
+1. 内核可编程：不改内核源码，动态加载程序到内核运行
+2. 安全沙箱：验证器（Verifier）确保程序不会崩溃内核
+3. 高性能：内核态处理，无用户态切换开销
+4. 动态性：运行时加载/卸载，无需重启
+
+工作原理：
+1. 用 C 写 eBPF 程序（受限子集）
+2. Clang/LLVM 编译成字节码
+3. 内核 Verifier 验证安全性（无死循环、无越界）
+4. JIT 编译成原生指令在内核运行
+5. 通过 Map 和用户态交互数据
+\`\`\`
+
+\`\`\`text
+四大典型应用场景：
+场景           传统方案痛点              eBPF 方案              代表项目
+网络           iptables 规则多性能差     XDP 内核态网络处理      Cilium
+可观测         用户态 Agent 开销大        内核态采集指标/链路     Pixie/Parca
+安全           内核模块危险              内核态安全监控          Falco/Tetragon
+调度           无法感知应用层            应用感知调度            Krypto
+
+场景1：网络（Cilium）
+- 替代 kube-proxy（iptables 模式）
+- iptables 在大规模集群（>1000 Service）规则匹配 O(n)
+- eBPF 用 Map 实现 O(1) 查找，性能不随规则数增长
+- Service Mesh Sidecarless：eBPF 在内核做 L4-L7 治理
+
+场景2：可观测（Pixie/Parca）
+- 传统 APM：应用埋点/Sidecar 采集，有开销
+- eBPF：内核态自动采集 HTTP/gRPC/SQL 调用
+- 零侵入：不改应用代码，不加 Sidecar
+- 全覆盖：所有进程自动观测
+
+场景3：安全（Falco/Tetragon）
+- 传统：内核模块（危险，可能崩溃）或用户态日志（不全）
+- eBPF：内核态监控 syscall/network/file 事件
+- 实时告警：检测容器逃逸/异常网络连接/敏感文件访问
+\`\`\`
+
+\`\`\`text
+eBPF vs 传统方案对比：
+维度        传统(用户态Agent)     eBPF(内核态)
+性能        有内核-用户态切换     纳秒级，无切换
+侵入性      需要改应用/加Sidecar  零侵入
+覆盖度      只看应用层            内核+应用全栈
+资源开销    每应用一个Agent       全局一个，共享
+调试难度    用户态易调试          内核态需要BPF工具链
+\`\`\`
+
+案例：Google GKE 用 eBPF 替代 kube-proxy，大规模集群网络延迟降低30%；字节跳动用 eBPF 做全链路追踪，零侵入采集 Go/Python/C++ 混合语言调用链；某金融系统用 Tetragon（基于 eBPF）实现容器运行时安全——检测到容器内执行 bash 立即告警阻断，替代传统 HIDS。
+
+踩坑：内核版本要求高（eBPF 功能依赖内核 4.10+，完整功能需要 5.4+，老内核用不了）；过度依赖 eBPF（简单场景用传统方案更易维护，eBPF 调试门槛高）；忽视 Verifier 限制（程序复杂度有限制，复杂逻辑可能无法通过验证）；生产直接上（eBPF 程序 bug 可能影响内核稳定性，需要充分测试）。`,
+    keyPoints: ["eBPF 是内核可编程虚拟机，不改内核源码", "内核态处理，无用户态切换，性能提升一个数量级", "四大场景：网络(Cilium)/可观测(Pixie)/安全(Falco)/调度"],
+    followUps: ["Cilium 怎么用 eBPF 替代 kube-proxy？", "eBPF 的 Verifier 怎么保证安全？"],
+    favorited: false,
+  },
+  {
+    id: "be-316",
+    nodeId: "be-cloud-native",
+    question: "Serverless / FaaS 的冷启动问题怎么解决？Knative 和传统 K8s 部署的区别？FinOps 是什么？",
+    bigTech: false,
+    answer: `结论：Serverless/FaaS 的核心卖点是「按用量付费+零运维+自动弹性」，最大痛点是「冷启动」——首次请求到来时需要拉镜像→启动容器→初始化应用，延迟从毫秒级飙到秒级。解决方案分三档：预热（保活）、加速（轻量运行时）、规避（事件驱动避免冷启动）。Knative 是 K8s 上的 Serverless 框架，核心是「Scale-to-Zero + 按需自动弹性」。FinOps 是「云成本运营」——把云资源当投资管，核心是让研发对成本负责。
+
+\`\`\`text
+冷启动四阶段与耗时：
+阶段           耗时           优化方向
+拉镜像          500ms-5s       镜像瘦身、镜像缓存
+启动容器        200ms-2s       轻量运行时（GraalVM Native Image）
+框架初始化      500ms-3s       预热、减少启动时初始化
+应用就绪        100ms-1s       健康检查优化
+
+冷启动优化三档：
+档位1：预热/保活
+- provisioned concurrency（AWS Lambda）：预置N个热实例
+- Knative min-scale：保底N个 Pod 不缩到0
+- 定时心跳：每分钟打一个请求保活
+
+档位2：加速启动
+- GraalVM Native Image：AOT 编译，启动 50ms（vs JVM 2s）
+- 镜像瘦身：Distroless/Scratch，镜像从 500MB→50MB
+- 框架轻量化：Quarkus/Micronaut 替代 Spring Boot（启动 0.3s vs 2s）
+
+档位3：规避冷启动
+- 事件驱动：用消息触发，用户不直接等待冷启动
+- 长连接保活：WebSocket/gRPC stream 保持实例不回收
+- 分级弹性：核心服务 min-scale=1（不缩到0），非核心允许冷启动
+\`\`\`
+
+\`\`\`text
+Knative vs 传统 K8s 部署：
+维度        传统 K8s Deployment      Knative Service
+副本数      固定 replicas 或 HPA     0 到 N，自动弹性
+缩容        需配 HPA + 手动          流量降后自动缩到0
+流量管理    Ingress/Service          Revision 蓝绿/灰度
+冷启动      无（副本固定）           有（Scale-from-0）
+计费        按实例数 × 时长           按请求次数 × 执行时长
+适用场景    长期稳定服务              突发/长尾/事件驱动
+
+Knative 三核心组件：
+- Serving：自动弹性 + Scale-to-Zero + 流量管理
+- Eventing：事件源→触发器→服务，事件驱动架构
+- Build（已独立为 Tekton）：源码到镜像的 CI/CD
+\`\`\`
+
+\`\`\`text
+FinOps（云成本运营）三阶段：
+阶段1：看见（Visibility）
+- 全资源打成本标签（team/service/env）
+- 每日成本报表，按团队/服务维度拆分
+- 异常成本告警（环比增长>20%告警）
+
+阶段2：优化（Optimization）
+- 闲置资源清理：未挂载的 EBS/未用的 ELB/僵尸 Pod
+- 实例规格优化：开发环境用 Spot/竞价实例，省70%
+- 采购优化：Reserved Instance/Savings Plan 预留，省40%
+- 架构优化：Serverless 替代常驻服务（长尾场景省80%）
+
+阶段3：治理（Governance）
+- 预算机制：每团队设月度预算，超支审批
+- 成本分摊：成本精确到服务/feature 级别
+- 研发赋能：让研发看到自己代码的成本影响
+
+FinOps 核心原则：
+- 成本是研发的"第一公民"（不是运维的事）
+- 按价值付费（为业务价值付费，不为闲置资源付费）
+- 持续优化（不是一次性活动）
+\`\`\`
+
+案例：AWS Lambda 用 provisioned concurrency 解决 API 冷启动（金融场景 P99 < 100ms）；某 BI 报表服务从 ECS 迁到 Knative，空闲时缩到0，成本降 70%（报表每天就跑几次）；字节跳动用 GraalVM Native Image 把 Spring Boot 应用启动从 3s 降到 80ms，支持 Serverless 场景；某公司 FinOps 治理——清理 300+ 闲置 EBS 卷、开发环境全换 Spot，月度云成本从 200 万降到 120 万。
+
+踩坑：盲目 Scale-to-Zero（核心服务冷启动用户可感知，不该缩到0）；冷启动只看延迟不看失败率（超时重试放大流量，雪崩）；FinOps 只看账单不看利用率（买了 RI 但利用率<60%，浪费）；Serverless 厂商锁定（Lambda 特性深度绑定AWS，迁移成本极高）；忽视 GraalVM 兼容性（Native Image 不支持反射/动态代理，Spring 应用需要大量改造）。`,
+    keyPoints: ["冷启动三档优化：预热/加速/规避", "Knative = Scale-to-Zero + 按需弹性 + 流量管理", "FinOps 三阶段：看见→优化→治理，让研发对成本负责"],
+    followUps: ["GraalVM Native Image 的原理和限制？", "Spot 实例被回收怎么保证服务可用性？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
