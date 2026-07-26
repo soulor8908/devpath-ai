@@ -27,6 +27,11 @@ const nodeSchema = z.object({
   frequency: z.union([z.literal("高"), z.literal("中"), z.literal("低")]),
   bigTech: z.boolean().describe("是否大厂高频考点"),
   summary: z.string().describe("一句话知识点摘要"),
+  // v4 深度字段（必填，让学习路径节点本身就是求职资产）
+  coreMechanism: z.string().describe("核心机制 80-150 字：为什么这样设计、内部发生什么、权衡与适用场景，含量化细节"),
+  commonPitfalls: z.array(z.string()).describe("高频踩坑 2-3 条，每条带具体场景与修复方向"),
+  interviewAngles: z.array(z.string()).describe("4 题角度提示：概念辨析/原理深挖/实战设计/踩坑对比各一句"),
+  sourceHint: z.string().describe("一手来源提示：官方文档/规范/论文/工程博客的名称"),
 });
 
 const treeSchema = z.object({

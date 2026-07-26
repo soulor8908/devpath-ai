@@ -86,7 +86,7 @@ describe("prompts registry", () => {
  *   - 两者都改但内容其实没变 → hash 不匹配 → 失败（防止虚假 bump）
  */
 const PROMPT_VERSION_HASHES: Record<PromptId, string> = {
-  knowledge_decompose: "v3:df3b9847",
+  knowledge_decompose: "v4:52e9c0e2",
   question_generate: "v4:bbbbf854",
   question_stem_generate: "v2:e7f34c2b",
   answer_generate: "v2:6dd6dfd",

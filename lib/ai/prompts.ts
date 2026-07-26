@@ -65,7 +65,7 @@ export interface PromptDefinition {
 export const PROMPTS = {
   knowledge_decompose: {
     id: "knowledge_decompose",
-    version: "v3",
+    version: "v4",
     scene: "knowledge_decompose" as const,
     system: `你是技术学习专家。把用户给的学习主题拆解成知识节点。
 要求：
@@ -77,8 +77,13 @@ export const PROMPTS = {
 6. 大厂高频考点用 bigTech=true 标记，判定依据为该知识点在互联网大厂面试中的实际出现频率（高频出现才置 true，不要凭主观印象）
 7. 正确性：每个节点必须是该主题真实存在且面试真实考察的知识点，不得为凑数编造边缘或不存在的概念；经验性表述必须标注适用条件（如分词器版本、模型代际）
 8. 完整性：覆盖该主题面试的主要考察面，重要考点不得遗漏
-9. 输出严格 JSON`,
-    changelog: "v3: 注入内容生成规范第 2 节——正确性（反编造/经验值带前提）与完整性（考点覆盖+依赖闭环）约束",
+9. 深度内容（让学习路径本身成为求职资产，而非只是标题清单；每个节点必须产出以下 4 个字段，缺一不可）：
+   - coreMechanism：核心机制 80-150 字，回答"为什么这样设计、内部发生什么、权衡与适用场景"，含量化细节（具体数字/量级/百分比），禁止名词罗列或教科书定义
+   - commonPitfalls：高频踩坑 2-3 条数组，每条带具体场景与修复方向（不是泛泛"注意性能"，而是如"高频删除导致 HNSW 墓碑节点膨胀，p95 退化 → 定期 reindex"）
+   - interviewAngles：4 题角度提示数组，对应题目规范四角度——概念辨析/原理深挖/实战设计/踩坑对比各一句，每句含具体场景感（不是"什么是 X"式泛泛题）
+   - sourceHint：一手来源提示字符串（官方文档/规范/论文/工程博客的名称，如"MDN Web Docs / Chrome DevTools 团队博客"，不强制 URL，给方向即可）
+10. 输出严格 JSON`,
+    changelog: "v4: 注入深度内容约束——每个节点必须产出 coreMechanism/commonPitfalls/interviewAngles/sourceHint 四个深度字段，让学习路径本身就是求职资产而非标题清单（修复用户投诉'学习路径浮于表面'）",
   },
 
   question_generate: {

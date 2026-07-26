@@ -257,6 +257,59 @@ const scene = useMemo(() => parseSceneParams(searchParams), [searchParams]);
 
 **适用范围**：所有"任务列表 → 任务详情/训练/复习"的跳转入口（首页今日清单 / 计划详情页 / 知识树 / 脑图节点等）。
 
+### 2.13 学习路径节点必须自带深度内容（v4，修复"浮于表面"投诉）
+
+**背景**：2026-07-26 用户投诉"所有学习路径还是不行，太简单，不全面，让人觉得候选人知识太浮于表面"。根因诊断（卡帕西视角）：
+
+1. **schema 太薄**：旧 `knowledge_decompose` 只产 `summary` 一句话，用户看到的学习路径就是"标题列表 + 一句话摘要"，必然浮于表面。
+2. **守护断层**：`preset-content-quality.test.ts` 只查答案字符数，不查答案是否真有四段式结构；`content-generation-standard.test.ts` 只查 prompt 字符串 marker，不查 preset 实际产物。结果 16 道 AI preset 题答案 < 500 字符蒙混过关（main 分支 CI 本来就是 red 的）。
+3. **prompt 不要求深度**：`knowledge_decompose` 第 5 条"节点数量"+ 第 8 条"覆盖面试主要考察面"，只管"宽度"不管"深度"。
+
+**正确模式**：AI 生成的知识节点必须自带 4 个深度字段，让学习路径本身就是求职资产，而非只是标题清单。
+
+```typescript
+// ✅ 正确：knowledge_decompose v4 schema（lib/ai/knowledge.ts）
+const nodeSchema = z.object({
+  // ... 基础字段
+  summary: z.string().describe("一句话知识点摘要"),
+  // v4 深度字段（必填，让学习路径节点本身就是求职资产）
+  coreMechanism: z.string().describe("核心机制 80-150 字：为什么这样设计、内部发生什么、权衡与适用场景，含量化细节"),
+  commonPitfalls: z.array(z.string()).describe("高频踩坑 2-3 条，每条带具体场景与修复方向"),
+  interviewAngles: z.array(z.string()).describe("4 题角度提示：概念辨析/原理深挖/实战设计/踩坑对比各一句"),
+  sourceHint: z.string().describe("一手来源提示：官方文档/规范/论文/工程博客的名称"),
+});
+
+// ✅ 正确：KnowledgeNode 类型字段可选（向后兼容旧 preset）
+interface KnowledgeNode {
+  // ... 基础字段
+  summary: string;
+  // v4 深度字段（可选，AI 新生成节点会自带）
+  coreMechanism?: string;
+  commonPitfalls?: string[];
+  interviewAngles?: string[];
+  sourceHint?: string;
+}
+```
+
+```typescript
+// ❌ 禁止：knowledge_decompose prompt 不要求深度字段
+// （会让 AI 退化到只产 summary 一句话，学习路径就是标题清单）
+const system = `你是技术学习专家。拆解知识节点。输出 JSON。`;
+```
+
+**守护测试**：
+- [content-generation-standard.test.ts](file:///workspace/__tests__/content-generation-standard.test.ts) 守护 `knowledge_decompose` prompt 必须包含 `coreMechanism`/`commonPitfalls`/`interviewAngles`/`sourceHint` 4 个字段标记 + "求职资产" + "缺一不可" + "禁止名词罗列" 三个意图标记
+- [preset-content-quality.test.ts](file:///workspace/__tests__/preset-content-quality.test.ts) 守护 preset 节点若带深度字段必须达标（coreMechanism >= 50 字符、commonPitfalls >= 2 条、interviewAngles == 4 条、sourceHint >= 5 字符；且要么 4 个都带要么都不带，防"凑数式"部分补充）
+- [prompts.test.ts](file:///workspace/__tests__/prompts.test.ts) 指纹快照守护 prompt 改动留痕
+
+**判断标准**（设计审查时自查）：
+- AI 生成的学习路径节点是否自带 coreMechanism/commonPitfalls/interviewAngles/sourceHint 4 个字段？
+- 用户看知识树本身（不点进具体题目）能否获取求职级深度？
+- preset 答案是否 >= 500 字符且符合四段式宪章（结论与原理/实战案例/举一反三/扣分点对照）？
+- 守护测试是否真的在跑（CI green 不等于内容达标，要确认测试覆盖了结构而非只查长度）？
+
+**适用范围**：所有 AI 生成学习路径入口（`lib/ai/knowledge.ts` 的 `decomposeKnowledge` / `lib/ai/plan-generator.ts` 的 `generateLearningPlan` / 任何未来新增的知识拆解入口）+ 所有 preset 答案（手工或策展）。
+
 ---
 
 ## 3. 测试与质量门禁
@@ -275,6 +328,9 @@ npm run lint            # ESLint (--max-warnings 0)
 |---|---|
 | [__tests__/no-native-form-elements.test.ts](file:///workspace/__tests__/no-native-form-elements.test.ts) | `components/ui/` 之外禁止原生表单元素 |
 | [__tests__/ui-design-system-guard.test.ts](file:///workspace/__tests__/ui-design-system-guard.test.ts) | 浅色 utility 必须带 `dark:` 配对；禁止 `text-[Npx]` 逃逸值 |
+| [__tests__/content-generation-standard.test.ts](file:///workspace/__tests__/content-generation-standard.test.ts) | 内容生成 prompt 必须注入四段式宪章/四角度/正确性完整性/深度字段约束 |
+| [__tests__/preset-content-quality.test.ts](file:///workspace/__tests__/preset-content-quality.test.ts) | preset 答案 >= 500 字符、无占位符、keyPoints/followUps 必填、深度字段达标 |
+| [__tests__/prompts.test.ts](file:///workspace/__tests__/prompts.test.ts) | prompt 版本指纹快照（改 prompt 必须 bump version + 同步 hash） |
 
 **新增设计规则时，应同时新增对应的守护测试**。规则没有测试守护等于不存在。
 
@@ -397,6 +453,8 @@ it("浅色 utility 必须带 dark: 配对", () => { ... });
 | emoji 当功能图标 | 代码评审打回（暂无测试守护） |
 | absolute 浮层覆盖画布内容（见 2.11） | 代码评审打回（暂无测试守护，需自查窄屏 + 浮层重叠） |
 | 跳转不带场景参数（见 2.12） | 代码评审打回（暂无测试守护，需自查交互闭环） |
+| 学习路径节点缺深度字段（见 2.13） | `content-generation-standard.test.ts` 失败（缺 prompt 约束标记）→ CI red |
+| preset 节点深度字段凑数（见 2.13） | `preset-content-quality.test.ts` 失败（字段不达标或不一致）→ CI red |
 | AI 生成内容删除/削弱质量宪章约束（见第 9 节） | `content-generation-standard.test.ts` 失败 → CI red |
 | AI 生成内容含占位符 / 裸答案 / 孤儿题（见第 9 节） | `preset-content-quality.test.ts` 失败 → CI red |
 | 改 prompt 不 bump version（见第 9 节） | `prompts.test.ts` 指纹快照失败 → CI red |

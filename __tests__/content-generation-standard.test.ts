@@ -9,7 +9,8 @@
 //   1. 产答案的 prompt（question_generate / answer_generate）必须包含四段式宪章关键标记
 //   2. 产题干的 prompt（question_stem_generate / question_generate）必须包含角度约束
 //   3. 知识树拆解 prompt（knowledge_decompose）必须包含正确性/完整性约束
-//   4. 任何未来新增的内容生成入口不得绕过（人工评审兜底）
+//   4. 知识树拆解 prompt 必须包含深度字段约束（v4 引入，修复"学习路径浮于表面"投诉）
+//   5. 任何未来新增的内容生成入口不得绕过（人工评审兜底）
 
 import { describe, it, expect } from "vitest";
 
@@ -32,6 +33,20 @@ const QUESTION_ANGLE_MARKERS = [
   "原理深挖",
   "实战设计",
   "踩坑对比",
+] as const;
+
+/**
+ * 知识树拆解深度字段标记（对应规范第 2.4 节，v4 引入）
+ *
+ * 背景（2026-07-26 用户投诉）：旧 knowledge_decompose 只产 summary 一句话，
+ * 用户看到的学习路径就是"标题列表 + 一句话摘要"，浮于表面，被面试官秒淘汰。
+ * v4 强制每个节点产出 4 个深度字段，让学习路径本身就是求职资产。
+ */
+const KNOWLEDGE_DEPTH_MARKERS = [
+  "coreMechanism",
+  "commonPitfalls",
+  "interviewAngles",
+  "sourceHint",
 ] as const;
 
 describe("AI 内容生成质量宪章守护", () => {
@@ -87,6 +102,32 @@ describe("AI 内容生成质量宪章守护", () => {
       const s = PROMPTS.knowledge_decompose.system;
       expect(s).toContain("完整性");
       expect(s).toContain("闭环");
+    });
+  });
+
+  describe("知识树拆解 prompt 必须注入深度字段约束（v4，修复'浮于表面'投诉）", () => {
+    it("knowledge_decompose 包含 4 个深度字段标记", () => {
+      const s = PROMPTS.knowledge_decompose.system;
+      for (const marker of KNOWLEDGE_DEPTH_MARKERS) {
+        expect(
+          s,
+          `knowledge_decompose.system 缺少深度字段标记「${marker}」——` +
+            `学习路径节点深度约束被移除，会让 AI 退化到只产 summary 一句话，` +
+            `见 docs/content-generation-standard.md 第 2.4 节`,
+        ).toContain(marker);
+      }
+    });
+
+    it("knowledge_decompose 深度字段约束必须明确'求职资产'意图", () => {
+      // 防止约束被弱化为"可选"——必须明确"让学习路径本身成为求职资产"
+      const s = PROMPTS.knowledge_decompose.system;
+      expect(s).toContain("求职资产");
+      expect(s).toContain("缺一不可");
+    });
+
+    it("knowledge_decompose 必须禁止名词罗列式 coreMechanism", () => {
+      const s = PROMPTS.knowledge_decompose.system;
+      expect(s).toContain("禁止名词罗列");
     });
   });
 });

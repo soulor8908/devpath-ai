@@ -242,4 +242,132 @@ describe("preset 内容质量门禁", () => {
       expect(offenders).toEqual([]);
     });
   });
+
+  // ============ 深度字段达标校验（v4 引入，修复"学习路径浮于表面"投诉） ============
+  //
+  // 策略（卡帕西视角，渐进收紧）：
+  //   - 字段全部可选：现有手工 preset（frontend/backend/llm-app/ai）的旧节点不带这些字段
+  //     也能编译通过，避免一次性让几千道题 CI red
+  //   - 但只要节点"带了"深度字段，就必须达标——防止"凑数式"深度字段蒙混过关
+  //   - AI 新生成的节点（knowledge_decompose v4）会自带这些字段，自动受守护
+  //   - 后续手工补全 preset 时，逐个节点补字段即可逐个达标，无需一次性重写
+  describe("深度字段达标（v4，节点若带深度字段必须达标）", () => {
+    it("coreMechanism 若存在，长度 >= 50 字符且不含占位符", () => {
+      const offenders: string[] = [];
+      for (const preset of PRESETS) {
+        for (const n of preset.knowledgeTree) {
+          const cm = n.coreMechanism;
+          if (cm === undefined) continue; // 可选字段，未提供不报错
+          if (cm.trim().length < 50) {
+            offenders.push(
+              `${preset.id}/${n.id}.coreMechanism: ${cm.trim().length} 字符（< 50，过短不像机制深挖）`,
+            );
+          }
+          const hit = findPlaceholder(cm);
+          if (hit) {
+            offenders.push(`${preset.id}/${n.id}.coreMechanism: 命中 "${hit}"`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it("commonPitfalls 若存在，至少 2 条且每条带具体场景（>= 10 字符）", () => {
+      const offenders: string[] = [];
+      for (const preset of PRESETS) {
+        for (const n of preset.knowledgeTree) {
+          const cp = n.commonPitfalls;
+          if (cp === undefined) continue;
+          if (cp.length < 2) {
+            offenders.push(
+              `${preset.id}/${n.id}.commonPitfalls: 仅 ${cp.length} 条（< 2，不够覆盖高频踩坑）`,
+            );
+          }
+          for (let i = 0; i < cp.length; i++) {
+            if (cp[i].trim().length < 10) {
+              offenders.push(
+                `${preset.id}/${n.id}.commonPitfalls[${i}]: "${cp[i]}"（< 10 字符，无场景无修复方向）`,
+              );
+            }
+            const hit = findPlaceholder(cp[i]);
+            if (hit) {
+              offenders.push(
+                `${preset.id}/${n.id}.commonPitfalls[${i}]: 命中 "${hit}"`,
+              );
+            }
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it("interviewAngles 若存在，必须正好 4 条（对应四角度）且每条非空", () => {
+      const offenders: string[] = [];
+      for (const preset of PRESETS) {
+        for (const n of preset.knowledgeTree) {
+          const ia = n.interviewAngles;
+          if (ia === undefined) continue;
+          if (ia.length !== 4) {
+            offenders.push(
+              `${preset.id}/${n.id}.interviewAngles: ${ia.length} 条（应为 4 条，对应概念辨析/原理深挖/实战设计/踩坑对比）`,
+            );
+          }
+          for (let i = 0; i < ia.length; i++) {
+            if (ia[i].trim().length === 0) {
+              offenders.push(`${preset.id}/${n.id}.interviewAngles[${i}]: 空`);
+            }
+            const hit = findPlaceholder(ia[i]);
+            if (hit) {
+              offenders.push(
+                `${preset.id}/${n.id}.interviewAngles[${i}]: 命中 "${hit}"`,
+              );
+            }
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it("sourceHint 若存在，长度 >= 5 字符且不含占位符", () => {
+      const offenders: string[] = [];
+      for (const preset of PRESETS) {
+        for (const n of preset.knowledgeTree) {
+          const sh = n.sourceHint;
+          if (sh === undefined) continue;
+          if (sh.trim().length < 5) {
+            offenders.push(
+              `${preset.id}/${n.id}.sourceHint: "${sh}"（< 5 字符，无来源指向）`,
+            );
+          }
+          const hit = findPlaceholder(sh);
+          if (hit) {
+            offenders.push(`${preset.id}/${n.id}.sourceHint: 命中 "${hit}"`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it("深度字段一致性：要么 4 个字段都带，要么都不带（防'凑数式'部分补充）", () => {
+      const DEPTH_FIELDS = [
+        "coreMechanism",
+        "commonPitfalls",
+        "interviewAngles",
+        "sourceHint",
+      ] as const;
+      const offenders: string[] = [];
+      for (const preset of PRESETS) {
+        for (const n of preset.knowledgeTree) {
+          const present = DEPTH_FIELDS.filter((f) => n[f] !== undefined).length;
+          // 允许 0 个（旧节点）或 4 个（完整深度节点），不允许 1-3 个（凑数）
+          if (present !== 0 && present !== 4) {
+            offenders.push(
+              `${preset.id}/${n.id}: 仅 ${present}/4 个深度字段（应 0 或 4，部分补充是凑数）`,
+            );
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  });
 });

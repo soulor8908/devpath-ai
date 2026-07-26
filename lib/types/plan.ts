@@ -83,6 +83,43 @@ export interface KnowledgeNode {
   customOrder?: number;
   // 大厂高频考点标记（true = 互联网大厂面试重点考察）
   bigTech?: boolean;
+
+  // ============ 深度内容字段（v4 引入，让学习路径节点本身就是求职资产） ============
+  // 设计动机（卡帕西视角）：旧 schema 只有 summary 一句话，用户看到的学习路径就是
+  // "标题列表 + 一句话摘要"，必然浮于表面。深度字段让每个节点自带核心机制/踩坑/面试角度/
+  // 来源提示，用户即使不点进具体题目，也能从知识树本身获取求职级深度。
+  // 字段全部可选：向后兼容现有 preset 与旧 IndexedDB 数据；AI 新生成的节点会自带这些字段。
+  // 守护：preset-content-quality.test.ts 对"带字段的节点"做达标校验，缺字段不强制报错
+  // （渐进收紧策略），但 content-generation-standard.test.ts 强制 knowledge_decompose
+  // prompt 必须包含这些字段的约束标记。
+
+  /**
+   * 核心机制 80-150 字：回答"为什么这样设计、内部发生什么、权衡与适用场景"。
+   * 含量化细节（具体数字/量级/百分比），禁止名词罗列或教科书定义。
+   * 与 summary 区别：summary 是一句话指路，coreMechanism 是机制深挖。
+   */
+  coreMechanism?: string;
+
+  /**
+   * 高频踩坑 2-3 条，每条带具体场景与修复方向。
+   * 反例（不合格）："注意性能" / "避免内存泄漏"
+   * 正例（合格）："高频删除导致 HNSW 墓碑节点膨胀，p95 退化 → 定期 reindex 或选 IVF-Flat"
+   */
+  commonPitfalls?: string[];
+
+  /**
+   * 4 题角度提示，对应题目规范四角度（docs/content-generation-standard.md 第 3.1 节）：
+   * 概念辨析 / 原理深挖 / 实战设计 / 踩坑对比，各一句带具体场景感的提示。
+   * 后续 question_generate 会基于这些角度产具体题目。
+   */
+  interviewAngles?: string[];
+
+  /**
+   * 一手来源提示（官方文档/规范/论文/工程博客的名称，不强制 URL，给方向即可）。
+   * 例："MDN Web Docs / Chrome DevTools 团队博客" / "OpenAI Embeddings 文档 + Eugene Yan RAG 实战博客"
+   * 用途：用户验证内容真实性 + 深入学习时的入口，避免"AI 说什么就信什么"。
+   */
+  sourceHint?: string;
 }
 
 // 面试题

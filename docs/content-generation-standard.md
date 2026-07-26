@@ -60,6 +60,31 @@
 面向"前端工程师 → AI 工程师"轨道的内容，每个节点必须有 `frontendBridge`：
 用前端已有心智（缓存/状态机/SSE/组件化/XSS 防御等）类比新概念，降低迁移成本。
 
+### 2.4 深度字段（v4 引入，修复"学习路径浮于表面"投诉）
+
+**背景（2026-07-26 用户投诉）**：旧 `knowledge_decompose` 只产 `summary` 一句话，
+用户看到的学习路径就是"标题列表 + 一句话摘要"，面试官秒淘汰。AI 生成的知识树
+本身不是求职资产，必须点进具体题目才有深度——这是反人类的设计。
+
+**强制要求**：`knowledge_decompose` v4 prompt 必须让每个节点产出 4 个深度字段：
+
+| 字段 | 类型 | 要求 |
+|------|------|------|
+| `coreMechanism` | string | 核心机制 80-150 字，回答"为什么这样设计、内部发生什么、权衡与适用场景"，含量化细节，禁止名词罗列 |
+| `commonPitfalls` | string[] | 高频踩坑 2-3 条，每条带具体场景与修复方向（不是"注意性能"，而是"高频删除导致 HNSW 墓碑膨胀 → 定期 reindex"） |
+| `interviewAngles` | string[4] | 4 题角度提示，对应第 3.1 节四角度各一句，每句含具体场景感 |
+| `sourceHint` | string | 一手来源提示（官方文档/规范/论文/工程博客的名称，不强制 URL） |
+
+**守护**：
+- `__tests__/content-generation-standard.test.ts` 守护 prompt 必须包含这 4 个字段标记
+- `__tests__/preset-content-quality.test.ts` 守护 preset 节点若带这些字段必须达标
+  （coreMechanism >= 50 字符、commonPitfalls >= 2 条、interviewAngles == 4 条、
+   sourceHint >= 5 字符；且要么 4 个都带要么都不带，防"凑数式"部分补充）
+
+**向后兼容**：字段在 `KnowledgeNode` 类型中是可选的（`?`），现有手工 preset
+（frontend/backend/llm-app/ai）的旧节点不带这些字段也能编译通过。AI 新生成的
+节点（v4 prompt）会自带这些字段，自动受守护。后续手工补全 preset 时逐节点补即可。
+
 ---
 
 ## 3. 题目规范（interview question）
@@ -121,7 +146,7 @@
 
 | 生成入口 | 文件 | 注入内容 |
 |----------|------|----------|
-| 知识树拆解 | `lib/ai/prompts.ts` `knowledge_decompose` | 第 2 节（正确性/完整性） |
+| 知识树拆解 | `lib/ai/prompts.ts` `knowledge_decompose` | 第 2 节（正确性/完整性/深度字段） |
 | 题干生成 | `lib/ai/prompts.ts` `question_stem_generate` | 第 3 节（角度/题面质量） |
 | 完整题目生成 | `lib/ai/prompts.ts` `question_generate` | 第 3 + 4 节 |
 | 答案生成 | `lib/ai/prompts.ts` `answer_generate` | 第 4 节 |
