@@ -11946,6 +11946,678 @@ HTTPDNS 解析 ─失败→ 备用 HTTPDNS IP（预埋 IP 直连）
     followUps: ["DoH 和企业内网审计的矛盾怎么解？", "DNS 的 TTL 设置多少合理？"],
     favorited: false,
   },
+  // ===== 计算机基础：操作系统与 Linux（be-230 ~ be-236）=====
+  {
+    id: "be-230",
+    nodeId: "be-os-linux",
+    question: "进程、线程、协程的核心区别？为什么 Go/Java 都在推协程（虚拟线程）？",
+    bigTech: true,
+    answer: `结论：进程是资源分配的最小单位（独立地址空间），线程是 CPU 调度的最小单位（共享进程资源），协程是用户态的轻量线程（由程序自己调度，不陷入内核）。演进方向是「把调度从内核搬到用户态」，用更低的成本支撑更高的并发。
+
+\`\`\`text
+对比表：
+维度        进程                  线程                  协程
+地址空间    独立                  共享进程               共享线程
+切换成本    高(切页表/TLB刷新)    中(内核态切换~1-10μs)  极低(用户态~100ns)
+内存开销    ~MB级                 ~MB级栈(Linux默认8MB)  ~KB级(Go初始2KB/8KB)
+创建上限    千级                  万级                   百万级
+调度者      内核                  内核                   语言运行时(Go GMP/JDK21)
+通信        IPC(管道/共享内存)    共享内存+锁            channel/挂起恢复
+\`\`\`
+
+为什么协程是趋势：互联网服务的瓶颈是 IO 等待不是 CPU——一个线程 99% 时间在等 DB/Redis/下游 RPC。1:1 内核线程模型下，10 万并发就要 10 万线程，光栈内存就 800GB，切换还把 CPU 吃光。协程让「写一个连接一个协程」的同步写法拥有异步的性能。
+
+案例：JDK 21 虚拟线程落地——阿里某网关从 Tomcat 线程池（200 线程扛 200 并发）迁移到 VirtualThreadPerTaskExecutor，单实例并发从 200→10000，代码不用改写成 Reactor 回调地狱。Go 更不用说：字节跳动微服务单实例百万 goroutine 是常态。
+
+\`\`\`java
+// JDK 21 虚拟线程：同步写法，异步性能
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i < 100_000; i++) {
+        executor.submit(() -> {
+            String result = httpClient.send(request, BodyHandlers.ofString()).body();
+            // 阻塞写法，但底层是挂起协程，不占内核线程
+            return result;
+        });
+    }
+}
+\`\`\`
+
+踩坑：虚拟线程里调 synchronized 块或 native 方法会 pin 住载体线程（JDK 21 已部分修复，用 ReentrantLock 替代）；协程泄漏比线程泄漏更隐蔽——goroutine 忘了退出会永久占用内存；CPU 密集型任务用协程没有收益，反而增加调度开销；虚拟线程的 ThreadLocal 滥用会导致内存爆炸（百万协程每个都挂一份）。`,
+    keyPoints: ["进程=资源/线程=调度/协程=用户态轻量线程", "协程让同步写法有异步性能", "JDK21 虚拟线程 200→10000 并发"],
+    followUps: ["Go 的 GMP 调度是怎么抢占协程的？", "虚拟线程下 ThreadLocal 该用什么替代（ScopedValue）？"],
+    favorited: false,
+  },
+  {
+    id: "be-231",
+    nodeId: "be-os-linux",
+    question: "进程间通信（IPC）有哪几种方式？各自适用什么场景？",
+    bigTech: true,
+    answer: `结论：七种主流 IPC——管道、命名管道、消息队列、共享内存、信号量、信号、Socket。选型核心看三点：是否跨机器、数据量大小、是否需要同步机制。
+
+\`\`\`text
+对比表：
+方式        速度    跨机器  数据类型    典型场景
+匿名管道    中      否      字节流      父子进程（shell 的 |）
+命名管道    中      否      字节流      无亲缘进程（MySQL 本地 sock）
+消息队列    中      否      结构化消息  任务分发（SysV/POSIX MQ）
+共享内存    最快    否      任意        大数据量（必须配信号量防竞争）
+信号量      -       否      计数器      不传数据，只做同步互斥
+信号        -       否      编号        异步通知（kill -15 优雅停机）
+Socket      慢      是      字节流      跨机器唯一选择，最通用
+\`\`\`
+
+共享内存为什么最快：其他方式都要「用户态→内核态→用户态」两次拷贝，共享内存让两个进程映射同一块物理页，零拷贝。代价是没有同步机制，必须配合信号量/自旋锁。
+
+案例 1：Chrome 浏览器多进程架构——渲染进程与主进程通信用 Mojo（基于共享内存+消息管道），页面崩溃不拖死浏览器。
+案例 2：Redis 的持久化 fork——父子进程通过管道同步状态；Nginx master/worker 通过 socketpair 传递 listen fd 实现热升级。
+
+\`\`\`c
+// 共享内存 + 信号量（高性能本地 IPC 标配）
+int shmid = shmget(IPC_PRIVATE, 4096, IPC_CREAT | 0666);
+void* addr = shmat(shmid, NULL, 0);   // 映射到本进程地址空间
+// 两个进程 addr 指向同一物理页 → 写入即对方可见（零拷贝）
+// 但必须用 semop() 做 P/V 操作保护临界区
+\`\`\`
+
+\`\`\`text
+选型决策树：
+跨机器？→ 是 → Socket（或上层的 gRPC/MQ）
+└否 → 数据量大？→ 是 → 共享内存+信号量
+     └否 → 要异步通知？→ 是 → 信号
+          └否 → 流式小数据 → 管道/消息队列
+\`\`\`
+
+踩坑：System V 系列 IPC（shmget/msgget）资源不随进程退出自动释放，kill -9 后会泄漏，要用 ipcs/ipcrm 清理；共享内存不写同步就是数据竞争的温床；Socket 本机通信用 unix domain socket 比 127.0.0.1 快一倍（不过协议栈）；信号处理函数里只能调 async-signal-safe 函数，printf 都不是安全的。`,
+    keyPoints: ["共享内存最快但要自配同步", "Socket 唯一跨机器方案", "SysV IPC 会泄漏要 ipcrm"],
+    followUps: ["unix domain socket 为什么比 loopback 快？", "mmap 能不能当 IPC 用？"],
+    favorited: false,
+  },
+  {
+    id: "be-232",
+    nodeId: "be-os-linux",
+    question: "虚拟内存是什么？分页机制和页面置换算法（LRU/FIFO/Clock）怎么工作？",
+    bigTech: true,
+    answer: `结论：虚拟内存给每个进程一个独立的、连续的虚拟地址空间，由 MMU 硬件+页表映射到物理内存。三大价值：进程隔离（A 崩了不影响 B）、超分配（物理 8G 跑总量 20G 的进程）、按需调页（只把用到的页加载进内存）。
+
+分页机制：
+- 虚拟地址 = 页号 + 页内偏移（页通常 4KB，大页 2MB/1GB）
+- CPU 查 TLB（页表缓存，~几十项），miss 则走多级页表（x86_64 四级，每级 512 项）
+- 页表项含：物理页框号、存在位、读写权限位、脏位、访问位（置换算法用）
+
+页面置换算法对比：
+\`\`\`text
+算法    原理                          优点        缺点
+OPT     置换未来最久不用(理论最优)     下界基准    无法实现
+FIFO    置换最早进入的                简单        Belady异常(帧多反而缺页多)
+LRU     置换最久未使用                接近最优    严格实现要链表+每访问都调整，太贵
+Clock   LRU近似：环形扫描访问位       开销低      精度略降
+LFU     置换使用次数最少              抗偶发      老热点赖着不走（要老化机制）
+\`\`\`
+
+Clock（第二次机会）算法：所有页排成环形，指针扫到访问位=1 就清 0 给第二次机会，扫到 0 就置换。Linux 的 LRU 实际是「活跃/不活跃双链表 + 访问位」的近似 Clock。
+
+案例：MySQL InnoDB Buffer Pool 的 LRU 魔改——原生 LRU 遇到全表扫描会把热点页全挤出去（缓存污染）。InnoDB 把链表分 young 5/8 + old 3/8，新页先插 old 区头部，且 old 区页被访问后要间隔 innodb_old_blocks_time（默认 1s）再次访问才升 young——全表扫描的大批页面只被读一次，永远留在 old 区被淘汰，热点页不受影响。
+
+\`\`\`bash
+# 观察系统内存与换页（si/so 持续非 0 = 内存在换页抖动）
+vmstat 1
+# procs -----------memory----------  ---swap--
+#  r  b   swpd   free   buff  cache   si   so
+#  2  0      0  1024M   512M  4.2G     0    0
+
+# 查看某进程的页错误（major fault = 要从磁盘调页，贵）
+ps -o maj_flt,min_flt -p <pid>
+\`\`\`
+
+踩坑：swap 开启时 Redis/JVM 堆被换出到磁盘会造成毫秒级毛刺，生产数据库/缓存服务器建议 swapoff 或 swappiness=1；TLB miss 在高频页表切换（大量进程切换）时显著，大页内存（HugePage）能减少页表层级，Oracle/RocksDB 都要求开；Belady 异常只有 FIFO 有，LRU/Clock 是栈式算法不会。`,
+    keyPoints: ["虚拟内存=隔离+超分配+按需调页", "LRU 太贵用 Clock 近似", "InnoDB young/old 分区防缓存污染"],
+    followUps: ["为什么 Redis 生产环境建议关 swap？", "大页内存对 JVM 有什么收益？"],
+    favorited: false,
+  },
+  {
+    id: "be-233",
+    nodeId: "be-os-linux",
+    question: "用户态和内核态的区别？一次系统调用到底有多贵？上下文切换的成本在哪？",
+    bigTech: true,
+    answer: `结论：CPU 分特权级（x86 的 Ring0 内核/Ring3 用户），用户程序要访问硬件/内存管理/进程调度必须通过系统调用陷入内核。一次系统调用的直接成本约 100ns~1μs（模式切换+参数校验），真正的贵在于「附带伤害」：缓存污染、TLB 刷新、潜在调度。
+
+系统调用全过程（以 read() 为例）：
+1. 用户态：参数压栈/寄存器，执行 syscall 指令
+2. CPU 切到内核态，查系统调用表跳到 sys_read
+3. 内核校验参数（指针是否合法、fd 是否有效）
+4. 执行（可能触发磁盘 IO、进程睡眠等待）
+5. 结果写回，iret 返回用户态
+
+\`\`\`text
+数量级感受（本机操作耗时）：
+L1 缓存            1ns
+主存              100ns
+系统调用(纯)      100ns-1μs
+上下文切换        1-10μs
+SSD 随机读        100μs
+同机房 RPC        500μs
+机械盘寻道        10ms
+跨太平洋网络      150ms
+→ 系统调用本身不贵，但如果你把它放在百万 QPS 的热路径上就很贵
+\`\`\`
+
+上下文切换的真正成本：
+1. 直接：保存/恢复寄存器、栈指针、程序计数器
+2. 间接（大头）：CPU 缓存失效——新线程的代码/数据不在 L1/L2，前几百 ns 全是缓存 miss；切进程还要刷 TLB（页表变了）
+
+案例：某电商秒杀服务 QPS 一高 CPU sys 占用 40%+（正常应 <10%）。strace 发现每次请求都 new Thread()，千级线程疯狂上下文切换。改线程池后 sys 降到 8%。另一个反例：Netty 的 EventLoop 把「连接数:线程数」做成 N:1，几万连接共用 16 个线程，几乎无切换——这就是 IO 多路复用省下的切换成本。
+
+\`\`\`bash
+# 查看上下文切换频率（cs 列，万级/秒就要警惕）
+vmstat 1
+# 单进程级别的自愿/非自愿切换
+pidstat -w -p <pid> 1
+# 追踪系统调用分布（排查 sys 高的神器）
+strace -c -p <pid>
+\`\`\`
+
+减少陷入的经典手段：vDSO（gettimeofday 不陷入内核）、io_uring（批量提交 IO，一次 syscall 干 32 件事）、sendfile 零拷贝（数据不出内核）、批量读写（readv/writev）。
+
+踩坑：sys CPU 高先 strace -c 看是什么调用在烧，别上来就调线程数；Java 的 Object.wait/notify 底层是 futex 系统调用，竞争激烈时 futex 风暴；容器里 pidstat 看到的是宿主机的视图，要看 cgroup 维度；虚拟化环境下 syscall 还有一层 hypervisor 开销。`,
+    keyPoints: ["系统调用 100ns-1μs+缓存附带伤害", "上下文切换大头是缓存/TLB 失效", "strace -c 是 sys 高第一排查工具"],
+    followUps: ["io_uring 为什么比 epoll 还能省？", "Java 的 futex 风暴怎么定位？"],
+    favorited: false,
+  },
+  {
+    id: "be-234",
+    nodeId: "be-os-linux",
+    question: "死锁产生的四个必要条件？如何预防和排查？给出一个真实的代码死锁案例。",
+    bigTech: true,
+    answer: `结论：死锁四条件缺一不可——互斥、持有并等待、不可剥夺、循环等待。破解任一条即可预防：破「循环等待」用固定顺序加锁（最常用），破「持有并等待」用一次性申请，破「不可剥夺」用 tryLock 超时退让。
+
+真实案例：转账系统经典死锁——
+\`\`\`java
+// 反例：两个线程按相反顺序加两把锁
+void transfer(Account from, Account to, int amount) {
+    synchronized (from) {        // 线程A锁甲账户
+        synchronized (to) {      // 线程B已锁乙账户，等甲 → 循环等待!
+            from.withdraw(amount);
+            to.deposit(amount);
+        }
+    }
+}
+// 线程A: lock(甲) → 等 lock(乙)
+// 线程B: lock(乙) → 等 lock(甲)   = 死锁
+
+// 正例 1：固定顺序（按账户 id 排序，破循环等待）
+void transfer(Account from, Account to, int amount) {
+    Account first = from.id < to.id ? from : to;
+    Account second = from.id < to.id ? to : from;
+    synchronized (first) {
+        synchronized (second) { /* 转账 */ }
+    }
+}
+
+// 正例 2：tryLock 超时退让（破不可剥夺）
+while (!done) {
+    if (from.lock.tryLock(100, MILLISECONDS)) {
+        try {
+            if (to.lock.tryLock(100, MILLISECONDS)) {
+                try { /* 转账 */ done = true; }
+                finally { to.lock.unlock(); }
+            }
+        } finally { from.lock.unlock(); }
+    }
+    Thread.sleep(random(50));  // 随机退避防活锁
+}
+\`\`\`
+
+排查实战（JVM 为例）：
+\`\`\`bash
+# 1. jstack 直接报死锁（Found one Java-level deadlock）
+jstack <pid> | grep -A 20 "deadlock"
+# 2. Arthas 一键定位（哪个线程 BLOCKED 在哪个锁上）
+thread -b
+# 3. 数据库死锁：InnoDB 自动检测并回滚代价小的事务
+SHOW ENGINE INNODB STATUS\\G  # 看 LATEST DETECTED DEADLOCK
+\`\`\`
+
+MySQL 死锁案例：两个事务都执行「UPDATE account SET balance=balance-100 WHERE id IN (1,2)」，但 WHERE 命中顺序不同（一个先锁 id=1 一个先锁 id=2）→ 行锁循环等待。修复：所有多行更新统一 ORDER BY 主键后按序加锁。
+
+\`\`\`text
+预防清单（评审 Checklist）：
+□ 全局加锁顺序文档化（锁编号，禁止逆序）
+□ 锁粒度最小化（锁内不调 RPC/不做 IO）
+□ 锁必须带超时（tryLock/SELECT ... FOR UPDATE NOWAIT）
+□ 开放调用（锁内调用外部方法）一律禁止——外部方法可能回来拿同一把锁
+\`\`\`
+
+踩坑：synchronized 锁内调用 RPC 是分布式死锁温床——本机锁没事，但锁住的线程等下游，下游又在等这台机器释放资源；tryLock 退让循环要加随机退避，否则两个线程同步退让同步重试形成活锁（活锁不是死锁，CPU 在跑但没进展）；数据库连接池+锁混用时，「锁内等连接、连接持有者在锁外等锁」也会死锁。`,
+    keyPoints: ["四条件缺一不可", "固定顺序加锁破循环等待", "jstack/Arthas thread -b 定位"],
+    followUps: ["活锁和饥饿怎么区分？", "分布式锁会不会死锁？怎么防？"],
+    favorited: false,
+  },
+  {
+    id: "be-235",
+    nodeId: "be-os-linux",
+    question: "线上服务器 CPU 负载飙高，你的完整排查流程是什么？（top/vmstat/iostat 实战）",
+    bigTech: true,
+    answer: `结论：标准动线「load 高 → 看 CPU 分类（us/sy/wa）→ 定位进程 → 定位线程 → 定位代码」。load 高 ≠ CPU 忙，也可能是 IO 等待（D 状态进程堆起来的）。
+
+第一步：总览
+\`\`\`bash
+uptime   # load average: 3.5 2.1 1.0（1/5/15分钟，看趋势）
+top      # 关注 us(用户态) sy(内核态) wa(IO等待) st(虚拟化被抢) 
+\`\`\`
+
+第二步：按 CPU 分布分流——
+\`\`\`text
+us 高（用户态计算）：业务代码在烧 CPU
+  → top -H 找高耗线程 → printf %x 转 16 进制 → jstack 找 nid 对应栈
+sy 高（内核态）：系统调用/切换过多
+  → strace -c -p <pid> 看什么调用在烧；vmstat 1 看 cs 上下文切换
+wa 高（IO 等待）：磁盘/网络存储瓶颈
+  → iostat -x 1 看 %util 和 await；iotop 找具体进程
+st 高（>5%）：虚拟机被宿主机超售抢走 CPU，找运维换机
+\`\`\`
+
+第三步：Java 进程 CPU 100% 定位到代码行——
+\`\`\`bash
+top -H -p <pid>                    # 找到 tid=12345 的线程 99%
+printf "%x\\n" 12345                # → 3039
+jstack <pid> | grep -A 30 "nid=0x3039"
+# 典型凶手：正则回溯、大对象序列化、HashMap 死循环(JDK7)、GC 线程
+\`\`\`
+
+案例：美团订单服务凌晨 CPU 100%——jstack 显示 200 个线程全在一个 JSON 反序列化栈上。根因：上游把 2MB 的订单快照整个塞进消息体，fastjson 解析大对象时产生海量临时对象+深递归。修复：消息体瘦身只传 id+版本，详情回源 DB，CPU 降到 15%。
+
+另一种形态：CPU 不高但 load 高——
+\`\`\`bash
+ps aux | awk '$8 ~ /^D/ {print}'   # 找 D 状态（不可中断睡眠）进程
+# 全是 D 状态等 NFS/磁盘 → load 高但 CPU 空闲 → 是 IO 问题不是计算
+\`\`\`
+
+\`\`\`bash
+# 内存也一起看了（free 的 available 才是真实可用，buff/cache 可回收）
+free -h
+iostat -x 1 3    # %util 接近 100% = 盘满了；await 高 = 响应慢
+\`\`\`
+
+踩坑：load 包含 D 状态进程，容器里 top 看到的 load 是宿主机的，要看 cgroup 的 cpu.stat；CPU 100% 的第一嫌疑永远是 GC——先看 jstat -gcutil 1s 排除 Full GC 再查业务；pidstat -t 比 top -H 更能看线程全貌；短时毛刺用 atop 录制回放，否则重启后现场全丢。`,
+    keyPoints: ["load 高≠CPU 忙，可能 IO/D 状态", "us/sy/wa/st 四分类定方向", "top -H + jstack nid 定位代码行"],
+    followUps: ["CPU 不高但 RT 毛刺怎么查（gc/锁/定时任务）？", "容器环境 CPU 排查有什么不同？"],
+    favorited: false,
+  },
+  {
+    id: "be-236",
+    nodeId: "be-os-linux",
+    question: "什么是僵尸进程和孤儿进程？fork 的写时拷贝（COW）机制是什么？",
+    bigTech: true,
+    answer: `结论：僵尸进程是「子进程已退出但父进程没 wait() 收尸」，残留 PCB 占 PID；孤儿进程是「父进程先退出，子进程被 init/systemd（PID 1）收养」，无害。fork 的 COW 让父子进程初始共享物理页，只读不写零拷贝，写时才复制——这是 Redis BGSAVE 和 Linux 高效创建进程的根基。
+
+僵尸进程的产生与处理：
+\`\`\`c
+pid_t pid = fork();
+if (pid == 0) { exit(0); }      // 子进程立即退出
+// 父进程不调 wait()/waitpid() → 子进程变 Z（zombie）
+\`\`\`
+\`\`\`bash
+ps aux | grep ' Z '    # STAT=Z 的就是僵尸
+# 处理：杀父进程（僵尸被 init 收养并回收）；根治：父进程注册 SIGCHLD 处理器 wait
+\`\`\`
+
+案例：某 Java 服务用 Runtime.exec() 调 shell 脚本做数据导出，脚本退出后 Process 对象没 destroy()/waitFor()，一个月堆了 3000 个僵尸，PID 耗尽（默认 32768）导致无法 fork 任何新进程，SSH 都登不上。修复：代码里 waitFor + 超时销毁，运维侧加 zombie 数监控。
+
+fork 的 COW 机制：
+1. fork() 时子进程只复制页表（虚拟地址），物理页与父进程共享，标记只读
+2. 任一方写某页 → 触发缺页异常 → 内核复制该页 → 各自独立
+3. 效果：fork 本身 O（页表大小） 极快，内存只按「实际修改的页」增长
+
+COW 的真实威力——Redis BGSAVE：
+\`\`\`text
+Redis 主进程 fork 子进程做 RDB 快照：
+- fork 瞬间：子进程共享主进程全部内存页（10GB 数据也不复制）
+- 快照期间：主进程继续服务，写命令触发 COW 只复制被改的页
+- 风险窗口：快照期间写入越猛，COW 复制的页越多
+  极端情况（全量重写一遍）内存翻倍 → OOM
+\`\`\`
+
+案例：阿里 Redis 大促容量规划——32GB 实例做 RDB 时预留 50% 空闲内存给 COW，且避开高峰做快照；某次没避开，双 11 零点 BGSAVE 撞上写入洪峰，COW 复制 28GB，触发 OOM Killer 把 Redis 杀了。教训：大内存实例用「从节点快照」或 AOF 替代。
+
+踩坑：fork 多线程进程时子进程只继承调用线程，其他线程的锁状态可能死锁（glibc 用 pthread_atfork 保护）；Java 的 fork+exec 大内存进程会因 commit 内存超 VM 限制失败，要用 posix_spawn；僵尸进程杀不死（它已经死了），只能杀它爹；容器里 PID 1 是你的应用进程时，它不回收僵尸——需要 tini/dumb-init 当 PID 1。`,
+    keyPoints: ["僵尸=父没收尸，杀父解决", "COW=共享只读页，写时复制", "Redis BGSAVE 内存翻倍风险"],
+    followUps: ["为什么容器需要 tini 做 PID 1？", "vfork/clone 和 fork 什么区别？"],
+    favorited: false,
+  },
+  // ===== 计算机基础：IO 模型（be-237 ~ be-243）=====
+  {
+    id: "be-237",
+    nodeId: "be-io-model",
+    question: "五种 IO 模型（阻塞/非阻塞/多路复用/信号驱动/异步）的区别？同步和异步的真正分界线在哪？",
+    bigTech: true,
+    answer: `结论：一次 IO 分两个阶段——「等数据就绪」（网卡→内核缓冲区）和「拷贝数据」（内核→用户态）。前四种模型第二阶段都阻塞（所以都是同步 IO），只有异步 IO（AIO）两阶段都不阻塞——这是同步/异步的唯一分界线。
+
+\`\`\`text
+五种模型对比：
+模型          等数据就绪        拷贝数据        一句话
+阻塞 BIO       阻塞             阻塞           傻瓜式，一连接一线程
+非阻塞 NIO     轮询(忙等)        阻塞           自己轮询费 CPU
+多路复用       阻塞在epoll_wait   阻塞           一个线程管万连接（主流）
+信号驱动       信号通知(不阻塞)   阻塞           信号处理复杂，少用
+异步 AIO       不阻塞            不阻塞(内核拷完回调)  真异步，Linux 不成熟
+\`\`\`
+
+关键认知：select/poll/epoll 都是同步 IO——epoll_wait 只告诉你「就绪了」，read 拷贝阶段还是你自己阻塞完成。POSIX 定义里只有 aio_read 系列才是异步。
+
+演进主线：BIO 一连接一线程（C10K 瓶颈：1万线程×8MB栈=80GB）→ NIO 非阻塞忙轮询（CPU 100% 空转）→ 多路复用把「谁就绪」的检查交给内核 → 一个线程处理万级连接。
+
+案例：Nginx 用 epoll 多路复用+少量 worker（=CPU 核数），单机扛 10 万并发连接；而传统 Apache 的 prefork 一连接一进程，1 万连接就内存爆炸。这就是 2005 年 Nginx 靠 IO 模型代差干掉 Apache 的故事。
+
+\`\`\`java
+// Java NIO Selector（多路复用的 Java 形态）
+Selector selector = Selector.open();
+ServerSocketChannel server = ServerSocketChannel.open();
+server.configureBlocking(false);
+server.register(selector, OP_ACCEPT);
+while (true) {
+    selector.select();               // 阻塞直到有事件（底层 epoll_wait）
+    for (SelectionKey key : selector.selectedKeys()) {
+        if (key.isAcceptable()) { /* 注册读事件 */ }
+        else if (key.isReadable()) { /* read 还是同步拷贝 */ }
+    }
+}
+\`\`\`
+
+踩坑：Java 的 NIO.2（AsynchronousSocketChannel）在 Linux 底层还是 epoll 模拟的「伪异步」，Windows 上才是真 IOCP；io_uring（Linux 5.1+）才是真异步 IO 的方向，Netty/Redis 都在接入；多路复用只是省了「等」的成本，业务处理慢照样要配 worker 线程池，Redis 6 引入多线程处理 IO 也是这个思路。`,
+    keyPoints: ["分界线=拷贝阶段是否阻塞", "epoll 仍是同步 IO", "io_uring 是真异步方向"],
+    followUps: ["Redis 单线程为什么还这么快？", "io_uring 和 epoll 的性能对比实测？"],
+    favorited: false,
+  },
+  {
+    id: "be-238",
+    nodeId: "be-io-model",
+    question: "select、poll、epoll 的底层区别？epoll 为什么能支撑百万连接？",
+    bigTech: true,
+    answer: `结论：三者都是 IO 多路复用，差异在「如何管理监控的 fd 集合」。select 有 1024 上限+每次全量拷贝+O(n) 遍历；poll 去掉上限但仍是全量拷贝 O(n)；epoll 用红黑树管理 fd、就绪链表返回、回调机制 O(1)，且 fd 集合常驻内核不用每次拷贝。
+
+\`\`\`text
+对比表：
+维度        select               poll                epoll
+fd 上限     1024(FD_SETSIZE)     无                   无（百万级）
+数据结构    位图                 数组                 红黑树(全量)+就绪链表
+每次调用    全量 fd 从用户态      同左                 epoll_ctl 注册一次，
+            拷贝到内核                                 内核常驻
+返回方式    遍历所有 fd 找就绪    同左 O(n)            只返回就绪的 O(1)
+触发方式    水平触发             水平触发             LT+ET 边缘触发
+\`\`\`
+
+epoll 三大系统调用：
+\`\`\`c
+int epfd = epoll_create1(0);                    // 建红黑树
+epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &event); // 注册 fd（只此一次拷贝）
+int n = epoll_wait(epfd, events, maxevents, timeout); // 只拿就绪链表
+\`\`\`
+
+epoll 高效的三板斧：
+1. fd 集合常驻内核：select 每次调用都把 1000 个 fd 的位图拷贝进内核，epoll_ctl 注册一次永久生效
+2. 就绪回调：网卡中断→协议栈→epoll 注册的回调把 fd 挂进就绪链表，epoll_wait 直接摘链表，不用遍历全部
+3. mmap 共享（早期实现）+ 按需返回：用户态和内核共享事件数组，返回的就绪事件数远小于总 fd 数
+
+案例：单机百万连接的实测——8GB 内存跑 epoll，100 万连接（每个连接内核缓冲区+应用状态约 4KB）轻松hold住；同样场景 select 直接死在 FD_SETSIZE=1024 的硬限制上，poll 则在 epoll_wait 等价的每次遍历中把 CPU 烧光（100 万 fd 全量遍历一次 10ms+，QPS 根本上不去）。
+
+\`\`\`text
+什么时候 epoll 也没优势：
+连接少（<1000）且每个都很活跃 → 全量遍历的 O(n) 和就绪 O(1) 差别不大
+epoll 的优势区间 = 海量连接 + 稀疏活跃（IM/推送/网关的典型特征）
+\`\`\`
+
+踩坑：epoll_create 的 size 参数在现代内核已被忽略（历史遗留）；EPOLLONESHOT 用于多线程下防止同一 fd 事件被多个线程并发处理；fd 关闭后记得 epoll_ctl DEL，重用 fd 编号会导致幽灵事件；容器里 strace 看 Java Netty 就是 epoll_wait 循环，别误以为是 bug。`,
+    keyPoints: ["select 1024 上限/poll 无上限仍 O(n)", "epoll 红黑树+就绪链表+回调 O(1)", "优势区间=海量连接稀疏活跃"],
+    followUps: ["epoll 的就绪链表会不会丢事件？", "kqueue（FreeBSD）和 epoll 谁更强？"],
+    favorited: false,
+  },
+  {
+    id: "be-239",
+    nodeId: "be-io-model",
+    question: "epoll 的 LT（水平触发）和 ET（边缘触发）区别？为什么 Nginx/Netty 高性能场景选 ET？",
+    bigTech: true,
+    answer: `结论：LT 是「只要缓冲区还有数据就一直通知你」，ET 是「状态变化的那一下才通知你」。ET 减少了 epoll_wait 唤醒次数（性能高），但要求每次必须把数据读完（且 fd 必须非阻塞），否则剩余数据再也收不到通知——这是 ET 最大的坑。
+
+\`\`\`text
+直观类比（快递柜）：
+LT：柜里有包裹就每天发短信催你，直到取完
+ET：只有新包裹入柜那一刻发一次短信；你没取完，后续不再提醒
+
+行为对比：
+场景：收到 10KB 数据，应用每次只 read 2KB
+LT：每次 epoll_wait 都返回该 fd → 读 5 次，触发 5 次
+ET：只在数据到达瞬间触发 1 次 → 必须循环 read 到 EAGAIN
+\`\`\`
+
+ET 的正确姿势（必须同时满足）：
+\`\`\`c
+// 1. fd 必须设为非阻塞（否则最后一次 read 阻塞，整个 EventLoop 卡死）
+fcntl(sockfd, F_SETFL, O_NONBLOCK);
+// 2. 注册 ET 模式
+event.events = EPOLLIN | EPOLLET;
+epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &event);
+// 3. 读必须循环到 EAGAIN（一次性读干）
+while (true) {
+    n = read(sockfd, buf, sizeof(buf));
+    if (n < 0 && errno == EAGAIN) break;  // 读完了
+    if (n <= 0) { /* 关闭 */ break; }
+    process(buf, n);
+}
+\`\`\`
+
+为什么高性能选 ET：
+1. 唤醒次数少：LT 下大数据量要「wait→read→wait→read」反复，ET 一次 wait 循环读完
+2. 避免惊群：ET 只在事件变化时触发，多线程 epoll_wait 场景下唤醒更可控（配合 EPOLLONESHOT）
+3. Nginx 的选择：Nginx 默认 ET——worker 进程拿到事件后必须一次性把请求处理完，配合它的事件驱动架构天衣无缝
+
+案例：Netty 在 Linux 的 EpollEventLoop 支持 ET 模式（epollEdgeTriggered），美团长连接网关实测开启后 epoll_wait 系统调用次数下降 60%，单机 50 万长连接的 CPU 从 70% 降到 45%。
+
+\`\`\`text
+选型建议：
+LT（默认）：编程简单不易错，业务系统首选
+ET：极致性能（网关/代理/长连接），但必须「非阻塞 fd + 读到 EAGAIN」
+     少一步都是 P0 事故
+\`\`\`
+
+踩坑：ET 模式忘了循环读到 EAGAIN——剩 500 字节在缓冲区，客户端等响应永远不来，超时重发又堆在缓冲区，雪崩；ET 模式 fd 设成阻塞是自杀行为（最后一次 read 卡住整个 Reactor）；ET 下 listen socket 也要循环 accept 到 EAGAIN，否则新连接积压在 backlog；Libevent/Netty 默认 LT 是为了通用性，框架级组件才开 ET。`,
+    keyPoints: ["LT 有数据就通知/ET 变化才通知", "ET 必须非阻塞+读到 EAGAIN", "Nginx 默认 ET/Netty 可开 ET"],
+    followUps: ["EPOLLONESHOT 解决什么并发问题？", "epoll 惊群问题在现代内核怎么解决的？"],
+    favorited: false,
+  },
+  {
+    id: "be-240",
+    nodeId: "be-io-model",
+    question: "什么是零拷贝？sendfile/mmap/splice 三种实现有什么区别？Kafka 为什么靠它起飞？",
+    bigTech: true,
+    answer: `结论：零拷贝（Zero-Copy）指数据不经过用户态、在内核空间直接完成「磁盘→网络」的搬运，消除冗余拷贝和上下文切换。传统 read+write 要 4 次拷贝+4 次上下文切换，sendfile 优化到 2 次拷贝+2 次切换，支持 scatter-gather 的网卡甚至 1 次拷贝。
+
+传统方式的 4 次拷贝：
+\`\`\`text
+read(file, buf):  磁盘 --DMA--> 内核页缓存 --CPU--> 用户态 buf（2次）
+write(sock, buf): 用户态 buf --CPU--> socket缓冲区 --DMA--> 网卡（2次）
++ 4 次用户/内核态切换
+\`\`\`
+
+三种零拷贝实现：
+\`\`\`text
+方式       原理                              拷贝次数   局限
+sendfile   内核直接 文件页缓存→socket缓冲区   2(带SG-DMA:1)  数据不可修改
+mmap+write 文件映射到用户地址空间，省CPU拷贝    3           小文件映射开销不划算
+splice     管道在两个内核缓冲区间搬数据        2           要求一端是管道
+\`\`\`
+
+\`\`\`java
+// Java 里用 FileChannel.transferTo（底层就是 sendfile）
+FileChannel fileChannel = FileChannel.open(path);
+SocketChannel socketChannel = ...;
+fileChannel.transferTo(0, fileChannel.size(), socketChannel);
+// 数据全程不出内核：磁盘→页缓存→socket缓冲区→网卡
+\`\`\`
+
+Kafka 的案例（教科书级应用）：消费者拉取消息 = 从磁盘读日志段文件发到网络。传统方式每条消息走用户态，Broker CPU 被拷贝吃满；Kafka 用 sendfile 后——
+- 消息从页缓存直接到网卡，用户态零参与
+- 配合「页缓存命中」（写最近的数据马上被读，全在内存）+ 顺序写日志
+- 效果：单机 10 万 EPS，网络打满而 CPU 只用 20%——「用 O(1) 的磁盘跑出了内存的速度」
+
+对比 RocketMQ 的选择：用 mmap（MappedByteBuffer）把 CommitLog 映射进内存，因为 RocketMQ 要在 Broker 侧解析消息做过滤（tag/SQL92），数据必须进用户态——所以 mmap 省掉一次拷贝更合适，而不是 sendfile。
+
+\`\`\`text
+零拷贝选型：
+纯转发（下载/消息队列消费）→ sendfile/transferTo
+要在应用层处理数据（过滤/修改）→ mmap
+大文件 + 高带宽场景 → 都零拷贝，瓶颈在网卡
+小数据 + 高频次 → 零拷贝收益小，直接 read/write
+\`\`\`
+
+踩坑：sendfile 传输加密数据（TLS）会失效——加密必须在用户态做，所以 HTTPS 下载服务享受不到零拷贝（除非 kTLS 内核态 TLS）；mmap 对超大文件（TB 级）映射会占满虚拟地址空间（64 位没事，32 位死）；transferTo 在某些 JDK 版本对 >2GB 文件有 bug 要分段；零拷贝不省 CPU 的「协议处理」开销，别把一切慢都归咎于拷贝。`,
+    keyPoints: ["4 次拷贝→sendfile 2 次（SG-DMA 1 次）", "Kafka 消费用 sendfile 是起飞关键", "TLS 场景零拷贝失效（除非 kTLS）"],
+    followUps: ["RocketMQ 为什么选 mmap 而不是 sendfile？", "io_uring 的零拷贝又是什么玩法？"],
+    favorited: false,
+  },
+  {
+    id: "be-241",
+    nodeId: "be-io-model",
+    question: "Reactor 三种线程模型（单线程/多线程/主从）？Netty 用的是哪种，为什么？",
+    bigTech: true,
+    answer: `结论：Reactor 模式 = 「事件分发器（IO 多路复用）+ 事件处理器池」。单线程版 Redis 用，多线程版引入业务线程池，主从版把 accept 和 IO 读写拆到两组线程——Netty 用主从 Reactor，因为 accept 无竞争、IO 读写负载均衡，单机百万连接的标配。
+
+\`\`\`text
+三种模型对比：
+模型          结构                                  优点        缺点       代表
+单Reactor单线程 1个线程干全部(accept+read+业务+write) 无并发竞争   慢任务堵全局  Redis
+单Reactor多线程 IO线程+业务线程池                     IO不阻塞    单Reactor扛不住海量accept Memcached
+主从Reactor    MainReactor只管accept，
+               SubReactor池管IO读写+业务池           全链路无瓶颈 复杂       Netty/Nginx
+\`\`\`
+
+单线程版（Redis 6 之前）：
+\`\`\`text
+epoll_wait → 就绪事件 → 顺序处理（读→解析→执行→写回）
+为什么快：内存操作 100ns 级，单线程无锁无切换，
+         瓶颈在网络不在 CPU → 单线程足够 10 万 QPS
+什么时候死：执行 O(n) 命令（KEYS */大 SMEMBERS）→ 全库卡住
+\`\`\`
+
+主从版（Netty 标准写法）：
+\`\`\`java
+EventLoopGroup bossGroup = new NioEventLoopGroup(1);    // MainReactor：只管 accept
+EventLoopGroup workerGroup = new NioEventLoopGroup();   // SubReactor：CPU×2 个，管 IO
+ServerBootstrap b = new ServerBootstrap();
+b.group(bossGroup, workerGroup)
+ .channel(NioServerSocketChannel.class)
+ .childHandler(new ChannelInitializer<SocketChannel>() {
+     protected void initChannel(SocketChannel ch) {
+         ch.pipeline().addLast(new BusinessHandler());
+     }
+ });
+// accept 到的连接轮询注册到 workerGroup 的 EventLoop 上
+// 一个连接绑定一个 EventLoop 终身 → 无锁串行化，单连接内不用同步
+\`\`\`
+
+Netty 的精妙之处：
+1. EventLoop 与线程 1:1，Channel 与 EventLoop N:1——单连接的所有 IO 串行执行，业务代码不用加锁
+2. 耗时的业务（DB/RPC）必须扔到独立业务线程池，否则堵住同 EventLoop 上其他 6 万个连接
+3. Nginx 是同样思路：master（管理）+ worker（=CPU 核数，各自独立 accept_mutex/EPOLLEXCLUSIVE 抢连接）
+
+案例：钉钉消息网关单实例 100 万长连接——boss 1 线程 accept，worker 32 线程（16 核×2），每个 EventLoop 挂 3 万+连接；业务处理（消息路由/存储写）全走独立线程池，IO 线程只做编解码+转发，P99 延迟 <10ms。
+
+踩坑：把 DB 查询写进 Netty 的 IO 线程是新手第一宗罪——一个慢 SQL 堵死 3 万连接；worker 线程数不是越多越好，纯 IO 场景 CPU×2 足够，加多了全是切换开销；boss 线程挂了不会自动重连 accept，生产要监控；Channel 跨 EventLoop 迁移（如重连后）要重新注册，状态同步是高级坑。`,
+    keyPoints: ["单线程=Redis/多线程=Memcached/主从=Netty+Nginx", "Netty 单连接绑定单 EventLoop 免锁", "慢业务必须扔独立线程池"],
+    followUps: ["Proactor 模式和 Reactor 什么区别（AIO）？", "Netty 的 EventLoop 如何做到无锁串行？"],
+    favorited: false,
+  },
+  {
+    id: "be-242",
+    nodeId: "be-io-model",
+    question: "阻塞/非阻塞、同步/异步，这两组概念到底怎么区分？（面试官的送命题）",
+    bigTech: true,
+    answer: `结论：这是两个正交维度——「阻塞/非阻塞」描述的是调用发起后线程是否挂起（等待时的姿态）；「同步/异步」描述的是结果由谁「取」：同步=调用方自己等待/轮询拿结果，异步=被调方完成后主动通知（回调/信号）。排列组合出四种形态。
+
+\`\`\`text
+四象限（以「去银行办业务」类比）：
+                同步                          异步
+阻塞   同步阻塞：窗口排队干等              异步阻塞：取了号坐着等广播
+       read() 默认                         （罕见，设计失误）
+非阻塞 同步非阻塞：隔5分钟去问一次         异步非阻塞：办完短信通知你
+       read() + O_NONBLOCK 轮询            AIO callback / 消息队列
+\`\`\`
+
+关键点：Linux 的 epoll 属于「同步非阻塞」——epoll_wait 告诉你就绪了，但 read 拷贝数据还是你自己干的（自己取结果=同步）。只有 IOCP（Windows）/io_uring 的完成队列才是「异步」——数据内核帮你拷好，通知你直接拿去用。
+
+\`\`\`text
+语言/框架映射：
+Java BIO              同步阻塞
+Java NIO (Selector)   同步非阻塞（多路复用本质还是同步）
+Java NIO.2 (AIO)      异步（Linux 下是 epoll 模拟，伪异步）
+Node.js               同步非阻塞 epoll + 事件循环回调（异步语法糖）
+Go netpoller          同步非阻塞 epoll，但用 goroutine 包装成「同步写法」
+io_uring              真异步（内核完成队列）
+\`\`\`
+
+案例：Go 的哲学——「用同步的写法获得异步的性能」。goroutine 调 net.Conn.Read() 看似同步阻塞，底层是 netpoller 把 fd 注册进 epoll，goroutine 挂起（G 离开 M），数据就绪后调度器再唤醒 goroutine。程序员写的是最简单的同步代码，运行时干的是 epoll 的活。对比 Node.js：同样的 epoll，但程序员要手写 callback/async 处理异步心智负担。
+
+面试答法（反套路加分）：不要背「同步=阻塞、异步=非阻塞」这个常见错误，直接给分界线：
+- 判断阻塞看「线程状态」
+- 判断同步看「结果的获取方」
+- 然后补一句：epoll/AIO/select 全是同步 IO，POSIX 标准里只有 aio_* 系列算异步，但 Linux 的 aio 只支持文件（且是 glibc 用线程池模拟的），真异步看 io_uring。
+
+踩坑：Java 的 Future.get() 是「异步发起+同步等待」的混合体，get 的那一刻回到同步阻塞；Reactor/WebFlux 全链路异步要求每一环都非阻塞，中间夹一个 JDBC 同步调用就全盘皆输；Python 的 asyncio 同理，await 链里调 requests.get() 会把事件循环卡死（要用 aiohttp）。`,
+    keyPoints: ["阻塞看线程姿态/同步看结果获取方", "epoll 是同步非阻塞", "Go 用同步写法跑异步性能"],
+    followUps: ["Future/Promise 算什么模式？", "Reactor 全链路异步被 JDBC 卡住怎么救（虚拟线程）？"],
+    favorited: false,
+  },
+  {
+    id: "be-243",
+    nodeId: "be-io-model",
+    question: "从 C10K 到 C10M：单机支撑千万级连接要解决哪些层面的问题？",
+    bigTech: true,
+    answer: `结论：C10K（万级连接）靠 epoll 解决「调度」问题；C100K（十万）要解决内存与内核参数；C1M（百万）要解决网卡中断与多队列；C10M（千万）要绕过内核协议栈本身（DPDK/XDP）——每一级都是「离硬件更近一步」。
+
+\`\`\`text
+各阶段瓶颈与解法：
+阶段    瓶颈                    解法
+C10K    一连接一线程模型         epoll 多路复用（2003 年已解决）
+C100K   fd 上限/端口/TCP内存     ulimit 调大、tcp_mem 调优、缩缓冲区
+C1M     软中断集中 CPU0/accept锁  RPS/RSS 网卡多队列、SO_REUSEPORT
+C10M    内核协议栈本身(拷贝/锁)   DPDK 用户态协议栈/XDP/eBPF
+\`\`\`
+
+C1M 级别的内核调优清单：
+\`\`\`bash
+# fd 上限（每个连接一个 fd）
+ulimit -n 1048576
+# 全连接队列（accept 队列溢出会丢连接）
+sysctl -w net.core.somaxconn=65535
+# 端口范围（客户端角色时需要，服务端监听复用 80 不受限）
+sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+# TCP 内存三件套（低水位/压力/上限，单位是页）
+sysctl -w net.ipv4.tcp_mem="786432 1048576 1572864"
+# 每个连接读写缓冲区调小（默认 87KB×100万 = 87GB 爆炸）
+sysctl -w net.ipv4.tcp_rmem="4096 4096 16384"
+sysctl -w net.ipv4.tcp_wmem="4096 4096 16384"
+\`\`\`
+
+SO_REUSEPORT 解决 accept 瓶颈：多个进程/线程各自 listen 同一端口，内核负责把新连接均匀分到各队列——Nginx 1.9+ 开启后 accept 吞吐翻倍，消除了 accept_mutex 惊群锁。
+
+C10M 的终极形态（DPDK）：
+\`\`\`text
+内核路径（1M pps 封顶）：
+网卡 → 中断 → 内核协议栈（拷贝/锁/内存分配）→ socket → 应用
+
+DPDK 路径（100M+ pps）：
+网卡 --DMA--> 用户态轮询驱动（UIO）→ 应用直接处理报文
+绕过：中断、协议栈、拷贝、socket
+代价：协议栈自己实现（TCP 都没有）、独占 CPU 核轮询
+玩家：云厂商 LB（阿里 SLB）、高频交易、字节网关
+\`\`\`
+
+案例：阿里云 SLB 四层负载均衡用 DPDK 自研用户态转发，单机扛 1 亿并发连接、4000 万 CPS；作为对照，基于内核协议栈的 LVS 单机约 1000 万连接就到头了。字节跳动接入层同样走 DPDK+XDP 路线扛春晚红包流量。
+
+踩坑：百万连接不是「能建立」就完事——GC 停顿 1 秒，百万连接的心跳超时全断（JVM 用 ZGC/Shenandoah 把停顿压到 1ms 内）；连接状态每连接 4KB 应用元数据×1M = 4GB，内存规划先行；DPDK 独占网卡后 SSH 都连不上管理口，要双网卡分离；监控体系（Prometheus 指标每连接一个 label）在百万连接下自身先 OOM，指标必须聚合。`,
+    keyPoints: ["C10K=epoll/C1M=内核调优+多队列/C10M=绕开内核", "SO_REUSEPORT 消 accept 惊群", "DPDK 用户态协议栈是终局"],
+    followUps: ["XDP 和 DPDK 的取舍（内核兼容性）？", "百万连接下 GC 选型为什么是 ZGC？"],
+    favorited: false,
+  },
 ];
 
 // ===== 学习计划：按拓扑顺序遍历节点，每天 1-2 个 learn + 1 个 review =====
