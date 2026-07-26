@@ -96,23 +96,38 @@ describe("AI Mock 场景", () => {
 
   it("部分成功部分失败", async () => {
     const nodes = [makeNode("k1"), makeNode("k2"), makeNode("k3"), makeNode("k4")];
-    // 2026-07-25：generateObject 失败后降级 generateText，要走到占位需 generateText 也失败
-    // 4 个节点：成功 / 超时失败 / 网络错误 / 成功
-    vi.mocked(generateObject)
-      .mockResolvedValueOnce({
-        object: { question: "题1", answer: "答1", keyPoints: ["p1"], followUps: ["f1"] },
-      } as any)
-      .mockRejectedValueOnce(new Error("Request timeout"))
-      .mockRejectedValueOnce(new Error("fetch failed: network error"))
-      .mockResolvedValueOnce({
-        object: { question: "题4", answer: "答4", keyPoints: ["p4"], followUps: ["f4"], bigTech: true },
-      } as any);
-    // k2/k3 降级 generateText 也失败（每个节点重试 1 次，共 4 次降级调用）
-    vi.mocked(generateText)
-      .mockRejectedValueOnce(new Error("Request timeout"))
-      .mockRejectedValueOnce(new Error("Request timeout"))
-      .mockRejectedValueOnce(new Error("fetch failed: network error"))
-      .mockRejectedValueOnce(new Error("fetch failed: network error"));
+    // 2026-07-26 更新：并发从 5 降到 3 后，mockRejectedValueOnce/mockResolvedValueOnce
+    // 的消费顺序与节点顺序不再一致（重试的 generateObject 调用可能抢先消费到给 k4 的 mock）。
+    // 改用 mockImplementation 按节点 id 分发，消除调用顺序依赖：
+    //   k1/k4 → 成功；k2 → 超时失败；k3 → 网络错误失败
+    // generateObject 和 generateText 都按 prompt 中的节点 id 判定返回值。
+    vi.mocked(generateObject).mockImplementation(async (opts: any) => {
+      const prompt: string = opts?.prompt ?? "";
+      if (prompt.includes("知识点 k1")) {
+        return { object: { question: "题1", answer: "答1", keyPoints: ["p1"], followUps: ["f1"] } } as any;
+      }
+      if (prompt.includes("知识点 k4")) {
+        return { object: { question: "题4", answer: "答4", keyPoints: ["p4"], followUps: ["f4"], bigTech: true } } as any;
+      }
+      if (prompt.includes("知识点 k2")) {
+        throw new Error("Request timeout");
+      }
+      if (prompt.includes("知识点 k3")) {
+        throw new Error("fetch failed: network error");
+      }
+      throw new Error("unexpected node in mock");
+    });
+    // generateText 降级也按节点 id 分发，对应节点抛对应错误
+    vi.mocked(generateText).mockImplementation(async (opts: any) => {
+      const prompt: string = opts?.prompt ?? "";
+      if (prompt.includes("知识点 k2")) {
+        throw new Error("Request timeout");
+      }
+      if (prompt.includes("知识点 k3")) {
+        throw new Error("fetch failed: network error");
+      }
+      throw new Error("unexpected node in mock");
+    });
 
     const questions = await generateQuestions(nodes);
 

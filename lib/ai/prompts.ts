@@ -76,7 +76,7 @@ export const PROMPTS = {
   question_stem_generate: {
     id: "question_stem_generate",
     version: "v1",
-    scene: "question_generate" as const,
+    scene: "question_stem_generate" as const,
     system: `你是资深技术面试官。针对给定知识点生成一道高频面试题。
 要求：
 1. 题目要考察对知识点的深度理解，一句话表述清楚

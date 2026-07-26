@@ -23,6 +23,7 @@ import { Button } from "@/components/ui";
 const SCENE_LABELS: Record<AIScene, string> = {
   knowledge_decompose: "知识树拆解",
   question_generate: "面试题生成",
+  question_stem_generate: "面试题干生成",
   answer_generate: "答案生成",
   daily_nudge: "每日提醒",
   chat: "聊天",

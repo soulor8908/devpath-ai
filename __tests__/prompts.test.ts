@@ -88,6 +88,7 @@ describe("prompts registry", () => {
 const PROMPT_VERSION_HASHES: Record<PromptId, string> = {
   knowledge_decompose: "v2:8bbf3f1f",
   question_generate: "v3:32f4919",
+  question_stem_generate: "v1:cc41f1e3",
   answer_generate: "v1:8153fa4",
   daily_nudge: "v2:a7f4c7ac",
   chat: "v3:1f6686bc",

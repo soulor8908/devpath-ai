@@ -28,6 +28,7 @@ export interface ModelConfig {
 export type AIScene =
   | "knowledge_decompose"
   | "question_generate"
+  | "question_stem_generate"
   | "answer_generate"
   | "daily_nudge"
   | "chat"
