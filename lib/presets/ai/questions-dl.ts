@@ -56,7 +56,11 @@ gelu = nn.GELU()
 def swish(x, beta=1.0): return x * torch.sigmoid(beta * x)
 \`\`\`
 
-踩坑：ReLU 死亡可降低学习率或用 Leaky/GELU；Sigmoid 梯度消失深网络禁用；ELU 负区间平滑零均值但计算贵。`,
+踩坑：ReLU 死亡可降低学习率或用 Leaky/GELU；Sigmoid 梯度消失深网络禁用；ELU 负区间平滑零均值但计算贵。
+
+【举一反三】：ReLU 之于激活函数，类似后端连接池里"无状态"之于会话——把状态依赖剥掉换成线性直通，简单可扩展。GELU/Swish 的"可微平滑"思路也映射到 Attention 里的 softmax 温度：用平滑近似替代硬截断，梯度更友好。前端把硬 if 换成 sigmoid 门控也是同构——可导才能反向传播。
+
+【扣分点对照】：背题者只能说"ReLU 计算快防消失"；真做过的人会答：训练 100 万步后约 5-10% 神经元死亡（可监控 dead_ratio 指标），用 LR 1e-3 + Leaky 0.01 把死亡率压到 <1%，并解释为什么 Transformer 选 GELU 而非 Leaky（GELU 的概率门控更适配 softmax 概率语义）。`,
     keyPoints: ["ReLU 正区间梯度恒 1 防消失", "ReLU 有神经元死亡问题", "Leaky/GELU 改进"],
     followUps: ["为什么 Sigmoid 梯度消失？", "GELU 为什么 Transformer 常用？"],
     favorited: false,
@@ -103,7 +107,11 @@ model.train()  # 训练用 batch 统计
 model.eval()   # 推理用 running 统计
 \`\`\`
 
-踩坑：BN 依赖 batch，batch=1 推理时必须用 eval 模式；分布式训练用 SyncBN 同步统计；序列模型/小 batch 用 LayerNorm/GroupNorm。`,
+踩坑：BN 依赖 batch，batch=1 推理时必须用 eval 模式；分布式训练用 SyncBN 同步统计；序列模型/小 batch 用 LayerNorm/GroupNorm。
+
+【举一反三】：BN 的"训练用 batch / 推理用 running 统计"模式，和前端构建时"dev 用 source map / prod 用压缩产物"同构——同一套代码两种统计口径，切错就出 bug。GroupNorm/LayerNorm 把"批统计"换成"特征统计"，类似把全局缓存换成请求级缓存，解耦 batch 依赖，类比后端把"全局锁"换成"行级锁"提升并发可用性。
+
+【扣分点对照】：背题者说"BN 加速训练"；真做过的人会答：batch=32 训练 ResNet50 在 CIFAR-10 上 50 epoch 到 93%，线上推理忘切 eval 模式直接用 batch=1 的统计，准确率掉 8 个点（从 93% → 85%），定位半小时才发现是 train/eval 状态没切换；SyncBN 跨卡同步在 8 卡 V100 上通信开销约占训练时间 12%。`,
     keyPoints: ["batch 内归一化+γ/β 仿射", "训练用 batch 推理用 running", "放宽初始化加速收敛"],
     followUps: ["BN 和 LayerNorm 区别？", "为什么 batch 小 BN 效果差？"],
     favorited: false,
@@ -128,7 +136,11 @@ net.train()  # 启用 dropout
 net.eval()   # 关闭 dropout
 \`\`\`
 
-踩坑：BN+Dropout 顺序和位置影响效果；Dropout 过大欠拟合；推理务必 eval 模式否则结果随机。`,
+踩坑：BN+Dropout 顺序和位置影响效果；Dropout 过大欠拟合；推理务必 eval 模式否则结果随机。
+
+【举一反三】：Dropout 的"子网络集成"思路在前端有同构——A/B 测试多套 UI 模板取均值防止单模板过拟合某用户群。MC Dropout 多次推理取方差估计不确定性，类比后端用多次请求取分位数（P99）估延迟尾部，都是用"重复采样"换"置信度"。Dropout 概率 p 类似正则化系数 λ，过大欠拟合过小过拟合。
+
+【扣分点对照】：背题者说"Dropout 防过拟合"；真做过的人会答：BERT 微调 GLUE 时 p=0.1 比 0.3 高 0.5 个点，p=0.5 时 val loss 卡在 0.8 不降（欠拟合）；线上推理忘切 eval 模式导致同样输入两次输出 logits 差异 0.3+，A/B 实验显著性全部失效，定位 1 小时；CNN 全连接层用 0.5 但卷积层用 Spatial Dropout 0.1 防特征图整通道失活。`,
     keyPoints: ["训练随机 drop+缩放（inverted dropout）", "推理不 drop", "子网络集成+去共适应"],
     followUps: ["Dropout 和 BN 一起用注意什么？", "Spatial Dropout 区别？"],
     favorited: false,
@@ -216,7 +228,11 @@ def receptive_rf(layers):
 print(receptive_rf([(3,1),(3,1),(3,2),(3,1)]))  # 11
 \`\`\`
 
-踩坑：感受野大不代表有效感受野大（中心贡献大）；下采样过多损失细节影响分割；空洞卷积过大有网格效应。`,
+踩坑：感受野大不代表有效感受野大（中心贡献大）；下采样过多损失细节影响分割；空洞卷积过大有网格效应。
+
+【举一反三】：感受野递推 RFₖ=RFₖ₋₁+(k-1)·∏stride 类似编译器里 AST 深度计算——每层下采样等价于"提一层抽象"，stride 累乘就是抽象层级累乘。前端虚拟 DOM diff 的"层次化区间"也是同构思路：每一层只看局部窗口，深一层看到更大范围。系统设计里"调用链路跨度"的递推公式与之结构相同。
+
+【扣分点对照】：背题者背 RF 公式但说不清有效感受野；真做过的人会答：U-Net 分割在 256×256 输入上把理论 RF 调到 212 才能覆盖整个细胞，浅层 RF 才 80 时边缘 IoU 掉 0.12（从 0.85 → 0.73）；空洞卷积 rate=4 把 RF 撑到 320 但出现网格伪影（grid artifact），需配合渐进式 dilation（1/2/4 而非全 4）或 HDF5 网络缓解；DeepLabv3 用 ASPP 多 rate 并联覆盖不同尺度目标。`,
     keyPoints: ["感受野=特征点对应原图区域", "RFₖ=RFₖ₋₁+(k-1)·∏stride", "小卷积堆叠等效大卷积省参数"],
     followUps: ["空洞卷积如何扩大感受野？", "有效感受野和理论感受野区别？"],
     favorited: false,
@@ -399,7 +415,11 @@ loss = h.sum(); loss.backward()
 print(h.grad.abs().mean())  # 梯度随时间衰减
 \`\`\`
 
-踩坑：梯度消失用 LSTM/GRU/残差/门控解决，梯度爆炸用裁剪解决；序列越长 RNN 越难；Transformer 缓解长程依赖但 O(n²) 复杂度。`,
+踩坑：梯度消失用 LSTM/GRU/残差/门控解决，梯度爆炸用裁剪解决；序列越长 RNN 越难；Transformer 缓解长程依赖但 O(n²) 复杂度。
+
+【举一反三】：RNN 时间步连乘雅可比，和后端长链路上 N 个微服务串行调用同构——每跳保留 0.9 的成功率，100 跳后剩 0.9^100≈0.00003 全链路失败。残差/LSTM 的"加法通路"等价于在调用链里加旁路缓存（Circuit Breaker 的 fallback），跳过下游连乘。Transformer 的全局注意力类似事件总线广播，省了串行跳转但通信 O(n²)。
+
+【扣分点对照】：背题者说"连乘小于 1 就消失"；真做过的人会答：PTB 上训 vanilla RNN 50 步后梯度范数从 1.2 降到 1e-7（用 torch.norm 打印各层梯度实测），换 LSTM 后 100 步仍保持 0.3；序列长于 80 时 vanilla RNN 的 PPL 卡在 250 不降，LSTM 能到 78；梯度爆炸用 clip_grad_norm_ max=5.0 防止 NaN，比不裁剪训练稳定但收敛慢 15%。`,
     keyPoints: ["时间步连乘雅可比", "谱半径<1 消失 >1 爆炸", "Sigmoid 饱和加剧消失"],
     followUps: ["LSTM 如何解决？", "梯度爆炸如何处理？"],
     favorited: false,
@@ -421,7 +441,11 @@ lstm = nn.LSTM(input_size=128, hidden_size=256, num_layers=2,
 out, (h, c) = lstm(x)  # out: (batch, seq, 256*2 双向)
 \`\`\`
 
-踩坑：LSTM 参数多训练慢；序列长仍受限（不如 Transformer）；门控需配合梯度裁剪防爆炸；双向 LSTM 不能用于自回归生成。`,
+踩坑：LSTM 参数多训练慢；序列长仍受限（不如 Transformer）；门控需配合梯度裁剪防爆炸；双向 LSTM 不能用于自回归生成。
+
+【举一反三】：LSTM 三门设计映射到后端限流/熔断：遗忘门像 LRU 淘汰旧数据，输入门像准入控制限流，输出门像响应过滤器。加法细胞状态本质是"带门控的残差连接"，比 RNN 的乘法链路更接近 ResNet 思路——这也是 Highway Network 和 LSTM 共享同一作者的关键线索。GRU 把三门合并成两门，类似把"读锁+写锁"合并成单一锁以减少同步开销。
+
+【扣分点对照】：背题者背三门公式但说不出为什么加法能防消失；真做过的人会答：WMT14 翻译上 LSTM 4 层 hidden=1024 训练 5 天 BLEU 22.5，加 attention 到 25.8；遗忘门偏置初始化 1.0（不是默认 0）让早期长程保留，否则前 10K 步梯度崩溃 loss 飙到 8+，这是 Gers & Schmidhuber 2000 论文的关键细节；序列长 100 时 LSTM 仍能学到 50 步依赖（用 LFSR 任务验证），vanilla RNN 20 步就崩。`,
     keyPoints: ["三门一细胞状态", "加法更新梯度直传", "遗忘门接近 1 长程保留"],
     followUps: ["GRU 和 LSTM 区别？", "LSTM 参数量如何算？"],
     favorited: false,
@@ -464,7 +488,11 @@ bilstm = nn.LSTM(input_size=128, hidden_size=256, bidirectional=True, batch_firs
 out, _ = bilstm(x)  # (batch, seq, 512) 前256+后256 拼接
 \`\`\`
 
-踩坑：BiRNN 训练需完整序列，流式推理不可用；双向输出维度翻倍；ELMo 用 BiLSTM 但生成任务仍受限。`,
+踩坑：BiRNN 训练需完整序列，流式推理不可用；双向输出维度翻倍；ELMo 用 BiLSTM 但生成任务仍受限。
+
+【举一反三】：BiRNN 的"双向上下文"思路在编译器里也有——LLVM 的双向数据流分析（forward 数据流 + backward 活跃变量），都是同一段代码两个方向各扫一遍再合并。BERT 的 MLM 把"双向"做到极致（全程 mask 不泄露未来），代价是没法自回归生成；GPT 选择单向换可生成性，是"理解 vs 生成"的工程权衡。
+
+【扣分点对照】：背题者说"BiRNN 看前后文适合分类"；真做过的人会答：CoNLL 2003 NER 上 BiLSTM-CRF F1 比 unidirectional 高 6 个点（85.0 → 91.0），但流式 ASR 不能用，必须换 LAS 或 CTC 单向模型；ELMo 用 BiLSTM 但生成时只能逐层固定提取特征，不像 GPT 能流式 token 生成；BiLSTM 显存是单向的 2.1 倍（多一份反向状态 + 通信开销），batch=64 时单卡 V100 32GB 才放得下。`,
     keyPoints: ["前向+后向输出拼接", "用了未来信息破坏因果性", "适合标注/分类/编码器"],
     followUps: ["ELMo 为什么能用 BiLSTM？", "解码器为何必须单向？"],
     favorited: false,
@@ -948,7 +976,11 @@ with torch.no_grad():
     out = model(x)
 \`\`\`
 
-踩坑：梯度默认累加需 zero_grad；detach() 截断梯度；requires_grad 控制是否求导；item() 取标量。`,
+踩坑：梯度默认累加需 zero_grad；detach() 截断梯度；requires_grad 控制是否求导；item() 取标量。
+
+【举一反三】：autograd 的"前向建图反向遍历"思路和 React 的 fiber 调度同构——都是把"过程式递归"转成"显式图结构"再调度。动态图相比静态图的优势，类似 REPL 相比编译型语言：调试时能 print 任意中间值、能加 if/else 控制流，代价是没法做全局编译优化（算子融合、内存复用）。torch.compile (2.0+) 是在动态图上叠加静态编译，类似 V8 的 JIT 思路。
+
+【扣分点对照】：背题者说"动态图灵活调试方便"；真做过的人会答：训练 BERT-base 时 backward 比 forward 慢 1.8 倍（autograd 建图+反向开销），用 torch.compile(mode="reduce-overhead") 后训练吞吐 +35%；GAN 训练里 detach() 漏加一处导致判别器梯度回流生成器 loss 直接 NaN，定位 2 小时；分布式训练中梯度累积 multiple backward 后才 step，需要 zero_grad(set_to_none=True) 省显存（PyTorch 1.7+ 默认行为）。`,
     keyPoints: ["autograd 自动构建计算图求导", "动态图灵活易调试", "静态图性能优可优化"],
     followUps: ["requires_grad 和 no_grad 作用？", "tf.function 如何加速？"],
     favorited: false,
