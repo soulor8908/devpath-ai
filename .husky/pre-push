@@ -1,1 +1,32 @@
-npm run lint && npm run typecheck
+# pre-push 防护栏（2026-07-27 闭环修复）
+#
+# 历史根因（卡帕西视角复盘）：
+#   2026-07-25~27 连续 3 次"代码 push 后 Cloudflare Pages 部署失败"：
+#     1. layout.tsx 用 next/dynamic + ssr:false（Server Component 限制）
+#     2. 队列改题目维度后测试类型不匹配
+#     3. 删除提示后测试断言过期
+#   共同点：typecheck 通过 ≠ build 通过；lint 通过 ≠ 测试通过。
+#   旧 hook 只跑 `lint + typecheck`，让 build/测试错误漏到 main 分支，
+#   触发 CF Pages 部署失败 → 用户看到旧版本 → 信任崩塌。
+#
+# 闭环解法（三层防护）：
+#   1. pre-commit: lint-staged（增量 lint + 格式化）
+#   2. pre-push:   lint + typecheck + test + build（全量门禁，确保 push 前一切就绪）
+#   3. 守护测试:   __tests__/pre-push-hook-guard.test.ts 防止 hook 被误删/降级
+#
+# 性能权衡：
+#   - build 耗时约 30-60 秒，push 变慢但杜绝"push 后部署失败"
+#   - 测试耗时约 100 秒，加上 build 总计 2-3 分钟，可接受
+#   - 若需跳过（紧急 hotfix）：git push --no-verify（自行承担风险）
+#
+# 失败时给出明确提示，方便定位是哪一层挂了
+set -e
+echo "🔍 [pre-push 1/4] lint..."
+npm run lint
+echo "🔍 [pre-push 2/4] typecheck..."
+npm run typecheck
+echo "🔍 [pre-push 3/4] test..."
+npm test
+echo "🔍 [pre-push 4/4] build（最耗时，约 30-60s）..."
+npm run build
+echo "✅ pre-push 全部门禁通过"

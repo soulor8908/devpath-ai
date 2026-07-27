@@ -245,6 +245,7 @@ const scene = useMemo(() => parseSceneParams(searchParams), [searchParams]);
 **参数约定**（见 [lib/study-queue/nav-params.ts](file:///workspace/lib/study-queue/nav-params.ts)）：
 - `planId`：关联的学习计划 id（type=new 时有值）
 - `nodeId`：关联的知识点 id（type=new 时有值）
+- `questionId`：关联的题目 id（type=new 时有值，2026-07-27 题目维度重构后必带——学习队列从节点维度改成题目维度，一题一 task）
 - `cardId`：关联的 FSRS 卡片 id（type=review 时有值）
 - `date`：任务日期 "YYYY-MM-DD"（用于"今日计划"过滤）
 - `from`：来源标记（如 "home" / "plan-detail"），用于目标页做埋点/差异化提示
@@ -309,6 +310,41 @@ const system = `你是技术学习专家。拆解知识节点。输出 JSON。`;
 - 守护测试是否真的在跑（CI green 不等于内容达标，要确认测试覆盖了结构而非只查长度）？
 
 **适用范围**：所有 AI 生成学习路径入口（`lib/ai/knowledge.ts` 的 `decomposeKnowledge` / `lib/ai/plan-generator.ts` 的 `generateLearningPlan` / 任何未来新增的知识拆解入口）+ 所有 preset 答案（手工或策展）。
+
+### 2.14 pre-push 必须跑 4 层门禁（v1，修复"部署失败"连环事故）
+
+**背景**：2026-07-25~27 连续 3 次"代码 push 后 Cloudflare Pages 部署失败"：
+1. `layout.tsx` 用 `next/dynamic` + `ssr:false`（Next.js 15 Server Component 限制）
+2. 队列改题目维度后测试类型不匹配
+3. 删除"今天还没开始"提示后测试断言过期
+
+**根因诊断（卡帕西视角）**：
+- `typecheck` 通过 ≠ `build` 通过：Next.js 15 Server Component 不能用 `ssr:false`，tsc 不报错但 `next build` 失败
+- `lint` 通过 ≠ `test` 通过：lint 检查代码风格，test 验证行为，删除分支后测试断言过期 lint 发现不了
+- 旧 pre-push hook 只跑 `lint + typecheck`，让 build/测试错误漏到 main 分支 → CF Pages 部署失败 → 用户看到旧版本 → 信任崩塌
+
+**正确模式**：pre-push 必须跑 4 层门禁，缺一不可：
+
+```bash
+# .husky/pre-push
+set -e
+npm run lint        # 1. 代码风格 + ESLint 规则
+npm run typecheck   # 2. TypeScript 类型检查
+npm test            # 3. 全量测试（行为正确性）
+npm run build       # 4. Next.js 构建（部署可行性，最关键的一层）
+```
+
+**守护测试**：[__tests__/pre-push-hook-guard.test.ts](file:///workspace/__tests__/pre-push-hook-guard.test.ts) 扫描 `.husky/pre-push` 文件，断言 4 层门禁都在，防止未来被误删/降级回只跑 lint+typecheck。
+
+**判断标准**（设计审查时自查）：
+- pre-push hook 是否包含 `lint + typecheck + test + build` 4 层？
+- 是否有 `set -e`（任一层失败立即终止）？
+- 是否有跳过指引（紧急 hotfix 用 `git push --no-verify`）？
+- 守护测试是否在跑（防止 hook 被误改）？
+
+**适用范围**：所有 push 到 `main` / `develop` 等受保护分支的操作。
+
+**紧急跳过**：`git push --no-verify`，但必须在 commit message 里说明原因，且事后补跑门禁。
 
 ---
 
