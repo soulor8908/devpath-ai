@@ -109,13 +109,15 @@ describe("generateEnhancedInsight", () => {
     expect(insight.message).toContain("7");
   });
 
-  it("能量1(未学习) → reminding", () => {
+  it("能量1(低能量) → 不再 reminding，回退到后续规则（2026-07-27 删除'今天还没开始'提示）", () => {
     const insight = generateEnhancedInsight(
       { energy: 1, mood: "neutral", recommendedPersona: "socratic", reasons: [] },
       null,
       0
     );
-    expect(insight.tone).toBe("reminding");
+    // 2026-07-27：删除了 energy===1 的 reminding 分支（"今天还没开始，从第一个知识点开始吧"）
+    // 用户反馈：这个提示一直在，变成噪音。现在 energy===1 回退到默认 encouraging
+    expect(insight.tone).toBe("encouraging");
   });
 
   it("frustrated → encouraging", () => {
