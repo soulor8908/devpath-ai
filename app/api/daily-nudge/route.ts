@@ -36,8 +36,6 @@ import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limi
 import { getOrCreateTraceIdFromRequest, TRACE_ID_HEADER } from "@/lib/ai/trace";
 import type { TokenUsage } from "@/lib/types";
 
-export const runtime = "edge";
-
 // 从 Prompt Registry 读取
 const PROMPT_DEF = getPrompt("daily_nudge");
 

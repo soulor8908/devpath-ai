@@ -12,8 +12,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { PublicPortfolio, PublicPortfolioEntry } from "@/lib/types";
 
-export const runtime = "edge";
-
 interface RouteContext {
   params: Promise<{ username: string }>;
 }

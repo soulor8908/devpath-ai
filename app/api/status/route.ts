@@ -13,8 +13,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
 import type { DailyStatus, ScheduleItem, DopamineTrigger } from "@/lib/types";
 
-export const runtime = "edge";
-
 interface StatusRequestBody {
   date: string;
   energy: 1 | 2 | 3 | 4 | 5;

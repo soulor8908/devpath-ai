@@ -12,8 +12,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { LearningPlan, Routine } from "@/lib/types";
 
-export const runtime = "edge";
-
 // 从 Prompt Registry 读取
 const PROMPT_DEF = getPrompt("adjust_plan");
 

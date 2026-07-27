@@ -7,10 +7,10 @@
 //   - 审计日志记录 userIdHash / IP / UA，绝不记录 apiKey / sessionSecret 明文
 //   - MASTER_KEY 未配置时返回 500，且不泄露任何用户输入
 //
-// 运行时：edge（Cloudflare Pages Functions）
+// 运行时：Cloudflare Workers（nodejs_compat）
 
 import { NextRequest, NextResponse } from "next/server";
-import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
+import { initCloudflareEnv, getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import {
   getMasterKey,
   createSessionStore,
@@ -19,9 +19,52 @@ import {
   AUDIT_TTL_SECONDS,
 } from "@/lib/ai/session-middleware";
 import { aesGcmEncrypt, sha256, randomBytes, bytesToBase64 } from "@/lib/ai/crypto";
+import { chinaDateNow } from "@/lib/time";
 import type { SessionRecord } from "@/lib/storage/kv";
 
-export const runtime = "edge";
+/** exchange 端点 IP 维度限流：每 IP 每天最多 10 次换 session */
+const EXCHANGE_RATE_LIMIT = 10;
+const EXCHANGE_RATE_TTL = 86400; // 24 小时
+
+/**
+ * 从请求头提取客户端真实 IP。
+ * 优先 cf-connecting-ip（Cloudflare 注入，最可信），其次 x-forwarded-for。
+ */
+function getClientIp(req: NextRequest): string {
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp;
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
+/**
+ * IP 维度限流：防止暴力枚举 apiKey 耗尽 KV 写配额。
+ * 复用 AUTH_SESSIONS KV namespace，key 前缀 ratelimit:exchange: 与 session key 空间隔离。
+ * KV 不可用时（本地开发）跳过限流。
+ */
+async function checkExchangeRateLimit(ip: string): Promise<boolean> {
+  const kv = getAuthSessionsKV();
+  if (!kv) return true; // 本地开发无 KV，放行
+  const date = chinaDateNow();
+  const key = `ratelimit:exchange:${ip}:${date}`;
+  const current = await kv.get(key);
+  const count = current ? parseInt(current, 10) : 0;
+  return count < EXCHANGE_RATE_LIMIT;
+}
+
+async function incrementExchangeRateLimit(ip: string): Promise<void> {
+  const kv = getAuthSessionsKV();
+  if (!kv) return; // 本地开发无 KV，跳过
+  const date = chinaDateNow();
+  const key = `ratelimit:exchange:${ip}:${date}`;
+  const current = await kv.get(key);
+  const count = current ? parseInt(current, 10) : 0;
+  await kv.put(key, String(count + 1), { expirationTtl: EXCHANGE_RATE_TTL });
+}
 
 interface ExchangeBody {
   apiKey?: string;
@@ -34,6 +77,16 @@ interface ExchangeBody {
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
+
+  // 0. IP 维度限流（防暴力枚举 apiKey 耗尽 KV 写配额）
+  const ip = getClientIp(req);
+  const allowed = await checkExchangeRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many session exchanges, try again tomorrow", code: "RATE_LIMITED" },
+      { status: 429 },
+    );
+  }
 
   // 1. MASTER_KEY 检查（前置：避免后续加密失败泄露 body 已解析的细节）
   let masterKey: string;
@@ -164,6 +217,8 @@ export async function POST(req: NextRequest) {
 
   // 8. 返回 sessionId + sessionSecret + expiresAt
   // sessionSecret 只在此次响应中出现，客户端需自行存储
+  // 限流计数 +1（成功换 session 后才计数，失败不计数）
+  await incrementExchangeRateLimit(ip);
   return NextResponse.json({
     sessionId,
     sessionSecret,

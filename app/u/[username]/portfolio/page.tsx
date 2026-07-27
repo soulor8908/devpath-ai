@@ -11,8 +11,6 @@
 
 import PortfolioPublicClient from "./PortfolioPublicClient";
 
-export const runtime = "edge";
-
 export default function Page() {
   return <PortfolioPublicClient />;
 }

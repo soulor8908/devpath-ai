@@ -6,13 +6,11 @@
 //   - 返回的 expiresAt 是滑动续期后的新值（与 requireSession 一致）
 //   - 不写审计日志（高频调用，避免噪音）
 //
-// 运行时：edge
+// 运行时：Cloudflare Workers（nodejs_compat）
 
 import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
-
-export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   await initCloudflareEnv();

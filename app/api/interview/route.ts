@@ -34,8 +34,6 @@ import {
   buildReportPrompt,
 } from "@/lib/ai/interview-coach";
 
-export const runtime = "edge";
-
 // 2026-07-27 P1：用 zod schema 校验请求体（替代 normalizeConfig 手动 if + safeMessages 手动处理）
 // 设计权衡（卡帕西视角）：
 //   - mode 枚举校验 + 默认值 "interview"：替代手写默认值

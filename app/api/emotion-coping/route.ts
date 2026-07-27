@@ -17,8 +17,6 @@ import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { EmotionTag } from "@/lib/types";
 
-export const runtime = "edge";
-
 const PROMPT_DEF = getPrompt("emotion_coping");
 
 // 2026-07-27 P1：用 zod 显式校验 EmotionTag 枚举，防未知名 tag 静默落到 fallback

@@ -27,8 +27,6 @@ import { createKVStore } from "@/lib/storage/kv";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
 import { sha256 } from "@/lib/ai/crypto";
 
-export const runtime = "edge";
-
 /** 嵌入模型 id（与构建期 scripts/build-knowledge-index.ts 保持一致） */
 const EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5";
 /** bge-base-en-v1.5 输出维度 */

@@ -8,7 +8,7 @@
 //   - PUT 改用 requireSession 校验签名 + 注入 session（不再依赖 PUBLIC_AUTH_TOKEN / API_TOKEN）
 //   - username 来自 URL，session.userId 用于审计（不强制校验 username 与 userId 绑定，
 //     因为 username 是用户自设置的别名，可变；服务端只校验请求来自有效 session）
-// 运行时：edge。通过 getCloudflareKV() 拿到 Cloudflare KV binding，
+// 运行时：Cloudflare Workers（nodejs_compat）。通过 getCloudflareKV() 拿到 Cloudflare KV binding，
 //         无 binding 时降级为内存 mock（仅本地开发）。
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,8 +17,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { PublicProfile, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
-
-export const runtime = "edge";
 
 interface RouteContext {
   params: Promise<{ username: string }>;

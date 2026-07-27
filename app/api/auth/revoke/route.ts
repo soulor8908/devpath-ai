@@ -6,7 +6,7 @@
 //   - 删除后 session 立即失效，无法再用此 sessionId 签发请求
 //   - 审计日志记录 revoke 事件（不含敏感字段）
 //
-// 运行时：edge
+// 运行时：Cloudflare Workers（nodejs_compat）
 
 import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
@@ -17,8 +17,6 @@ import {
   AUDIT_TTL_SECONDS,
 } from "@/lib/ai/session-middleware";
 import { sha256 } from "@/lib/ai/crypto";
-
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();

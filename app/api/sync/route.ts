@@ -3,7 +3,7 @@
 // - GET  ：读取 user:${userId}:backup，返回完整备份数据（userId 从 session 取）
 // - POST body=UserBackup：写入 user:${userId}:backup（userId 从 session 取）
 // 鉴权：统一走 requireSession（apiKey Session 安全架构）。
-// 运行时：edge。通过 getCloudflareKV() 拿到 Cloudflare KV binding，
+// 运行时：Cloudflare Workers（nodejs_compat）。通过 getCloudflareKV() 拿到 Cloudflare KV binding，
 //         无 binding 时降级为内存 mock（仅本地开发）。
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,8 +11,6 @@ import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { UserBackup } from "@/lib/types";
-
-export const runtime = "edge";
 
 const BACKUP_VERSION = 1;
 

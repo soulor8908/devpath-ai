@@ -13,8 +13,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { collectRhythmContext, getNextAction } from "@/lib/ai/rhythm-engine";
 
-export const runtime = "edge";
-
 export async function GET(req: NextRequest) {
   const sessionResult = await requireSession(req);
   if (sessionResult instanceof NextResponse) return sessionResult;

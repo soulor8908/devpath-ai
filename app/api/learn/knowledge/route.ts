@@ -24,8 +24,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
 import { parseRequestBody, nonEmptyString, boundedString } from "@/lib/ai/body-validation";
 
-export const runtime = "edge";
-
 // 2026-07-27 P1：用 zod 替代手写校验
 const knowledgeBodySchema = z.object({
   topic: nonEmptyString,

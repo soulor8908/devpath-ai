@@ -27,8 +27,6 @@ import { nanoid } from "nanoid";
 import { getOrCreateTraceIdFromRequest, TRACE_ID_HEADER } from "@/lib/ai/trace";
 import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, TokenUsage } from "@/lib/types";
 
-export const runtime = "edge";
-
 // 2026-07-27 P1：用 zod 替代手写校验
 //   - weekStart 必须 YYYY-MM-DD
 //   - learnLogs/reviewLogs/statuses 必须是数组（元素结构下游兜底，避免过严破坏旧数据）

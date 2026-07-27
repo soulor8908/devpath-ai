@@ -17,8 +17,6 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { getNode, getRubric } from "@/lib/curriculum/server-graph";
 import { nowISO } from "@/lib/time";
 
-export const runtime = "edge";
-
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
 

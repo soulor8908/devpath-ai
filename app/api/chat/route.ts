@@ -30,8 +30,6 @@ import { createKVStore } from "@/lib/storage/kv";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
 import { parseRequestBody, boundedString } from "@/lib/ai/body-validation";
 
-export const runtime = "edge";
-
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
