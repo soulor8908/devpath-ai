@@ -51,6 +51,14 @@ export interface LearningPlanSummary {
    * 旧 summary 缺此字段时回退为空对象（不过滤），向后兼容
    */
   nodeStates?: Record<string, { mastered: boolean; allUnderstood: boolean }>;
+  /**
+   * 已看懂题目数（2026-07-26 新增）：列表页/详情页据此展示"已看懂 X/Y 题"进度。
+   * - 派生自 plan.questions.filter(q => q.understood).length
+   * - 旧 summary 缺此字段时回退为 0（向后兼容）
+   * - 用户在训练页点"我答对了"或计划详情页点"看懂了"后，savePlanSummary 会同步更新此字段
+   * - 解决用户反馈"我答对了进度还是 0"：列表卡片直接展示进度，让用户看到点击有效
+   */
+  understoodCount?: number;
   createdAt: string;
   updatedAt: string;
 }

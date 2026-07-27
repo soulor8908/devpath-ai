@@ -18,6 +18,7 @@ import { CAREER_PATHS, getCareerPathNodes } from "@/lib/onboarding/career-paths"
 import { PRESET_METAS, loadPresetData } from "@/lib/presets";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { confirmDialog } from "@/lib/confirm-dialog";
+import { savePlanSummary, findExistingPlanByTopic } from "@/lib/plan-summary";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { nanoid } from "nanoid";
@@ -31,6 +32,28 @@ export default function OnboardingPage() {
     if (!selectedPath) return;
     setStarting(true);
     try {
+      // 2026-07-26 修复（用户反馈"通过学习路径添加知识库时没判断是否已在学习列表"）：
+      //   落库前先 findExistingPlanByTopic 查重，命中则 confirm 让用户选择：
+      //     - 确认 → 跳转到已有计划训练页（避免重复创建）
+      //     - 取消 → 继续创建新计划（保留用户的"重新开始"自由度）
+      //   注意：career path 的 topic 用 selectedPath.title（如"前端工程师 → AI 工程师"），
+      //   与 preset.topic 一致，因此查重能命中之前创建过的同路径计划。
+      const existing = await findExistingPlanByTopic(selectedPath.title);
+      if (existing) {
+        const openExisting = await confirmDialog({
+          title: "已存在相同主题的学习计划",
+          message: `检测到学习列表中已有「${existing.topic}」（${existing.knowledgeCount} 知识点 · ${existing.questionCount} 题）。是否直接进入已有计划？取消则继续创建新计划。`,
+          confirmText: "进入已有",
+          cancelText: "仍要创建",
+        });
+        if (openExisting) {
+          // 直接跳转到已有计划的训练页（保持 onboarding 的"立即训练"体验）
+          router.push(`/train?planId=${existing.id}`);
+          return;
+        }
+        // 用户选"仍要创建" → 继续走原创建流程
+      }
+
       // 用户选择路径进入学习时，若存在 demo 示例数据，先询问是否清除
       // 避免示例计划/复习卡片干扰真实学习流程
       const hasDemo = await hasDemoData();
@@ -60,6 +83,11 @@ export default function OnboardingPage() {
         updatedAt: now,
       };
       await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
+      // 2026-07-26 补丁：保存 summary 让 listPlanSummaries 能立即读到（避免查重失效）
+      // 旧版只 setItem 不 savePlanSummary，依赖 migrateSummaries 兜底补全——但补全时机
+      // 不确定（用户下次进入 /learn/list 时才触发），导致 onboarding 创建后立即再次
+      // 进入 onboarding 选同一路径时，findExistingPlanByTopic 读不到上次创建的 summary。
+      await savePlanSummary(plan);
       await dbSet("my:onboarding", {
         pathId: selectedPath.id,
         planId: plan.id,

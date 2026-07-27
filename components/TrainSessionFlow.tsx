@@ -280,17 +280,27 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   // 注意：
   //   - "没答对"按钮不写 understood=false（避免污染从未标记过的题）
   //   - 仅 type="new" 且有 currentQuestion 时调用（review 任务无 Question 概念）
-  const handleAnswerCorrect = useCallback(async () => {
-    if (!currentQuestion || !currentPlan) return;
+  const handleAnswerCorrect = useCallback(async (): Promise<boolean> => {
+    if (!currentQuestion || !currentPlan) return false;
     try {
       const { plan: updatedPlan, autoMastered, node } =
         await markQuestionUnderstoodAndMaybeMasterNode(
           currentPlan,
           currentQuestion.id,
         );
-      setCurrentPlan(updatedPlan);
+      // 2026-07-26 修复（用户反馈"我答对了进度还是 0"）：
+      // 验证写入是否真的生效——find 题目并检查 understood 是否变为 true。
+      // 旧版只看 markQuestionUnderstoodAndMaybeMasterNode 是否抛错，
+      // 但若内部静默返回未修改的 plan，调用方会误以为成功 → toast 显示"已记录"但 understood 没写。
+      // 现在 markQuestionUnderstood 已改为抛错，这里是双保险：若 updatedQ.understood 仍为 false，说明写入异常。
       const updatedQ =
         updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
+      if (!updatedQ || updatedQ.understood !== true) {
+        // 写入未生效：不更新 UI 状态，提示用户重试
+        toast.error("记录失败：题目状态未更新，请重试");
+        return false;
+      }
+      setCurrentPlan(updatedPlan);
       setCurrentQuestion(updatedQ);
       // 与 PlanDetailClient.handleMarkUnderstood 保持一致：
       // autoMastered 显示节点掌握提示，否则显示单题已记录（让用户知道点击有效）
@@ -301,10 +311,12 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
       } else {
         toast.success("已记录「我答对了」");
       }
+      return true;
     } catch (e) {
       // 持久化失败不影响训练流程，但要让用户看到错误（避免静默失败导致"下次进来还是没学"）
       console.warn("[train] 写 understood 失败:", e);
       toast.error("记录失败，请重试");
+      return false;
     }
   }, [currentQuestion, currentPlan]);
 
@@ -478,7 +490,10 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                     setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
                     // 2026-07-26 修复：await 写库再 dispatch，避免 NEXT_TASK 读到旧 plan
                     // 写库期间按钮会显示 loading 状态（loading prop），用户感知到"系统在处理"
-                    await handleAnswerCorrect();
+                    // 2026-07-26 二次修复：handleAnswerCorrect 失败时早退不 dispatch，
+                    // 避免写入失败但 UI 跳到下一题（用户感觉"我答对了"但进度没变）
+                    const ok = await handleAnswerCorrect();
+                    if (!ok) return;
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
                   }}
                   leftIcon="check"

@@ -38,10 +38,11 @@ export function normalizePlan(plan: LearningPlan): LearningPlan {
 }
 
 /**
- * 规范化 LearningPlanSummary：对 schedule / nodeStates 做回退，
- * 避免旧摘要缺字段导致首页 computeTodaySchedule 崩溃。
+ * 规范化 LearningPlanSummary：对 schedule / nodeStates / understoodCount 做回退，
+ * 避免旧摘要缺字段导致首页 computeTodaySchedule 崩溃或列表页进度展示异常。
  *
  * 2026-07-25：nodeStates 字段回退为空对象（旧 summary 缺此字段时不过滤，向后兼容）
+ * 2026-07-26：understoodCount 字段回退为 0（旧 summary 缺此字段时进度显示 0/Y，向后兼容）
  */
 export function normalizePlanSummary(summary: LearningPlanSummary): LearningPlanSummary {
   return {
@@ -49,6 +50,8 @@ export function normalizePlanSummary(summary: LearningPlanSummary): LearningPlan
     schedule: Array.isArray(summary.schedule) ? summary.schedule : [],
     // 旧 summary 缺 nodeStates → 回退为空对象（不过滤任何节点）
     nodeStates: summary.nodeStates ?? {},
+    // 旧 summary 缺 understoodCount → 回退为 0（列表卡片显示"已看懂 0/Y 题"）
+    understoodCount: typeof summary.understoodCount === "number" ? summary.understoodCount : 0,
   };
 }
 
@@ -57,6 +60,9 @@ export function toSummary(plan: LearningPlan): LearningPlanSummary {
   const knowledgeTree = Array.isArray(plan.knowledgeTree) ? plan.knowledgeTree : [];
   const questions = Array.isArray(plan.questions) ? plan.questions : [];
   const schedule = Array.isArray(plan.schedule) ? plan.schedule : [];
+  // 2026-07-26 派生 understoodCount：列表/详情页据此展示"已看懂 X/Y 题"进度
+  // 解决用户反馈"我答对了进度还是 0"：让用户在列表卡片直接看到点击效果
+  const understoodCount = questions.filter((q) => q.understood === true).length;
   return {
     id: plan.id,
     topic: plan.topic,
@@ -71,6 +77,8 @@ export function toSummary(plan: LearningPlan): LearningPlanSummary {
     // 2026-07-25 派生 nodeStates：study-queue 据此过滤已掌握/全部看懂的节点
     // 计算成本 O(N+Q)，远小于加载完整 plan 的 IO 成本
     nodeStates: deriveNodeStates(knowledgeTree, questions),
+    // 2026-07-26 派生 understoodCount：列表卡片展示"已看懂 X/Y 题"
+    understoodCount,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
@@ -157,9 +165,12 @@ export async function migrateSummaries(): Promise<number> {
     return !summaryIds.has(id);
   });
   // 旧 summary 缺 schedule 字段的（P1 升级前的数据）
+  // 2026-07-26：也补齐缺 understoodCount 字段的旧 summary（让老用户看到进度展示）
   const staleIds = new Set(
     existingSummaries
-      .filter((s) => !Array.isArray(s.schedule))
+      .filter(
+        (s) => !Array.isArray(s.schedule) || typeof s.understoodCount !== "number",
+      )
       .map((s) => s.id),
   );
   const staleKeys = planKeys.filter((k) => {
@@ -196,4 +207,31 @@ export async function getPlanSummary(
     () => getItem<LearningPlanSummary>(KEY_PREFIXES.PLAN_SUMMARY + planId),
     SUMMARY_CACHE_TTL_MS,
   );
+}
+
+/**
+ * 按 topic 查找已存在的学习计划（2026-07-26 新增）。
+ *
+ * 用途：避免用户重复添加相同主题的学习计划。
+ *   - 入口 1：preset 一键导入（startLearningFromPreset）
+ *   - 入口 2：LearnWizard 保存（saveAndRedirect）
+ *   - 入口 3：Onboarding 选择职业路径（handleStart）
+ *
+ * 匹配规则（卡帕西视角，简单且可预测）：
+ *   - 大小写不敏感（"AI" 和 "ai" 视为相同）
+ *   - 去除首尾空白（" 前端 " 和 "前端" 视为相同）
+ *   - 全等匹配（不做模糊匹配，避免误伤）
+ *
+ * 性能：复用 listPlanSummaries 的 5min 缓存，避免每次创建都扫 IndexedDB。
+ *
+ * @param topic 要查找的主题（来自用户输入或 preset.topic）
+ * @returns 命中的 LearningPlanSummary，未命中返回 undefined
+ */
+export async function findExistingPlanByTopic(
+  topic: string,
+): Promise<LearningPlanSummary | undefined> {
+  const trimmed = topic.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  const summaries = await listPlanSummaries();
+  return summaries.find((s) => s.topic.trim().toLowerCase() === trimmed);
 }

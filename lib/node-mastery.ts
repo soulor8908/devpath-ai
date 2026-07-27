@@ -154,6 +154,12 @@ export async function markNodeNeedsReinforce(
  * 副作用：
  *   - 写回 plan
  *   - 写入 LearnLog（understood_event / ununderstood_event）
+ *
+ * 2026-07-26 修复（用户反馈"我答对了进度还是 0"）：
+ *   - 旧版 `if (!targetQ) return plan;` 静默返回未修改的 plan，调用方误以为写入成功
+ *     → toast 显示"已记录「我答对了」"但 understood 没真正写入
+ *   - 现在抛错让调用方知道 questionId 在 plan.questions 中找不到（数据漂移 / 状态不一致）
+ *   - 调用方据此决定是否提示用户重试或回滚 UI
  */
 export async function markQuestionUnderstood(
   plan: LearningPlan,
@@ -162,7 +168,11 @@ export async function markQuestionUnderstood(
 ): Promise<LearningPlan> {
   const now = nowISO();
   const targetQ = plan.questions.find((q) => q.id === questionId);
-  if (!targetQ) return plan;
+  if (!targetQ) {
+    throw new Error(
+      `markQuestionUnderstood: questionId "${questionId}" 不在 plan "${plan.id}" 的 questions 中（可能数据漂移或状态不一致）`,
+    );
+  }
 
   const updatedQuestions = plan.questions.map((q) =>
     q.id === questionId
@@ -279,13 +289,21 @@ export async function markQuestionUnderstoodAndMaybeMasterNode(
 /**
  * 记录题目被展开查看（隐式反馈）。
  * 不修改 understood 状态，只更新 viewed 时间戳。
+ *
+ * 2026-07-26 修复：questionId 找不到时抛错（与 markQuestionUnderstood 一致），
+ * 避免静默失败让调用方误以为已写入。已查看过则跳过（幂等）。
  */
 export async function markQuestionViewed(
   plan: LearningPlan,
   questionId: string
 ): Promise<LearningPlan> {
   const targetQ = plan.questions.find((q) => q.id === questionId);
-  if (!targetQ || targetQ.viewed) return plan; // 已查看过则不重复记录
+  if (!targetQ) {
+    throw new Error(
+      `markQuestionViewed: questionId "${questionId}" 不在 plan "${plan.id}" 的 questions 中`,
+    );
+  }
+  if (targetQ.viewed) return plan; // 已查看过则不重复记录（幂等）
 
   const now = nowISO();
   const updated: LearningPlan = {

@@ -11,7 +11,7 @@ import { listPlanSummaries, migrateSummaries } from "@/lib/plan-summary";
 import { deletePlanCascade, sweepOrphanPlanData } from "@/lib/plan-cleanup";
 import { type LearningPlanSummary } from "@/lib/types";
 import { Icon } from "@/components/Icon";
-import { Button } from "@/components/ui";
+import { Button, ProgressBar, type ProgressBarColor } from "@/components/ui";
 
 export default function ListClient() {
   const router = useRouter();
@@ -107,41 +107,83 @@ export default function ListClient() {
       </header>
 
       <div className="space-y-2">
-        {plans.map((p) => (
-          <Link
-            key={p.id}
-            href={`/learn/${p.id}`}
-            className="block border rounded-lg p-4 hover:bg-gray-50 hover:border-blue-300 transition-colors bg-white"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-medium truncate">{p.topic}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {p.knowledgeCount} 知识点 · {p.questionCount} 题 ·{" "}
-                  {p.scheduleDays} 天计划 · 每日 {p.dailyMinutes} 分钟
-                </p>
-                <p className="text-2xs text-gray-400 mt-0.5">
-                  创建于 {new Date(p.createdAt).toLocaleDateString("zh-CN")}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 ml-2">
-                <Button
-                  onClick={(e) => deletePlan(p.id, e)}
-                  variant={confirmingDeleteId === p.id ? "danger" : "ghost"}
-                  size="sm"
-                  aria-label="删除计划"
-                >
-                  {confirmingDeleteId === p.id ? (
-                    "确认删除"
-                  ) : (
-                    <Icon name="x" className="w-3.5 h-3.5 inline-block" />
+        {plans.map((p) => {
+          // 2026-07-26 修复（用户反馈"我答对了进度还是 0"）：
+          // 在列表卡片直接展示"已看懂 X/Y 题"进度，让用户看到点击效果
+          // understoodCount 由 toSummary 派生（plan.questions.filter(q => q.understood).length）
+          // 旧 summary 缺此字段时 normalizePlanSummary 回退为 0（向后兼容）
+          const understood = p.understoodCount ?? 0;
+          const total = p.questionCount ?? 0;
+          const hasProgress = total > 0;
+          const progressPct = hasProgress ? Math.round((understood / total) * 100) : 0;
+          // 全部看懂显示绿色，部分进度显示蓝色，未开始显示灰色
+          const progressColor: ProgressBarColor =
+            understood === 0
+              ? "gray"
+              : understood >= total
+                ? "green"
+                : "blue";
+          return (
+            <Link
+              key={p.id}
+              href={`/learn/${p.id}`}
+              className="block border rounded-lg p-4 hover:bg-gray-50 hover:border-blue-300 transition-colors bg-white"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-medium truncate">{p.topic}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {p.knowledgeCount} 知识点 · {p.questionCount} 题 ·{" "}
+                    {p.scheduleDays} 天计划 · 每日 {p.dailyMinutes} 分钟
+                  </p>
+                  {/* 进度展示（2026-07-26 新增）：让用户在列表页就能看到学习进度 */}
+                  {hasProgress && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <ProgressBar
+                        value={understood}
+                        max={total}
+                        color={progressColor}
+                        size="xs"
+                        widthClassName="w-24"
+                        label={`已看懂 ${understood} / ${total} 题，进度 ${progressPct}%`}
+                      />
+                      <span
+                        className={`text-2xs ${
+                          understood === 0
+                            ? "text-gray-500 dark:text-gray-400"
+                            : understood >= total
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-blue-600 dark:text-blue-400"
+                        }`}
+                      >
+                        已看懂 {understood}/{total} 题
+                        {understood >= total && " · 已完成"}
+                      </span>
+                    </div>
                   )}
-                </Button>
-                <span className="text-xs text-gray-400">查看 →</span>
+                  <p className="text-2xs text-gray-400 mt-0.5">
+                    创建于 {new Date(p.createdAt).toLocaleDateString("zh-CN")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 ml-2">
+                  <Button
+                    onClick={(e) => deletePlan(p.id, e)}
+                    variant={confirmingDeleteId === p.id ? "danger" : "ghost"}
+                    size="sm"
+                    aria-label="删除计划"
+                  >
+                    {confirmingDeleteId === p.id ? (
+                      "确认删除"
+                    ) : (
+                      <Icon name="x" className="w-3.5 h-3.5 inline-block" />
+                    )}
+                  </Button>
+                  <span className="text-xs text-gray-400">查看 →</span>
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
 
       <p className="text-center text-xs text-gray-300 mt-8">
