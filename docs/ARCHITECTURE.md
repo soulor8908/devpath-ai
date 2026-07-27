@@ -337,6 +337,27 @@ buildProfileContext(profile) → ≤500 字符文本
 - 首页加载时 `checkAndNotify()` 轮询检测，新成就触发通知
 - **扩展方向**：未来可改为事件驱动（LearnLog 写入 → 触发检测）
 
+### 11. 学习队列按题目维度展开（2026-07-27 重构）
+
+- **原因**：旧设计一节点一 StudyTask（节点维度），用户答对 7/8 题节点还没 mastered，进度条 0%，反馈断裂
+- **新设计**：一题一 StudyTask（题目维度），每道未 `understood` 的题都是独立任务，已答对的题不进队列
+- **代价**：队列变长（1 节点 8 题 → 8 个 task），但首页清单粒度更细，用户认知更清晰
+- **进度统计同步**：`deriveCareerPath.progress` 从 `masteredCount/totalNodes` 改成 `understoodCount/totalQuestions`，每答对一题进度条 +1/N
+
+### 12. useHomeData 窗口聚焦自动 reload（2026-07-27 修复）
+
+- **原因**：`useHomeData` 只在 mount 时调一次 `load`，用户从训练页/计划详情页回首页时 hook 不重新加载，显示旧数据
+- **解法**：监听 `visibilitychange` + `window.focus`，窗口聚焦时自动 reload，3 秒节流避免频繁刷新
+- **覆盖场景**：训练页中途退出回首页 / 计划详情页标记 mastered 后回首页 / 任何修改 plan 的页面回首页
+- **守护测试**：`__tests__/home-auto-reload-guard.test.ts` 防止监听被误删
+
+### 13. pre-push 4 层门禁（2026-07-27 闭环修复）
+
+- **原因**：旧 pre-push hook 只跑 `lint + typecheck`，`typecheck` 通过 ≠ `build` 通过（Next.js 15 Server Component 限制），导致部署失败
+- **解法**：pre-push 跑 `lint + typecheck + test + build` 4 层门禁，任一失败立即终止
+- **守护测试**：`__tests__/pre-push-hook-guard.test.ts` 防止 hook 被误删/降级
+- **详见**：[AGENTS.md 第 2.14 节](file:///workspace/AGENTS.md)
+
 ## AI-Native 架构分析
 
 ### Karpathy 视角：从「调用 AI 的工具」到「AI 编排的系统」

@@ -1,6 +1,6 @@
 # 附录 B：踩坑记录
 
-> 15 个真实踩坑记录，按"现象 / 根因 / 修复 / 关联"结构整理。来源：AGENTS.md 2.11-2.13 + 各 spec 的"Why"部分 + 迭代史 Phase 0-13。
+> 17 个真实踩坑记录，按"现象 / 根因 / 修复 / 关联"结构整理。来源：AGENTS.md 2.11-2.14 + 各 spec 的"Why"部分 + 迭代史 Phase 0-13。
 
 ---
 
@@ -241,9 +241,54 @@
 
 ---
 
+## 坑 16：Next.js 15 Server Component 不能用 next/dynamic + ssr:false
+
+**现象**：`npm run build` 报 webpack 错误，Cloudflare Pages 部署失败。但 `npm run typecheck` 通过，本地 `npm run dev` 也正常。
+
+**根因**：`app/layout.tsx` 是 Server Component（默认），用 `next/dynamic` + `ssr: false` 加载 `FloatingChat` / `PomodoroWidget` / `AITaskModal`。Next.js 15 不允许在 Server Component 中用 `ssr: false`——Server Component 在服务端渲染，没有浏览器环境，`ssr: false` 没有意义。tsc 不报错（类型层面合法），但 `next build` 在 webpack 编译阶段失败。
+
+**修复**：把 3 个 dynamic import 移到新建的 Client Component `app/GlobalWidgets.tsx`（文件头 `"use client"`），`layout.tsx` 引用它。性能优化保留（首屏 JS 体积降到最小，用户不点开就不加载）。
+
+**教训**：
+1. `typecheck` 通过 ≠ `build` 通过——TypeScript 类型检查不覆盖框架运行时限制
+2. Next.js 15 Server Component 的限制要查官方文档，不能靠 tsc 兜底
+3. `ssr: false` 必须放在 Client Component 中，不能放在 layout.tsx 这种默认 Server Component 里
+4. pre-push hook 必须跑 `build`，不能只跑 `lint + typecheck`（见坑 17）
+
+**关联**：2026-07-27 / [app/GlobalWidgets.tsx](file:///workspace/app/GlobalWidgets.tsx) / [app/layout.tsx](file:///workspace/app/layout.tsx)
+
+---
+
+## 坑 17：部署失败连环事故（pre-push 门禁缺失）
+
+**现象**：2026-07-25~27 连续 3 次"代码 push 后 Cloudflare Pages 部署失败"：
+1. 坑 16 的 `layout.tsx` ssr:false 问题
+2. 队列改题目维度后测试类型不匹配（`LearningPlanSummary[]` 不能赋给 `LearningPlan[]`）
+3. 删除"今天还没开始"提示后测试断言过期（`expect(insight.tone).toBe("reminding")` 失败）
+
+**根因**：pre-push hook 只跑 `lint + typecheck`，不跑 `test + build`。
+- `typecheck` 通过 ≠ `build` 通过（见坑 16）
+- `lint` 通过 ≠ `test` 通过（lint 检查代码风格，test 验证行为，删除分支后测试断言过期 lint 发现不了）
+- 错误漏到 main 分支 → CF Pages 部署失败 → 用户看到旧版本 → 信任崩塌
+
+**修复**：
+1. pre-push hook 改为 4 层门禁：`lint + typecheck + test + build`，任一失败立即终止（`set -e`）
+2. 守护测试 `__tests__/pre-push-hook-guard.test.ts` 防止 hook 被误删/降级
+3. AGENTS.md 第 2.14 节强制规定 pre-push 必须跑 4 层门禁
+
+**教训**：
+1. **门禁层数要全**：lint / typecheck / test / build 各管一摊，缺一不可
+2. **门禁要有守护**：hook 本身也是代码，会被误删/降级，需要测试守护
+3. **紧急跳过要有规范**：`git push --no-verify` 留后路，但必须在 commit message 说明原因
+4. **部署失败不是单次事故，是系统性缺陷**——不修门禁，下次还会犯
+
+**关联**：2026-07-27 / [.husky/pre-push](file:///workspace/.husky/pre-push) / [AGENTS.md 2.14](file:///workspace/AGENTS.md) / [__tests__/pre-push-hook-guard.test.ts](file:///workspace/__tests__/pre-push-hook-guard.test.ts)
+
+---
+
 ## 踩坑规律总结
 
-回顾 15 个坑，能提炼出 4 条规律：
+回顾 17 个坑，能提炼出 4 条规律：
 
 ### 规律 1：MVP 阶段图快会埋雷
 

@@ -454,6 +454,26 @@ npm run presets:export       # → public/data/presets/<id>.json
 
 4. 客户端用 `loadPresetData(id)` 异步加载完整数据；用 `matchPresetByTopic(topic)` 同步匹配元信息
 
+### 创建学习计划必须查重（2026-07-27）
+
+**所有创建计划的入口**（预设导入 / AI 向导 / Onboarding）必须先调 [`checkOverwriteOrCreate(topic)`](file:///workspace/lib/plan-summary.ts) 查重：
+
+```ts
+import { checkOverwriteOrCreate } from "@/lib/plan-summary";
+
+const overwrite = await checkOverwriteOrCreate(topic);
+if (!overwrite.shouldProceed) return; // 用户选了"取消"
+// 用户选了"覆盖" → 函数内部已级联删除旧计划（deletePlanCascade）
+// 继续创建新计划...
+```
+
+- **查重规则**：`topic.trim().toLowerCase()` 全等匹配
+- **命中重名**：弹 confirm"已经存在相同名字的知识库...是否覆盖？覆盖将删除旧计划及其全部学习记录，无法恢复"
+- **选"覆盖"**：调 `deletePlanCascade(existing.id)` 级联删除旧计划（PLAN_SUMMARY / CARD / REVIEW_LOG / PRIORITY_CACHE / REMINDER 等），然后继续创建
+- **选"取消"**：返回 `{ shouldProceed: false }`，不创建
+
+**不要绕过此函数直接创建计划**，否则会产生同名重复计划（用户反馈"可以添加两个名字相同的知识库"的根因）。
+
 ### 知识库向量搜索
 
 - `lib/knowledge/index-store.ts` — 加载 `public/data/knowledge-index.json`（500 条 × 768 维 BGE 嵌入，构建期预嵌入）

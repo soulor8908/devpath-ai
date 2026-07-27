@@ -208,7 +208,27 @@ npm run start
 
 ---
 
-## 6. 待办（P2/P3，后续优化）
+## 6. 已完成的优化（2026-07-27）
+
+**Bug 修复**：
+- `lib/home.ts` `useHomeData` 加窗口聚焦自动 reload（监听 `visibilitychange` + `window.focus`，3 秒节流）——修复"训练页学会了，回首页 PathProgressBar 进度不更新 + 已 mastered 节点仍在今日清单"
+- `lib/home.ts` `deriveCareerPath` 进度从节点维度改成题目维度（`understoodCount / totalQuestions × 100`）——每答对一题进度条 +1/N，避免节点 8 题答对 7 题仍显示 0%
+- `lib/study-queue/build-study-queue.ts` 学习队列从节点维度改成题目维度（一题一 task，已 understood 的题不进队列）
+- 删除"今天还没开始，从第一个知识点开始吧"提示（streak === 0 提醒，用户反馈变成噪音）
+
+**部署失败闭环修复**：
+- `app/layout.tsx` 拆出 `app/GlobalWidgets.tsx`（Client Component）承载 `ssr:false` dynamic import——Next.js 15 不允许 Server Component 用 `ssr:false`
+- `.husky/pre-push` 改为 4 层门禁：`lint + typecheck + test + build`，任一失败立即终止
+- `__tests__/pre-push-hook-guard.test.ts` 守护 hook 不被误删/降级
+- 详见 [AGENTS.md 第 2.14 节](file:///workspace/AGENTS.md) / [坑 16-17](file:///workspace/docs/tutorial/appendix/pitfalls.md)
+
+**重名计划校验**：
+- `lib/plan-summary.ts` 新增 `checkOverwriteOrCreate(topic)`，3 个创建入口（预设导入 / AI 向导 / Onboarding）统一调用
+- 详见 [DEVELOPMENT.md "创建学习计划必须查重"](file:///workspace/docs/DEVELOPMENT.md)
+
+---
+
+## 7. 待办（P2/P3，后续优化）
 
 按优先级排序，**非阻塞当前发布**：
 
@@ -230,7 +250,7 @@ npm run start
 
 ---
 
-## 7. 审计报告模板
+## 8. 审计报告模板
 
 每次审计完成后，在 `docs/superpowers/plans/` 下创建报告：
 
@@ -247,7 +267,7 @@ docs/superpowers/plans/YYYY-MM-DD-perf-audit.md
 
 ---
 
-## 8. 与 AGENTS.md 的关系
+## 9. 与 AGENTS.md 的关系
 
 本文件不替代 AGENTS.md，是其性能优化场景的展开。任何冲突以 AGENTS.md 为准。
 
