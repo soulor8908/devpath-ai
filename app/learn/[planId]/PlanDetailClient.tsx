@@ -12,7 +12,7 @@ import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
 import { RelatedKnowledge } from "@/components/RelatedKnowledge";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Textarea, Select, Modal, LoadingScreen, ProgressBar, type ProgressBarColor } from "@/components/ui";
+import { Button, Input, Textarea, Select, Modal, LoadingScreen } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
 import { savePlanSummary } from "@/lib/plan-summary";
 import { nowISO } from "@/lib/time";
@@ -731,46 +731,6 @@ export default function PlanDetailClient() {
               {plan.knowledgeTree.length} 个知识点 · {plan.questions.length} 道题 ·{" "}
               {days.length} 天计划
             </p>
-            {/* 2026-07-26 进度展示（修复用户反馈"我答对了进度还是 0"）：
-                头部直接展示"已看懂 X/Y 题"+进度条，让用户在详情页顶部就能看到学习进度，
-                而不是滚到下方才从题目卡片的"已看懂"标签推断。
-                understoodCount 由 plan.questions 实时派生——用户点"我答对了"或"看懂了"后
-                plan 状态更新 → 这里立即重算，确保用户看到点击有效。 */}
-            {plan.questions.length > 0 && (() => {
-              const understoodCount = plan.questions.filter((q) => q.understood).length;
-              const totalCount = plan.questions.length;
-              const pct = Math.round((understoodCount / totalCount) * 100);
-              const color: ProgressBarColor =
-                understoodCount === 0
-                  ? "gray"
-                  : understoodCount >= totalCount
-                    ? "green"
-                    : "blue";
-              return (
-                <div className="mt-2 flex items-center gap-2">
-                  <ProgressBar
-                    value={understoodCount}
-                    max={totalCount}
-                    color={color}
-                    size="sm"
-                    widthClassName="w-40"
-                    label={`已看懂 ${understoodCount} / ${totalCount} 题，进度 ${pct}%`}
-                  />
-                  <span
-                    className={
-                      understoodCount === 0
-                        ? "text-xs text-gray-500 dark:text-gray-400"
-                        : understoodCount >= totalCount
-                          ? "text-xs text-green-600 dark:text-green-400"
-                          : "text-xs text-blue-600 dark:text-blue-400"
-                    }
-                  >
-                    已看懂 {understoodCount}/{totalCount} 题（{pct}%）
-                    {understoodCount >= totalCount && " · 全部完成"}
-                  </span>
-                </div>
-              );
-            })()}
           </div>
           <div className="flex items-center gap-2">
             <Button

@@ -270,37 +270,36 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   //   2. 同步更新 currentPlan / currentQuestion 内存状态（避免 NEXT_TASK 重新 loadCurrentTask 读到旧 plan）
   //   3. 弹 toast 提示用户（autoMastered 显示节点掌握，否则显示题目已记录）
   //
-  // 2026-07-26 修复（用户反馈"点击我答对了，进度没变化、知识库没被改变"）：
+  // 2026-07-26 修复（用户反馈"点击我答对了，进度没变化"）：
   //   - 原版仅在 autoMastered 时弹 toast，单题理解时用户无感知 → 补 else 分支 toast
   //   - 原版 fire-and-forget 写库与 NEXT_TASK 存在竞态：写未完成时 loadCurrentTask
-  //     可能读到旧 plan → 改为返回 Promise，让 onClick 决定是否阻塞 dispatch
-  //   - 关键根因：loadCurrentTask 取节点首题而非首道未看懂题，导致用户下次进来
-  //     还会看到已答对的题（详见 loadCurrentTask 注释）
+  //     可能读到旧 plan → 改为 await 写库后再 dispatch
+  //   - loadCurrentTask 优先选节点下 !understood 的题，避免下次进来重复已答对的题
+  //
+  // 2026-07-27 二次修复（用户反馈"开始训练的进度还是一直为 0"）：
+  //   - 上次修复引入了 regression：handleAnswerCorrect 返回 boolean，
+  //     onClick 里 `if (!ok) return` 阻止了 dispatch ANSWER_SUBMIT
+  //   - 这导致 questionsAnswered/questionsCorrect 永远不增加 → 顶部进度条一直为 0
+  //   - 根因：写库失败时不该阻塞 UI 流程——用户点"我答对了"应该始终进入 feedback phase
+  //     （即使写库失败，用户也不该卡在 questioning phase 无响应）
+  //   - 修复：回到不返回 boolean 的设计，写库失败只 toast 不阻塞 dispatch
+  //     dispatch ANSWER_SUBMIT 始终触发，让训练进度正常累加
   //
   // 注意：
   //   - "没答对"按钮不写 understood=false（避免污染从未标记过的题）
   //   - 仅 type="new" 且有 currentQuestion 时调用（review 任务无 Question 概念）
-  const handleAnswerCorrect = useCallback(async (): Promise<boolean> => {
-    if (!currentQuestion || !currentPlan) return false;
+  //   - markQuestionUnderstood 已改为找不到题目时抛错（避免静默失败），这里 catch 住
+  const handleAnswerCorrect = useCallback(async (): Promise<void> => {
+    if (!currentQuestion || !currentPlan) return;
     try {
       const { plan: updatedPlan, autoMastered, node } =
         await markQuestionUnderstoodAndMaybeMasterNode(
           currentPlan,
           currentQuestion.id,
         );
-      // 2026-07-26 修复（用户反馈"我答对了进度还是 0"）：
-      // 验证写入是否真的生效——find 题目并检查 understood 是否变为 true。
-      // 旧版只看 markQuestionUnderstoodAndMaybeMasterNode 是否抛错，
-      // 但若内部静默返回未修改的 plan，调用方会误以为成功 → toast 显示"已记录"但 understood 没写。
-      // 现在 markQuestionUnderstood 已改为抛错，这里是双保险：若 updatedQ.understood 仍为 false，说明写入异常。
+      setCurrentPlan(updatedPlan);
       const updatedQ =
         updatedPlan.questions.find((q) => q.id === currentQuestion.id) ?? null;
-      if (!updatedQ || updatedQ.understood !== true) {
-        // 写入未生效：不更新 UI 状态，提示用户重试
-        toast.error("记录失败：题目状态未更新，请重试");
-        return false;
-      }
-      setCurrentPlan(updatedPlan);
       setCurrentQuestion(updatedQ);
       // 与 PlanDetailClient.handleMarkUnderstood 保持一致：
       // autoMastered 显示节点掌握提示，否则显示单题已记录（让用户知道点击有效）
@@ -311,12 +310,11 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
       } else {
         toast.success("已记录「我答对了」");
       }
-      return true;
     } catch (e) {
-      // 持久化失败不影响训练流程，但要让用户看到错误（避免静默失败导致"下次进来还是没学"）
+      // 持久化失败不阻塞训练流程（dispatch 仍会触发，让用户进入 feedback phase）
+      // 但 toast 提示用户重试，避免静默失败导致"下次进来还是没学"
       console.warn("[train] 写 understood 失败:", e);
       toast.error("记录失败，请重试");
-      return false;
     }
   }, [currentQuestion, currentPlan]);
 
@@ -489,11 +487,11 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                     setIsCorrect(true);
                     setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
                     // 2026-07-26 修复：await 写库再 dispatch，避免 NEXT_TASK 读到旧 plan
-                    // 写库期间按钮会显示 loading 状态（loading prop），用户感知到"系统在处理"
-                    // 2026-07-26 二次修复：handleAnswerCorrect 失败时早退不 dispatch，
-                    // 避免写入失败但 UI 跳到下一题（用户感觉"我答对了"但进度没变）
-                    const ok = await handleAnswerCorrect();
-                    if (!ok) return;
+                    // 2026-07-27 二次修复：写库失败不阻塞 dispatch——
+                    //   用户点"我答对了"应该始终进入 feedback phase（即使写库失败），
+                    //   否则训练进度（questionsAnswered/Correct）永远不增加，用户感知"进度为 0"
+                    //   写库失败时 handleAnswerCorrect 内部已 toast 提示用户重试
+                    await handleAnswerCorrect();
                     dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
                   }}
                   leftIcon="check"
