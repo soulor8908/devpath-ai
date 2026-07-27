@@ -8,18 +8,28 @@
 //   - layout.tsx SW 注册脚本
 //   - Next.js RSC payload 脚本（框架固有）
 //
-// 闭环解法：
-//   middleware.ts 生成 per-request nonce，覆盖 next.config.js 的 CSP
-//   layout.tsx 读取 nonce，注入 <script nonce={nonce}>
-//   Next.js 15 自动给 RSC payload 脚本加 nonce
+// 已尝试方案（2026-07-27 回退）：
+//   1. middleware.ts 生成 per-request nonce，覆盖 next.config.js 的 CSP
+//   2. layout.tsx 用 await headers() 读取 nonce，注入 <script nonce={nonce}>
+//   3. Next.js 15 自动给 RSC payload 脚本加 nonce
 //
-// 检测策略：源码级别扫描
-//   - 防止"误删 middleware.ts"
-//   - 防止"middleware 不生成 nonce"
-//   - 防止"middleware 不设置 CSP"
-//   - 防止"layout.tsx 不读取 nonce"
-//   - 防止"layout.tsx inline script 不带 nonce 属性"
-//   - 防止"next.config.js CSP 退化（去掉 fallback）"
+// 回退原因（@cloudflare/next-on-pages adapter 限制）：
+//   - middleware 让所有路由变 dynamic
+//   - @cloudflare/next-on-pages 要求所有 dynamic 路由声明 runtime='edge'
+//   - /_not-found 是 Next.js 内置路由，无法声明 edge runtime
+//   - 部署失败：ERROR: Failed to produce a Cloudflare Pages build
+//   - wrangler.toml 注释已提示 @cloudflare/next-on-pages 被弃用，
+//     建议迁移到 OpenNext adapter（https://opennext.js.org/cloudflare）
+//
+// 后续路径：
+//   迁移到 OpenNext adapter 后，重新启用 nonce 模式（middleware + layout.tsx 注入）。
+//   迁移完成前，CSP 由 next.config.js 静态注入（含 'unsafe-inline'），
+//   仍能拦截外部域脚本注入，仅允许同源 + inline 脚本。
+//
+// 检测策略：源码级别扫描，防止"误删 fallback CSP"或"误加回退的 middleware"
+//   - middleware.ts 必须不存在（防止误启用导致部署失败）
+//   - next.config.js 必须保留 CSP fallback（含 'unsafe-inline'）
+//   - layout.tsx inline script 不能带 nonce 属性（nonce 来源已移除）
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -27,78 +37,56 @@ import { resolve } from "node:path";
 
 const MIDDLEWARE_PATH = resolve(__dirname, "../middleware.ts");
 const LAYOUT_PATH = resolve(__dirname, "../app/layout.tsx");
+const NEXT_CONFIG_PATH = resolve(__dirname, "../next.config.js");
 
-const MIDDLEWARE = existsSync(MIDDLEWARE_PATH)
-  ? readFileSync(MIDDLEWARE_PATH, "utf-8")
-  : "";
 const LAYOUT = readFileSync(LAYOUT_PATH, "utf-8");
+const NEXT_CONFIG = readFileSync(NEXT_CONFIG_PATH, "utf-8");
 
-describe("middleware.ts CSP nonce 守护", () => {
-  it("middleware.ts 必须存在（CSP nonce 注入入口）", () => {
-    expect(existsSync(MIDDLEWARE_PATH)).toBe(true);
+describe("CSP nonce 模式现状守护（@cloudflare/next-on-pages 限制）", () => {
+  it("middleware.ts 必须不存在（误启用会导致部署失败）", () => {
+    // 误启用会触发 /_not-found 无法声明 edge runtime → 部署失败
+    // 启用 nonce 模式前须先迁移到 OpenNext adapter
+    expect(existsSync(MIDDLEWARE_PATH)).toBe(false);
   });
 
-  it("必须生成 nonce（crypto.getRandomValues 或 crypto.randomUUID）", () => {
-    expect(MIDDLEWARE).toMatch(/crypto\.(getRandomValues|randomUUID)/);
+  it("next.config.js 必须保留 CSP fallback（含 'unsafe-inline'）", () => {
+    // 防止误删 CSP 配置导致无任何脚本保护
+    expect(NEXT_CONFIG).toContain("Content-Security-Policy");
+    expect(NEXT_CONFIG).toContain("script-src");
+    // 当前 adapter 限制下，'unsafe-inline' 是必要的（inline script 无 nonce）
+    expect(NEXT_CONFIG).toContain("unsafe-inline");
   });
 
-  it("必须设置 Content-Security-Policy 响应头（覆盖 next.config.js 的 CSP）", () => {
-    expect(MIDDLEWARE).toContain("Content-Security-Policy");
-    expect(MIDDLEWARE).toContain("response.headers.set");
-  });
-
-  it("CSP 必须含 'nonce-${nonce}'（不能用 'unsafe-inline'）", () => {
-    expect(MIDDLEWARE).toMatch(/nonce-\$\{nonce\}/);
-    // middleware 的 buildCSP 函数不能含 'unsafe-inline' 在 script-src
-    // 注意：style-src 'unsafe-inline' 是允许的（Next.js 内联样式需要）
-    const buildCSPMatch = MIDDLEWARE.match(
-      /function buildCSP[\s\S]*?return\s*\[[\s\S]*?\]\.join/
-    );
-    expect(buildCSPMatch).not.toBeNull();
-    const buildCSPBody = buildCSPMatch![0];
-    // script-src 行不能含 unsafe-inline
-    const scriptSrcLine = buildCSPBody
-      .split("\n")
-      .find((l) => l.includes("script-src"));
-    expect(scriptSrcLine).toBeTruthy();
-    expect(scriptSrcLine).not.toContain("unsafe-inline");
-  });
-
-  it("必须把 nonce 写入 request header 'x-nonce'（供 layout.tsx 读取）", () => {
-    expect(MIDDLEWARE).toContain("x-nonce");
-    expect(MIDDLEWARE).toContain("requestHeaders.set");
-  });
-
-  it("matcher 必须排除静态资源（_next/static / icons / sw.js 等）", () => {
-    expect(MIDDLEWARE).toContain("matcher");
-    expect(MIDDLEWARE).toContain("_next/static");
-    expect(MIDDLEWARE).toContain("favicon.ico");
-    expect(MIDDLEWARE).toContain("sw.js");
-  });
-});
-
-describe("app/layout.tsx nonce 注入守护", () => {
-  it("必须 import headers from next/headers（读取 middleware 注入的 nonce）", () => {
-    expect(LAYOUT).toContain('from "next/headers"');
-    expect(LAYOUT).toContain("headers");
-  });
-
-  it("RootLayout 必须是 async 函数（Next.js 15 headers() 返回 Promise）", () => {
-    expect(LAYOUT).toMatch(/export default async function RootLayout/);
-  });
-
-  it("必须 await headers() 读取 nonce", () => {
-    expect(LAYOUT).toMatch(/await headers\(\)/);
-    expect(LAYOUT).toContain("x-nonce");
-  });
-
-  it("所有 inline <script> 必须带 nonce 属性（含 dangerouslySetInnerHTML 的）", () => {
-    // 提取所有 <script 标签
+  it("layout.tsx inline script 不能带 nonce 属性（nonce 来源已移除）", () => {
+    // 防止残留 nonce={nonce} 引用，会导致 build 失败（nonce 未定义）
     const scriptTags = LAYOUT.match(/<script[^>]*>/g) || [];
     expect(scriptTags.length).toBeGreaterThan(0);
     for (const tag of scriptTags) {
-      // 每个 script 标签必须含 nonce={nonce}
-      expect(tag).toContain("nonce={nonce}");
+      expect(tag).not.toContain("nonce={nonce}");
+      expect(tag).not.toMatch(/nonce=\{[^}]*\}/);
     }
+  });
+
+  it("layout.tsx RootLayout 不能是 async 函数（不再 await headers）", () => {
+    // async + await headers() 会让 layout 变 dynamic，触发 adapter 限制
+    expect(LAYOUT).not.toMatch(/export default async function RootLayout/);
+    expect(LAYOUT).toMatch(/export default function RootLayout/);
+  });
+
+  it("layout.tsx 不能 import headers from next/headers", () => {
+    // 防止残留 import，typecheck 会报 unused 但更明确地断言意图
+    expect(LAYOUT).not.toMatch(/from\s+["']next\/headers["']/);
+  });
+});
+
+describe("未来启用 nonce 模式的检查清单（迁移到 OpenNext adapter 后）", () => {
+  // 这是文档型守护：提醒未来迁移完成后要恢复的配置
+  it("TODO: 迁移到 OpenNext adapter 后恢复 middleware.ts", () => {
+    // 当前不强制，作为文档提醒
+    // 迁移完成后：
+    //   1. 重新创建 middleware.ts（生成 nonce + 设置 CSP）
+    //   2. layout.tsx 改回 async + await headers() + 注入 nonce
+    //   3. 更新本测试文件为断言 middleware.ts 存在
+    expect(true).toBe(true);
   });
 });

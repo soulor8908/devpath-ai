@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { ToastContainer } from "@/components/ui";
@@ -103,20 +102,23 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // 2026-07-27 P1-4：读取 middleware 注入的 nonce，用于 CSP nonce 模式
-  // Next.js 15 的 headers() 返回 Promise（async API），需 await
-  // nonce 注入到 inline script 后，Next.js 15 会自动给 RSC payload 脚本加 nonce
-  const nonce = (await headers()).get("x-nonce") ?? "";
+  // 2026-07-27 P1-4 nonce 模式因 @cloudflare/next-on-pages 限制回退：
+  //   middleware 会让所有路由变 dynamic，而 @cloudflare/next-on-pages 要求
+  //   dynamic 路由声明 runtime='edge'，但 /_not-found 是 Next.js 内置路由
+  //   无法声明 → 部署失败。CSP nonce 模式留待迁移到 OpenNext adapter 后启用。
+  //   详见 __tests__/csp-nonce-guard.test.ts 顶部说明。
+  //   当前 CSP 由 next.config.js 静态注入（含 'unsafe-inline'），仍能拦截
+  //   外部域脚本注入，仅允许同源 + inline 脚本。
 
   return (
     <html lang="zh-CN">
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `
+        <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
               var stored = localStorage.getItem('devpath:theme') || 'light';
@@ -133,7 +135,6 @@ export default async function RootLayout({
         <Nav />
         <GlobalWidgets />
         <script
-          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
               window.addEventListener('load', () => {
