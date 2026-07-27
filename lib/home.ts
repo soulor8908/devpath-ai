@@ -9,7 +9,7 @@
 //   streakMeta 原本是组件内的 40 行 IIFE，纯函数特性 → 抽出为独立函数 getStreakMeta，
 //   便于单测、复用、且使 page.tsx 渲染层保持"纯展示"。
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getItem, countDueCards, listDueCards, listRecentItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
@@ -564,6 +564,10 @@ export function useHomeData(): HomeData & {
     coachInsight: null,
   });
 
+  // 上次 load 完成时间戳（用于窗口聚焦自动 reload 的节流）
+  // 设计动机见下方 visibilitychange useEffect
+  const lastLoadRef = useRef<number>(0);
+
   const load = useCallback(async () => {
     const today = chinaDateNow();
     const todayStatusKey = KEY_PREFIXES.STATUS + today;
@@ -724,8 +728,43 @@ export function useHomeData(): HomeData & {
       });
   }, []);
 
+  // mount 时首次加载
   useEffect(() => {
-    void load();
+    void load().finally(() => {
+      lastLoadRef.current = Date.now();
+    });
+  }, [load]);
+
+  // 窗口聚焦/可见性变化时自动刷新（2026-07-27 修复）
+  // 设计动机（用户反馈"训练页学会了，回首页 PathProgressBar 进度不更新 + 已 mastered 节点仍在今日清单"）：
+  //   - useHomeData 只在 mount 时调 load，无自动刷新机制
+  //   - 用户从训练页/计划详情页回首页时，首页 hook 不重新加载，显示旧数据
+  //   - 根因：useHomeData 是 React state，路由切换不会重新触发 hook（首页组件可能在 App Router 缓存中）
+  //   - 解法：监听 visibilitychange + focus，窗口聚焦时自动 reload
+  // 节流：距离上次 load > 3s 才允许触发，避免短时间多次刷新（如切标签页快速来回）
+  // 覆盖场景：
+  //   - 训练页中途退出回首页 → 首页 reload → PathProgressBar 更新 + 今日清单过滤已 mastered 节点
+  //   - 计划详情页标记 mastered 后回首页 → 同上
+  //   - 任何修改 plan 的页面回首页 → 同上
+  useEffect(() => {
+    if (typeof window === "undefined") return; // SSR 安全
+    const RELOAD_THROTTLE_MS = 3000;
+    const triggerReload = () => {
+      if (Date.now() - lastLoadRef.current < RELOAD_THROTTLE_MS) return;
+      lastLoadRef.current = Date.now();
+      void load();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        triggerReload();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", triggerReload);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", triggerReload);
+    };
   }, [load]);
 
   return { ...data, reload: load };
