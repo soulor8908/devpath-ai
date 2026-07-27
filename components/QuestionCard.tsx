@@ -41,6 +41,8 @@ interface Props {
 
 export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate, regenerating, onFollowUpClick, onMarkUnderstood, onViewed }: Props) {
   const [expanded, setExpanded] = useState(false);
+  // 2026-07-27：收藏按钮 loading 反馈（造卡涉及多次 IndexedDB 串行写入，慢时无反馈让用户连点 → 重复造卡）
+  const [favoriting, setFavoriting] = useState(false);
   const isFailed = question.question === "生成失败，点击重试";
   const isUnderstood = question.understood === true;
 
@@ -164,32 +166,38 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
         {onFavoriteToggle && (
           <Button
             onClick={async () => {
-              if (!question.favorited) {
-                trackImplicit("favorited");
-                // 即将收藏 → 同步造复习卡（带查重，避免重复）
-                if (planId) {
-                  try {
-                    const existing = await findExistingCard({ planId, questionId: question.id });
-                    if (!existing) {
-                      const card = createCard(
-                        planId,
-                        question.nodeId,
-                        question.id,
-                        question.question,
-                        question.answer || "",
-                        "standard"
-                      );
-                      await setItem(KEY_PREFIXES.CARD + card.id, card);
+              setFavoriting(true);
+              try {
+                if (!question.favorited) {
+                  trackImplicit("favorited");
+                  // 即将收藏 → 同步造复习卡（带查重，避免重复）
+                  if (planId) {
+                    try {
+                      const existing = await findExistingCard({ planId, questionId: question.id });
+                      if (!existing) {
+                        const card = createCard(
+                          planId,
+                          question.nodeId,
+                          question.id,
+                          question.question,
+                          question.answer || "",
+                          "standard"
+                        );
+                        await setItem(KEY_PREFIXES.CARD + card.id, card);
+                      }
+                    } catch {
+                      // 造卡失败不影响收藏本身
                     }
-                  } catch {
-                    // 造卡失败不影响收藏本身
                   }
                 }
+                onFavoriteToggle(question.id);
+              } finally {
+                setFavoriting(false);
               }
-              onFavoriteToggle(question.id);
             }}
             variant="ghost"
             size="sm"
+            loading={favoriting}
             className={`text-lg ${question.favorited ? "text-yellow-500" : "text-gray-300"}`}
             aria-label="收藏"
           >

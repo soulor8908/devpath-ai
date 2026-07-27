@@ -38,6 +38,8 @@ export default function MistakeBookClient() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 2026-07-27：单条错题"已掌握"按钮 loading 反馈（按 id 跟踪，支持列表多卡片）
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -198,7 +200,15 @@ export default function MistakeBookClient() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleResolve(m.id)}
+                      loading={resolvingId === m.id}
+                      onClick={async () => {
+                        setResolvingId(m.id);
+                        try {
+                          await handleResolve(m.id);
+                        } finally {
+                          setResolvingId(null);
+                        }
+                      }}
                     >
                       已掌握
                     </Button>

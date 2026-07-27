@@ -91,6 +91,9 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   const [feedback, setFeedback] = useState("");
   const [isCorrect, setIsCorrect] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 2026-07-27：按钮级 loading 反馈，避免用户点击后无反馈感
+  const [submitting, setSubmitting] = useState(false); // "我答对了"提交中
+  const [favoriting, setFavoriting] = useState(false); // 收藏按钮操作中
   // 测试阶段答案是否已揭示（默认隐藏，强制用户先回忆）
   // 2026-07-25 持久化：恢复时从 sessionStorage 读出（用户已看过答案就直接展示）
   const [answerRevealed, setAnswerRevealed] = useState(restored?.extras.answerRevealed ?? false);
@@ -409,10 +412,18 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
             </div>
             {/* 收藏按钮：收藏后进入 FSRS 复习轮换 */}
             <Button
-              onClick={handleFavorite}
+              onClick={async () => {
+                setFavoriting(true);
+                try {
+                  await handleFavorite();
+                } finally {
+                  setFavoriting(false);
+                }
+              }}
               variant="ghost"
               size="sm"
               iconOnly
+              loading={favoriting}
               aria-label={currentQuestion.favorited ? "取消收藏" : "收藏题目"}
               className={currentQuestion.favorited ? "text-yellow-500" : "text-gray-300 dark:text-gray-600"}
             >
@@ -486,16 +497,24 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
                   variant="success"
                   block
                   onClick={async () => {
-                    setIsCorrect(true);
-                    setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
-                    // 2026-07-26 修复：await 写库再 dispatch，避免 NEXT_TASK 读到旧 plan
-                    // 2026-07-27 二次修复：写库失败不阻塞 dispatch——
-                    //   用户点"我答对了"应该始终进入 feedback phase（即使写库失败），
-                    //   否则训练进度（questionsAnswered/Correct）永远不增加，用户感知"进度为 0"
-                    //   写库失败时 handleAnswerCorrect 内部已 toast 提示用户重试
-                    await handleAnswerCorrect();
-                    dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
+                    setSubmitting(true);
+                    try {
+                      setIsCorrect(true);
+                      setFeedback(generateSocraticFeedback(true, currentQuestion.keyPoints?.[0]));
+                      // 2026-07-26 修复：await 写库再 dispatch，避免 NEXT_TASK 读到旧 plan
+                      // 2026-07-27 二次修复：写库失败不阻塞 dispatch——
+                      //   用户点"我答对了"应该始终进入 feedback phase（即使写库失败），
+                      //   否则训练进度（questionsAnswered/Correct）永远不增加，用户感知"进度为 0"
+                      //   写库失败时 handleAnswerCorrect 内部已 toast 提示用户重试
+                      // 2026-07-27 三次补全：补 submitting loading 反馈，
+                      //   解决"点了没反应"的体验问题（写库 IO 慢时无视觉反馈）
+                      await handleAnswerCorrect();
+                      dispatch({ type: "ANSWER_SUBMIT", isCorrect: true });
+                    } finally {
+                      setSubmitting(false);
+                    }
                   }}
+                  loading={submitting}
                   leftIcon="check"
                 >
                   我答对了

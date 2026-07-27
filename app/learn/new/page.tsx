@@ -112,6 +112,8 @@ export default function LearnNewPage() {
   const [showPromptLib, setShowPromptLib] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [savePromptTitle, setSavePromptTitle] = useState("");
+  // 2026-07-27："常用提示词库"按钮 loading 反馈（首次 ensurePromptLibrary 需写 IndexedDB）
+  const [loadingPromptLib, setLoadingPromptLib] = useState(false);
 
   // 按需加载提示词库（首次展开时调用）
   const ensurePromptLibrary = useCallback(async () => {
@@ -374,9 +376,15 @@ export default function LearnNewPage() {
                 type="button"
                 variant="link"
                 size="sm"
+                loading={loadingPromptLib}
                 onClick={async () => {
-                  await ensurePromptLibrary();
-                  setShowPromptLib((v) => !v);
+                  setLoadingPromptLib(true);
+                  try {
+                    await ensurePromptLibrary();
+                    setShowPromptLib((v) => !v);
+                  } finally {
+                    setLoadingPromptLib(false);
+                  }
                 }}
               >
                 <Icon name="book" className="w-4 h-4 inline-block align-middle" /> 常用 {promptLibraryLoaded ? `(${promptLibrary.length})` : ""}

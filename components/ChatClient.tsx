@@ -122,6 +122,11 @@ export default function ChatClient({
   // 用户消息编辑：仅最新一条 user 消息可编辑，编辑时渲染 textarea 替代气泡
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  // 2026-07-27：消息工具栏按钮 loading 反馈（按 messageId 跟踪，支持列表多消息）
+  // - copyingId：复制消息按钮（clipboard.writeText 是 async）
+  // - deletingMessageId：删除消息按钮（confirmDialog + handleDeleteMessage 是 async）
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1431,18 +1436,24 @@ export default function ChatClient({
                     size="sm"
                     iconOnly
                     onClick={async () => {
+                    setCopyingId(m.id);
+                    try {
                       try {
                         await navigator.clipboard?.writeText(m.content);
                         toast.success("已复制到剪贴板");
                       } catch {
                         toast.error("复制失败，请手动选择文字复制");
                       }
-                    }}
-                    className="text-2xs text-gray-400 hover:text-blue-500"
-                    aria-label="复制消息"
-                    title="复制消息"
-                  >
-                    <Icon name="copy" className="w-3.5 h-3.5" />
+                    } finally {
+                      setCopyingId(null);
+                    }
+                  }}
+                  loading={copyingId === m.id}
+                  className="text-2xs text-gray-400 hover:text-blue-500"
+                  aria-label="复制消息"
+                  title="复制消息"
+                >
+                  <Icon name="copy" className="w-3.5 h-3.5" />
                   </Button>
                   {/* 编辑按钮：仅最新一条 user 消息 + 非流式输出时显示 */}
                   {!streaming && m.id === lastUserMessageId && (
@@ -1467,6 +1478,8 @@ export default function ChatClient({
                     size="sm"
                     iconOnly
                     onClick={async () => {
+                    setDeletingMessageId(m.id);
+                    try {
                       const ok = await confirmDialog({
                         title: "删除这条消息？",
                         message: "确定删除这条消息吗？此操作不可恢复。",
@@ -1475,7 +1488,11 @@ export default function ChatClient({
                         danger: true,
                       });
                       if (ok) handleDeleteMessage(m.id);
-                    }}
+                    } finally {
+                      setDeletingMessageId(null);
+                    }
+                  }}
+                  loading={deletingMessageId === m.id}
                     className="text-2xs text-gray-400 hover:text-red-500"
                     aria-label="删除消息"
                     title="删除消息"
@@ -1537,13 +1554,19 @@ export default function ChatClient({
                   size="sm"
                   iconOnly
                   onClick={async () => {
+                    setCopyingId(m.id);
                     try {
-                      await navigator.clipboard?.writeText(m.content);
-                      toast.success("已复制到剪贴板");
-                    } catch {
-                      toast.error("复制失败，请手动选择文字复制");
+                      try {
+                        await navigator.clipboard?.writeText(m.content);
+                        toast.success("已复制到剪贴板");
+                      } catch {
+                        toast.error("复制失败，请手动选择文字复制");
+                      }
+                    } finally {
+                      setCopyingId(null);
                     }
                   }}
+                  loading={copyingId === m.id}
                   className="text-2xs text-gray-400 hover:text-blue-500"
                   aria-label="复制回复内容"
                   title="复制回复内容"
@@ -1555,15 +1578,21 @@ export default function ChatClient({
                   size="sm"
                   iconOnly
                   onClick={async () => {
-                    const ok = await confirmDialog({
-                      title: "删除这条回复？",
-                      message: "确定删除这条回复吗？此操作不可恢复。",
-                      confirmText: "删除",
-                      cancelText: "取消",
-                      danger: true,
-                    });
-                    if (ok) handleDeleteMessage(m.id);
+                    setDeletingMessageId(m.id);
+                    try {
+                      const ok = await confirmDialog({
+                        title: "删除这条回复？",
+                        message: "确定删除这条回复吗？此操作不可恢复。",
+                        confirmText: "删除",
+                        cancelText: "取消",
+                        danger: true,
+                      });
+                      if (ok) handleDeleteMessage(m.id);
+                    } finally {
+                      setDeletingMessageId(null);
+                    }
                   }}
+                  loading={deletingMessageId === m.id}
                   className="text-2xs text-gray-400 hover:text-red-500"
                   aria-label="删除回复"
                   title="删除回复"

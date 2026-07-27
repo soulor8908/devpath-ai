@@ -65,6 +65,10 @@ export function KnowledgeTree({
   onMarkNeedsReinforce,
 }: KnowledgeTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // 2026-07-27：标记掌握 / 需要加强 按钮的 loading 反馈
+  // 异步回调会写 IndexedDB（节点状态 + 计划摘要级联更新），无反馈时用户连点易产生竞态
+  const [masteringId, setMasteringId] = useState<string | null>(null);
+  const [reinforcingId, setReinforcingId] = useState<string | null>(null);
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -204,9 +208,15 @@ export function KnowledgeTree({
                           <Button
                             variant="success"
                             size="sm"
-                            onClick={(e) => {
+                            loading={masteringId === node.id}
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              onMarkMastered(node, !isMastered);
+                              setMasteringId(node.id);
+                              try {
+                                await onMarkMastered(node, !isMastered);
+                              } finally {
+                                setMasteringId(null);
+                              }
                             }}
                             title={isMastered ? "取消掌握标记" : "标记为已掌握"}
                           >
@@ -216,9 +226,15 @@ export function KnowledgeTree({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={(e) => {
+                              loading={reinforcingId === node.id}
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                onMarkNeedsReinforce(node, !needsReinforce);
+                                setReinforcingId(node.id);
+                                try {
+                                  await onMarkNeedsReinforce(node, !needsReinforce);
+                                } finally {
+                                  setReinforcingId(null);
+                                }
                               }}
                               title={
                                 needsReinforce
