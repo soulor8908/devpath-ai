@@ -48,6 +48,64 @@ import type { PublicProfile } from "@/lib/types";
 import { getLastSyncedAt, uploadIncremental } from "@/lib/sync";
 import { confirmDialog } from "@/lib/confirm-dialog";
 
+// 首屏骨架屏：与 HomeClient 布局对齐，提供"结构感"而非白屏
+// 2026-07-27：从 app/page.tsx 移到此处 export，让 Suspense fallback 和
+// useHomeData isLoading 共用同一骨架屏，避免两段式跳变（chunk 加载骨架屏 →
+// 数据加载假数据 → 真实数据）
+export function HomeSkeleton() {
+  return (
+    <div className="min-h-screen p-4 max-w-2xl mx-auto pb-20 dark:bg-gray-900 animate-pulse">
+      {/* 顶部 */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-7 w-20 bg-gray-100 dark:bg-gray-700 rounded-full" />
+      </div>
+      {/* AI 提醒卡片占位 */}
+      <div className="mb-4 space-y-3">
+        <div className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        <div className="h-12 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </div>
+      {/* 三宫格统计占位 */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 border dark:border-gray-700 rounded-lg" />
+        ))}
+      </div>
+      {/* 今日安排占位 */}
+      <div className="space-y-2 mb-4">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-9 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        ))}
+      </div>
+      {/* 情绪区占位 */}
+      <div className="mb-4">
+        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+        <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </div>
+      {/* 错题区占位 */}
+      <div className="mb-4">
+        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+        <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </div>
+      {/* 热力图占位 */}
+      <div className="mb-4">
+        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+        <div className="flex gap-1">
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex-1 h-12 bg-gray-100 dark:bg-gray-800 rounded" />
+          ))}
+        </div>
+      </div>
+      {/* 快捷入口占位 */}
+      <div className="grid grid-cols-3 gap-3 mt-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function HomeClient() {
   const {
     streak,
@@ -66,6 +124,7 @@ export default function HomeClient() {
     careerPath,
     coachInsight,
     reload,
+    isLoading,
   } = useHomeData();
 
   const [shareMsg, setShareMsg] = useState<string>("");
@@ -149,6 +208,13 @@ export default function HomeClient() {
   const lowEnergy = todayEnergy !== null && todayEnergy <= 2;
   // 需求 4：7 天热力图仅在至少 1 天有打卡数据时才显示（新账户隐藏）
   const heatmapHasData = heatmapData.some((d) => d.minutes > 0);
+
+  // ============ 加载态：首屏骨架屏 ============
+  // 2026-07-27：useHomeData 首次加载时显示骨架屏，避免 0/null 假数据跳变
+  // reload（visibilitychange/focus）不重新设 isLoading=true，数据直接更新不闪骨架屏
+  if (isLoading) {
+    return <HomeSkeleton />;
+  }
 
   // ============ 新用户引导 ============
   if (hasPlans === false) {

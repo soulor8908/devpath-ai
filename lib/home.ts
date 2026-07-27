@@ -547,8 +547,9 @@ interface OnboardingData {
  */
 export function useHomeData(): HomeData & {
   reload: () => Promise<void>;
+  isLoading: boolean;
 } {
-  const [data, setData] = useState<HomeData>({
+  const [data, setData] = useState<HomeData & { isLoading: boolean }>({
     dueCount: 0,
     todayLearnCount: 0,
     streak: 0,
@@ -570,11 +571,17 @@ export function useHomeData(): HomeData & {
     todayCompletedCount: 0,
     careerPath: null,
     coachInsight: null,
+    // 2026-07-27 新增：首页加载状态
+    // 初始 true（首次加载显示骨架屏），load 完成后 false
+    // 后续 reload（visibilitychange/focus）不重新设 true，避免闪骨架屏（数据直接更新）
+    isLoading: true,
   });
 
   // 上次 load 完成时间戳（用于窗口聚焦自动 reload 的节流）
   // 设计动机见下方 visibilitychange useEffect
   const lastLoadRef = useRef<number>(0);
+  // 是否已完成首次加载（区分首次 vs reload，避免 reload 闪骨架屏）
+  const firstLoadedRef = useRef<boolean>(false);
 
   const load = useCallback(async () => {
     const today = chinaDateNow();
@@ -703,7 +710,10 @@ export function useHomeData(): HomeData & {
       todayCompletedCount,
       careerPath,
       coachInsight,
+      // 2026-07-27：首次加载完成后设 false，后续 reload 直接更新数据不闪骨架屏
+      isLoading: false,
     });
+    firstLoadedRef.current = true;
 
     // 后台维护任务：不阻塞 UI，失败静默
     // - autoFillTodayActualMinutes: 自动回填今日 actualMinutes
@@ -779,7 +789,7 @@ export function useHomeData(): HomeData & {
     };
   }, [load]);
 
-  return { ...data, reload: load };
+  return { ...data, reload: load, isLoading: data.isLoading };
 }
 
 // ============ 内部工具：后台任务包装 ============
