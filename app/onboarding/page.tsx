@@ -18,7 +18,7 @@ import { CAREER_PATHS, getCareerPathNodes } from "@/lib/onboarding/career-paths"
 import { PRESET_METAS, loadPresetData } from "@/lib/presets";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { confirmDialog } from "@/lib/confirm-dialog";
-import { savePlanSummary, findExistingPlanByTopic } from "@/lib/plan-summary";
+import { savePlanSummary, checkOverwriteOrCreate } from "@/lib/plan-summary";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { nanoid } from "nanoid";
@@ -32,27 +32,15 @@ export default function OnboardingPage() {
     if (!selectedPath) return;
     setStarting(true);
     try {
-      // 2026-07-26 修复（用户反馈"通过学习路径添加知识库时没判断是否已在学习列表"）：
-      //   落库前先 findExistingPlanByTopic 查重，命中则 confirm 让用户选择：
-      //     - 确认 → 跳转到已有计划训练页（避免重复创建）
-      //     - 取消 → 继续创建新计划（保留用户的"重新开始"自由度）
+      // 2026-07-27 修复（用户反馈"可以添加两个名字相同的知识库"）：
+      //   以名字作为唯一键去重，遇到重名弹 confirm"是否覆盖"：
+      //     - 覆盖 → 删除旧计划（含关联卡 / 日志）+ 创建新计划
+      //     - 取消 → 不创建，留在 onboarding 页让用户重选路径
+      //   旧的"进入已有 vs 仍要创建"会让用户选"仍要创建"产生重名，不符合唯一键语义
       //   注意：career path 的 topic 用 selectedPath.title（如"前端工程师 → AI 工程师"），
       //   与 preset.topic 一致，因此查重能命中之前创建过的同路径计划。
-      const existing = await findExistingPlanByTopic(selectedPath.title);
-      if (existing) {
-        const openExisting = await confirmDialog({
-          title: "已存在相同主题的学习计划",
-          message: `检测到学习列表中已有「${existing.topic}」（${existing.knowledgeCount} 知识点 · ${existing.questionCount} 题）。是否直接进入已有计划？取消则继续创建新计划。`,
-          confirmText: "进入已有",
-          cancelText: "仍要创建",
-        });
-        if (openExisting) {
-          // 直接跳转到已有计划的训练页（保持 onboarding 的"立即训练"体验）
-          router.push(`/train?planId=${existing.id}`);
-          return;
-        }
-        // 用户选"仍要创建" → 继续走原创建流程
-      }
+      const overwrite = await checkOverwriteOrCreate(selectedPath.title);
+      if (!overwrite.shouldProceed) return;
 
       // 用户选择路径进入学习时，若存在 demo 示例数据，先询问是否清除
       // 避免示例计划/复习卡片干扰真实学习流程

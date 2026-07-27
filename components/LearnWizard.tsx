@@ -29,7 +29,7 @@ import { confirmDialog } from "@/lib/confirm-dialog";
 import { Icon } from "@/components/Icon";
 import { Button, Textarea } from "@/components/ui";
 import { recordInputHistory } from "@/lib/learn-input-history";
-import { savePlanSummary, findExistingPlanByTopic } from "@/lib/plan-summary";
+import { savePlanSummary, checkOverwriteOrCreate } from "@/lib/plan-summary";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
 import { parseNDJSONChunk } from "@/lib/parse-ndjson";
 import { listModelConfigs } from "@/lib/model-config";
@@ -438,30 +438,17 @@ export function LearnWizard({
   }, [questions, nodes, topic, learnFetch, updateTrialModeFromResponse]);
 
   // ---- Step 4: 保存计划并跳转 ----
-  // 2026-07-26 修复（用户反馈"添加知识库时没判断是否已在学习列表"）：
-  //   落库前先 findExistingPlanByTopic 查重，命中则 confirm 让用户选择：
-  //     - 确认 → 跳转到已有计划详情页（避免重复创建）
-  //     - 取消 → 继续创建新计划（保留用户的"重新开始"自由度）
-  //   注意：查重必须在 setStep("saving") 之前，否则用户选"打开已有"时
+  // 2026-07-27 修复（用户反馈"可以添加两个名字相同的知识库"）：
+  //   以名字作为唯一键去重，遇到重名弹 confirm"是否覆盖"：
+  //     - 覆盖 → 删除旧计划（含关联卡 / 日志）+ 创建新计划
+  //     - 取消 → 不创建，保留在 answers step 让用户改 topic 或退出
+  //   旧的"打开已有 vs 仍要创建"会让用户选"仍要创建"产生重名，不符合唯一键语义
+  //   注意：查重必须在 setStep("saving") 之前，否则用户选"取消"时
   //   会留下 saving 状态导致 UI 卡住。
   const saveAndRedirect = useCallback(async () => {
-    // 查重：topic 完全匹配（大小写不敏感 + 去首尾空白）
-    const existing = await findExistingPlanByTopic(topic);
-    if (existing) {
-      const openExisting = await confirmDialog({
-        title: "已存在相同主题的学习计划",
-        message: `检测到学习列表中已有「${existing.topic}」（${existing.knowledgeCount} 知识点 · ${existing.questionCount} 题）。是否打开已有计划？取消则继续创建新计划。`,
-        confirmText: "打开已有",
-        cancelText: "仍要创建",
-      });
-      if (openExisting) {
-        // 跳转到已有计划详情页，并清除草稿（避免下次进入向导时误恢复）
-        await delItem(KEY_PREFIXES.PLAN_DRAFT + topic).catch(() => {});
-        router.push(`/learn/${existing.id}`);
-        return;
-      }
-      // 用户选"仍要创建" → 继续走原创建流程
-    }
+    // 覆盖式查重：命中重名则 confirm，选"覆盖"删除旧的，选"取消"返回不创建
+    const overwrite = await checkOverwriteOrCreate(topic);
+    if (!overwrite.shouldProceed) return;
     setStep("saving");
     try {
       const sorted = topoSort(nodes);

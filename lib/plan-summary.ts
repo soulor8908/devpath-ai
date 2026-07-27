@@ -235,3 +235,69 @@ export async function findExistingPlanByTopic(
   const summaries = await listPlanSummaries();
   return summaries.find((s) => s.topic.trim().toLowerCase() === trimmed);
 }
+
+/**
+ * 覆盖式创建前置检查（2026-07-27 新增）。
+ *
+ * 设计动机（用户反馈"可以添加两个名字相同的知识库"）：
+ *   旧的查重只是 confirm"打开已有 vs 仍要创建"，用户选"仍要创建"还是会产生重名。
+ *   用户要求：以名字作为唯一键去重，遇到重名提示"是否覆盖"。
+ *   - 选"覆盖" → 删除旧计划（含关联卡 / 日志 / 草稿等），返回 shouldProceed=true
+ *   - 选"取消" → 不创建，返回 shouldProceed=false
+ *
+ * 使用模式（3 个创建入口统一调用）：
+ *   ```ts
+ *   const overwrite = await checkOverwriteOrCreate(topic);
+ *   if (!overwrite.shouldProceed) return; // 用户取消
+ *   // 若 overwrite.deletedPlanId 有值，旧计划已被级联删除，直接创建新的即可
+ *   const plan: LearningPlan = { id: nanoid(), topic, ... };
+ *   await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
+ *   await savePlanSummary(plan);
+ *   ```
+ *
+ * 性能：
+ *   - 查重走 listPlanSummaries 的 5min 缓存
+ *   - 删除走 deletePlanCascade（级联清理 PLAN_SUMMARY / CARD / REVIEW_LOG 等）
+ *   - 不命中时无副作用，零成本
+ *
+ * @param topic 要创建的主题（来自用户输入或 preset.topic）
+ * @returns { shouldProceed: 是否继续创建; deletedPlanId?: 被覆盖删除的旧 planId }
+ */
+export async function checkOverwriteOrCreate(topic: string): Promise<{
+  shouldProceed: boolean;
+  deletedPlanId?: string;
+}> {
+  const existing = await findExistingPlanByTopic(topic);
+  if (!existing) {
+    // 无重名 → 直接创建
+    return { shouldProceed: true };
+  }
+
+  // 命中重名 → 弹 confirm："已经存在相同名字的知识库，是否覆盖？"
+  // 用动态 import 避免循环依赖（confirm-dialog 不依赖 plan-summary，但保持稳健）
+  const { confirmDialog } = await import("@/lib/confirm-dialog");
+  const { deletePlanCascade } = await import("@/lib/plan-cleanup");
+
+  const shouldOverwrite = await confirmDialog({
+    title: "已经存在相同名字的知识库",
+    message: `学习列表中已有「${existing.topic}」（${existing.knowledgeCount} 知识点 · ${existing.questionCount} 题）。是否覆盖？覆盖将删除旧计划及其全部学习记录，无法恢复。`,
+    confirmText: "覆盖",
+    cancelText: "取消",
+    danger: true,
+  });
+
+  if (!shouldOverwrite) {
+    // 用户取消 → 不创建
+    return { shouldProceed: false };
+  }
+
+  // 用户选"覆盖" → 级联删除旧计划（含卡 / 日志 / 草稿）
+  // 失败不阻断创建（兜底：新计划用新 id，旧计划残留可后续手动清理）
+  try {
+    await deletePlanCascade(existing.id);
+  } catch (e) {
+    console.warn("[plan-summary] 覆盖删除旧计划失败，继续创建新计划:", e);
+  }
+
+  return { shouldProceed: true, deletedPlanId: existing.id };
+}
