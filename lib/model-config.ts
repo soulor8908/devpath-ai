@@ -1,9 +1,28 @@
 // lib/model-config.ts
 // AI 模型配置 CRUD：用户可在 profile 配置多个 OpenAI 兼容模型
+//
+// 2026-07-27 P0 安全加固（卡帕西视角：根因修复）：
+//   - apiKey 不再持久化到 IndexedDB（仅在表单内存中持有，用于 exchange）
+//   - createModelConfig / updateModelConfig 写入前用 stripApiKey 去除 apiKey 字段
+//   - 旧数据若含 apiKey 会在下次 update 时自动清除（向后兼容迁移）
+//   - 服务端只通过 session 鉴权，apiKey 永不离开本机除了 exchange 那一次
 
 import { nanoid } from "nanoid";
 import { getItem, setItem, listItems, delItem } from "./storage/db";
 import { KEY_PREFIXES, type ModelConfig } from "./types";
+
+/**
+ * 从 ModelConfig 中剥离 apiKey 字段。
+ *
+ * 用途：写入 IndexedDB 前调用，确保 apiKey 永不落盘。
+ * 类型上 apiKey 已是可选，这里用解构 + rest 把它从对象中物理删除，
+ * 避免某些序列化路径（如 JSON.stringify）把 undefined 字段也带上。
+ */
+function stripApiKey<T extends { apiKey?: string }>(config: T): Omit<T, "apiKey"> {
+  const { apiKey: _omit, ...rest } = config;
+  void _omit;
+  return rest;
+}
 
 /** 预设模型模板（点击后填充到表单，不自动创建） */
 export const MODEL_PRESETS: Array<Pick<ModelConfig, "name" | "provider" | "baseURL" | "model">> = [
@@ -87,10 +106,10 @@ async function migrateDeepseekChatToV4(): Promise<void> {
     if (toMigrate.length === 0) return;
     await Promise.all(
       toMigrate.map((c) =>
-        setItem(KEY_PREFIXES.MODEL_CONFIG + c.id, {
+        setItem(KEY_PREFIXES.MODEL_CONFIG + c.id, stripApiKey({
           ...c,
           model: "deepseek-v4-flash",
-        }),
+        })),
       ),
     );
   } catch {
@@ -120,8 +139,11 @@ export async function createModelConfig(data: Omit<ModelConfig, "id" | "createdA
   if (config.isDefault) {
     await clearOtherDefaults(config.id);
   }
-  await setItem(KEY_PREFIXES.MODEL_CONFIG + config.id, config);
-  return config;
+  // P0 安全加固：apiKey 仅用于 exchange，永不落盘 IndexedDB
+  const persisted = stripApiKey(config);
+  await setItem(KEY_PREFIXES.MODEL_CONFIG + config.id, persisted);
+  // 返回不含 apiKey 的配置（调用方应用 payload.apiKey 做 exchange，不依赖此返回值）
+  return persisted as ModelConfig;
 }
 
 /** 更新模型配置 */
@@ -133,7 +155,8 @@ export async function updateModelConfig(id: string, patch: Partial<Omit<ModelCon
   if (patch.isDefault) {
     await clearOtherDefaults(id);
   }
-  await setItem(KEY_PREFIXES.MODEL_CONFIG + id, updated);
+  // P0 安全加固：strip apiKey（旧数据若有 apiKey，本次更新会自动清除）
+  await setItem(KEY_PREFIXES.MODEL_CONFIG + id, stripApiKey(updated));
 }
 
 /** 删除模型配置 */
@@ -146,7 +169,8 @@ export async function setDefaultModel(id: string): Promise<void> {
   await clearOtherDefaults(id);
   const config = await getModelConfig(id);
   if (config) {
-    await setItem(KEY_PREFIXES.MODEL_CONFIG + id, { ...config, isDefault: true });
+    // P0 安全加固：strip apiKey（旧数据可能含 apiKey，此处顺带清除）
+    await setItem(KEY_PREFIXES.MODEL_CONFIG + id, stripApiKey({ ...config, isDefault: true }));
   }
 }
 
@@ -156,6 +180,6 @@ async function clearOtherDefaults(exceptId: string): Promise<void> {
   await Promise.all(
     configs
       .filter((c) => c.id !== exceptId && c.isDefault)
-      .map((c) => setItem(KEY_PREFIXES.MODEL_CONFIG + c.id, { ...c, isDefault: false }))
+      .map((c) => setItem(KEY_PREFIXES.MODEL_CONFIG + c.id, stripApiKey({ ...c, isDefault: false })))
   );
 }

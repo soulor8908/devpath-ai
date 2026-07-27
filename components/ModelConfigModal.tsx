@@ -58,8 +58,14 @@ export interface ModelConfigModalProps {
   editingModel?: ModelConfig | null;
   /** 编辑模式下的删除回调（提供后才显示"删除"按钮） */
   onDelete?: (id: string) => void | Promise<void>;
-  /** 编辑模式下的"测试连接"回调（提供后才显示"测试连接"按钮） */
-  onTest?: (config: ModelConfig) => void | Promise<void>;
+  /**
+   * 编辑模式下的"测试连接"回调（提供后才显示"测试连接"按钮）
+   *
+   * 2026-07-27 P0 安全加固：apiKey 不再持久化到 IndexedDB，
+   *   测试连接所需的 apiKey 由表单内存传入（formApiKey 参数），
+   *   不依赖 config.apiKey（持久化数据中已无此字段）。
+   */
+  onTest?: (config: ModelConfig, formApiKey: string) => void | Promise<void>;
 }
 
 export function ModelConfigModal({
@@ -100,10 +106,12 @@ export function ModelConfigModal({
     }
     if (editingModel) {
       // 编辑模式：用已有配置填充
+      // 注意：apiKey 自 2026-07-27 P0 加固后不再持久化，editingModel.apiKey 通常为 undefined。
+      // 这里强制留空，要求用户重新输入（保存时再用 exchange 换取 session）。
       setModelName(editingModel.name);
       setModelProvider(editingModel.provider);
       setModelBaseURL(editingModel.baseURL);
-      setModelApiKey(editingModel.apiKey);
+      setModelApiKey("");
       setModelModel(editingModel.model);
       setModelIsDefault(editingModel.isDefault);
       setModelError("");
@@ -258,9 +266,14 @@ export function ModelConfigModal({
   /** 测试连接：调 onTest 回调（profile 列表页传入完整链路） */
   async function handleTest() {
     if (!editingModel || !onTest) return;
+    // P0 安全加固：apiKey 不再从持久化 config 读取，必须由用户在表单中重新输入
+    if (!modelApiKey.trim()) {
+      setModelError("请重新填写 API Key 后再测试连接（出于安全考虑，API Key 不再持久化）");
+      return;
+    }
     setTesting(true);
     try {
-      await onTest(editingModel);
+      await onTest(editingModel, modelApiKey.trim());
     } finally {
       setTesting(false);
     }

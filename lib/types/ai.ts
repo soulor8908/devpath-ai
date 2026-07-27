@@ -12,8 +12,16 @@ export interface ModelConfig {
   provider: "glm" | "deepseek" | "mimo" | "kimi" | "custom";
   /** API baseURL（OpenAI 兼容格式） */
   baseURL: string;
-  /** API Key（仅本地存储 IndexedDB，不同步到云端 KV——换设备需重新输入） */
-  apiKey: string;
+  /**
+   * API Key（仅在保存/编辑时由表单持有，用于一次性 exchange 换取加密 session）。
+   *
+   * 2026-07-27 P0 安全加固：不再持久化到 IndexedDB。
+   *   - createModelConfig / updateModelConfig 写入前会 strip 掉 apiKey
+   *   - 旧数据可能仍含 apiKey（向后兼容检测用），首次编辑保存后自动清除
+   *   - 换设备需重新输入（session 也只在单设备有效）
+   *   - 服务端只通过 session 鉴权，resolve-model 不再有 client apiKey 分支
+   */
+  apiKey?: string;
   /** 模型名称（如 gpt-4o, deepseek-chat, glm-4-flash） */
   model: string;
   /** 是否默认模型 */

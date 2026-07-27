@@ -197,10 +197,11 @@ export default function ProfilePage() {
       const configs = await listModelConfigs();
       setModelConfigs(configs);
 
-      // 安全升级检测：有 modelConfig.apiKey 但无有效 session → 显示升级提示
+      // 安全升级检测：旧数据可能仍含 apiKey（2026-07-27 P0 加固前的持久化遗留）
+      // 检测到 apiKey 残留且无有效 session → 提示用户重新保存以清除明文 apiKey
       const hasSession = await hasValidSession();
       if (!hasSession) {
-        const hasApiKey = configs.some((c) => c.apiKey.trim().length > 0);
+        const hasApiKey = configs.some((c) => typeof c.apiKey === "string" && c.apiKey.trim().length > 0);
         if (hasApiKey) {
           setShowUpgradeModal(true);
         }
@@ -430,15 +431,18 @@ export default function ProfilePage() {
    *   2. 签名校验通过（客户端/服务端签名算法一致）
    *   3. 上游 AI provider 接受 apiKey（不是 invalid signature / 401）
    *
+   * 2026-07-27 P0 安全加固：apiKey 不再从 config.apiKey 读取（已不持久化），
+   *   由 ModelConfigModal 表单内存传入 formApiKey 参数。
+   *
    * 整合后：本函数由 ModelConfigModal 的 onTest 回调调用，结果显示在 toast
    * 而非列表（旧实现的 testResult state 已删除）。
    */
-  async function runModelTest(config: ModelConfig): Promise<void> {
+  async function runModelTest(config: ModelConfig, formApiKey: string): Promise<void> {
     try {
       const userId = await getUserId();
       // 第 1 步：exchange 拿到 session（写入服务端 KV + 本地 IndexedDB）
       await exchangeSession({
-        apiKey: config.apiKey,
+        apiKey: formApiKey,
         userId,
         provider: config.provider,
         baseURL: config.baseURL,
@@ -1103,8 +1107,8 @@ export default function ProfilePage() {
           toast.success("已删除");
           scheduleAutoSync();
         }}
-        onTest={async (config) => {
-          await runModelTest(config);
+        onTest={async (config, formApiKey) => {
+          await runModelTest(config, formApiKey);
         }}
       />
     </div>

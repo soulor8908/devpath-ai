@@ -643,10 +643,12 @@ export default function ChatClient({
           setSelectedModelId(modelConfig.id);
         }
       }
-      // Trial 模式：用户没配模型（或 apiKey 为空）时走服务端默认模型
-      // 服务端检测到无 session 会自动降级（getModel + IP 限流），
-      // 客户端无需做任何特殊处理，只需用普通 fetch（不带 session 签名）
-      const useTrialMode = !modelConfig || !modelConfig.apiKey;
+      // Trial 模式：用户没配模型时走服务端默认模型
+      // 2026-07-27 P0 安全加固：apiKey 不再持久化到 IndexedDB，trial 判定只看 modelConfig 是否存在
+      //   - 有 modelConfig → 走 aiFetch（带 session 签名）；session 失效时 aiFetch 抛 SessionExpiredError
+      //   - 无 modelConfig → 走普通 fetch（trial 模式，服务端 IP 限流降级）
+      //   - session 失效的用户会被 profile 页升级提示引导重新 exchange（不在此处兜底）
+      const useTrialMode = !modelConfig;
 
       // 上下文快照 + 工具上下文（失败时静默降级）
       let contextSnapshot = "";
