@@ -188,7 +188,7 @@ Phase 13 内容层重构                → Content-as-Code + L1-L4 四层架构
 
 ## Phase 8：ESLint 强化 + 零信任 session
 
-**做了什么**：[eslint-and-apikey-security-overhaul](file:///workspace/.trae/specs/eslint-and-apikey-security-overhaul/spec.md) spec —— (a) `.eslintrc.json` 把 `no-unused-vars` / `exhaustive-deps` / `prefer-const` 从 `"warn"` 改 `"error"`，`npm run lint` 加 `--max-warnings 0`，[scripts/install-git-hooks.sh](file:///workspace/scripts/install-git-hooks.sh) 自动安装 pre-commit hook；(b) 零信任 session 架构：apiKey 不直接暴露，AES-GCM 加密 session + nonce 5min 一次性消费 + HMAC-SHA256 签名 + 时间窗 ±60s + 滑动续期 7d，4 个独立 KV namespace（业务 / AUTH_SESSIONS / AUTH_NONCES / AUTH_AUDIT），提供「登出所有设备」按钮调 `revokeSession`。
+**做了什么**：[eslint-and-apikey-security-overhaul](file:///workspace/.trae/specs/eslint-and-apikey-security-overhaul/spec.md) spec —— (a) `.eslintrc.json` 把 `no-unused-vars` / `exhaustive-deps` / `prefer-const` 从 `"warn"` 改 `"error"`，`npm run lint` 加 `--max-warnings 0`，pre-commit hook 自动安装（husky + lint-staged）；(b) 零信任 session 架构：apiKey 不直接暴露，AES-GCM 加密 session + nonce 5min 一次性消费 + HMAC-SHA256 签名 + 时间窗 ±60s + 滑动续期 7d，4 个独立 KV namespace（业务 / AUTH_SESSIONS / AUTH_NONCES / AUTH_AUDIT），提供「登出所有设备」按钮调 `revokeSession`。
 
 **为什么做**：ESLint 问题又一次复发——CI 是 source of truth 了，但本地反馈链断裂（warning 容忍）+ git hooks 漏装。同时 apiKey 一直是明文存在 IndexedDB + 明文同步到云端 KV，这是定时炸弹。
 

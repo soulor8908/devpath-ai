@@ -64,7 +64,7 @@
 | AI 聊天 | 流式对话 + 8 个工具调用 + Persona 注入 | [components/ChatClient.tsx](file:///workspace/components/ChatClient.tsx) |
 | 4 种 Persona | 严厉教练 / 温和陪伴 / 苏格拉底导师 / 平等同行，根据状态自动切换 | [lib/ai/persona.ts](file:///workspace/lib/ai/persona.ts) |
 | 用户画像 | 6 维（技能水平 / 偏好时段 / 平均专注时长 / 薄弱环节 / 学习风格 / 目标），24h TTL 自动重建 | [lib/ai/memory/](file:///workspace/lib/ai/memory/) |
-| 周报 | AI 生成本周学习报告（统计 / 模式识别 / 情绪与多巴胺 / 下周建议） | [app/api/weekly-report/](file:///workspace/app/api/weekly-report/) |
+| 周报 | AI 生成本周学习报告（统计 / 模式识别 / 情绪与多巴胺 / 下周建议） | [app/api/weekly/](file:///workspace/app/api/weekly/) |
 | AI 质量观测 | 按场景统计调用数 / 采纳率 / 再生成率 / 平均耗时 | [lib/ai/quality-tracker.ts](file:///workspace/lib/ai/quality-tracker.ts) |
 | AI 成本追踪 | 从 data stream 协议解析 token 使用量，按模型定价表估算 USD 成本 | 同上 |
 
