@@ -9,6 +9,13 @@
 //   - review 任务：dueCards 筛 due <= now（FSRS 到期卡片）
 //   - 合并后用 explainPriority 计算优先级 + reason，按 priority 降序返回
 //
+// 第 3 阶段（2026-07-27 重构）：学习队列从节点维度改成题目维度
+//   - 用户反馈"学了几题进度还是 0"+ "已学会的题不应该出现在训练页"
+//   - 旧设计：一节点一 StudyTask（scheduleItemToTask），具体做哪道题由 TrainSessionFlow 运行时挑
+//   - 新设计：一题一 StudyTask（questionToTask），每道未 understood 的题都是独立任务
+//   - 过滤逻辑：从 nodeStates.mastered/allUnderstood 改成直接查 question.understood
+//   - 签名变更：接收 LearningPlan[]（需 questions 字段）而非 LearningPlanSummary[]
+//
 // 设计（卡帕西视角）：
 //   - 纯函数：输入相同 → 输出相同，可在 Node 环境单测，不依赖 IndexedDB
 //   - 可解释：reason 字段告诉用户"为什么排在这里"
@@ -16,7 +23,7 @@
 
 import { nanoid } from "nanoid";
 import { chinaDateNow, nowISO } from "@/lib/time";
-import type { LearningPlanSummary, ScheduleItem, ReviewCard } from "@/lib/types";
+import type { LearningPlan, ScheduleItem, ReviewCard, Question } from "@/lib/types";
 import { explainPriority } from "./compute-priority";
 import type { StudyTask, StudyQueueContext } from "./types";
 
@@ -37,30 +44,34 @@ export interface BuildStudyQueueOptions {
 }
 
 /**
- * 把 ScheduleItem（plan 内部）转换为 new 类型的 StudyTask
+ * 把一道 Question 转换为 new 类型的 StudyTask（2026-07-27 题目维度重构）
  *
  * 字段映射：
  *   - plan.id → task.planId（用于跳转 /learn/{planId}）
- *   - nodeId → task.nodeId
+ *   - question.nodeId → task.nodeId
+ *   - question.id → task.questionId（新字段，题目维度）
  *   - plan.topic → task.topic
- *   - plan.topic → task.title（"新学 - {topic}"）
- *   - estimatedMinutes → task.estimatedMinutes
+ *   - question.question 前 30 字 → task.title（"新学 - {题目前缀}"）
+ *   - item.estimatedMinutes → task.estimatedMinutes
  */
-function scheduleItemToTask(
+function questionToTask(
+  question: Question,
   item: ScheduleItem,
-  plan: LearningPlanSummary,
+  plan: LearningPlan,
   date: string,
   createdAt: string,
 ): StudyTask {
+  const questionPreview = question.question.slice(0, 30);
   return {
     id: nanoid(),
     date,
     type: "new",
     planId: plan.id,
-    nodeId: item.nodeId,
+    nodeId: question.nodeId,
+    questionId: question.id,
     topic: plan.topic,
     estimatedMinutes: item.estimatedMinutes,
-    title: `新学 - ${plan.topic}`,
+    title: `新学 - ${questionPreview}${question.question.length > 30 ? "..." : ""}`,
     priority: 0,
     reason: "",
     status: "todo",
@@ -98,19 +109,29 @@ function reviewCardToTask(card: ReviewCard, date: string, createdAt: string): St
 /**
  * 从 plans + dueCards 构建今日学习队列（纯函数，不读 IndexedDB）
  *
- * 流程：
- *   1. plans[].schedule 筛 day === 1 && !completed && type === "learn" → new 任务
- *   2. dueCards（已到期） → review 任务
- *   3. 合并 + 用 explainPriority 计算 priority + reason
- *   4. 按 priority 降序排序后返回
+ * 2026-07-27 重构：学习队列从节点维度改成题目维度
+ *   - 旧设计：一节点一 task（scheduleItemToTask）
+ *   - 新设计：一题一 task（questionToTask），每道未 understood 的题都是独立任务
+ *   - 已 understood 的题不进队列（用户已学会，不再出现）
+ *   - 已 mastered 的节点下所有题不进队列（节点已完成）
  *
- * @param plans 学习计划列表（含 schedule 字段）
+ * 流程：
+ *   1. plans[].schedule 筛 day === 1 && !completed && type === "learn" → 候选节点
+ *   2. 对每个候选节点，找 plan.questions 中 q.nodeId === nodeId && !q.understood 的题
+ *      - 节点已 mastered → 跳过整个节点
+ *      - 节点下所有题都 understood → 跳过（不产生 task）
+ *      - 节点下有未 understood 的题 → 每题一个 task
+ *   3. dueCards（已到期） → review 任务
+ *   4. 合并 + 用 explainPriority 计算 priority + reason
+ *   5. 按 priority 降序排序后返回
+ *
+ * @param plans 完整学习计划列表（含 schedule + questions + knowledgeTree）
  * @param dueCards 已到期的复习卡片列表
  * @param options 日期 / 上下文 / 当前时间（均可选，有默认值）
  * @returns 排序后的 StudyTask[]（priority 大的在前）
  */
 export function buildStudyQueueFromData(
-  plans: LearningPlanSummary[],
+  plans: LearningPlan[],
   dueCards: ReviewCard[],
   options?: BuildStudyQueueOptions,
 ): StudyTask[] {
@@ -121,23 +142,30 @@ export function buildStudyQueueFromData(
 
   const tasks: StudyTask[] = [];
 
-  // 1. new 任务：每个 plan 的 schedule 中 day === 1 && !completed && type === "learn"
-  //    2026-07-25 用户需求：已掌握（mastered）或全部看懂（allUnderstood）的节点排除
-  //    通过 summary.nodeStates 派生字段判断，无需加载完整 plan/questions
-  //    旧 summary 缺 nodeStates 字段时回退为空对象（不过滤），向后兼容
+  // 1. new 任务：按题目维度展开
   for (const plan of plans) {
-    const nodeStates = plan.nodeStates ?? {};
+    // 筛今日待学的 schedule 项（day === 1 && !completed && type === "learn"）
     const todayItems = (plan.schedule ?? []).filter(
-      (s) =>
-        s.day === 1 &&
-        !s.completed &&
-        s.type === "learn" &&
-        // 排除已掌握或全部看懂的节点（用户已完成学习）
-        !nodeStates[s.nodeId]?.mastered &&
-        !nodeStates[s.nodeId]?.allUnderstood,
+      (s) => s.day === 1 && !s.completed && s.type === "learn",
     );
+
+    // 构建 nodeId → node 的映射（用于查 mastered 状态）
+    const nodeMap = new Map(plan.knowledgeTree.map((n) => [n.id, n]));
+
     for (const item of todayItems) {
-      tasks.push(scheduleItemToTask(item, plan, date, createdAt));
+      const node = nodeMap.get(item.nodeId);
+      // 节点已 mastered → 跳过整个节点
+      if (node?.mastered) continue;
+
+      // 找该节点下所有未 understood 的题
+      const pendingQuestions = plan.questions.filter(
+        (q) => q.nodeId === item.nodeId && !q.understood,
+      );
+
+      // 每题一个 task
+      for (const question of pendingQuestions) {
+        tasks.push(questionToTask(question, item, plan, date, createdAt));
+      }
     }
   }
 

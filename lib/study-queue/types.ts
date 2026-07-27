@@ -44,6 +44,12 @@ export interface StudyTask {
   planId?: string;
   /** 关联的知识点 id（对应 KnowledgeNode.id） */
   nodeId?: string;
+  /**
+   * 关联的题目 id（对应 Question.id）
+   * 2026-07-27 新增：学习队列改成题目维度，一题一 task。
+   * 旧队列是节点维度（一节点一 task），已废弃。
+   */
+  questionId?: string;
   /** 主题（LearnLog 没有直接字段，从计划 topic 或节点 title 衍生） */
   topic?: string;
   /** 预计耗时（分钟，来自 ScheduleItem.estimatedMinutes） */

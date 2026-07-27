@@ -154,14 +154,10 @@ export function generateEnhancedInsight(
     };
   }
 
-  // 提醒：今日未学习
-  if (state.energy === 1) {
-    return {
-      tone: "reminding",
-      message: "今天还没开始，从第一个知识点开始吧。5 分钟就够。",
-      icon: "bell",
-    };
-  }
+  // 2026-07-27 删除："今天还没开始，从第一个知识点开始吧。5 分钟就够。"
+  // 用户反馈：这个提示一直在，变成噪音，没有意义。
+  // 用户打开 app 就是为了学习，不需要被告知"你还没开始"。
+  // 低能量（energy === 1）时回退到下面的默认鼓励语。
 
   // 挑战：状态好，推一把
   if (state.mood === "confident") {

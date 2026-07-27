@@ -115,12 +115,12 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   // 2026-07-25 修改：移除 setAnswerRevealed(false) —— answerRevealed 的重置
   // 由 LEARN_COMPLETE / NEXT_TASK 的 dispatch 处负责，避免恢复时被错误清空
   //
-  // 2026-07-26 修复（用户反馈"下次进来那道题还是没学，要重新学"）：
-  //   原版 `plan.questions.find((q) => q.nodeId === node?.id)` 取节点下第一道题，
-  //   不区分该题是否已 understood。导致用户上次点过"我答对了"的题会被再次展示。
-  //   修复：优先选节点下第一道 `!understood` 的题；若全部 understood（理论上
-  //   studyQueue 会过滤掉该节点，但兜底处理），回退到第一道题。
-  //   这样用户每次进入训练，看到的都是真正"还没学"的题，不会重复已答对的题。
+  // 2026-07-27 重构：学习队列改成题目维度，StudyTask 现在带 questionId
+  //   - 旧设计：一节点一 task，loadCurrentTask 运行时从节点下挑一道 !understood 的题
+  //   - 新设计：一题一 task，task.questionId 直接指定要做的题，不需要运行时挑选
+  //   - 好处：已 understood 的题不会进队列（buildStudyQueueFromData 已过滤），
+  //     训练中不会再出现已答对的题
+  //   - 兜底：若 task 无 questionId（旧数据兼容）或 questionId 找不到，回退到节点下首道题
   const loadCurrentTask = useCallback(async () => {
     if (!currentTask) {
       dispatch({ type: "SESSION_COMPLETE" });
@@ -133,11 +133,13 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
         const plan = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + currentTask.planId);
         if (plan) {
           const node = plan.knowledgeTree.find((n) => n.id === currentTask.nodeId) || plan.knowledgeTree[0];
-          // 优先选未看懂的题；若全部看懂则回退到首题（兜底）
-          const question =
-            plan.questions.find((q) => q.nodeId === node?.id && !q.understood) ||
-            plan.questions.find((q) => q.nodeId === node?.id) ||
-            null;
+          // 2026-07-27：优先用 task.questionId 直接定位题目（题目维度队列）
+          // 兜底：无 questionId 或找不到时，回退到节点下首道题（向后兼容旧节点维度队列）
+          const question = currentTask.questionId
+            ? plan.questions.find((q) => q.id === currentTask.questionId) ?? null
+            : plan.questions.find((q) => q.nodeId === node?.id && !q.understood) ||
+              plan.questions.find((q) => q.nodeId === node?.id) ||
+              null;
           setCurrentNode(node ?? null);
           setCurrentQuestion(question);
           setCurrentPlan(plan);

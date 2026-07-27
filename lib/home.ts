@@ -10,7 +10,7 @@
 //   便于单测、复用、且使 page.tsx 渲染层保持"纯展示"。
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getItem, countDueCards, listDueCards, listRecentItems } from "@/lib/storage/db";
+import { getItem, listItems, countDueCards, listDueCards, listRecentItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
 import type {
   LearningPlan,
@@ -382,9 +382,15 @@ export function deriveCareerPath(
   pathDef: CareerPath,
   plan: LearningPlan,
 ): HomeData["careerPath"] {
-  const totalNodes = plan.knowledgeTree.length;
-  if (totalNodes === 0) {
-    // 空知识树：进度 0，weeksLeft 用 pathDef.weeksEstimate 兜底
+  // 2026-07-27 改动：进度统计从知识点维度改成题目维度
+  // 旧设计：progress = masteredCount / totalNodes × 100
+  //   痛点：一个节点 8 道题，用户答对 7 题，节点还没 mastered（差 1 题），进度显示 0%
+  //   用户做了 7 次正确动作，进度条纹丝不动 → "我白学了"的失败感
+  // 新设计：progress = understoodCount / totalQuestions × 100
+  //   每答对一题，进度条 +1/N，即时反馈
+  const totalQuestions = plan.questions.length;
+  if (totalQuestions === 0) {
+    // 无题目：进度 0，weeksLeft 用 pathDef.weeksEstimate 兜底
     return {
       title: pathDef.title,
       icon: pathDef.icon,
@@ -394,19 +400,24 @@ export function deriveCareerPath(
     };
   }
 
-  const masteredCount = plan.knowledgeTree.filter((n) => n.mastered === true).length;
-  const progress = Math.round((masteredCount / totalNodes) * 100);
+  const understoodCount = plan.questions.filter((q) => q.understood === true).length;
+  const progress = Math.round((understoodCount / totalQuestions) * 100);
 
   // 剩余总小时数 = path 总 hours × (1 - 进度比)
+  // 进度比用题目维度（与 progress 一致）
   const totalHours = pathDef.nodes.reduce((sum, n) => sum + n.estimatedHours, 0);
-  const remainingHours = totalHours * (1 - masteredCount / totalNodes);
+  const remainingHours = totalHours * (1 - understoodCount / totalQuestions);
   const weeksLeft = pathDef.weeklyHours > 0
     ? Math.max(1, Math.ceil(remainingHours / pathDef.weeklyHours))
     : pathDef.weeksEstimate;
 
-  // 当前节点：第「已完成数」个节点（线性顺序假设）
-  const currentNodeIdx = Math.min(masteredCount, pathDef.nodes.length - 1);
-  const currentNodeTitle = pathDef.nodes[currentNodeIdx]?.title ?? pathDef.title;
+  // 当前节点：第一个还有未 understood 题目的节点（用户正在学的节点）
+  // 旧设计用 masteredCount 作为索引，改成按题目维度后用"第一个未全部 understood 的节点"
+  const currentNode = plan.knowledgeTree.find((node) => {
+    const nodeQuestions = plan.questions.filter((q) => q.nodeId === node.id);
+    return nodeQuestions.length > 0 && !nodeQuestions.every((q) => q.understood === true);
+  });
+  const currentNodeTitle = currentNode?.title ?? pathDef.title;
 
   return {
     title: pathDef.title,
@@ -423,8 +434,12 @@ export function deriveCareerPath(
  * 规则（按优先级，先命中先返回）：
  *   1. streak >= 7 → celebrating: "连续打卡 X 天，你正在建立习惯！"
  *   2. todayCompletedCount > 0 → challenging: "今天已完成 X 项，继续推进！"
- *   3. streak === 0 → reminding: "今天还没开始，从第一个知识点开始吧"
- *   4. 默认 → encouraging: "每天进步一点点，离 offer 越来越近"
+ *   3. 默认 → encouraging: "每天进步一点点，离 offer 越来越近"
+ *
+ * 2026-07-27 删除："今天还没开始，从第一个知识点开始吧"（streak === 0 提醒）
+ *   用户反馈：这个提示一直在（只要 streak === 0），变成噪音，没有意义。
+ *   用户打开 app 就是为了学习，不需要被告知"你还没开始"。
+ *   删除后 streak === 0 回退到默认鼓励语。
  *
  * @returns 洞察对象；输入异常时返回 null
  */
@@ -446,13 +461,6 @@ export function deriveCoachInsight(params: {
       tone: "challenging",
       message: `今天已完成 ${todayCompletedCount} 项，继续推进！`,
       icon: "zap",
-    };
-  }
-  if (streak === 0) {
-    return {
-      tone: "reminding",
-      message: "今天还没开始，从第一个知识点开始吧",
-      icon: "leaf",
     };
   }
   return {
@@ -593,15 +601,18 @@ export function useHomeData(): HomeData & {
     // P1 精准查询优化（替代全量加载）：
     //   - 卡片：countDueCards(now) 走 dueAt 索引精准计数，O(due) 而非 O(n)
     //     （首页只需要 dueCount，不需要卡片数据本身）
-    //   - 计划：listPlanSummaries() 加载轻量 summary（含 schedule），避免拉取 knowledgeTree/questions
+    //   - 计划：listItems<LearningPlan>(PLAN) 加载完整 plan（含 questions + knowledgeTree）
+    //     2026-07-27 改动：学习队列改成题目维度，需要 questions 字段；
+    //     旧版用 listPlanSummaries() 加载轻量 summary（无 questions）已不够用
     //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
     // 第 2 阶段：新增 listDueCards 拉到期卡片数据（用于 studyQueue 渲染）
     // V2：新增 onboarding 并行读取（无 IO 依赖）
     const now = new Date();
     const [
-      dueCount, plans, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards, onboarding,
+      dueCount, fullPlans, summaries, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards, onboarding,
     ] = await Promise.all([
       countDueCards(now),
+      listItems<LearningPlan>(KEY_PREFIXES.PLAN),
       listPlanSummaries(),
       listRecentItems<LearnLog>(KEY_PREFIXES.LEARN_LOG, 7),
       getItem<DailyStatus>(todayStatusKey),
@@ -613,6 +624,10 @@ export function useHomeData(): HomeData & {
       listDueCards<ReviewCard>(now, 50),
       getItem<OnboardingData>("my:onboarding"),
     ]);
+
+    // summaries 用于 computeTodaySchedule（旧 API，仍需要 summary 格式）
+    // fullPlans 用于 buildStudyQueueFromData（题目维度）+ deriveCareerPath（按题目统计进度）
+    const plans = summaries;
 
     // 内存派生计算（无 IO）
     const { streak, lastStreak } = computeStreaks(logs);
@@ -631,7 +646,7 @@ export function useHomeData(): HomeData & {
       energy: todayStatus?.energy ?? 3,
       dopamine: todayStatus?.dopamineTrigger ?? ("无" as const),
     };
-    const studyQueue = buildStudyQueueFromData(plans, dueCards, {
+    const studyQueue = buildStudyQueueFromData(fullPlans, dueCards, {
       date: today,
       context: studyQueueContext,
       now,
@@ -650,18 +665,15 @@ export function useHomeData(): HomeData & {
     const aiQualitySummary = deriveAiQualitySummary(qualityReport);
 
     // V2 派生：职业路径信息（仅当用户走过 onboarding 流程时计算）
-    // 串行读取完整 plan（含 knowledgeTree）—— 旧用户无 onboarding 时跳过，零开销
+    // 2026-07-27 优化：fullPlans 已在上方并行加载，直接从中查找 onboarding.planId，
+    // 不再串行 getItem（减少 1 次 IO，首页加载更快）
     let careerPath: HomeData["careerPath"] = null;
     if (onboarding?.pathId) {
       const pathDef = getCareerPathById(onboarding.pathId);
       if (pathDef && onboarding.planId) {
-        try {
-          const plan = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + onboarding.planId);
-          if (plan) {
-            careerPath = deriveCareerPath(pathDef, plan);
-          }
-        } catch {
-          // plan 读取失败 → careerPath 保持 null（旧用户兼容，不阻塞首页）
+        const plan = fullPlans.find((p) => p.id === onboarding.planId);
+        if (plan) {
+          careerPath = deriveCareerPath(pathDef, plan);
         }
       }
     }

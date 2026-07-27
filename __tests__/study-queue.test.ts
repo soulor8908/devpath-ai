@@ -7,7 +7,7 @@
 //   - buildStudyQueueFromData：从 plans + dueCards 构建 + 排序（第 2 阶段纯函数，不读 IndexedDB）
 
 import { describe, it, expect } from "vitest";
-import type { LearningPlanSummary, ReviewCard } from "../lib/types";
+import type { LearningPlan, ReviewCard } from "../lib/types";
 import {
   computePriority,
   explainPriority,
@@ -226,22 +226,48 @@ describe("explainPriority", () => {
 });
 
 describe("buildStudyQueueFromData", () => {
-  // 第 2 阶段：纯函数测试，不依赖 IndexedDB
-  // 数据构造器
-  function makePlan(over: Partial<LearningPlanSummary> = {}): LearningPlanSummary {
+  // 第 3 阶段（2026-07-27 重构）：题目维度队列测试
+  // - 旧设计：一节点一 StudyTask（scheduleItemToTask）
+  // - 新设计：一题一 StudyTask（questionToTask），每道未 understood 的题都是独立 task
+  // - 过滤：节点 mastered=true → 跳过整个节点；题 understood=true → 不进队列
+  // - 签名：接收 LearningPlan[]（需 questions 字段）而非 LearningPlanSummary[]
+
+  /** 构造完整 LearningPlan（含 knowledgeTree + questions + schedule，题目维度） */
+  function makePlan(over: Partial<LearningPlan> = {}): LearningPlan {
     return {
       id: "p1",
-      topic: "k1",
-      knowledgeCount: 1,
-      questionCount: 0,
-      scheduleDays: 1,
-      dailyMinutes: 30,
-      maxNewPerDay: 5,
-      createdAt: NOW.toISOString(),
-      updatedAt: NOW.toISOString(),
+      topic: "测试计划",
+      knowledgeTree: [
+        {
+          id: "k1",
+          title: "知识点1",
+          summary: "摘要",
+          difficulty: 3,
+          prerequisites: [],
+          frequency: "中",
+          mastery: 0,
+        },
+      ],
+      questions: [
+        {
+          id: "q1",
+          nodeId: "k1",
+          question: "题目1内容",
+          answer: "答案",
+          keyPoints: [],
+          followUps: [],
+          favorited: false,
+          understood: false,
+        },
+      ],
       schedule: [
         { day: 1, type: "learn", nodeId: "k1", estimatedMinutes: 30, completed: false },
       ],
+      dailyMinutes: 30,
+      maxNewPerDay: 5,
+      fsrsMode: "standard",
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
       ...over,
     };
   }
@@ -267,8 +293,9 @@ describe("buildStudyQueueFromData", () => {
     };
   }
 
-  it("返回 StudyTask 数组（合并 learn + review 并按 priority 降序）", () => {
-    const plans: LearningPlanSummary[] = [makePlan()];
+  it("返回 StudyTask 数组（合并 learn + review 并按 priority 降序，题目维度）", () => {
+    // 1 道未 understood 的题 → 1 个 new task；1 张到期卡片 → 1 个 review task
+    const plans: LearningPlan[] = [makePlan()];
     const cards: ReviewCard[] = [makeCard()];
 
     const queue = buildStudyQueueFromData(plans, cards, {
@@ -278,6 +305,7 @@ describe("buildStudyQueueFromData", () => {
     });
 
     expect(Array.isArray(queue)).toBe(true);
+    // 题目维度：1 个 new task（来自 q1）+ 1 个 review task
     expect(queue).toHaveLength(2);
 
     // review 基础分 50+，new 基础分 20 → review 排前面
@@ -296,18 +324,34 @@ describe("buildStudyQueueFromData", () => {
     // review task 字段
     expect(queue[0].cardId).toBe("c1");
     expect(queue[0].dueDate).toBeDefined();
-    // new task 字段（第 2 阶段：planId 填充用于跳转 /learn/{planId}）
+    // new task 字段（题目维度：带 questionId，title 用题目前缀而非 plan.topic）
     expect(queue[1].planId).toBe("p1");
     expect(queue[1].nodeId).toBe("k1");
-    expect(queue[1].topic).toBe("k1");
+    expect(queue[1].questionId).toBe("q1");
+    expect(queue[1].topic).toBe("测试计划");
+    // title 是"新学 - {题面前 30 字}"，不再是"新学 - {plan.topic}"
     expect(queue[1].title).toContain("新学");
+    expect(queue[1].title).toContain("题目1内容");
   });
 
-  it("只取今日待学 schedule（day === 1 && !completed && type === \"learn\"）", () => {
-    const plans: LearningPlanSummary[] = [
+  it("只取今日待学 schedule（day === 1 && !completed && type === \"learn\"），按题目维度展开", () => {
+    // 多节点 + 每节点一题，schedule 含 4 种过滤场景
+    const plans: LearningPlan[] = [
       makePlan({
+        knowledgeTree: [
+          { id: "k-today", title: "今日待学", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+          { id: "k-yesterday", title: "昨日", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+          { id: "k-complete", title: "已完成", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+          { id: "k-other", title: "review类型", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+        ],
+        questions: [
+          { id: "q-today", nodeId: "k-today", question: "今日题", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+          { id: "q-yesterday", nodeId: "k-yesterday", question: "昨日题", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+          { id: "q-complete", nodeId: "k-complete", question: "已完成题", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+          { id: "q-other", nodeId: "k-other", question: "review题", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+        ],
         schedule: [
-          // 今日待学（应保留）
+          // 今日待学（应保留 → q-today 进队列）
           { day: 1, type: "learn", nodeId: "k-today", estimatedMinutes: 30, completed: false },
           // 昨日 schedule（day=0 应被过滤）
           { day: 0, type: "learn", nodeId: "k-yesterday", estimatedMinutes: 30, completed: false },
@@ -323,8 +367,10 @@ describe("buildStudyQueueFromData", () => {
       date: TODAY,
       now: NOW,
     });
+    // 只有 k-today 节点的 q-today 题进入队列
     expect(queue).toHaveLength(1);
     expect(queue[0].nodeId).toBe("k-today");
+    expect(queue[0].questionId).toBe("q-today");
   });
 
   it("空 plans + 空 dueCards 返回空数组", () => {
@@ -333,7 +379,7 @@ describe("buildStudyQueueFromData", () => {
   });
 
   it("低能量上下文下 review 排在 new 前面（认知负担小优先）", () => {
-    const plans: LearningPlanSummary[] = [makePlan()];
+    const plans: LearningPlan[] = [makePlan()];
     const cards: ReviewCard[] = [makeCard()];
 
     // 低能量：review 加分 15 / new 扣分 15，差距进一步拉大
@@ -346,93 +392,105 @@ describe("buildStudyQueueFromData", () => {
     expect(queue[1].type).toBe("new");
   });
 
-  // ============ 2026-07-25 新增：已掌握/全部看懂的节点过滤 ============
+  // ============ 2026-07-27 重构：题目维度过滤（替换旧 nodeStates 派生字段） ============
   // 用户需求：训练中点"我答对了"→题目 understood=true，
-  // 节点下所有题 understood 时该节点的学习任务不进入今日清单 / study-queue
-  // 通过 summary.nodeStates 派生字段实现，无需加载完整 plan/questions
-  describe("已掌握 / 全部看懂的节点排除（2026-07-25 用户需求）", () => {
-    it("mastered=true 的节点不进入 study-queue", () => {
-      const plans: LearningPlanSummary[] = [
+  // 节点下所有题 understood 时该节点不再产生 new 任务；
+  // 节点 mastered=true 时整个节点跳过。
+  // 新设计直接查 plan.knowledgeTree[].mastered 和 plan.questions[].understood，
+  // 不再用 summary.nodeStates 派生字段（无需向后兼容旧 summary）。
+  describe("已掌握 / 全部看懂的节点排除（题目维度，2026-07-27 重构）", () => {
+    it("mastered=true 的节点不进入 study-queue（整个节点跳过）", () => {
+      const plans: LearningPlan[] = [
         makePlan({
-          nodeStates: { k1: { mastered: true, allUnderstood: false } },
+          knowledgeTree: [
+            { id: "k1", title: "知识点1", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0, mastered: true },
+          ],
         }),
       ];
       const queue = buildStudyQueueFromData(plans, [], {
         date: TODAY,
         now: NOW,
       });
-      // k1 节点 mastered → 不应进入队列
+      // k1 节点 mastered → 跳过整个节点（即使该节点下有未 understood 的题）
       expect(queue).toHaveLength(0);
     });
 
-    it("allUnderstood=true 的节点不进入 study-queue（即使未显式 mastered）", () => {
-      const plans: LearningPlanSummary[] = [
+    it("节点下所有题 understood=true 时不进入 study-queue（!q.understood 过滤）", () => {
+      const plans: LearningPlan[] = [
         makePlan({
-          nodeStates: { k1: { mastered: false, allUnderstood: true } },
+          questions: [
+            { id: "q1", nodeId: "k1", question: "题目1内容", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: true },
+          ],
         }),
       ];
       const queue = buildStudyQueueFromData(plans, [], {
         date: TODAY,
         now: NOW,
       });
-      // k1 节点所有题看懂 → 不应进入队列
+      // k1 节点下所有题 understood → 没有未 understood 的题 → 队列空
       expect(queue).toHaveLength(0);
     });
 
-    it("mastered=false 且 allUnderstood=false 的节点正常进入 study-queue", () => {
-      const plans: LearningPlanSummary[] = [
+    it("节点 mastered=false 且有未 understood 的题时正常进入 study-queue", () => {
+      const plans: LearningPlan[] = [
         makePlan({
-          nodeStates: { k1: { mastered: false, allUnderstood: false } },
+          knowledgeTree: [
+            { id: "k1", title: "知识点1", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0, mastered: false },
+          ],
+          questions: [
+            { id: "q1", nodeId: "k1", question: "题目1内容", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+          ],
         }),
       ];
       const queue = buildStudyQueueFromData(plans, [], {
         date: TODAY,
         now: NOW,
       });
-      // 节点未掌握也未全部看懂 → 正常进入队列
+      // 节点未掌握且有未看懂的题 → 该题进入队列
       expect(queue).toHaveLength(1);
       expect(queue[0].nodeId).toBe("k1");
+      expect(queue[0].questionId).toBe("q1");
     });
 
-    it("旧 summary 缺 nodeStates 字段时回退为不过滤（向后兼容）", () => {
-      // 旧数据没有 nodeStates 字段，不应抛错也不应误过滤
-      const plans: LearningPlanSummary[] = [makePlan()]; // 不传 nodeStates
-      const queue = buildStudyQueueFromData(plans, [], {
-        date: TODAY,
-        now: NOW,
-      });
-      expect(queue).toHaveLength(1);
-      expect(queue[0].nodeId).toBe("k1");
-    });
-
-    it("混合场景：部分节点掌握、部分未掌握", () => {
-      const plans: LearningPlanSummary[] = [
+    it("混合场景：部分节点掌握、部分题目看懂、部分题目未看懂", () => {
+      const plans: LearningPlan[] = [
         makePlan({
+          knowledgeTree: [
+            { id: "k1", title: "已掌握", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0, mastered: true },
+            { id: "k2", title: "全看懂", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+            { id: "k3", title: "未完成", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0 },
+          ],
+          questions: [
+            // k1 下有未 understood 题，但节点 mastered → 跳过整个节点
+            { id: "q1", nodeId: "k1", question: "题1", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+            // k2 下所有题 understood → 跳过
+            { id: "q2", nodeId: "k2", question: "题2", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: true },
+            // k3 下有未 understood 题 → 保留
+            { id: "q3", nodeId: "k3", question: "题3", answer: "答案", keyPoints: [], followUps: [], favorited: false, understood: false },
+          ],
           schedule: [
             { day: 1, type: "learn", nodeId: "k1", estimatedMinutes: 30, completed: false },
             { day: 1, type: "learn", nodeId: "k2", estimatedMinutes: 30, completed: false },
             { day: 1, type: "learn", nodeId: "k3", estimatedMinutes: 30, completed: false },
           ],
-          nodeStates: {
-            k1: { mastered: true, allUnderstood: false },     // 已掌握 → 排除
-            k2: { mastered: false, allUnderstood: true },      // 全部看懂 → 排除
-            k3: { mastered: false, allUnderstood: false },     // 未完成 → 保留
-          },
         }),
       ];
       const queue = buildStudyQueueFromData(plans, [], {
         date: TODAY,
         now: NOW,
       });
-      // 只有 k3 应该进入队列
+      // 只有 k3 的 q3 进入队列（k1 mastered、k2 全 understood）
       expect(queue).toHaveLength(1);
       expect(queue[0].nodeId).toBe("k3");
+      expect(queue[0].questionId).toBe("q3");
     });
 
-    it("review 卡片不受 nodeStates 影响（仅过滤 new 学习任务）", () => {
-      const plans: LearningPlanSummary[] = [
+    it("review 卡片不受 mastered 影响（仅过滤 new 学习任务）", () => {
+      const plans: LearningPlan[] = [
         makePlan({
-          nodeStates: { k1: { mastered: true, allUnderstood: false } },
+          knowledgeTree: [
+            { id: "k1", title: "知识点1", summary: "摘要", difficulty: 3, prerequisites: [], frequency: "中", mastery: 0, mastered: true },
+          ],
         }),
       ];
       const cards: ReviewCard[] = [makeCard({ nodeId: "k1" })];
@@ -441,7 +499,7 @@ describe("buildStudyQueueFromData", () => {
         now: NOW,
       });
       // new 任务被过滤（k1 mastered），但 review 卡片应保留
-      // 注意：review 卡片由 dueCards 直接转换，不走 nodeStates 过滤
+      // review 卡片由 dueCards 直接转换，不走 mastered 过滤
       const reviewTasks = queue.filter((t) => t.type === "review");
       const newTasks = queue.filter((t) => t.type === "new");
       expect(newTasks).toHaveLength(0);
