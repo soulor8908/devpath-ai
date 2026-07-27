@@ -24,11 +24,13 @@
 //   - NDJSON 简单、自描述、易调试，客户端用 ReadableStream reader 即可解析
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { streamText, type LanguageModel } from "ai";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
+import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { KnowledgeNode, Question } from "@/lib/types";
 
@@ -38,6 +40,25 @@ const PROMPT_DEF = getPrompt("answer_generate");
 
 /** 并发 worker 数量：3 个一组，平衡吞吐和 LLM 端 RPS */
 const CONCURRENCY = 3;
+
+// 2026-07-27 P1：用 zod 校验关键字段
+//   - questions 必须非空数组，每个元素必须有 id（用于 chunk questionId）+ question（题面）+ nodeId（关联知识点）
+//   - topic 必须非空字符串
+//   - nodes 可选数组，元素必须有 id（建 Map 用）
+//   旧实现只校验 questions 是非空数组 + topic 非空，元素内部字段不校验 →
+//   传入缺 id 的元素会让 send({questionId: undefined}) 污染响应流
+const questionItemSchema = z.object({
+  id: nonEmptyString,
+  question: nonEmptyString,
+  nodeId: z.string().optional(),
+  // 其它字段（answer/keyPoints/followUps/codeSnippet 等）下游使用时容错
+}, { message: "questions 元素必须含 id 和 question 字段" });
+
+const answersBodySchema = z.object({
+  questions: z.array(questionItemSchema).min(1, { message: "questions 不能为空" }),
+  nodes: z.array(z.object({ id: nonEmptyString }).passthrough()).optional(),
+  topic: nonEmptyString,
+});
 
 interface AnswerChunk {
   questionId: string;
@@ -70,26 +91,15 @@ export async function POST(req: NextRequest) {
     trialRemaining = trial.remaining;
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
-  const { questions, nodes, topic } = body as {
-    questions?: Question[];
-    nodes?: KnowledgeNode[];
-    topic?: string;
-  };
-
-  if (!Array.isArray(questions) || questions.length === 0) {
-    return NextResponse.json(
-      { error: "questions 是必填项且不能为空" },
-      { status: 400 },
-    );
-  }
-  if (!topic || typeof topic !== "string" || !topic.trim()) {
-    return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
+  let questions: Question[];
+  let nodes: KnowledgeNode[] | undefined;
+  let topic: string;
+  {
+    const result = await parseRequestBody(req, answersBodySchema);
+    if (result instanceof NextResponse) return result;
+    questions = result.data.questions as unknown as Question[];
+    nodes = result.data.nodes as unknown as KnowledgeNode[] | undefined;
+    topic = result.data.topic;
   }
 
   // 构建 nodeId → node 映射，便于按节点上下文生成答案

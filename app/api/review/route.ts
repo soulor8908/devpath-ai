@@ -7,14 +7,29 @@
 // （review 是纯规则计算，session 仅用于身份校验，模型不实际使用）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { nanoid } from "nanoid";
 import { rateCard } from "@/lib/fsrs";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { nowISO } from "@/lib/time";
 import type { ReviewCard, ReviewLog, Rating } from "@/lib/types";
 
 export const runtime = "edge";
+
+// 2026-07-27 P1：用 zod 替代手写校验
+//   - rating 必须 1-4（FSRS 标准评级），用 z.literal 联合类型而非 number 范围
+//   - mode 限定三档枚举（默认 "standard"）
+//   - card 用 passthrough() 保留所有字段（rateCard 需要完整 card 结构）
+const reviewBodySchema = z.object({
+  card: z.object(
+    { id: nonEmptyString },
+    { message: "card 必须含 id 字段" },
+  ).passthrough(),
+  rating: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  mode: z.enum(["conservative", "standard", "aggressive"]).default("standard"),
+});
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -22,27 +37,17 @@ export async function POST(req: NextRequest) {
   const sessionResult = await requireSession(req);
   if (sessionResult instanceof NextResponse) return sessionResult;
 
-  let body: {
-    card?: ReviewCard;
-    rating?: Rating;
-    mode?: "conservative" | "standard" | "aggressive";
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  let card: ReviewCard;
+  let rating: Rating;
+  let mode: "conservative" | "standard" | "aggressive";
+  {
+    const result = await parseRequestBody(req, reviewBodySchema);
+    if (result instanceof NextResponse) return result;
+    card = result.data.card as unknown as ReviewCard;
+    rating = result.data.rating;
+    mode = result.data.mode;
   }
-
-  const { card, rating, mode = "standard" } = body;
   try {
-    if (!card || !card.id) {
-      return NextResponse.json({ error: "card 是必填项" }, { status: 400 });
-    }
-
-    if (!rating || ![1, 2, 3, 4].includes(rating)) {
-      return NextResponse.json({ error: "rating 须为 1-4" }, { status: 400 });
-    }
-
     const updatedCard = rateCard(card, rating, mode);
 
     const log: ReviewLog = {

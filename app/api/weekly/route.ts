@@ -17,15 +17,31 @@
 //   - 通过响应头 X-Trace-Id 回传，客户端可用于日志关联
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { generateWeeklyReport } from "@/lib/ai/weekly-report";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { nanoid } from "nanoid";
 import { getOrCreateTraceIdFromRequest, TRACE_ID_HEADER } from "@/lib/ai/trace";
 import type { LearnLog, ReviewLog, DailyStatus, EmotionEntry, TokenUsage } from "@/lib/types";
 
 export const runtime = "edge";
+
+// 2026-07-27 P1：用 zod 替代手写校验
+//   - weekStart 必须 YYYY-MM-DD
+//   - learnLogs/reviewLogs/statuses 必须是数组（元素结构下游兜底，避免过严破坏旧数据）
+//   - emotions 可选数组
+//   旧实现仅校验 `!weekStart || !Array.isArray(learnLogs)`，
+//   reviewLogs/statuses/emotions 完全不校验 → 畸形数据直传 LLM 污染 prompt
+const weeklyBodySchema = z.object({
+  weekStart: isoDate,
+  learnLogs: z.array(z.unknown()),
+  reviewLogs: z.array(z.unknown()),
+  statuses: z.array(z.unknown()),
+  emotions: z.array(z.unknown()).optional(),
+});
 
 interface WeeklyRequestBody {
   weekStart: string;
@@ -54,17 +70,13 @@ export async function POST(req: Request) {
   const { session } = sessionResult;
 
   let body: WeeklyRequestBody;
-  try {
-    body = (await req.json()) as WeeklyRequestBody;
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  {
+    const result = await parseRequestBody(req, weeklyBodySchema);
+    if (result instanceof NextResponse) return result;
+    body = result.data as WeeklyRequestBody;
   }
 
   const model = getModelFromSession(session, "weekly");
-
-  if (!body.weekStart || !Array.isArray(body.learnLogs)) {
-    return NextResponse.json({ error: "缺少必填字段" }, { status: 400 });
-  }
 
   const { content, usage, modelId: reportModelId } = await generateWeeklyReport({
     learnLogs: body.learnLogs,

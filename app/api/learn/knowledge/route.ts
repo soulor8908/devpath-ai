@@ -15,14 +15,22 @@
 //   - trial 模式让体验用户第一时间能拆解知识点（乔布斯视角：API Key 不应是首日门槛）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import type { LanguageModel } from "ai";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
+import { parseRequestBody, nonEmptyString, boundedString } from "@/lib/ai/body-validation";
 
 export const runtime = "edge";
+
+// 2026-07-27 P1：用 zod 替代手写校验
+const knowledgeBodySchema = z.object({
+  topic: nonEmptyString,
+  prompt: boundedString(2000, 1).optional(),
+});
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -45,27 +53,17 @@ export async function POST(req: NextRequest) {
     trialRemaining = trial.remaining;
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
-  const { topic, prompt } = body as {
-    topic?: string;
-    prompt?: string;
-  };
-
-  if (!topic || typeof topic !== "string" || !topic.trim()) {
-    return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
+  let topic: string;
+  let userPrompt: string | undefined;
+  {
+    const result = await parseRequestBody(req, knowledgeBodySchema);
+    if (result instanceof NextResponse) return result;
+    topic = result.data.topic.trim();
+    userPrompt = result.data.prompt?.trim();
   }
 
   try {
-    const userPrompt =
-      typeof prompt === "string" && prompt.trim().length > 0
-        ? prompt.trim().slice(0, 2000)
-        : undefined;
-    const nodes = await decomposeKnowledge(topic.trim(), userPrompt, undefined, model);
+    const nodes = await decomposeKnowledge(topic, userPrompt, undefined, model);
 
     const response = NextResponse.json({ nodes });
     applyTrialHeaders(response, isTrial, trialRemaining);

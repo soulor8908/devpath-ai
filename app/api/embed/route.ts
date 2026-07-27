@@ -19,8 +19,10 @@
 // 成功响应：{ vector: number[], cached: boolean, model: string, dimensions: number }
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { initCloudflareEnv, getAI, getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
 import { sha256 } from "@/lib/ai/crypto";
@@ -36,6 +38,13 @@ const CACHE_KEY_PREFIX = "kb:embed:";
 const CACHE_TTL_SECONDS = 30 * 24 * 60 * 60;
 /** 查询文本最大长度（截断防滥用，bge-base 上下文 512 token，中文约 200 字） */
 const MAX_TEXT_LENGTH = 500;
+
+// 2026-07-27 P1：用 zod 替代手写校验
+//   旧实现用 `body as { text?: unknown }` + 手写 if，类型不安全
+//   新实现用 zod schema：text 必须是非空字符串，长度上限 MAX_TEXT_LENGTH
+const embedBodySchema = z.object({
+  text: nonEmptyString.max(MAX_TEXT_LENGTH, { message: `text 长度不能超过 ${MAX_TEXT_LENGTH}` }),
+});
 
 function getClientIp(req: NextRequest): string {
   const cfIp = req.headers.get("cf-connecting-ip");
@@ -87,22 +96,13 @@ export async function POST(req: NextRequest) {
       void incrementTrialRateLimit(ip, "embed", kv).catch(() => {});
     }
 
-    // 读 body
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    // 读 body（用 zod schema 校验）
+    let text: string;
+    {
+      const result = await parseRequestBody(req, embedBodySchema);
+      if (result instanceof NextResponse) return result;
+      text = result.data.text;
     }
-    const { text: rawText } = body as { text?: unknown };
-    if (typeof rawText !== "string" || rawText.trim().length === 0) {
-      return NextResponse.json(
-        { error: "text 必须是非空字符串", code: "INVALID_INPUT" },
-        { status: 400 },
-      );
-    }
-    // 截断防滥用
-    const text = rawText.slice(0, MAX_TEXT_LENGTH);
 
     // KV 缓存检查（按文本 sha256 去重）
     const textHash = await sha256(text);

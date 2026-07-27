@@ -8,9 +8,11 @@
 // （session 中的 apiKey 由 exchange 保证可用，无 key 不会进入此路由）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { generateText } from "ai";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { parseRequestBody, boundedString } from "@/lib/ai/body-validation";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { EmotionTag } from "@/lib/types";
@@ -19,10 +21,17 @@ export const runtime = "edge";
 
 const PROMPT_DEF = getPrompt("emotion_coping");
 
-interface EmotionCopingBody {
-  tag?: EmotionTag;
-  reason?: string;
-}
+// 2026-07-27 P1：用 zod 显式校验 EmotionTag 枚举，防未知名 tag 静默落到 fallback
+//   旧实现只 `if (!tag)` —— 传入 "unknown" 等未知名 tag 会落到 `RULES[tag] ?? RULES.平静`，
+//   用户看不到错误，但实际收到的是不相关情绪的建议
+const EMOTION_TAGS: readonly EmotionTag[] = [
+  "焦虑", "兴奋", "疲惫", "烦躁", "满足", "冲动", "平静", "沮丧",
+] as const;
+
+const emotionCopingBodySchema = z.object({
+  tag: z.enum(EMOTION_TAGS as unknown as [EmotionTag, ...EmotionTag[]]),
+  reason: boundedString(500, 0).optional(),
+});
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -31,24 +40,15 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  let body: EmotionCopingBody;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  let tag: EmotionTag;
+  let safeReason: string;
+  {
+    const result = await parseRequestBody(req, emotionCopingBodySchema);
+    if (result instanceof NextResponse) return result;
+    tag = result.data.tag;
+    safeReason = result.data.reason?.trim() ?? "";
   }
-
-  const { tag, reason } = body;
   const model = getModelFromSession(session, "emotion-coping");
-
-  if (!tag) {
-    return NextResponse.json({ error: "缺少 tag 字段" }, { status: 400 });
-  }
-
-  const safeReason =
-    typeof reason === "string" && reason.length > 0
-      ? reason.slice(0, 500)
-      : "";
 
   try {
     const userPrompt = `情绪：${tag}\n原因/影响：${safeReason || "（用户未填写）"}\n\n请生成 3-5 条应对建议：`;

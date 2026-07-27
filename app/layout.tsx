@@ -11,10 +11,77 @@ import { GlobalWidgets } from "./GlobalWidgets";
 //   性能优化保留：首屏 JS 体积降到最小，用户不点开就不加载。
 //   详见 app/GlobalWidgets.tsx 文件头注释。
 
+// 2026-07-27 P1：补齐 OG / Twitter Card / canonical
+//   - metadataBase 让所有相对路径（og:image / canonical）解析为绝对 URL
+//   - OG 标签：facebook / linkedin / 微信 / 钉钉 等分享卡片
+//   - Twitter Card：summary_large_image（即使没大图也降级到 summary）
+//   - og:image 引用 manifest 已声明的 /icons/icon-512.png
+//     （用户后续补图标文件即可自动生效，无需改 metadata）
+//   - 守护测试：__tests__/seo-metadata-guard.test.ts
+const SITE_URL = "https://devpath-ai.pages.dev";
+
 export const metadata: Metadata = {
-  title: "devpath-ai — AI 驱动的开发者成长 OS",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "devpath-ai — AI 驱动的开发者成长 OS",
+    template: "%s · devpath-ai",
+  },
   description: "告诉 AI 你想学什么，它给你拆知识树、排学习计划、生面试题、按遗忘曲线复习、追踪能量与情绪",
+  applicationName: "devpath-ai",
   manifest: "/manifest.json",
+  keywords: [
+    "AI 学习",
+    "开发者成长",
+    "学习路径",
+    "知识树",
+    "面试题",
+    "FSRS 间隔重复",
+    "复习算法",
+    "开发者 OS",
+  ],
+  authors: [{ name: "devpath-ai" }],
+  creator: "devpath-ai",
+  publisher: "devpath-ai",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "zh_CN",
+    url: SITE_URL,
+    siteName: "devpath-ai",
+    title: "devpath-ai — AI 驱动的开发者成长 OS",
+    description: "告诉 AI 你想学什么，它给你拆知识树、排学习计划、生面试题、按遗忘曲线复习、追踪能量与情绪",
+    images: [
+      {
+        url: "/icons/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "devpath-ai",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "devpath-ai — AI 驱动的开发者成长 OS",
+    description: "告诉 AI 你想学什么，它给你拆知识树、排学习计划、生面试题、按遗忘曲线复习、追踪能量与情绪",
+    images: ["/icons/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {

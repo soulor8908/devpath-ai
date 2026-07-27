@@ -1,16 +1,26 @@
 // app/api/learn/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { nanoid } from "nanoid";
 import { decomposeKnowledge } from "@/lib/ai/knowledge";
 import { generateQuestions } from "@/lib/ai/question";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
+import { parseRequestBody, nonEmptyString, boundedString } from "@/lib/ai/body-validation";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import type { LearningPlan } from "@/lib/types";
 
 export const runtime = "edge";
+
+// 2026-07-27 P1：用 zod 校验范围（替代手写 if）
+const learnBodySchema = z.object({
+  topic: nonEmptyString,
+  dailyMinutes: z.number().finite().min(15).max(120).default(30),
+  maxNewPerDay: z.number().finite().int().min(1).max(5).default(1),
+  prompt: boundedString(2000, 1).optional(),
+});
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -19,18 +29,18 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+  let topic: string;
+  let dailyMinutes: number;
+  let maxNewPerDay: number;
+  let userPrompt: string | undefined;
+  {
+    const result = await parseRequestBody(req, learnBodySchema);
+    if (result instanceof NextResponse) return result;
+    topic = result.data.topic.trim();
+    dailyMinutes = result.data.dailyMinutes;
+    maxNewPerDay = result.data.maxNewPerDay;
+    userPrompt = result.data.prompt?.trim();
   }
-  const { topic, dailyMinutes = 30, maxNewPerDay = 1, prompt } = body as {
-    topic?: string;
-    dailyMinutes?: number;
-    maxNewPerDay?: number;
-    prompt?: string;
-  };
 
   const model = getModelFromSession(session, "learn");
 
@@ -38,32 +48,8 @@ export async function POST(req: NextRequest) {
 
   try {
 
-    if (!topic || typeof topic !== "string" || !topic.trim()) {
-      return NextResponse.json({ error: "topic 是必填项" }, { status: 400 });
-    }
-
-    if (typeof dailyMinutes !== "number" || !Number.isFinite(dailyMinutes) || dailyMinutes < 15 || dailyMinutes > 120) {
-      return NextResponse.json(
-        { error: "dailyMinutes 须在 15-120 之间" },
-        { status: 400 }
-      );
-    }
-
-    if (typeof maxNewPerDay !== "number" || !Number.isFinite(maxNewPerDay) || maxNewPerDay < 1 || maxNewPerDay > 5) {
-      return NextResponse.json(
-        { error: "maxNewPerDay 须在 1-5 之间" },
-        { status: 400 }
-      );
-    }
-
-    // 用户自定义提示词（可选，最长 2000 字符）
-    const userPrompt =
-      typeof prompt === "string" && prompt.trim().length > 0
-        ? prompt.trim().slice(0, 2000)
-        : undefined;
-
     // 1. 拆知识树（传入用户自定义提示词）
-    const nodes = await decomposeKnowledge(topic.trim(), userPrompt, undefined, model);
+    const nodes = await decomposeKnowledge(topic, userPrompt, undefined, model);
 
     // 2. 生成面试题（并行分批）
     const questions = await generateQuestions(nodes, model);
@@ -76,7 +62,7 @@ export async function POST(req: NextRequest) {
     const now = nowISO();
     const plan: LearningPlan = {
       id: nanoid(),
-      topic: topic.trim(),
+      topic,
       knowledgeTree: nodes,
       questions,
       schedule,

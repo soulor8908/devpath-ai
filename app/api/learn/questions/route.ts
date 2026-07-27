@@ -11,15 +11,29 @@
 //   - trial 配额 question_generate=2/天（单次拆解会生成多题，限流按"次调用"计）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import type { LanguageModel } from "ai";
 import { generateQuestionStems, FAILED_QUESTION_SENTINEL } from "@/lib/ai/question";
 import { getModelFromSession } from "@/lib/ai/provider";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
+import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import type { KnowledgeNode } from "@/lib/types";
 
 export const runtime = "edge";
+
+// 2026-07-27 P1：用 zod 校验 nodes 数组元素关键字段（id/title 必填，summary/difficulty/frequency 下游使用）
+//   旧实现只校验 `Array.isArray(nodes) && length > 0`，元素内部字段不校验 →
+//   传入缺 id 的元素会让 generateQuestionStems 内部 throw
+const nodeItemSchema = z.object({
+  id: nonEmptyString,
+  title: nonEmptyString,
+}, { message: "nodes 元素必须含 id 和 title 字段" }).passthrough();
+
+const questionsBodySchema = z.object({
+  nodes: z.array(nodeItemSchema).min(1, { message: "nodes 不能为空" }),
+});
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -42,18 +56,11 @@ export async function POST(req: NextRequest) {
     trialRemaining = trial.remaining;
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
-  const { nodes } = body as {
-    nodes?: KnowledgeNode[];
-  };
-
-  if (!Array.isArray(nodes) || nodes.length === 0) {
-    return NextResponse.json({ error: "nodes 是必填项且不能为空" }, { status: 400 });
+  let nodes: KnowledgeNode[];
+  {
+    const result = await parseRequestBody(req, questionsBodySchema);
+    if (result instanceof NextResponse) return result;
+    nodes = result.data.nodes as unknown as KnowledgeNode[];
   }
 
   try {
