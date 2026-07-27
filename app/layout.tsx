@@ -1,29 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import dynamic from "next/dynamic";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { ToastContainer } from "@/components/ui";
+import { GlobalWidgets } from "./GlobalWidgets";
 
-// 2026-07-26 性能优化（卡帕西视角）：
-// 全局浮窗组件改 dynamic + ssr:false，把首屏 JS 体积降到最小。
-// - FloatingChat：含 ChatClient（重型，含流式 LLM 调用 + 消息列表），用户不点开就不加载
-// - PomodoroWidget：番茄钟 widget，仅 running session 存在时才渲染，没必要进首屏 bundle
-// - AITaskModal：AI 任务进度弹窗，仅在有 AI 任务时才渲染
-// 保留 Nav + ToastContainer 同步加载：Nav 是首屏可见的底部导航，Toast 是错误反馈必需，
-// 它们体积小且必须立即可用，不能延迟加载。
-// ssr:false 因为这些组件依赖 window/indexedDB，且首屏不需要它们渲染任何东西。
-const FloatingChat = dynamic(
-  () => import("@/components/FloatingChat").then((m) => m.FloatingChat),
-  { ssr: false, loading: () => null },
-);
-const PomodoroWidget = dynamic(
-  () => import("@/components/PomodoroWidget").then((m) => m.PomodoroWidget),
-  { ssr: false, loading: () => null },
-);
-const AITaskModal = dynamic(
-  () => import("@/components/AITaskModal").then((m) => m.AITaskModal),
-  { ssr: false, loading: () => null },
-);
+// 2026-07-27 修复 build 失败：
+//   Next.js 15 不允许在 Server Component（layout.tsx）中用 next/dynamic + ssr:false。
+//   把 FloatingChat / PomodoroWidget / AITaskModal 的 dynamic import 移到
+//   Client Component（GlobalWidgets.tsx）中，layout.tsx 引用它。
+//   性能优化保留：首屏 JS 体积降到最小，用户不点开就不加载。
+//   详见 app/GlobalWidgets.tsx 文件头注释。
 
 export const metadata: Metadata = {
   title: "devpath-ai — AI 驱动的开发者成长 OS",
@@ -62,12 +48,8 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">跳到主内容</a>
         <main id="main-content">{children}</main>
         <ToastContainer />
-        <AITaskModal />
         <Nav />
-        <FloatingChat />
-        {/* 全局浮动番茄钟 widget：仅在 running session 存在且不在 /timer 页时显示
-            z-index 高于 FloatingChat/ChatModal（z-[60]），让聊天中启动番茄钟后用户能看到倒计时 */}
-        <PomodoroWidget />
+        <GlobalWidgets />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
