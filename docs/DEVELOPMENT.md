@@ -58,7 +58,7 @@ npx wrangler pages secret put MASTER_KEY --project-name=devpath-ai
 ## 测试
 
 ```bash
-# 全部单测（986 用例 / 77 个测试文件）
+# 全部单测（1037 用例 / 92 个测试文件）
 npm test
 
 # 监听模式

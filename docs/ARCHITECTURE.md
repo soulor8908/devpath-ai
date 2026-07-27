@@ -407,7 +407,7 @@ buildProfileContext(profile) → ≤500 字符文本
 
 ## 测试策略
 
-- **Vitest 单测**（986 用例 / 77 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / curriculum 图谱规则 / preset 内容质量 / no-native-form-elements 守护 / ui-design-system-guard 守护 / pomodoro-widget-no-modal 守护 / mindmap-question-stats 守护 / nav-icon-only 守护 / heatmap SVG 渲染守护 等核心模块
+- **Vitest 单测**（1037 用例 / 92 个测试文件）：覆盖 fsrs / energy-regression / sync / prompts / chat-tools / emotion-migrate / pomodoro / profile-builder / priority-engine / plan-feasibility / rhythm-engine / persona / achievements / rate-limit / cost-tracking / curriculum 图谱规则 / preset 内容质量 / no-native-form-elements 守护 / ui-design-system-guard 守护 / pomodoro-widget-no-modal 守护 / mindmap-question-stats 守护 / nav-icon-only 守护 / heatmap SVG 渲染守护 / security-headers-guard 守护 / seo-metadata-guard 守护 / body-validation 守护 等核心模块
 - **Playwright E2E**：主流程（首页 → 学习 → 复习 → 我的；浮动按钮打开 AI 对话）+ Demo 注入/清除
 - **CI 强制校验**：prompt 版本一致性快照、类型检查、ESlint、UI 设计系统守护测试（原生表单元素 / dark 配对 / 逃逸值）
 

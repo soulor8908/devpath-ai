@@ -146,7 +146,9 @@ wc -l /workspace/README.md /workspace/docs/ARCHITECTURE.md /workspace/docs/DEVEL
 
 ```bash
 # 6.1 测试用例数在 4 份文档里必须一致
-grep -E "(986|786|758)" /workspace/README.md /workspace/docs/ARCHITECTURE.md /workspace/docs/DEVELOPMENT.md /workspace/docs/PRODUCT.md 2>/dev/null
+# 注：测试数会随开发推进变化，update-docs 执行时先跑 `npm test` 拿到最新数字，
+# 然后用此 grep 确认所有文档都更新到位（不再写死单一数字避免漏更新）
+grep -E "([0-9]+) (个用例|单测)" /workspace/README.md /workspace/docs/ARCHITECTURE.md /workspace/docs/DEVELOPMENT.md /workspace/docs/PRODUCT.md 2>/dev/null
 
 # 6.2 节点数（49）必须一致
 grep -E "49 (个)?节点|49 nodes" /workspace/README.md /workspace/docs/ARCHITECTURE.md /workspace/docs/PRODUCT.md 2>/dev/null
