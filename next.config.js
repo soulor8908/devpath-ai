@@ -8,6 +8,8 @@ const nextConfig = {
     unoptimized: true,
   },
   trailingSlash: true,
+  // 2026-07-27 生产 source maps：线上错误堆栈可溯源（不影响功能，仅增加构建产物体积）
+  productionBrowserSourceMaps: true,
   // 2026-07-26 性能优化（卡帕西视角）：
   // experimental.optimizePackageImports 让 Next.js 对 barrel export 友好的库
   // 做 per-module 拆分，只把实际用到的模块打进 chunk，避免全量引入。
@@ -91,6 +93,7 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "object-src 'none'",
+              "report-uri /api/csp-report",
             ].join("; "),
           },
           { key: "X-Frame-Options", value: "DENY" },

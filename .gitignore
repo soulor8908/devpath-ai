@@ -14,6 +14,7 @@ next-env.d.ts.bak
 # Cloudflare 本地状态
 .wrangler/
 .dev.vars
+.open-next/
 
 # Playwright 产物
 /test-results/

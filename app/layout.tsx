@@ -54,18 +54,18 @@ export const metadata: Metadata = {
     description: "告诉 AI 你想学什么，它给你拆知识树、排学习计划、生面试题、按遗忘曲线复习、追踪能量与情绪",
     images: [
       {
-        url: "/icons/icon-512.png",
-        width: 512,
-        height: 512,
+        url: "/icons/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "devpath-ai",
       },
     ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "devpath-ai — AI 驱动的开发者成长 OS",
     description: "告诉 AI 你想学什么，它给你拆知识树、排学习计划、生面试题、按遗忘曲线复习、追踪能量与情绪",
-    images: ["/icons/icon-512.png"],
+    images: ["/icons/og-image.png"],
   },
   robots: {
     index: true,
