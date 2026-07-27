@@ -190,4 +190,127 @@ describe("已迁移路由的 schema 关键字段（防回归）", () => {
     expect(schema.safeParse({ tag: "unknown" }).success).toBe(false);
     expect(schema.safeParse({ tag: "" }).success).toBe(false);
   });
+
+  it("chat 路由 schema：messages 必须非空数组且元素有合法 role + content", () => {
+    const schema = z.object({
+      messages: z
+        .array(
+          z.object({
+            role: z.enum(["user", "assistant", "system"]),
+            content: z.string().min(1),
+          }),
+        )
+        .min(1),
+      contextSnapshot: boundedString(4000).optional(),
+      toolContext: z.unknown().optional(),
+      personaContext: z
+        .object({
+          energy: z.number(),
+          mood: z.string(),
+          streak: z.number(),
+          topic: z.string().optional(),
+        })
+        .optional(),
+      preferredPersona: z
+        .enum(["strict_coach", "gentle_companion", "socratic_tutor", "peer_dev"])
+        .optional(),
+      knowledgeContext: boundedString(4000).optional(),
+    });
+    // 合法
+    expect(
+      schema.safeParse({
+        messages: [{ role: "user", content: "hi" }],
+      }).success,
+    ).toBe(true);
+    // 空 messages 数组 → 失败
+    expect(
+      schema.safeParse({ messages: [] }).success,
+    ).toBe(false);
+    // 非法 role → 失败
+    expect(
+      schema.safeParse({
+        messages: [{ role: "tool", content: "x" }],
+      }).success,
+    ).toBe(false);
+    // 空 content → 失败
+    expect(
+      schema.safeParse({
+        messages: [{ role: "user", content: "" }],
+      }).success,
+    ).toBe(false);
+    // 非法 preferredPersona → 失败
+    expect(
+      schema.safeParse({
+        messages: [{ role: "user", content: "hi" }],
+        preferredPersona: "unknown_persona",
+      }).success,
+    ).toBe(false);
+    // contextSnapshot 超长 → 失败（boundedString 拒绝）
+    expect(
+      schema.safeParse({
+        messages: [{ role: "user", content: "hi" }],
+        contextSnapshot: "x".repeat(4001),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("interview 路由 schema：config 字段全部带默认值 + 越界拒绝", () => {
+    const schema = z.object({
+      mode: z.enum(["interview", "report"]).default("interview"),
+      config: z
+        .object({
+          difficulty: z.enum(["junior", "mid", "senior", "stress"]).default("junior"),
+          topic: boundedString(100).default("AI 基础"),
+          duration: z.number().finite().int().min(5).max(120).default(20),
+          questionCount: z.number().finite().int().min(1).max(15).default(5),
+        })
+        .default({}),
+      messages: z
+        .array(
+          z.object({
+            role: z.enum(["interviewer", "candidate"]),
+            content: z.string().max(4000),
+            timestamp: z.string(),
+          }),
+        )
+        .max(30)
+        .default([]),
+    });
+    // 空 body → 全部默认值填充
+    const emptyResult = schema.safeParse({});
+    expect(emptyResult.success).toBe(true);
+    if (emptyResult.success) {
+      expect(emptyResult.data.mode).toBe("interview");
+      expect(emptyResult.data.config.difficulty).toBe("junior");
+      expect(emptyResult.data.config.topic).toBe("AI 基础");
+      expect(emptyResult.data.config.duration).toBe(20);
+      expect(emptyResult.data.config.questionCount).toBe(5);
+      expect(emptyResult.data.messages).toEqual([]);
+    }
+    // 越界 duration → 失败（不再静默 clamp）
+    expect(
+      schema.safeParse({
+        config: { difficulty: "junior", topic: "x", duration: 999, questionCount: 5 },
+      }).success,
+    ).toBe(false);
+    // 非法 difficulty → 失败
+    expect(
+      schema.safeParse({
+        config: { difficulty: "intern", topic: "x", duration: 20, questionCount: 5 },
+      }).success,
+    ).toBe(false);
+    // 非法 mode → 失败
+    expect(
+      schema.safeParse({ mode: "unknown", config: {} }).success,
+    ).toBe(false);
+    // messages 超过 30 条 → 失败
+    const tooManyMessages = Array.from({ length: 31 }, (_, i) => ({
+      role: "interviewer" as const,
+      content: String(i),
+      timestamp: "2026-07-27",
+    }));
+    expect(
+      schema.safeParse({ config: {}, messages: tooManyMessages }).success,
+    ).toBe(false);
+  });
 });

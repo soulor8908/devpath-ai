@@ -69,7 +69,7 @@
 | 知识向量 | Workers AI `bge-base-en-v1.5`（768 维，构建期预嵌入）|
 | 课程图谱 | YAML Content-as-Code + zod 校验 + G1-G7 图谱规则 |
 | PWA | Service Worker + Web Push + Manifest + periodicsync |
-| 测试 | Vitest 1.6（**1037 单测 / 92 个测试文件**）+ Playwright E2E |
+| 测试 | Vitest 1.6（**1039 单测 / 92 个测试文件**）+ Playwright E2E |
 | 代码质量 | ESLint（next/core-web-vitals + typescript）+ 三层质量护栏 |
 | CI/CD | GitHub Actions（quality-gate → deploy to Cloudflare Pages）|
 
@@ -225,7 +225,7 @@ public/data/            数据产物（运行时 fetch）
   └── knowledge-articles/*.json 入门长文（前端类比驱动）
 
 public/                 PWA 配置（manifest / sw.js / _routes.json / icons）
-__tests__/              Vitest 单测（92 个测试文件 / 1037 个用例）
+__tests__/              Vitest 单测（92 个测试文件 / 1039 个用例）
 e2e/                    Playwright E2E（主流程）
 docs/                   项目文档（架构 / 开发指南 / 产品说明 / UI 设计系统 / 内容生成规范 / 性能优化方法论 / 代码审计方法论）
 .github/workflows/      CI：quality-gate → deploy to Cloudflare Pages
@@ -266,7 +266,7 @@ npm run dev
 ### 4. 测试与质量门禁
 
 ```bash
-npm test                # Vitest 单测（1037 个用例 / 92 个测试文件）
+npm test                # Vitest 单测（1039 个用例 / 92 个测试文件）
 npm run test:watch      # 监听模式
 npm run test:e2e        # Playwright E2E（需先 npx playwright install chromium）
 npm run test:perf       # 性能基准测试

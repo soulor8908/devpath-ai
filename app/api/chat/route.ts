@@ -16,6 +16,7 @@
 //   - trial 模式让体验用户第一时间得到 AI 响应（乔布斯视角：API Key 不应是首日门槛）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { streamText } from "ai";
 import { initCloudflareEnv, getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
@@ -27,6 +28,7 @@ import { PERSONAS, selectPersona, type PersonaContext, type Persona } from "@/li
 import type { PersonaId } from "@/lib/types";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
+import { parseRequestBody, boundedString } from "@/lib/ai/body-validation";
 
 export const runtime = "edge";
 
@@ -34,6 +36,41 @@ interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
+
+// 2026-07-27 P1：用 zod schema 校验请求体（替代手写 if + filter）
+// 设计权衡（卡帕西视角）：
+//   - messages 数组元素结构强校验（role 枚举 + content 非空字符串）：替代手动 filter
+//   - personaContext 形状校验（energy/mood/streak 类型 + topic 可选）：替代手动 if
+//   - preferredPersona 枚举校验：替代 Object.hasOwn 运行时检查
+//   - toolContext 保持 z.unknown() passthrough：结构复杂且客户端可能扩展字段，
+//     强行 schema 化会让客户端合法调用被 400 拒绝；服务端 createChatTools 内部
+//     自己会校验 plans 数组等字段，不需要在入口重复校验
+//   - contextSnapshot / knowledgeContext 用 boundedString(4000) 同时校验类型与长度，
+//     替代手动 slice(0, 4000)（zod 的 .max() 会直接拒绝过长，避免静默截断）
+const chatBodySchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string().min(1, { message: "content 不能为空字符串" }),
+      }),
+    )
+    .min(1, { message: "messages 必须是非空数组" }),
+  contextSnapshot: boundedString(4000).optional(),
+  toolContext: z.unknown().optional(),
+  personaContext: z
+    .object({
+      energy: z.number(),
+      mood: z.string(),
+      streak: z.number(),
+      topic: z.string().optional(),
+    })
+    .optional(),
+  preferredPersona: z
+    .enum(["strict_coach", "gentle_companion", "socratic_tutor", "peer_dev"])
+    .optional(),
+  knowledgeContext: boundedString(4000).optional(),
+});
 
 // 从 Prompt Registry 读取基础 system（运行时拼接 contextSnapshot）
 const PROMPT_DEF = getPrompt("chat");
@@ -67,48 +104,24 @@ export async function POST(req: NextRequest) {
     const hasSession = !(sessionResult instanceof NextResponse);
     const session = hasSession ? sessionResult.session : null;
 
-    // 再读 body（不再含客户端凭证字段）
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-    }
-    const { messages, contextSnapshot, toolContext, personaContext, preferredPersona, knowledgeContext } = body as {
-      messages?: ChatMessage[];
-      contextSnapshot?: string;
-      toolContext?: ToolContext;
-      /** Persona 选择上下文（客户端聚合：energy/mood/streak/topic） */
-      personaContext?: PersonaContext;
-      /** 用户手动设置的偏好 Persona（覆盖自动选择） */
-      preferredPersona?: PersonaId;
-      /**
-       * 知识库检索结果（v1 知识检索）：客户端 pre-retrieval 命中后注入。
-       * 服务端追加到 system prompt，让 AI 回答 grounded 在检索结果上。
-       * 为可选字段，老客户端不发送时行为不变。
-       */
-      knowledgeContext?: string;
-    };
+    // 再读 body（不再含客户端凭证字段）+ zod schema 校验
+    // parseRequestBody 失败时返回 400 + 结构化 error，路由层用 instanceof 判失败
+    const bodyResult = await parseRequestBody(req, chatBodySchema);
+    if (bodyResult instanceof NextResponse) return bodyResult;
+    const {
+      messages,
+      contextSnapshot,
+      toolContext,
+      personaContext,
+      preferredPersona,
+      knowledgeContext,
+    } = bodyResult.data;
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: "messages 必须是非空数组" },
-        { status: 400 },
-      );
-    }
-    // 元素级校验：缺 role/content 的消息会让 streamText 抛错
-    const validMessages = messages.filter(
-      (m): m is ChatMessage =>
-        !!m &&
-        (m.role === "user" || m.role === "assistant" || m.role === "system") &&
-        typeof m.content === "string",
-    );
-    if (validMessages.length === 0) {
-      return NextResponse.json(
-        { error: "messages 中没有合法消息（需含 role 和 content）" },
-        { status: 400 },
-      );
-    }
+    // zod schema 已保证 messages 是非空数组且每个元素有合法 role + content
+    const validMessages: ChatMessage[] = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
     // 模型选择 + Trial 模式判定
     // - session 存在 → 用 session.apiKey 调上游（用户自担额度）
@@ -152,38 +165,28 @@ export async function POST(req: NextRequest) {
       void incrementTrialRateLimit(ip, "chat", kv).catch(() => {});
     }
 
-    const safeContext =
-      typeof contextSnapshot === "string" && contextSnapshot.length > 0
-        ? contextSnapshot.slice(0, 4000)
-        : "";
+    // zod schema 已校验 contextSnapshot 为 string | undefined 且长度 <= 4000
+    const safeContext = contextSnapshot ?? "";
 
     // Persona 注入：根据用户状态选择匹配的 AI 人格片段
     // - preferredPersona（用户手动设置）覆盖自动选择
     // - personaContext（客户端聚合 energy/mood/streak/topic）用于自动选择
     // - 两者都缺时跳过 persona 注入（保持向后兼容）
     // - persona.id 可由客户端记入 AICallRecord.inputDigest 用于归因分析
+    // - zod schema 已校验 personaContext 形状与 preferredPersona 枚举合法性
     let personaSnippet = "";
     let personaId: PersonaId | null = null;
-    if (preferredPersona && Object.hasOwn(PERSONAS, preferredPersona)) {
-      // 用户手动设置优先级最高（校验合法性：客户端传入值可能不在 PersonaId 枚举内）
+    if (preferredPersona) {
+      // preferredPersona 已是合法 PersonaId（zod enum 校验过），PERSONAS 必有对应项
       const persona: Persona = PERSONAS[preferredPersona];
       personaSnippet = persona.snippet;
       personaId = persona.id;
-    } else if (
-      personaContext &&
-      typeof personaContext.energy === "number" &&
-      typeof personaContext.mood === "string" &&
-      typeof personaContext.streak === "number"
-    ) {
-      // 自动选择（服务端不读 IndexedDB，由客户端聚合 ctx）
-      // 先校验形状：畸形 ctx（如 topic 非字符串）会让 selectPersona 抛 TypeError
+    } else if (personaContext) {
       const safeCtx: PersonaContext = {
         energy: personaContext.energy,
         mood: personaContext.mood,
         streak: personaContext.streak,
-        ...(typeof personaContext.topic === "string"
-          ? { topic: personaContext.topic }
-          : {}),
+        ...(personaContext.topic ? { topic: personaContext.topic } : {}),
       };
       const persona = selectPersona(safeCtx);
       personaSnippet = persona.snippet;
@@ -197,13 +200,10 @@ export async function POST(req: NextRequest) {
     if (safeContext) parts.push(safeContext);
     // 知识库检索结果注入（v1 知识检索）：客户端 pre-retrieval 命中后传入，
     // 让 AI 回答 grounded 在检索结果上，回答中可引用知识标题
-    const safeKnowledgeContext =
-      typeof knowledgeContext === "string" && knowledgeContext.length > 0
-        ? knowledgeContext.slice(0, 4000)
-        : "";
-    if (safeKnowledgeContext) {
+    // zod schema 已校验 knowledgeContext 为 string | undefined 且长度 <= 4000
+    if (knowledgeContext) {
       parts.push(
-        `【知识库检索结果】\n以下是检索到的相关知识，回答时可参考并引用其标题。若用户问"有哪些 X"，请基于这些知识作答；若与问题无关请忽略。\n${safeKnowledgeContext}`,
+        `【知识库检索结果】\n以下是检索到的相关知识，回答时可参考并引用其标题。若用户问"有哪些 X"，请基于这些知识作答；若与问题无关请忽略。\n${knowledgeContext}`,
       );
     }
     if (personaSnippet) parts.push(personaSnippet);
@@ -217,8 +217,10 @@ export async function POST(req: NextRequest) {
     const systemPrompt = parts.join("\n\n");
 
     // 如果有 toolContext，创建工具并启用多步调用
-    const hasTools = toolContext && Array.isArray(toolContext.plans);
-    const tools = hasTools ? createChatTools(toolContext!) : undefined;
+    // zod schema 把 toolContext 类型保留为 unknown（passthrough），
+    // 这里用结构判别 + 类型断言：plans 是数组则视为合法 ToolContext
+    const hasTools = !!toolContext && typeof toolContext === "object" && Array.isArray((toolContext as ToolContext).plans);
+    const tools = hasTools ? createChatTools(toolContext as ToolContext) : undefined;
 
     const result = await streamText({
       model,

@@ -19,12 +19,14 @@
 //   3. 未登录 + 服务端没配 → 返回 401（引导用户配置自己的模型）
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { generateText } from "ai";
 import { initCloudflareEnv, getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession, getModel, hasAIKey } from "@/lib/ai/provider";
 import { createKVStore } from "@/lib/storage/kv";
 import { checkTrialRateLimit, incrementTrialRateLimit } from "@/lib/ai/rate-limit";
+import { parseRequestBody, boundedString } from "@/lib/ai/body-validation";
 import {
   type InterviewConfig,
   type InterviewMessage,
@@ -34,11 +36,37 @@ import {
 
 export const runtime = "edge";
 
-interface InterviewRequestBody {
-  mode?: "interview" | "report";
-  config?: InterviewConfig;
-  messages?: InterviewMessage[];
-}
+// 2026-07-27 P1：用 zod schema 校验请求体（替代 normalizeConfig 手动 if + safeMessages 手动处理）
+// 设计权衡（卡帕西视角）：
+//   - mode 枚举校验 + 默认值 "interview"：替代手写默认值
+//   - config 字段全部带默认值：与原 normalizeConfig 行为一致（向后兼容老客户端）
+//     difficulty 默认 junior、topic 默认 "AI 基础"、duration 默认 20、questionCount 默认 5
+//     越界值用 clamp 思路处理：zod 用 .refine 拒绝越界，调用方拿到的必是合法值
+//   - messages 数组元素结构校验（role 枚举 + content 字符串 + timestamp 字符串）：
+//     替代 safeMessages 手动 slice + String() 强转 + timestamp 兜底
+//   - messages 上限 30 条：用 .max(30) 替代手动 slice(-30)（zod 拒绝过长而非静默截断，
+//     但客户端正常场景只会传最近若干条，不会触发 30 上限）
+const interviewBodySchema = z.object({
+  mode: z.enum(["interview", "report"]).default("interview"),
+  config: z
+    .object({
+      difficulty: z.enum(["junior", "mid", "senior", "stress"]).default("junior"),
+      topic: boundedString(100).default("AI 基础"),
+      duration: z.number().finite().int().min(5).max(120).default(20),
+      questionCount: z.number().finite().int().min(1).max(15).default(5),
+    })
+    .default({}),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["interviewer", "candidate"]),
+        content: z.string().max(4000),
+        timestamp: z.string(),
+      }),
+    )
+    .max(30)
+    .default([]),
+});
 
 /**
  * 从请求头提取客户端真实 IP（与 /api/chat 一致）。
@@ -55,32 +83,9 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
-/** 校验面试配置 + 提供默认值 */
-function normalizeConfig(config?: InterviewConfig): InterviewConfig | null {
-  if (!config) return null;
-  const validDifficulties: InterviewConfig["difficulty"][] = [
-    "junior",
-    "mid",
-    "senior",
-    "stress",
-  ];
-  const difficulty = validDifficulties.includes(config.difficulty)
-    ? config.difficulty
-    : "junior";
-  const topic =
-    typeof config.topic === "string" && config.topic.trim().length > 0
-      ? config.topic.trim().slice(0, 100)
-      : "AI 基础";
-  const duration =
-    typeof config.duration === "number" && config.duration > 0
-      ? Math.min(120, Math.max(5, Math.floor(config.duration)))
-      : 20;
-  const questionCount =
-    typeof config.questionCount === "number" && config.questionCount > 0
-      ? Math.min(15, Math.max(1, Math.floor(config.questionCount)))
-      : 5;
-  return { difficulty, topic, duration, questionCount };
-}
+/** 校验面试配置 + 提供默认值 —— 已迁移到 interviewBodySchema（zod schema） */
+// normalizeConfig 函数已删除（2026-07-27 P1）：zod schema 用 .default() 内联了所有默认值，
+// 调用方拿到的 config 必是 { difficulty, topic, duration, questionCount } 完整对象。
 
 /** 面试模式：基于历史 + 配置生成下一句面试官回复 */
 async function runInterview(
@@ -167,30 +172,11 @@ export async function POST(req: NextRequest) {
     const hasSession = !(sessionResult instanceof NextResponse);
     const session = hasSession ? sessionResult.session : null;
 
-    // 再读 body
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-    }
-    const { mode = "interview", config: rawConfig, messages: rawMessages } = body as InterviewRequestBody;
-
-    // 参数校验
-    const config = normalizeConfig(rawConfig);
-    if (!config) {
-      return NextResponse.json(
-        { error: "config 是必填项" },
-        { status: 400 },
-      );
-    }
-    const messages = Array.isArray(rawMessages) ? rawMessages : [];
-    // 安全截断：避免 prompt 过长
-    const safeMessages = messages.slice(-30).map((m) => ({
-      role: m.role === "interviewer" || m.role === "candidate" ? m.role : "candidate",
-      content: String(m.content ?? "").slice(0, 4000),
-      timestamp: typeof m.timestamp === "string" ? m.timestamp : new Date().toISOString(),
-    }));
+    // zod schema 校验请求体（替代手动 if + safeMessages 手动处理）
+    // schema 已内联所有默认值：mode/config/messages 缺失时自动填充
+    const bodyResult = await parseRequestBody(req, interviewBodySchema);
+    if (bodyResult instanceof NextResponse) return bodyResult;
+    const { mode, config, messages: safeMessages } = bodyResult.data;
 
     // 模型选择
     // - session 存在 → 用 session.apiKey 调上游
