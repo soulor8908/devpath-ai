@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { ToastContainer } from "@/components/ui";
@@ -79,8 +80,17 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
+    // 2026-07-27 P0-1：补齐所有尺寸 + SVG 矢量版 + favicon
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
 };
 
@@ -93,15 +103,20 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // 2026-07-27 P1-4：读取 middleware 注入的 nonce，用于 CSP nonce 模式
+  // Next.js 15 的 headers() 返回 Promise（async API），需 await
+  // nonce 注入到 inline script 后，Next.js 15 会自动给 RSC payload 脚本加 nonce
+  const nonce = (await headers()).get("x-nonce") ?? "";
+
   return (
     <html lang="zh-CN">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
               var stored = localStorage.getItem('devpath:theme') || 'light';
@@ -118,6 +133,7 @@ export default function RootLayout({
         <Nav />
         <GlobalWidgets />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
               window.addEventListener('load', () => {

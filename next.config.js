@@ -64,11 +64,12 @@ const nextConfig = {
   },
   // 2026-07-27 安全四件套（卡帕西视角：默认安全，防御纵深）
   // - HSTS：CF Pages 全站 HTTPS，HSTS 安全；preload 待显式申请后再加（避免回退困难）
-  // - CSP：script-src 'self' 'unsafe-inline' —— inline 用于 layout.tsx 的主题探测脚本
-  //   （必须在首屏前运行避免 FOUC，无法改外部文件；nonces 是后续演进方向）
+  // - CSP：script-src 'self' 'unsafe-inline' —— 作为 fallback（middleware.ts 覆盖为 nonce 模式）
+  //   2026-07-27 P1-4：middleware.ts 生成 per-request nonce，覆盖此 CSP 去掉 'unsafe-inline'
+  //   此处保留 'unsafe-inline' 是防御纵深——若 middleware 异常不执行，至少有基础 CSP 防护
   // - frame-ancestors 'none' + X-Frame-Options DENY 双重防点击劫持
   // - Permissions-Policy 收敛浏览器能力到仅必要项（PWA 不需要摄像头/麦克风/地理位置）
-  // 守护测试：__tests__/security-headers-guard.test.ts
+  // 守护测试：__tests__/security-headers-guard.test.ts + __tests__/csp-nonce-guard.test.ts
   async headers() {
     return [
       {

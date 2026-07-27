@@ -77,10 +77,31 @@ describe("app/sitemap.ts 守护", () => {
 
   it("必须列出核心公开页面（首页 + 学习 + 复习 + 面试）", () => {
     const content = readFileSync(sitemapPath, "utf-8");
-    expect(content).toContain("/learn/list");
-    expect(content).toContain("/review");
-    expect(content).toContain("/interview");
-    expect(content).toContain("/train");
+    // 2026-07-27 P0-2：trailingSlash: true 下所有 URL 须带尾斜杠（根 / 除外）
+    expect(content).toContain("/learn/list/");
+    expect(content).toContain("/review/");
+    expect(content).toContain("/interview/");
+    expect(content).toContain("/train/");
+  });
+
+  it("2026-07-27 P0-2：除根 / 外所有 URL 必须带尾斜杠（防 308 重定向）", () => {
+    const content = readFileSync(sitemapPath, "utf-8");
+    // 提取所有 url: 行，校验尾斜杠
+    const urlLines = content
+      .split("\n")
+      .filter((l) => l.includes("url:"))
+      .map((l) => l.match(/`[^`]*\/`|"[^"]*"/g))
+      .flat()
+      .filter(Boolean) as string[];
+    expect(urlLines.length).toBeGreaterThan(0);
+    for (const url of urlLines) {
+      // 根 URL 是 `${SITE_URL}/`，其他必须是 `${SITE_URL}/xxx/`
+      // 即：除 SITE_URL/ 外，所有都以 / 结尾
+      const cleaned = url.replace(/[`"]/g, "");
+      // 允许 ${SITE_URL}/ 作为根，其他必须以 / 结尾
+      if (cleaned.endsWith("}/`")) continue; // 根 URL ${SITE_URL}/
+      expect(cleaned.endsWith("/")).toBe(true);
+    }
   });
 
   it("必须设置 priority 与 changeFrequency", () => {

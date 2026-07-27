@@ -18,13 +18,19 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
     { "name": "今日学习", "url": "/" },
-    { "name": "复习", "url": "/review" },
-    { "name": "休息", "url": "/rest" },
-    { "name": "数据", "url": "/stats" }
+    { "name": "复习", "url": "/review/" },
+    { "name": "休息", "url": "/rest/" },
+    { "name": "数据", "url": "/stats/" }
   ],
   "gcm_sender_id": "103953800507"
 }
