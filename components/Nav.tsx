@@ -38,7 +38,7 @@ export function Nav() {
             className={`flex items-center justify-center py-2.5 px-1 transition-colors min-h-[44px] ${
               active
                 ? "text-blue-600 dark:text-blue-400"
-                : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             }`}
           >
             <Icon name={item.icon} className="w-[22px] h-[22px]" />

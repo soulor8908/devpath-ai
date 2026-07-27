@@ -507,7 +507,7 @@ export function MindMap({
 
   if (nodes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+      <div className="flex items-center justify-center h-40 text-sm text-gray-500">
         暂无知识点
       </div>
     );
@@ -645,7 +645,7 @@ export function MindMap({
       </div>
 
       {/* 提示（底部，不遮挡画布主区域） */}
-      <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded pointer-events-none">
+      <div className="absolute bottom-2 left-2 z-20 text-2xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded pointer-events-none">
         双指缩放 · 单指拖拽 · 点击节点展开/收起
       </div>
 

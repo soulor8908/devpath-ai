@@ -84,7 +84,7 @@ export default function DailyPage() {
   if (!log) {
     return (
       <div className="mx-auto max-w-2xl p-4">
-        <p className="text-gray-400 text-sm">加载中...</p>
+        <p className="text-gray-500 text-sm">加载中...</p>
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function DailyPage() {
           className="max-w-[180px]"
         />
         {!hasData && (
-          <span className="ml-2 text-xs text-gray-400">（新日志）</span>
+          <span className="ml-2 text-xs text-gray-500">（新日志）</span>
         )}
       </div>
 
@@ -123,13 +123,13 @@ export default function DailyPage() {
               checked={item.checked}
               onChange={() => toggleChecklist(i)}
             >
-              <span className={`text-sm ${item.checked ? "line-through text-gray-400" : "text-gray-700 dark:text-gray-300"}`}>
+              <span className={`text-sm ${item.checked ? "line-through text-gray-500" : "text-gray-700 dark:text-gray-300"}`}>
                 {item.text}
               </span>
             </Checkbox>
           ))}
           {log.checklist.length === 0 && (
-            <p className="text-xs text-gray-400">当日无 checklist</p>
+            <p className="text-xs text-gray-500">当日无 checklist</p>
           )}
         </div>
       </div>

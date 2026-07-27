@@ -191,10 +191,10 @@ export default function TrainClient() {
       <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800 px-4 py-3 z-10">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <Link href="/" aria-label="返回首页">
-            <Icon name="chevron-right" className="w-5 h-5 rotate-180 text-gray-400 dark:text-gray-500" />
+            <Icon name="chevron-right" className="w-5 h-5 rotate-180 text-gray-500 dark:text-gray-400" />
           </Link>
           <div className="text-center">
-            <p className="text-xs text-gray-400 dark:text-gray-500">训练中</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">训练中</p>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {progressText}
             </p>
@@ -237,7 +237,7 @@ export default function TrainClient() {
               {" · "}专注 {elapsedMinutes} 分钟
             </p>
           )}
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             番茄钟已自动结束并计入今日统计
           </p>
           <div className="pt-2 space-y-2">

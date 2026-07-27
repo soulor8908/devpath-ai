@@ -325,7 +325,7 @@ function renderMarkdownBlocks(text: string): React.ReactNode[] {
         i++;
       }
       blocks.push(
-        <ul key={key++} className="my-2 list-disc list-inside space-y-0.5 marker:text-gray-400">
+        <ul key={key++} className="my-2 list-disc list-inside space-y-0.5 marker:text-gray-500">
           {items.map((item, idx) => <li key={idx}>{parseInline(item)}</li>)}
         </ul>
       );
@@ -340,7 +340,7 @@ function renderMarkdownBlocks(text: string): React.ReactNode[] {
         i++;
       }
       blocks.push(
-        <ol key={key++} className="my-2 list-decimal list-inside space-y-0.5 marker:text-gray-400">
+        <ol key={key++} className="my-2 list-decimal list-inside space-y-0.5 marker:text-gray-500">
           {items.map((item, idx) => <li key={idx}>{parseInline(item)}</li>)}
         </ol>
       );
@@ -475,7 +475,7 @@ export function CodeBlock({ code, language, filename, collapsible = true, onCopy
     <div className="my-3 rounded-lg overflow-hidden border border-gray-700 bg-[#0d1117]">
       {/* 标题栏 */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-gray-700">
-        <span className="text-2xs text-gray-400 font-mono">
+        <span className="text-2xs text-gray-500 font-mono">
           {filename || lang}
         </span>
         <Button
@@ -486,7 +486,7 @@ export function CodeBlock({ code, language, filename, collapsible = true, onCopy
             onCopy?.();
           }}
           aria-label="复制代码"
-          className="text-2xs text-gray-400 hover:text-white"
+          className="text-2xs text-gray-500 hover:text-white"
         >
           <Icon name="copy" className="w-3.5 h-3.5 inline-block align-middle" /> 复制
         </Button>
@@ -506,7 +506,7 @@ export function CodeBlock({ code, language, filename, collapsible = true, onCopy
           size="sm"
           block
           onClick={() => setExpanded((v) => !v)}
-          className="text-2xs text-gray-400 bg-[#161b22] hover:bg-[#1f2937] border-t border-gray-700"
+          className="text-2xs text-gray-500 bg-[#161b22] hover:bg-[#1f2937] border-t border-gray-700"
         >
           {expanded ? "▼ 收起" : `▶ 展开剩余 ${lines.length - 25} 行（共 ${lines.length} 行）`}
         </Button>

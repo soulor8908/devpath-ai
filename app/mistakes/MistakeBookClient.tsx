@@ -107,7 +107,7 @@ export default function MistakeBookClient() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">加载错题本...</p>
+        <p className="text-gray-500">加载错题本...</p>
       </div>
     );
   }
@@ -154,7 +154,7 @@ export default function MistakeBookClient() {
       {unresolved.length === 0 ? (
         <div className="text-center py-16">
           <div className="mb-3 flex justify-center">
-            <Icon name="party" className="w-12 h-12 text-gray-400" />
+            <Icon name="party" className="w-12 h-12 text-gray-500" />
           </div>
           <p className="text-gray-600 font-medium">还没有错题，继续保持！</p>
           <Link
@@ -188,7 +188,7 @@ export default function MistakeBookClient() {
                 </div>
 
                 <div className="flex items-center justify-between mt-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                     {nodeTitle && (
                       <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600">
                         {nodeTitle}
@@ -265,7 +265,7 @@ export default function MistakeBookClient() {
                         {m.questionText}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                       {nodeTitle && (
                         <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-500">
                           {nodeTitle}

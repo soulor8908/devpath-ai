@@ -95,7 +95,7 @@ export function ModelIconSelector({ selectedModelId, onSelect, onAddModel }: Mod
           onClick={onAddModel}
           aria-label="添加模型配置"
           title="添加模型配置"
-          className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
         >
           <Icon name="plus" className="w-4 h-4" />
         </Button>
@@ -105,7 +105,7 @@ export function ModelIconSelector({ selectedModelId, onSelect, onAddModel }: Mod
       <Link
         href="/profile"
         aria-label="添加模型配置"
-        className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
       >
         <Icon name="plus" className="w-4 h-4" />
       </Link>
@@ -140,7 +140,7 @@ export function ModelIconSelector({ selectedModelId, onSelect, onAddModel }: Mod
         {triggerLetter ? (
           <span className="text-white text-xs font-bold">{triggerLetter}</span>
         ) : (
-          <Icon name="plus" className="w-4 h-4 text-gray-400" />
+          <Icon name="plus" className="w-4 h-4 text-gray-500" />
         )}
       </Button>
 

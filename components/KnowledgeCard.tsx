@@ -47,9 +47,9 @@ export function KnowledgeCard({ entry, score, compact, onClick }: KnowledgeCardP
         <div className="flex items-center gap-1.5 min-w-0">
           <Icon
             name={entry.source === "preset" ? "book" : "info"}
-            className="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500"
+            className="w-3.5 h-3.5 shrink-0 text-gray-500 dark:text-gray-400"
           />
-          <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
+          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
             {sourceLabel}
           </span>
         </div>

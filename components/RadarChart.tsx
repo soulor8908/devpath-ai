@@ -14,7 +14,7 @@ const RadarChartContent = dynamic(
   () => import("./RadarChartContent").then((m) => m.RadarChartContent),
   {
     loading: () => (
-      <div className="flex h-80 items-center justify-center text-sm text-gray-400">
+      <div className="flex h-80 items-center justify-center text-sm text-gray-500">
         加载图表...
       </div>
     ),

@@ -86,19 +86,19 @@ export function RelatedKnowledge({ node, query: queryOverride }: RelatedKnowledg
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
           相关知识
         </h3>
-        <span className="text-2xs text-gray-400 dark:text-gray-500">
+        <span className="text-2xs text-gray-500 dark:text-gray-400">
           基于当前节点语义检索
         </span>
       </div>
 
       {state.loading ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">检索中...</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 py-2">检索中...</p>
       ) : state.error ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400 py-2">
           检索失败，稍后再试
         </p>
       ) : state.entries.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400 py-2">
           暂无相关知识
         </p>
       ) : (

@@ -124,9 +124,9 @@ export default function EmotionPage() {
       <div>
         <h2 className="text-sm font-semibold text-gray-700 mb-2">历史记录</h2>
         {loading ? (
-          <div className="text-center text-gray-400 text-sm py-8">加载中...</div>
+          <div className="text-center text-gray-500 text-sm py-8">加载中...</div>
         ) : grouped.length === 0 ? (
-          <div className="text-center text-gray-400 text-sm py-8">
+          <div className="text-center text-gray-500 text-sm py-8">
             还没有记录，先用上面的卡片记一次吧
           </div>
         ) : (
@@ -145,7 +145,7 @@ export default function EmotionPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 text-xs">
                             <span className="font-medium text-gray-700">{entry.tag}</span>
-                            <span className="text-gray-400">{entry.time}</span>
+                            <span className="text-gray-500">{entry.time}</span>
                             {entry.dopamine !== "无" && (
                               <span className="px-1.5 py-0.5 rounded text-2xs bg-orange-100 text-orange-700">
                                 {entry.dopamine}

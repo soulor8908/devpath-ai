@@ -280,7 +280,7 @@ export default function PlanEditClient() {
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
         >
           <h2 className="text-base font-bold">作息时间表</h2>
-          <span className="text-gray-400">
+          <span className="text-gray-500">
             {openSection === "routine" ? "▼" : "▶"}
           </span>
         </Button>
@@ -341,7 +341,7 @@ export default function PlanEditClient() {
               </Button>
             ))}
           </div>
-          <p className="text-2xs text-gray-400 mt-1">
+          <p className="text-2xs text-gray-500 mt-1">
             {INTENSITY_HINT[routine.intensity]}
           </p>
         </div>
@@ -379,7 +379,7 @@ export default function PlanEditClient() {
                   inputSize="sm"
                   className="w-24"
                 />
-                <span className="text-xs text-gray-400">-</span>
+                <span className="text-xs text-gray-500">-</span>
                 <Input
                   type="time"
                   value={slot.end}
@@ -411,7 +411,7 @@ export default function PlanEditClient() {
               </div>
             ))}
             {routine.slots.length === 0 && (
-              <p className="text-xs text-gray-400">暂无学习时段</p>
+              <p className="text-xs text-gray-500">暂无学习时段</p>
             )}
           </div>
         </div>
@@ -428,13 +428,13 @@ export default function PlanEditClient() {
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
         >
           <h2 className="text-base font-bold">知识点优先级</h2>
-          <span className="text-gray-400">
+          <span className="text-gray-500">
             {openSection === "priority" ? "▼" : "▶"}
           </span>
         </Button>
         {openSection === "priority" && (
           <div className="p-4">
-            <p className="text-xs text-gray-400 mb-3">
+            <p className="text-xs text-gray-500 mb-3">
               排在前面的优先学习（customOrder 越小优先级越高）
             </p>
             <div className="space-y-2">
@@ -443,7 +443,7 @@ export default function PlanEditClient() {
               key={node.id}
               className="flex items-center gap-2 border rounded-lg p-2"
             >
-              <span className="text-xs text-gray-400 w-6 text-center shrink-0">
+              <span className="text-xs text-gray-500 w-6 text-center shrink-0">
                 {i + 1}
               </span>
               <div className="flex-1 min-w-0">
@@ -457,7 +457,7 @@ export default function PlanEditClient() {
                     </span>
                   )}
                 </div>
-                <div className="text-2xs text-gray-400 mt-0.5">
+                <div className="text-2xs text-gray-500 mt-0.5">
                   难度{node.difficulty} · 频率{node.frequency}
                 </div>
               </div>
@@ -504,7 +504,7 @@ export default function PlanEditClient() {
               已选 {includedIds.size}/{plan.questions.length}
             </span>
           </div>
-          <span className="text-gray-400">
+          <span className="text-gray-500">
             {openSection === "questions" ? "▼" : "▶"}
           </span>
         </Button>
@@ -540,7 +540,7 @@ export default function PlanEditClient() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{q.question}</p>
                   {node && (
-                    <p className="text-2xs text-gray-400 mt-0.5">
+                    <p className="text-2xs text-gray-500 mt-0.5">
                       {node.title}
                     </p>
                   )}
@@ -549,7 +549,7 @@ export default function PlanEditClient() {
             );
           })}
           {plan.questions.length === 0 && (
-            <p className="text-xs text-gray-400">暂无题目</p>
+            <p className="text-xs text-gray-500">暂无题目</p>
           )}
         </div>
           </div>
@@ -565,13 +565,13 @@ export default function PlanEditClient() {
           className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
         >
           <h2 className="text-base font-bold">AI 调整日程</h2>
-          <span className="text-gray-400">
+          <span className="text-gray-500">
             {openSection === "ai" ? "▼" : "▶"}
           </span>
         </Button>
         {openSection === "ai" && (
           <div className="p-4">
-            <p className="text-xs text-gray-400 mb-3">
+            <p className="text-xs text-gray-500 mb-3">
               用自然语言描述调整需求，AI 会重排 schedule（不改变知识点和题目）
             </p>
             <Textarea

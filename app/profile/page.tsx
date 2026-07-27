@@ -519,7 +519,7 @@ export default function ProfilePage() {
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">
               {Math.floor(totalMinutes / 60)}
-              <span className="text-sm font-normal text-gray-400">h</span>
+              <span className="text-sm font-normal text-gray-500">h</span>
             </div>
             <div className="text-xs text-gray-500">累计学习</div>
           </div>
@@ -673,7 +673,7 @@ export default function ProfilePage() {
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-500">
               <Icon name="user" className="w-8 h-8" />
             </div>
           )}
@@ -853,7 +853,7 @@ export default function ProfilePage() {
             })}
           </div>
           {personaSaving && (
-            <p className="text-xs text-gray-400">保存中...</p>
+            <p className="text-xs text-gray-500">保存中...</p>
           )}
           {personaSaved && (
             <p className="text-xs text-green-600 inline-flex items-center gap-1">
@@ -898,7 +898,7 @@ export default function ProfilePage() {
             </Button>
             {saved && <span className="text-sm text-green-600 inline-flex items-center gap-1">已保存 <Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
             {!profile.username && (
-              <span className="text-xs text-gray-400">需先设置用户名</span>
+              <span className="text-xs text-gray-500">需先设置用户名</span>
             )}
           </div>
         </div>
@@ -1008,7 +1008,7 @@ export default function ProfilePage() {
               >
                 <summary className="flex cursor-pointer items-center justify-between font-medium hover:text-blue-600">
                   <span>{faq.q}</span>
-                  <span className="text-gray-400 transition-transform group-open:rotate-90">
+                  <span className="text-gray-500 transition-transform group-open:rotate-90">
                     ›
                   </span>
                 </summary>
@@ -1036,7 +1036,7 @@ export default function ProfilePage() {
                 Cmd/Ctrl+K
               </kbd>{" "}
               快速跳转
-              <span className="ml-1 text-xs text-gray-400">（即将支持）</span>
+              <span className="ml-1 text-xs text-gray-500">（即将支持）</span>
             </span>
           </div>
         </div>
@@ -1134,7 +1134,7 @@ function Section({
           <Icon name={icon} className="w-5 h-5 shrink-0" />
           {title}
         </h2>
-        <span className="text-right text-xs text-gray-400">{desc}</span>
+        <span className="text-right text-xs text-gray-500">{desc}</span>
       </header>
       <div className="space-y-3">{children}</div>
     </section>
@@ -1169,10 +1169,10 @@ function CollapsibleSection({
           {title}
         </h2>
         <span className="flex items-center gap-2">
-          {desc && <span className="text-right text-xs text-gray-400">{desc}</span>}
+          {desc && <span className="text-right text-xs text-gray-500">{desc}</span>}
           <Icon
             name="chevron-down"
-            className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
           />
         </span>
       </Button>

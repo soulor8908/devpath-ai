@@ -831,7 +831,7 @@ function RingWidget({
             isOvertime
               ? "text-danger"
               : isPaused
-                ? "text-gray-400 dark:text-gray-500"
+                ? "text-gray-500 dark:text-gray-400"
                 : isBreak
                   ? "text-green-600 dark:text-green-400"
                   : "text-gray-900 dark:text-gray-100"
@@ -871,7 +871,7 @@ function RingWidget({
               top: `${Math.max(8, position.y - 96)}px`,
             }}
           >
-            <div className="px-3 py-1.5 text-2xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700 font-mono">
+            <div className="px-3 py-1.5 text-2xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 font-mono">
               {formatCountdown(remainingMs)}
             </div>
             <Button

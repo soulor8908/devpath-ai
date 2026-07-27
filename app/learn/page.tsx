@@ -42,7 +42,7 @@ export default function LearnRouterPage() {
       <div className="mb-4 animate-pulse">
         <Icon name="book" className="w-10 h-10 inline-block text-gray-300" />
       </div>
-      <p className="text-sm text-gray-400">正在进入学习…</p>
+      <p className="text-sm text-gray-500">正在进入学习…</p>
       {failed && (
         <Button
           onClick={() => router.replace("/learn/new")}

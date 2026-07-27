@@ -410,7 +410,7 @@ export default function LearnNewPage() {
             showCount
           />
           {promptText.trim() && (
-            <p className="text-2xs text-gray-400 mt-1">
+            <p className="text-2xs text-gray-500 mt-1">
               生成时会附加到 AI 请求
             </p>
           )}
@@ -420,7 +420,7 @@ export default function LearnNewPage() {
             <div className="mt-2 border-t pt-2 space-y-1">
               <p className="text-xs text-gray-500 mb-1">选择常用提示词：</p>
               {promptLibrary.length === 0 ? (
-                <p className="text-xs text-gray-400">暂无，可输入后点击&quot;存为常用&quot;</p>
+                <p className="text-xs text-gray-500">暂无，可输入后点击&quot;存为常用&quot;</p>
               ) : (
                 promptLibrary.map((p) => (
                   <div
@@ -436,7 +436,7 @@ export default function LearnNewPage() {
                       <p className="text-xs font-medium text-gray-800">
                         {p.title}
                         {p.usedCount > 0 && (
-                          <span className="ml-2 text-2xs text-gray-400">
+                          <span className="ml-2 text-2xs text-gray-500">
                             使用 {p.usedCount} 次
                           </span>
                         )}
@@ -518,7 +518,7 @@ export default function LearnNewPage() {
             <Icon name="package" className="w-4 h-4" />
             内置知识库（{PRESET_METAS.length} 个方向）
           </h2>
-          <span className="text-xs text-gray-400 dark:text-gray-500">秒级加载 · 可重新生成</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">秒级加载 · 可重新生成</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {PRESET_METAS.map((p) => (
@@ -561,7 +561,7 @@ export default function LearnNewPage() {
                 ))}
               </div>
               {/* 统计：知识点 / 题目数 */}
-              <div className="flex items-center gap-3 text-2xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
+              <div className="flex items-center gap-3 text-2xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
                 <span className="flex items-center gap-0.5">
                   <Icon name="book" className="w-3 h-3" />
                   {p.knowledgeNodeCount} 知识点
@@ -710,7 +710,7 @@ function PresetMindMapModal({
               <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                 AI 正在重新生成知识树...
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 预计 30-90 秒，请勿关闭弹窗
               </p>
             </div>

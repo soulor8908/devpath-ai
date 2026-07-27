@@ -25,22 +25,22 @@ function MethodCard({ method, defaultOpen }: { method: RestMethod; defaultOpen?:
           <span className="text-xl">{method.emoji}</span>
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{method.name}</p>
-            <p className="text-xs text-gray-400">{method.duration}</p>
+            <p className="text-xs text-gray-500">{method.duration}</p>
           </div>
         </div>
-        <span className={`text-gray-400 text-xs transition-transform ${open ? "rotate-90" : ""}`}>
+        <span className={`text-gray-500 text-xs transition-transform ${open ? "rotate-90" : ""}`}>
           ▶
         </span>
       </Button>
       {open && (
         <div className="px-3 pb-3 space-y-2 text-xs">
           <div>
-            <span className="text-gray-400">原理：</span>
+            <span className="text-gray-500">原理：</span>
             <span className="text-gray-600">{method.principle}</span>
           </div>
           {method.steps && method.steps.length > 0 && (
             <div>
-              <span className="text-gray-400 block mb-1">操作步骤：</span>
+              <span className="text-gray-500 block mb-1">操作步骤：</span>
               <ol className="list-decimal list-inside space-y-1 text-gray-600">
                 {method.steps.map((s, i) => (
                   <li key={i}>{s}</li>
@@ -49,7 +49,7 @@ function MethodCard({ method, defaultOpen }: { method: RestMethod; defaultOpen?:
             </div>
           )}
           <div>
-            <span className="text-gray-400">适用：</span>
+            <span className="text-gray-500">适用：</span>
             <span className="text-gray-600">{method.suitableFor}</span>
           </div>
         </div>
@@ -111,7 +111,7 @@ export default function RestPage() {
       {/* 其他方法 */}
       {others.length > 0 && (
         <details className="mt-2">
-          <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-600">
+          <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-600">
             其他方法（{others.length}）
           </summary>
           <div className="space-y-2 mt-2">

@@ -109,10 +109,10 @@ export function UserProfileCard({ profile }: Props) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2 mb-3">
-          <Icon name="user" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+          <Icon name="user" className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">用户画像</h3>
         </div>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mb-3">暂无画像</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">暂无画像</p>
         <Button
           block
           onClick={() => void handleRebuild()}
@@ -144,7 +144,7 @@ export function UserProfileCard({ profile }: Props) {
       {/* 标题 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon name="user" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+          <Icon name="user" className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">用户画像</h3>
         </div>
         <Button
@@ -205,7 +205,7 @@ export function UserProfileCard({ profile }: Props) {
       {/* 偏好时段 */}
       {slots.length > 0 && (
         <div className="flex items-center gap-2">
-          <Icon name="clock" className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
+          <Icon name="clock" className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
           <p className="text-xs text-gray-600 dark:text-gray-300">
             偏好时段：{slots.map((s) => `${timeSlotPrefix(s)} ${s}`).join("、")}
           </p>
@@ -215,7 +215,7 @@ export function UserProfileCard({ profile }: Props) {
       {/* 平均专注时长 */}
       {avgMinutes > 0 && (
         <div className="flex items-center gap-2">
-          <Icon name="target" className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
+          <Icon name="target" className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
           <p className="text-xs text-gray-600 dark:text-gray-300">
             平均专注时长：{avgMinutes} 分钟
           </p>
@@ -224,7 +224,7 @@ export function UserProfileCard({ profile }: Props) {
 
       {/* 无有效数据提示 */}
       {topSkills.length === 0 && slots.length === 0 && avgMinutes === 0 && (
-        <p className="text-xs text-gray-400 dark:text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           画像数据为空，点击&quot;手动重建画像&quot;生成
         </p>
       )}

@@ -359,7 +359,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           答对 {state.questionsCorrect} / {state.questionsAnswered} 题
         </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           <Icon name="loader" className="w-3 h-3 inline-block align-middle animate-spin mr-1" />
           正在统计结果...
         </p>
@@ -370,7 +370,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   if (loading) {
     return (
       <div className="text-center py-12">
-        <Icon name="loader" className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto animate-spin mb-2" />
+        <Icon name="loader" className="w-8 h-8 text-gray-500 dark:text-gray-400 mx-auto animate-spin mb-2" />
         <p className="text-sm text-gray-500 dark:text-gray-400">加载中...</p>
       </div>
     );
@@ -380,7 +380,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
   return (
     <div>
       {/* 顶部：当前任务信息 */}
-      <div className="mb-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+      <div className="mb-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1">
           <Icon name={currentTask.type === "review" ? "repeat" : "book"} className="w-3.5 h-3.5" />
           {currentTask.type === "review" ? "复习" : "新学"} · {currentTask.title}
@@ -443,7 +443,7 @@ export function TrainSessionFlow({ studyQueue, onSessionComplete, onProgressChan
               新版：先让用户回忆，点击"查看答案"才揭示，再自评对错 */}
           {!answerRevealed ? (
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mb-4 border border-dashed border-gray-200 dark:border-gray-600 text-center">
-              <Icon name="lightbulb" className="w-6 h-6 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+              <Icon name="lightbulb" className="w-6 h-6 text-gray-500 dark:text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                 先在脑中回忆你的答案，准备好后查看参考答案
               </p>

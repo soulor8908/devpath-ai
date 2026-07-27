@@ -140,7 +140,7 @@ export default function OnboardingPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     {path.description}
                   </p>
-                  <div className="flex gap-3 text-xs text-gray-400 dark:text-gray-500">
+                  <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
                     <span className="flex items-center gap-1">
                       <Icon name="clock" className="w-3 h-3" />
                       约 {path.weeksEstimate} 周
@@ -164,7 +164,7 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-8 text-center">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-8 text-center">
           已经知道自己要学什么？{" "}
           <Link href="/learn/new" className="text-blue-500 hover:underline">
             自定义学习主题 →
@@ -234,7 +234,7 @@ export default function OnboardingPage() {
                 <div className="flex-1 pb-3">
                   <p className="font-medium text-sm">{node.title}</p>
                   {node.description && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                       {node.description}
                     </p>
                   )}
@@ -266,7 +266,7 @@ export default function OnboardingPage() {
         {starting ? "准备中..." : "开始第一次训练 →"}
       </Button>
 
-      <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-3">{selectedPath.cta}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">{selectedPath.cta}</p>
     </div>
   );
 }

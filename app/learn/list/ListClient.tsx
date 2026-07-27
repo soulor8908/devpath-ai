@@ -83,7 +83,7 @@ export default function ListClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-8">
         <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-        <p className="text-sm text-gray-400 mt-3">加载学习计划…</p>
+        <p className="text-sm text-gray-500 mt-3">加载学习计划…</p>
       </div>
     );
   }
@@ -132,7 +132,7 @@ export default function ListClient() {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-medium truncate">{p.topic}</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 mt-1">
                     {p.knowledgeCount} 知识点 · {p.questionCount} 题 ·{" "}
                     {p.scheduleDays} 天计划 · 每日 {p.dailyMinutes} 分钟
                   </p>
@@ -161,7 +161,7 @@ export default function ListClient() {
                       </span>
                     </div>
                   )}
-                  <p className="text-2xs text-gray-400 mt-0.5">
+                  <p className="text-2xs text-gray-500 mt-0.5">
                     创建于 {new Date(p.createdAt).toLocaleDateString("zh-CN")}
                   </p>
                 </div>
@@ -178,7 +178,7 @@ export default function ListClient() {
                       <Icon name="x" className="w-3.5 h-3.5 inline-block" />
                     )}
                   </Button>
-                  <span className="text-xs text-gray-400">查看 →</span>
+                  <span className="text-xs text-gray-500">查看 →</span>
                 </div>
               </div>
             </Link>

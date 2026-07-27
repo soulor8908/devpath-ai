@@ -193,7 +193,7 @@ export function DailyNudge() {
     return (
       <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-gray-400 truncate">
+          <span className="text-xs text-gray-500 truncate">
             <Icon name="alert" className="w-3.5 h-3.5 inline-block align-middle" /> AI 提醒加载失败：{error}
           </span>
           <Button
@@ -242,7 +242,7 @@ export function DailyNudge() {
           <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
             {nudge.nudge}
           </p>
-          <div className="mt-1 flex items-center gap-2 text-2xs text-gray-400">
+          <div className="mt-1 flex items-center gap-2 text-2xs text-gray-500">
             <span>
               {nudge.source === "ai" ? "AI 生成" : "规则生成"} ·{" "}
               {new Date(nudge.generatedAt).toLocaleTimeString("zh-CN", {
@@ -265,7 +265,7 @@ export function DailyNudge() {
                 size="sm"
                 iconOnly
                 onClick={handleThumbsDown}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="text-gray-500 hover:text-red-500 transition-colors"
                 aria-label="这条建议没帮助"
                 title="这条建议没帮助"
               >

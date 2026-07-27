@@ -481,7 +481,7 @@ export function PomodoroFullContent({
               <div className="font-mono text-6xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
                 {formatCountdown(idleMs)}
               </div>
-              <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">点按下方开始</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">点按下方开始</div>
             </div>
           </ProgressRing>
 
@@ -564,7 +564,7 @@ export function PomodoroFullContent({
                     ))}
                   </Select>
                   {plans.length === 0 && (
-                    <p className="text-2xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-2xs text-gray-500 dark:text-gray-400 mt-1">
                       暂无学习计划，可去「学习」页面创建
                     </p>
                   )}
@@ -624,7 +624,7 @@ export function PomodoroFullContent({
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 flex flex-col items-center space-y-5">
           {/* 类型徽章 + 任务描述 */}
           <div className="text-center w-full">
-            <p className="text-2xs uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
+            <p className="text-2xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
               {session.type === "focus"
                 ? "专注中"
                 : session.type === "short_break"
@@ -646,13 +646,13 @@ export function PomodoroFullContent({
                   isOvertime
                     ? "text-red-600 dark:text-red-400"
                     : isPaused
-                      ? "text-gray-400 dark:text-gray-500"
+                      ? "text-gray-500 dark:text-gray-400"
                       : "text-gray-900 dark:text-gray-100"
                 }`}
               >
                 {formatCountdown(remainingMs)}
               </div>
-              <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {isOvertime
                   ? "已超时，请尽快完成"
                   : isPaused
@@ -874,13 +874,13 @@ function TodaySummary({
               key={s.id}
               className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg bg-gray-50 dark:bg-gray-900/40"
             >
-              <span className="text-gray-400 dark:text-gray-500 font-mono shrink-0">
+              <span className="text-gray-500 dark:text-gray-400 font-mono shrink-0">
                 {formatStartedAtTime(s.startedAt)}
               </span>
               <span className="text-gray-700 dark:text-gray-300 flex-1 truncate">
                 {s.taskDescription || "（未命名任务）"}
               </span>
-              <span className="text-gray-400 dark:text-gray-500 shrink-0">
+              <span className="text-gray-500 dark:text-gray-400 shrink-0">
                 {s.durationMinutes}min
               </span>
               {(s.interruptions ?? 0) > 0 && (
@@ -895,7 +895,7 @@ function TodaySummary({
           ))}
         </ul>
       ) : (
-        <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-2">
+        <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">
           今天还没有完成番茄，点上方「开始专注」开启第一个
         </p>
       )}
@@ -925,7 +925,7 @@ function RecoveryCard({
       <p className="text-center text-sm text-gray-600 dark:text-gray-400">
         「{session.taskDescription}」还剩约 {mins} 分钟
       </p>
-      <p className="text-center text-xs text-gray-500 dark:text-gray-500">
+      <p className="text-center text-xs text-gray-500 dark:text-gray-400">
         可能是浏览器刷新或关闭前未结束
       </p>
       <div className="flex gap-2 pt-2">

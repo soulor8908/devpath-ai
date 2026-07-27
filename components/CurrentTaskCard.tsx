@@ -200,7 +200,7 @@ function RhythmActionCard({ action }: { action: NextAction }) {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">现在该做什么</p>
           <p className="text-base font-bold leading-snug">{reason}</p>
         </div>
-        <Icon name={button.icon} className="w-6 h-6 shrink-0 text-gray-400 dark:text-gray-500" />
+        <Icon name={button.icon} className="w-6 h-6 shrink-0 text-gray-500 dark:text-gray-400" />
       </div>
 
       {button && (

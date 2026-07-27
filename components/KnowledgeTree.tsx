@@ -90,7 +90,7 @@ export function KnowledgeTree({
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-bold">知识树（{nodes.length} 个节点）</h2>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500">
         {onSelectNode
           ? "点击节点标题展开详情，点「进入」筛选该知识点的题目"
           : "点击节点标题展开/收起详情"}
@@ -98,7 +98,7 @@ export function KnowledgeTree({
       </p>
       {sortedLevels.map((level) => (
         <div key={level}>
-          <p className="text-xs text-gray-400 mb-1">
+          <p className="text-xs text-gray-500 mb-1">
             难度 {level} · {DIFFICULTY_LABELS[level]}
           </p>
           <div className="space-y-1">
@@ -179,7 +179,7 @@ export function KnowledgeTree({
                       size="sm"
                       onClick={() => toggle(node.id)}
                       aria-label={expanded.has(node.id) ? "收起" : "展开"}
-                      className="text-gray-400"
+                      className="text-gray-500"
                     >
                       {expanded.has(node.id) ? "▼" : "▶"}
                     </Button>

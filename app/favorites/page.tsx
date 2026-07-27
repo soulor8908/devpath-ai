@@ -116,7 +116,7 @@ export default function FavoritesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">加载中...</p>
+        <p className="text-gray-500">加载中...</p>
       </div>
     );
   }
@@ -163,14 +163,14 @@ export default function FavoritesPage() {
       {tab === "decks" && (
         <div className="space-y-3">
           {decks.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">还没有收藏的试题集</p>
+            <p className="text-center text-gray-500 py-8">还没有收藏的试题集</p>
           ) : (
             decks.map((deck) => (
               <div key={deck.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h3 className="font-medium">{deck.topic}</h3>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       {deck.questionCount} 题 · {new Date(deck.favoritedAt).toLocaleDateString("zh-CN")}
                     </p>
                   </div>
@@ -220,14 +220,14 @@ export default function FavoritesPage() {
       {tab === "questions" && (
         <div className="space-y-2">
           {questions.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">还没有收藏的单题</p>
+            <p className="text-center text-gray-500 py-8">还没有收藏的单题</p>
           ) : (
             questions.map(({ question: q, planId, planTopic }) => (
               <div key={q.id} className="border rounded-lg p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{q.question}</p>
-                    <p className="text-xs text-gray-400 mt-1">来自：{planTopic}</p>
+                    <p className="text-xs text-gray-500 mt-1">来自：{planTopic}</p>
                   </div>
                   <Button
                     variant="secondary"

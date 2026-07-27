@@ -158,12 +158,12 @@ export default function AIQualityPage() {
       {!hasData ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center">
           <div className="mb-3 flex justify-center">
-            <Icon name="chart" className="w-10 h-10 text-gray-400" />
+            <Icon name="chart" className="w-10 h-10 text-gray-500" />
           </div>
           <p className="text-gray-600 dark:text-gray-300 font-medium mb-1">
             还没有 AI 调用数据
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-500">
             使用学习计划、每日提醒、AI 聊天等功能后，这里会展示 AI 输出质量统计。
           </p>
         </div>
@@ -186,7 +186,7 @@ export default function AIQualityPage() {
           </div>
 
           {/* 时间范围副信息 */}
-          <p className="text-xs text-gray-400 -mt-3">
+          <p className="text-xs text-gray-500 -mt-3">
             时间范围：
             {report.period.from
               ? `${report.period.from.slice(0, 10)} ~ ${report.period.to?.slice(0, 10) ?? ""}`
@@ -197,7 +197,7 @@ export default function AIQualityPage() {
           </p>
 
           {pruned !== null && pruned > 0 && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               已自动清理 {pruned} 条 90 天前的旧记录
             </p>
           )}
@@ -251,7 +251,7 @@ export default function AIQualityPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               采纳率 = adopted / (adopted + discarded) · 再生成率 = regenerated / calls · 评分仅来自显式反馈 · Token/成本仅统计有 usage 记录的调用
             </p>
           </section>
@@ -280,13 +280,13 @@ export default function AIQualityPage() {
                               {version}
                             </span>
                           </div>
-                          <span className="text-xs text-gray-400 shrink-0">{pv.calls} 次调用</span>
+                          <span className="text-xs text-gray-500 shrink-0">{pv.calls} 次调用</span>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                           <span>评分 {fmtRating(pv.avgRating)}</span>
                           <span>采纳率 {fmtPct(pv.adoptionRate)}</span>
                           {def?.changelog && (
-                            <span className="text-gray-400 truncate" title={def.changelog}>
+                            <span className="text-gray-500 truncate" title={def.changelog}>
                               · {def.changelog}
                             </span>
                           )}
@@ -302,7 +302,7 @@ export default function AIQualityPage() {
           {report.failureClusters.length > 0 ? (
             <section>
               <h2 className="text-lg font-bold mb-3">失败模式聚类</h2>
-              <p className="text-xs text-gray-400 mb-2">
+              <p className="text-xs text-gray-500 mb-2">
                 高再生成率的输入（至少 2 次调用 + 有再生成反馈），按再生成率排序
               </p>
               <div className="space-y-2">
@@ -313,7 +313,7 @@ export default function AIQualityPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">#{i + 1}</span>
+                        <span className="text-xs text-gray-500">#{i + 1}</span>
                         <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                           {SCENE_LABELS[c.scene] ?? c.scene}
                         </span>
@@ -326,7 +326,7 @@ export default function AIQualityPage() {
                       <div className="text-sm font-medium text-red-500">
                         {c.regenerationRate}% 再生成
                       </div>
-                      <div className="text-xs text-gray-400">{c.count} 次调用</div>
+                      <div className="text-xs text-gray-500">{c.count} 次调用</div>
                     </div>
                   </div>
                 ))}
@@ -336,7 +336,7 @@ export default function AIQualityPage() {
             hasData && (
               <section>
                 <h2 className="text-lg font-bold mb-3">失败模式聚类</h2>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-500">
                   暂无明显的失败模式（没有输入出现 2 次以上的再生成反馈）。
                 </p>
               </section>
@@ -363,7 +363,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
         <Icon name={icon} className="w-3.5 h-3.5" />
         <span>{label}</span>
       </div>

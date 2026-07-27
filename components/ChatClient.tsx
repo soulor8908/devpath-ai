@@ -1173,7 +1173,7 @@ export default function ChatClient({
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-gray-400 dark:text-gray-500">加载中...</p>
+        <p className="text-gray-500 dark:text-gray-400">加载中...</p>
       </div>
     );
   }
@@ -1215,7 +1215,7 @@ export default function ChatClient({
           onClick={() => activeConv && handleTogglePin(activeConv.id)}
           aria-label="收藏对话"
           className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-            activeConv?.pinned ? "text-blue-500" : "text-gray-400"
+            activeConv?.pinned ? "text-blue-500" : "text-gray-500"
           }`}
           disabled={!activeConv}
         >
@@ -1227,7 +1227,7 @@ export default function ChatClient({
           iconOnly
           onClick={() => activeConv && handleDelete(activeConv.id)}
           aria-label="删除对话"
-          className="rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-400"
+          className="rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500"
           disabled={!activeConv}
         >
           <Icon name="trash" className="w-5 h-5" />
@@ -1322,7 +1322,7 @@ export default function ChatClient({
       {/* 消息区（仅此区域滚动） */}
       <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3">
         {messages.length === 0 && !streaming && (
-          <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 py-10">
+          <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 py-10">
             <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center mb-4">
               <Icon name="chat" className="w-8 h-8 text-blue-400" />
             </div>
@@ -1344,7 +1344,7 @@ export default function ChatClient({
               ))}
             </div>
             <div className="w-full max-w-lg space-y-3">
-              <p className="text-xs text-gray-400 font-medium">AI 工具能力</p>
+              <p className="text-xs text-gray-500 font-medium">AI 工具能力</p>
               {TOOL_CATEGORIES.map((cat) => {
                 const tools = getToolsByCategory(cat.id);
                 if (tools.length === 0) return null;
@@ -1451,7 +1451,7 @@ export default function ChatClient({
                     }
                   }}
                   loading={copyingId === m.id}
-                  className="text-2xs text-gray-400 hover:text-blue-500"
+                  className="text-2xs text-gray-500 hover:text-blue-500"
                   aria-label="复制消息"
                   title="复制消息"
                 >
@@ -1467,7 +1467,7 @@ export default function ChatClient({
                         setEditingMessageId(m.id);
                         setEditContent(m.content);
                       }}
-                      className="text-2xs text-gray-400 hover:text-blue-500"
+                      className="text-2xs text-gray-500 hover:text-blue-500"
                       aria-label="编辑消息"
                       title="编辑消息"
                     >
@@ -1495,7 +1495,7 @@ export default function ChatClient({
                     }
                   }}
                   loading={deletingMessageId === m.id}
-                    className="text-2xs text-gray-400 hover:text-red-500"
+                    className="text-2xs text-gray-500 hover:text-red-500"
                     aria-label="删除消息"
                     title="删除消息"
                   >
@@ -1510,7 +1510,7 @@ export default function ChatClient({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRegenerateAnswer(m.id)}
-                  className="mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   aria-label="刷新回答"
                   title="重新生成 AI 回答"
                 >
@@ -1569,7 +1569,7 @@ export default function ChatClient({
                     }
                   }}
                   loading={copyingId === m.id}
-                  className="text-2xs text-gray-400 hover:text-blue-500"
+                  className="text-2xs text-gray-500 hover:text-blue-500"
                   aria-label="复制回复内容"
                   title="复制回复内容"
                 >
@@ -1595,7 +1595,7 @@ export default function ChatClient({
                     }
                   }}
                   loading={deletingMessageId === m.id}
-                  className="text-2xs text-gray-400 hover:text-red-500"
+                  className="text-2xs text-gray-500 hover:text-red-500"
                   aria-label="删除回复"
                   title="删除回复"
                 >
@@ -1608,7 +1608,7 @@ export default function ChatClient({
                     size="sm"
                     iconOnly
                     onClick={() => handleThumbsDown(m.id)}
-                    className="text-2xs text-gray-400 hover:text-red-500"
+                    className="text-2xs text-gray-500 hover:text-red-500"
                     aria-label="这条回复没帮助"
                     title="这条回复没帮助"
                   >
@@ -1631,7 +1631,7 @@ export default function ChatClient({
             {streamContent ? (
               <AnswerContent text={streamContent} />
             ) : (
-              <span className="text-gray-400 inline-flex items-center gap-1">
+              <span className="text-gray-500 inline-flex items-center gap-1">
                 <span className="animate-pulse">●</span>
                 <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>●</span>
                 <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>●</span>
@@ -1729,7 +1729,7 @@ export default function ChatClient({
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {filteredConversations.length === 0 ? (
-                <p className="text-center text-gray-400 text-sm py-8">暂无对话</p>
+                <p className="text-center text-gray-500 text-sm py-8">暂无对话</p>
               ) : (
                 filteredConversations.map((conv) => (
                   <div
@@ -1749,7 +1749,7 @@ export default function ChatClient({
                           {conv.title || "未命名对话"}
                         </p>
                       </div>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         {new Date(conv.lastMessageAt).toLocaleString()}
                       </p>
                     </div>

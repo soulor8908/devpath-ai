@@ -99,7 +99,7 @@ export function AITaskModal() {
     },
     aborted: {
       icon: "x-circle" as const,
-      iconClass: "text-gray-400 dark:text-gray-500",
+      iconClass: "text-gray-500 dark:text-gray-400",
       label: "已中止",
       labelClass: "text-gray-500 dark:text-gray-400",
     },
@@ -130,7 +130,7 @@ export function AITaskModal() {
             iconOnly
             onClick={handleClose}
             aria-label="关闭"
-            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0"
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-600 dark:hover:text-gray-200 shrink-0"
           >
             <Icon name="x" className="w-4 h-4" />
           </Button>
@@ -144,7 +144,7 @@ export function AITaskModal() {
           {task.content ? (
             task.content
           ) : (
-            <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
               <span className="inline-flex gap-1">
                 <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" />
                 <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" style={{ animationDelay: "0.2s" }} />
@@ -167,7 +167,7 @@ export function AITaskModal() {
 
         {/* Footer - 操作按钮 */}
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-500">
             {task.createdAt && (
               <>
                 已运行 {Math.max(0, Math.round(((task.finishedAt ?? Date.now()) - task.createdAt) / 1000))}s

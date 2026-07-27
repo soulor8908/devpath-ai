@@ -73,7 +73,7 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
       {open && (
         <div className="absolute bottom-full left-0 mb-2 w-72 max-h-[60vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-50">
           {/* Section 1: 常用 */}
-          <div className="text-xs text-gray-400 font-medium px-2 py-1">常用</div>
+          <div className="text-xs text-gray-500 font-medium px-2 py-1">常用</div>
           {COMMON_PROMPTS.map((prompt) => (
             <Button
               key={prompt}
@@ -84,7 +84,7 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
             >
               <Icon
                 name="message-circle"
-                className="w-4 h-4 text-gray-400 shrink-0"
+                className="w-4 h-4 text-gray-500 shrink-0"
               />
               <span>{prompt}</span>
             </Button>
@@ -94,13 +94,13 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
           <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
 
           {/* Section 2: AI 工具（按分类分组） */}
-          <div className="text-xs text-gray-400 font-medium px-2 py-1">AI 工具</div>
+          <div className="text-xs text-gray-500 font-medium px-2 py-1">AI 工具</div>
           {TOOL_CATEGORIES.map((cat) => {
             const tools = getToolsByCategory(cat.id);
             if (tools.length === 0) return null;
             return (
               <div key={cat.id}>
-                <div className="text-xs text-gray-400 px-2 py-1 flex items-center gap-1">
+                <div className="text-xs text-gray-500 px-2 py-1 flex items-center gap-1">
                   <Icon name={cat.icon} className="w-3.5 h-3.5" />
                   {cat.label}
                 </div>
@@ -115,7 +115,7 @@ export function QuickShortcuts({ onSelect }: QuickShortcutsProps) {
                     >
                       <Icon
                         name={tool.icon}
-                        className="w-4 h-4 text-gray-400 shrink-0"
+                        className="w-4 h-4 text-gray-500 shrink-0"
                       />
                       <span>{qp}</span>
                     </Button>

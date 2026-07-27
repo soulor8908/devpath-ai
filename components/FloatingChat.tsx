@@ -58,7 +58,7 @@ export function FloatingChat() {
       <ChatModal open={state.open} onClose={handleClose}>
         {/* ChatClient 内部已不再使用 useSearchParams，无需 Suspense 包裹；
             但保留 Suspense 作为 lazy 加载的兼容兜底 */}
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-400">加载中...</div>}>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">加载中...</div>}>
           <ChatClient
             prefill={state.prefill}
             source={state.source}

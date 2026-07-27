@@ -61,7 +61,7 @@ export default function ReviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-[50vh] text-sm text-gray-400 dark:text-gray-500">
+        <div className="flex items-center justify-center min-h-[50vh] text-sm text-gray-500 dark:text-gray-400">
           <Icon name="loader" className="w-5 h-5 mr-2 animate-spin" />
           加载中...
         </div>
@@ -512,9 +512,9 @@ function ReviewPageContent() {
                     大厂
                   </span>
                 )}
-                {cardDeck && <span className="ml-1 text-gray-400">· 来源: {cardDeck.topic}</span>}
+                {cardDeck && <span className="ml-1 text-gray-500">· 来源: {cardDeck.topic}</span>}
               </p>
-              <p className="truncate text-gray-400">
+              <p className="truncate text-gray-500">
                 上次复习: {formatRelative(card.lastReview)} · 下次到期: {formatRelative(card.due)} ·
                 复习 {card.reps} 次 · 失误 {card.lapses} 次
               </p>
@@ -529,7 +529,7 @@ function ReviewPageContent() {
 
       {/* ===== 卡片视图 / 空状态 ===== */}
       {dueCards.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-gray-500">
           <Icon name="check-circle" className="w-10 h-10 inline-block mb-2" />
           <p>当前筛选下没有到期的复习卡片</p>
           {isFiltered && (
@@ -584,7 +584,7 @@ function ReviewPageContent() {
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-2xs text-gray-400 w-8 shrink-0">{label}</span>
+      <span className="text-2xs text-gray-500 w-8 shrink-0">{label}</span>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

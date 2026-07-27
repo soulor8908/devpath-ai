@@ -35,7 +35,7 @@ export function EnergyTrendMini({ trend, todayEnergy }: Props) {
           <Icon name="zap" className="w-4 h-4 text-amber-500" />
           <h3 className="text-xs font-medium text-gray-500">本周能量</h3>
         </div>
-        <p className="text-xs text-gray-400 text-center py-3">
+        <p className="text-xs text-gray-500 text-center py-3">
           记录今日状态后即可看到能量趋势
         </p>
       </div>
@@ -50,7 +50,7 @@ export function EnergyTrendMini({ trend, todayEnergy }: Props) {
           <h3 className="text-xs font-medium text-gray-500">本周能量</h3>
         </div>
         {todayEnergy !== null && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-500">
             今日 <span className="font-bold text-gray-700 dark:text-gray-300">{todayEnergy}</span>/5
           </span>
         )}
@@ -78,7 +78,7 @@ export function EnergyTrendMini({ trend, todayEnergy }: Props) {
                   title={v === null ? "无数据" : `能量 ${v}/5`}
                 />
               </div>
-              <span className={`text-2xs ${isToday ? "text-blue-500 font-bold" : "text-gray-400"}`}>
+              <span className={`text-2xs ${isToday ? "text-blue-500 font-bold" : "text-gray-500"}`}>
                 {WEEKDAYS[i]}
               </span>
             </div>

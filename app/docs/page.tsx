@@ -101,7 +101,7 @@ export default function DocsPage() {
         </div>
         <Link
           href="/profile"
-          className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1"
+          className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1"
         >
           <Icon name="chevron-right" className="w-4 h-4 rotate-180" />
           返回
@@ -143,7 +143,7 @@ export default function DocsPage() {
               if (sections.length === 0) return null;
               return (
                 <div key={cat} className="mb-4">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5 px-2">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 px-2">
                     {cat}
                   </p>
                   <div className="space-y-0.5">
@@ -171,7 +171,7 @@ export default function DocsPage() {
               );
             })
           ) : (
-            <p className="text-sm text-gray-400 px-2">未找到相关文档</p>
+            <p className="text-sm text-gray-500 px-2">未找到相关文档</p>
           )}
         </aside>
 
@@ -207,7 +207,7 @@ export default function DocsPage() {
               />
             </article>
           ) : (
-            <div className="text-center py-20 text-gray-400">
+            <div className="text-center py-20 text-gray-500">
               <Icon name="search" className="w-12 h-12 mx-auto mb-3 opacity-40" />
               <p className="text-sm">
                 {search ? `未找到与"${search}"相关的文档` : "暂无文档"}

@@ -320,7 +320,7 @@ export default function InterviewClient() {
       <div className="min-h-screen p-4 max-w-lg mx-auto pb-20 dark:bg-gray-900">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm text-gray-400 dark:text-gray-500 mb-4"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-4"
         >
           <Icon name="chevron-left" className="w-4 h-4" />
           返回
@@ -439,12 +439,12 @@ export default function InterviewClient() {
               iconOnly
               onClick={handleRetry}
               aria-label="返回配置"
-              className="text-gray-400 dark:text-gray-500"
+              className="text-gray-500 dark:text-gray-400"
             >
               <Icon name="chevron-left" className="w-5 h-5" />
             </Button>
             <div className="text-center">
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {DIFFICULTY_LABELS[config.difficulty]}
               </p>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -514,7 +514,7 @@ export default function InterviewClient() {
                 <div className="bg-white dark:bg-gray-800 rounded-card px-4 py-2.5 border border-gray-100 dark:border-gray-700">
                   <Icon
                     name="loader"
-                    className="w-4 h-4 text-gray-400 dark:text-gray-500 animate-spin"
+                    className="w-4 h-4 text-gray-500 dark:text-gray-400 animate-spin"
                   />
                 </div>
               </div>

@@ -178,7 +178,7 @@ export function SyncStatus() {
       <div className="flex items-center justify-between">
         <span className={`text-sm ${statusColor}`}>{statusText}</span>
         {lastSync && (
-          <span className="text-xs text-gray-400 dark:text-gray-500">上次同步：{formatTime(lastSync)}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">上次同步：{formatTime(lastSync)}</span>
         )}
       </div>
 

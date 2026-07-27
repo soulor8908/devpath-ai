@@ -107,7 +107,7 @@ export default function AchievementsPage() {
                             className={`w-5 h-5 ${
                               unlocked
                                 ? "text-amber-600 dark:text-amber-400"
-                                : "text-gray-400 dark:text-gray-500"
+                                : "text-gray-500 dark:text-gray-400"
                             }`}
                           />
                         </div>
@@ -146,7 +146,7 @@ export default function AchievementsPage() {
                                   style={{ width: `${progress * 100}%` }}
                                 />
                               </div>
-                              <p className="text-2xs text-gray-400 mt-0.5">
+                              <p className="text-2xs text-gray-500 mt-0.5">
                                 {Math.round(progress * 100)}%
                               </p>
                             </div>

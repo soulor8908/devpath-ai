@@ -348,7 +348,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             className={`ml-auto ${
               isFailed
                 ? "bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900"
-                : "text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                : "text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
             }`}
           >
             {regenerating ? "生成中..." : (isFailed ? "重新生成" : "换一题")}

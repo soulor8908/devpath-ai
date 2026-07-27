@@ -586,7 +586,7 @@ export function LearnWizard({
                     ? "bg-black text-white dark:bg-white dark:text-black"
                     : passed
                     ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
-                    : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                    : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                 }`}
               >
                 {s.label}
@@ -638,7 +638,7 @@ export function LearnWizard({
             <div className="py-12 text-center">
               <div className="inline-block w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-600 dark:text-gray-300">AI 正在拆解知识点...</p>
-              <p className="text-xs text-gray-400 mt-1">预计 10-30 秒</p>
+              <p className="text-xs text-gray-500 mt-1">预计 10-30 秒</p>
             </div>
           ) : nodes.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-500">
@@ -652,7 +652,7 @@ export function LearnWizard({
                   className="p-3 border rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700"
                 >
                   <div className="flex items-start gap-2">
-                    <span className="text-xs text-gray-400 mt-0.5 shrink-0">#{i + 1}</span>
+                    <span className="text-xs text-gray-500 mt-0.5 shrink-0">#{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-gray-900 dark:text-gray-100">{n.title}</span>
@@ -664,7 +664,7 @@ export function LearnWizard({
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{n.summary}</p>
                       <div className="flex items-center gap-2 mt-2 text-2xs">
-                        <span className="text-gray-400">难度</span>
+                        <span className="text-gray-500">难度</span>
                         <span className="text-gray-700 dark:text-gray-300">{"★".repeat(n.difficulty)}{"☆".repeat(5 - n.difficulty)}</span>
                         <span className={`px-1.5 py-0.5 rounded ${FREQUENCY_COLOR[n.frequency] ?? ""}`}>
                           频率 {n.frequency}
@@ -738,7 +738,7 @@ export function LearnWizard({
             <div className="py-12 text-center">
               <div className="inline-block w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-600 dark:text-gray-300">AI 正在生成题目...</p>
-              <p className="text-xs text-gray-400 mt-1">预计 20-60 秒</p>
+              <p className="text-xs text-gray-500 mt-1">预计 20-60 秒</p>
             </div>
           ) : (
             <ul className="space-y-2">
@@ -748,7 +748,7 @@ export function LearnWizard({
                   className="p-3 border rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700"
                 >
                   <div className="flex items-start gap-2">
-                    <span className="text-xs text-gray-400 mt-0.5 shrink-0">Q{i + 1}</span>
+                    <span className="text-xs text-gray-500 mt-0.5 shrink-0">Q{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 dark:text-gray-100">{q.question}</p>
                       {q.bigTech && (
@@ -838,7 +838,7 @@ export function LearnWizard({
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <span className="text-xs text-gray-400 mt-0.5 shrink-0">Q{i + 1}</span>
+                  <span className="text-xs text-gray-500 mt-0.5 shrink-0">Q{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{q.question}</p>
                     {q.answer ? (
@@ -846,7 +846,7 @@ export function LearnWizard({
                         {q.answer}
                       </div>
                     ) : loading ? (
-                      <p className="mt-2 text-xs text-gray-400 animate-pulse">生成中...</p>
+                      <p className="mt-2 text-xs text-gray-500 animate-pulse">生成中...</p>
                     ) : (
                       <p className="mt-2 text-xs text-red-500">未生成</p>
                     )}
@@ -885,7 +885,7 @@ export function LearnWizard({
         <div className="py-16 text-center">
           <div className="inline-block w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
           <p className="text-base font-medium">正在创建学习计划...</p>
-          <p className="text-xs text-gray-400 mt-1">编排日程并保存到本地</p>
+          <p className="text-xs text-gray-500 mt-1">编排日程并保存到本地</p>
         </div>
       )}
     </div>

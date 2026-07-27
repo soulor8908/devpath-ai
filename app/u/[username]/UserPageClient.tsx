@@ -356,7 +356,7 @@ export default function UserPageClient() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">
                   {typeof window !== "undefined" ? window.location.href : `/u/${username}`}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   AI 驱动的开发者成长 OS · devpath
                 </p>
               </div>
@@ -365,7 +365,7 @@ export default function UserPageClient() {
         )}
 
         {/* ============ Footer ============ */}
-        <footer className="text-center text-xs text-gray-400 dark:text-gray-500 pt-4">
+        <footer className="text-center text-xs text-gray-500 dark:text-gray-400 pt-4">
           <Link
             href="/"
             className="inline-flex items-center gap-1 hover:text-purple-500 transition-colors"
@@ -404,7 +404,7 @@ function StatCard({
       </div>
       <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
         {value}
-        <span className="text-xs font-normal text-gray-400 ml-1">{unit}</span>
+        <span className="text-xs font-normal text-gray-500 ml-1">{unit}</span>
       </div>
       <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
     </div>

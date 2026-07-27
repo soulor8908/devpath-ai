@@ -199,7 +199,7 @@ export function UsernameSetupModal({
     >
       {!loaded ? (
         <div className="flex items-center justify-center py-6">
-          <Icon name="loader" className="w-5 h-5 text-gray-400 dark:text-gray-500 animate-spin" />
+          <Icon name="loader" className="w-5 h-5 text-gray-500 dark:text-gray-400 animate-spin" />
         </div>
       ) : (
         <div className="space-y-3">

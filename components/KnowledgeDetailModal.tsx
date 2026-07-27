@@ -103,7 +103,7 @@ export function KnowledgeDetailModal({ entry, onClose, onNavigate }: KnowledgeDe
         {/* 摘要 */}
         {entry.summary && (
           <div>
-            <h5 className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-1">摘要</h5>
+            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">摘要</h5>
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
               {entry.summary}
             </p>
@@ -113,7 +113,7 @@ export function KnowledgeDetailModal({ entry, onClose, onNavigate }: KnowledgeDe
         {/* tags */}
         {entry.tags.length > 0 && (
           <div>
-            <h5 className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-1">标签</h5>
+            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">标签</h5>
             <div className="flex flex-wrap gap-1">
               {entry.tags.map((tag) => (
                 <span
@@ -130,7 +130,7 @@ export function KnowledgeDetailModal({ entry, onClose, onNavigate }: KnowledgeDe
         {/* 前置依赖（preset 节点） */}
         {isPreset && entry.prerequisites && entry.prerequisites.length > 0 && (
           <div>
-            <h5 className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-1">
+            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
               前置知识
             </h5>
             <div className="flex flex-wrap gap-1">

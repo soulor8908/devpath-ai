@@ -775,7 +775,7 @@ export default function PlanDetailClient() {
             />
             知识树（{plan.knowledgeTree.length}）
           </span>
-          <span className="text-2xs text-gray-400 dark:text-gray-500">
+          <span className="text-2xs text-gray-500 dark:text-gray-400">
             {knowledgeTreeCollapsed ? "展开" : "收起"}
           </span>
         </Button>
@@ -1002,7 +1002,7 @@ export default function PlanDetailClient() {
             )}
           </div>
           {/* Result count */}
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             显示 {filteredQuestions.length} / {plan.questions.length} 题
           </p>
         </div>
@@ -1011,7 +1011,7 @@ export default function PlanDetailClient() {
             重新生成失败：{regenError}
           </div>
         )}
-        <p className="text-xs text-gray-400 mb-2">点击题目展开答案，可单题收藏或重新生成</p>
+        <p className="text-xs text-gray-500 mb-2">点击题目展开答案，可单题收藏或重新生成</p>
         <div className="space-y-2">
           {filteredQuestions.map((q) => (
             <div key={q.id} ref={(el) => { questionRefs.current[q.id] = el; }}>
@@ -1045,13 +1045,13 @@ export default function PlanDetailClient() {
             />
             学习计划（{days.length} 天）
           </span>
-          <span className="text-2xs text-gray-400 dark:text-gray-500">
+          <span className="text-2xs text-gray-500 dark:text-gray-400">
             {scheduleCollapsed ? "展开" : "收起"}
           </span>
         </Button>
         {!scheduleCollapsed && (
           <div id="schedule-panel">
-            <p className="text-xs text-gray-400 mb-2">点击任务标记完成/取消，点击标题跳转到对应题目</p>
+            <p className="text-xs text-gray-500 mb-2">点击任务标记完成/取消，点击标题跳转到对应题目</p>
             <div className="space-y-2">
               {days.map((day) => {
                 const dayItems = scheduleByDay[day];
@@ -1060,7 +1060,7 @@ export default function PlanDetailClient() {
                   <div key={day} className="border rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-medium">第 {day} 天</p>
-                      <span className="text-xs text-gray-400">{completedCount}/{dayItems.length} 完成</span>
+                      <span className="text-xs text-gray-500">{completedCount}/{dayItems.length} 完成</span>
                     </div>
                     <div className="space-y-1">
                       {dayItems.map(({ item, index }) => {
@@ -1092,7 +1092,7 @@ export default function PlanDetailClient() {
                               {nodeTitle}
                             </span>
                             {item.completed && <span className="text-green-500"><Icon name="check" className="w-3.5 h-3.5 inline-block" /></span>}
-                            <span className="text-gray-400">{item.estimatedMinutes}min</span>
+                            <span className="text-gray-500">{item.estimatedMinutes}min</span>
                           </div>
                         );
                       })}
@@ -1198,7 +1198,7 @@ export default function PlanDetailClient() {
             </div>
           )}
 
-          <p className="text-2xs text-gray-400 dark:text-gray-500 text-center">
+          <p className="text-2xs text-gray-500 dark:text-gray-400 text-center">
             预计 30-90 秒，生成期间请勿关闭页面
           </p>
         </div>

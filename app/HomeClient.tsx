@@ -246,7 +246,7 @@ export default function HomeClient() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-xl font-bold">今天</h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {new Date().toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })}
             </p>
           </div>
@@ -291,7 +291,7 @@ export default function HomeClient() {
             <div className="mt-2 text-center">
               <Link
                 href="/onboarding"
-                className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:underline"
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:underline"
               >
                 选错方向了？重新选择岗位 →
               </Link>
@@ -433,20 +433,20 @@ export default function HomeClient() {
                   </div>
                   <div className="space-y-0.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">入门</span>
+                      <span className="text-gray-500 dark:text-gray-400">入门</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">进阶</span>
+                      <span className="text-gray-500 dark:text-gray-400">进阶</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">高级</span>
+                      <span className="text-gray-500 dark:text-gray-400">高级</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
                     </div>
                     {userProfileSummary.preferredSlot && (
                       <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
-                        <span className="text-gray-400 dark:text-gray-500">偏好时段</span>
+                        <span className="text-gray-500 dark:text-gray-400">偏好时段</span>
                         <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
                       </div>
                     )}
@@ -461,11 +461,11 @@ export default function HomeClient() {
                   </div>
                   <div className="space-y-0.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">今日调用</span>
+                      <span className="text-gray-500 dark:text-gray-400">今日调用</span>
                       <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">采纳率</span>
+                      <span className="text-gray-500 dark:text-gray-400">采纳率</span>
                       <span className="text-green-600 dark:text-green-400 font-medium">
                         {Math.round(aiQualitySummary.adoptionRate * 100)}%
                       </span>
@@ -473,7 +473,7 @@ export default function HomeClient() {
                   </div>
                   <Link
                     href="/stats/ai-quality"
-                    className="block text-2xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 mt-2 text-center"
+                    className="block text-2xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 mt-2 text-center"
                   >
                     详情 →
                   </Link>
@@ -509,7 +509,7 @@ export default function HomeClient() {
                     <span className="text-xs text-white font-medium">{d.minutes}</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{d.date.slice(5)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{d.date.slice(5)}</p>
               </div>
             ))}
           </div>
@@ -574,15 +574,15 @@ export default function HomeClient() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate text-gray-800 dark:text-gray-200">{task.title}</p>
                     {task.reason && (
-                      <p className="text-2xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                      <p className="text-2xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                         {task.reason}
                       </p>
                     )}
                   </div>
                   {task.estimatedMinutes && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{task.estimatedMinutes}min</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{task.estimatedMinutes}min</span>
                   )}
-                  <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0 mt-1" />
+                  <Icon name="chevron-right" className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0 mt-1" />
                 </Link>
               );
             })}
@@ -608,7 +608,7 @@ export default function HomeClient() {
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
               {todayCompletedCount > 0 ? "今日清单已清空，干得漂亮！" : "今天没有待学习项"}
             </p>
-            <p className="text-2xs text-gray-400 dark:text-gray-500 mb-3">
+            <p className="text-2xs text-gray-500 dark:text-gray-400 mb-3">
               {todayCompletedCount > 0 ? "休息一下，或规划明天的学习" : "创建一个学习计划，开始你的成长之旅"}
             </p>
             <LinkButton
