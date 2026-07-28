@@ -72,7 +72,7 @@ async function callInterviewApi(
   let hasModel = false;
   try {
     const cfg = await getDefaultModelConfig();
-    hasModel = Boolean(cfg && cfg.apiKey);
+    hasModel = Boolean(cfg);
   } catch {
     hasModel = false;
   }

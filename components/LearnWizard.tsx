@@ -105,14 +105,14 @@ export function LearnWizard({
   });
 
   /**
-   * 检测当前用户是否应进入 trial 模式（无 modelConfig 或 apiKey 为空）。
+   * 检测当前用户是否应进入 trial 模式（无 modelConfig）。
    * 在挂载时同步执行，判定结果写入 ref 供 learnFetch 同步读取。
    * @returns 是否为 trial 模式
    */
   const detectTrialMode = useCallback(async (): Promise<boolean> => {
     try {
       const configs = await listModelConfigs();
-      const hasModel = configs.some((c) => c.apiKey && c.apiKey.trim().length > 0);
+      const hasModel = configs.length > 0;
       const isTrial = !hasModel;
       useTrialModeRef.current = isTrial;
       return isTrial;

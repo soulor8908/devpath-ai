@@ -99,12 +99,12 @@ export function DailyNudge() {
       // 进度反馈由卡片自身 inline loader 承担，完成/失败用 toast 提示
       //
       // Trial 模式降级（与 ChatClient 一致）：
-      //   - 用户没配模型 / apiKey 为空 → 走普通 fetch（不带 session 签名头）
+      //   - 用户没配模型 → 走普通 fetch（不带 session 签名头）
       //   - 服务端检测到无 session 会自动降级到 trial 模式（getModel + IP 限流）
       //   - 即使服务端没配 AI_API_KEY，也会降级到 rule 模板（不报错）
       //   - 关键约束：试用用户进首页不能看到"AI 提醒加载失败"
       const defaultCfg = await getDefaultModelConfig().catch(() => undefined);
-      const useTrialMode = !defaultCfg || !defaultCfg.apiKey;
+      const useTrialMode = !defaultCfg;
 
       const newCallId = generateCallId();
       const stopTimer = startTimer();
