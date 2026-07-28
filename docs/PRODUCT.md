@@ -78,7 +78,7 @@ DevPath 的学习内容不是 LLM 现场生成的二手货，而是仓库里 YAM
 
 ### 第一次使用
 
-1. **打开** https://devpath-ai.pages.dev/ → 自动注入 Demo 数据（前端工程师示例计划 + 3 张复习卡片 + 2 天学习日志），不用配置即可体验完整功能
+1. **打开** https://devpath-ai.ai-kits.workers.dev/ → 自动注入 Demo 数据（前端工程师示例计划 + 3 张复习卡片 + 2 天学习日志），不用配置即可体验完整功能
 2. **配置 AI 模型**：我的 → AI 模型配置
    - Trial 模式：免费试用，按场景配额限流（聊天 20/日、计划 5/日、周报 1/日、提醒 4/日）
    - 自带 Key：用 GLM / DeepSeek / OpenAI 等模型的 API Key，走零信任 session 加密，无限流

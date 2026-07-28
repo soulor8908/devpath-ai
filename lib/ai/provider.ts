@@ -35,9 +35,10 @@ const PRESETS: Record<string, Omit<ProviderConfig, "apiKey">> = {
   },
 };
 
-// Cloudflare Pages 运行时环境变量访问
-// next-on-pages 构建时 process.env 被内联为字面量，运行时环境变量必须通过 getRequestContext 获取
-// 开发环境（next dev）走 process.env，生产环境（Cloudflare Pages）走 getRequestContext
+// Cloudflare Workers 运行时环境变量访问（2026-07-27 OpenNext 迁移）
+// @opennextjs/cloudflare 构建时 process.env 被内联为字面量，运行时环境变量必须通过
+// getCloudflareContext() 获取（详见 lib/ai/cloudflare-env.ts）
+// 开发环境（next dev）走 process.env，生产环境（Cloudflare Workers）走 getCloudflareContext
 declare global {
   // eslint-disable-next-line no-var
   var __cloudflareEnv: Record<string, string> | undefined;
@@ -47,7 +48,7 @@ function getEnv(key: string): string | undefined {
   // 1. 开发环境：process.env
   const pe = process.env[key];
   if (pe) return pe;
-  // 2. Cloudflare Pages 运行时：通过 getRequestContext 注入的 env
+  // 2. Cloudflare Workers 运行时：通过 getCloudflareContext 注入的 env
   if (globalThis.__cloudflareEnv && globalThis.__cloudflareEnv[key]) {
     return globalThis.__cloudflareEnv[key];
   }

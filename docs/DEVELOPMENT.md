@@ -58,7 +58,7 @@ npx wrangler pages secret put MASTER_KEY --project-name=devpath-ai
 ## 测试
 
 ```bash
-# 全部单测（1037 用例 / 92 个测试文件）
+# 全部单测（1051 用例 / 94 个测试文件）
 npm test
 
 # 监听模式
@@ -87,7 +87,8 @@ npx next lint      # ESLint（next/core-web-vitals + typescript）
 
 ```bash
 npm run build                    # Next.js 构建
-npx @cloudflare/next-on-pages    # Cloudflare Pages 适配
+npm run build:cloudflare         # Cloudflare Workers 适配（@opennextjs/cloudflare）
+npm run preview                  # 本地预览 Workers 产物（wrangler dev）
 ```
 
 ## 添加新的 AI Prompt

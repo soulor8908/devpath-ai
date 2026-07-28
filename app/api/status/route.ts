@@ -6,24 +6,32 @@
 // 鉴权：requireSession 注入 session，body 不含客户端凭证
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { adjustDailyLoad, detectEnhanceTrigger } from "@/lib/status";
 import { enhanceAdjustment } from "@/lib/ai/status-enhance";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
+import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
 import type { DailyStatus, ScheduleItem, DopamineTrigger } from "@/lib/types";
 
-interface StatusRequestBody {
-  date: string;
-  energy: 1 | 2 | 3 | 4 | 5;
-  mood: "good" | "neutral" | "bad";
-  availableMinutes: number;
-  basePlan: ScheduleItem[];
-  /** 多巴胺干扰来源（情绪觉察流程收集，可选） */
-  dopamineTrigger?: DopamineTrigger;
-  /** 最近 7 天历史状态（由客户端从 IndexedDB 读取后传入） */
-  recentStatuses?: DailyStatus[];
-}
+// 2026-07-28 P1 安全：改用 zod schema 强校验，替代 as cast + 手写 if
+// - date 用 isoDate 校验（YYYY-MM-DD）
+// - energy 限定 1-5 整数
+// - mood 限定枚举
+// - availableMinutes 限定 0-1440 整数（一天最多 1440 分钟）
+// - basePlan 是数组（元素结构由 ScheduleItem 类型保证，运行时不深校验避免性能开销）
+// - dopamineTrigger 可选枚举
+// - recentStatuses 可选数组
+const statusBodySchema = z.object({
+  date: isoDate,
+  energy: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  mood: z.enum(["good", "neutral", "bad"]),
+  availableMinutes: z.number().int().min(0).max(1440),
+  basePlan: z.array(z.unknown()),
+  dopamineTrigger: z.string().optional(),
+  recentStatuses: z.array(z.unknown()).optional(),
+});
 
 export async function POST(req: Request) {
   await initCloudflareEnv();
@@ -32,18 +40,20 @@ export async function POST(req: Request) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  let body: StatusRequestBody;
-  try {
-    body = (await req.json()) as StatusRequestBody;
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
+  // 2026-07-28 P1：用 parseRequestBody 替代 as cast + 手写 if
+  const result = await parseRequestBody(req, statusBodySchema);
+  if (result instanceof NextResponse) return result;
+  const body = result.data as {
+    date: string;
+    energy: 1 | 2 | 3 | 4 | 5;
+    mood: "good" | "neutral" | "bad";
+    availableMinutes: number;
+    basePlan: ScheduleItem[];
+    dopamineTrigger?: DopamineTrigger;
+    recentStatuses?: DailyStatus[];
+  };
 
   const model = getModelFromSession(session, "status");
-
-  if (!body.date || !body.energy || !body.mood || typeof body.availableMinutes !== "number" || !Array.isArray(body.basePlan)) {
-    return NextResponse.json({ error: "缺少必填字段" }, { status: 400 });
-  }
 
   const status: DailyStatus = {
     date: body.date,

@@ -6,15 +6,42 @@
 // 作品集是用户带去面试的"硬资产"——V4 通过的项目发布为公开作品。
 // 客户端维护完整 portfolio 列表（IndexedDB），整体上传到 KV（与 achievements 同构）。
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
+import { parseRequestBody, nonEmptyString, isoDate } from "@/lib/ai/body-validation";
 import type { PublicPortfolio, PublicPortfolioEntry } from "@/lib/types";
 
 interface RouteContext {
   params: Promise<{ username: string }>;
 }
+
+// 2026-07-28 P1 安全：改用 zod schema 强校验 entries 数组元素结构
+// - id/title/nodeId/rubricId/publishedAt 必填
+// - repoUrl/deployUrl/docUrl 用 http(s) 协议白名单（防存储型 XSS，公开页直接渲染这些链接）
+// - 复用现有手写校验逻辑，但用 zod 统一错误格式
+const httpUrlOrEmpty = z
+  .string()
+  .trim()
+  .regex(/^https?:\/\/[^\s]+$/i, { message: "链接必须是 http(s) URL" })
+  .or(z.literal(""));
+
+const portfolioEntrySchema = z.object({
+  id: nonEmptyString,
+  title: nonEmptyString,
+  nodeId: nonEmptyString,
+  rubricId: nonEmptyString,
+  publishedAt: isoDate,
+  repoUrl: httpUrlOrEmpty.optional(),
+  deployUrl: httpUrlOrEmpty.optional(),
+  docUrl: httpUrlOrEmpty.optional(),
+});
+
+const portfolioBodySchema = z.object({
+  entries: z.array(portfolioEntrySchema),
+});
 
 export async function GET(_req: NextRequest, ctx: RouteContext) {
   await initCloudflareEnv();
@@ -53,42 +80,15 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     await store.claimUsername(username, session.userId);
   }
 
-  let body: { entries?: PublicPortfolioEntry[] };
-  try {
-    body = (await req.json()) as { entries?: PublicPortfolioEntry[] };
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
-
-  if (!Array.isArray(body.entries)) {
-    return NextResponse.json(
-      { error: "entries 必须是数组" },
-      { status: 400 },
-    );
-  }
-
-  // 校验每条 entry 必须含必要字段 + publishedAt
-  for (const e of body.entries) {
-    if (!e.id || !e.title || !e.nodeId || !e.rubricId || !e.publishedAt) {
-      return NextResponse.json(
-        { error: `作品集条目字段缺失: ${e.id ?? "(无 id)"}` },
-        { status: 400 },
-      );
-    }
-    // URL 协议白名单（防存储型 XSS：公开页会直接渲染这些链接）
-    for (const url of [e.repoUrl, e.deployUrl, e.docUrl]) {
-      if (url !== undefined && url !== "" && !/^https?:\/\//i.test(url.trim())) {
-        return NextResponse.json(
-          { error: `链接必须是 http(s) URL: ${e.id}` },
-          { status: 400 },
-        );
-      }
-    }
-  }
+  // 2026-07-28 P1：用 parseRequestBody 替代 as cast + 手写 for 循环校验
+  // zod schema 已校验每条 entry 的必填字段 + URL 协议白名单
+  const result = await parseRequestBody(req, portfolioBodySchema);
+  if (result instanceof NextResponse) return result;
+  const body = result.data;
 
   const portfolio: PublicPortfolio = {
     username,
-    entries: body.entries,
+    entries: body.entries as PublicPortfolioEntry[],
   };
   await store.setPortfolio(username, portfolio);
 

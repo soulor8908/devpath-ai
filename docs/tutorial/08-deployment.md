@@ -3,7 +3,7 @@
 > **视角**：卡帕西（工程视角，关注可重复、可观测、可回滚）
 > **预计阅读时间**：18 分钟
 > **前置知识**：第 4d 章部署技术选型、第 5 章规范约束
-> **学习目标**：理解 devpath-ai 如何从一行代码变成 https://devpath-ai.pages.dev/ 上的生产服务，包括 CI/CD 流水线、Secrets 配置、KV 命名空间、域名 HTTPS、本地验证流程。
+> **学习目标**：理解 devpath-ai 如何从一行代码变成 https://devpath-ai.ai-kits.workers.dev/ 上的生产服务，包括 CI/CD 流水线、Secrets 配置、KV 命名空间、域名 HTTPS、本地验证流程。
 
 ---
 
@@ -38,7 +38,7 @@ GitHub Actions 触发 deploy-devpath.yml
 └─────────────────────────────────────┘
         ↓
 Cloudflare Pages 边缘网络
-https://devpath-ai.pages.dev/
+https://devpath-ai.ai-kits.workers.dev/
         ↓
 绑定 4 个 KV namespace + Workers AI binding
         ↓
@@ -76,7 +76,7 @@ on:
   workflow_dispatch:  # 手动触发（用于紧急回滚或重跑）
 ```
 
-**为什么监听 `develop` 分支**：develop 用于预发布验证——main 是生产，develop 是预览。Cloudflare Pages 会自动给 develop 分支的部署分配 `dev.devpath-ai.pages.dev` 子域名（预览环境），不污染生产数据（KV 用 `preview_id`）。
+**为什么监听 `develop` 分支**：develop 用于预发布验证——main 是生产，develop 是预览。Workers 部署可通过 wrangler deploy --env preview 或单独的 Workers 服务配置预览环境，不污染生产数据（KV 用 `preview_id`）。
 
 **为什么用 `paths` 过滤**：避免改文档或测试就触发部署。代价是改了 `next.config.js` 但没改业务代码时会触发（罕见），收益是节省 CI 资源。
 
@@ -287,16 +287,15 @@ binding = "AI"
 
 ### 默认域名
 
-Cloudflare Pages 自动分配：
-- 生产：`https://devpath-ai.pages.dev/`
-- 预览：`https://dev.devpath-ai.pages.dev/`（develop 分支）
-- 每次 PR 自动分配预览域名
+Cloudflare Workers 自动分配：
+- 生产：`https://devpath-ai.ai-kits.workers.dev/`
+- 预览：通过单独的 Workers 服务或 wrangler deploy --env preview 配置（develop 分支）
 
 ### HTTPS 自动配置
 
 Cloudflare 自动签发 SSL 证书，无需手动配置。HTTP 自动重定向 HTTPS。
 
-**为什么不用自定义域名**：devpath-ai 是工具产品，`pages.dev` 子域名足够。如果要绑定自定义域名（如 `devpath.ai`），在 Cloudflare Dashboard > Pages > devpath-ai > Custom domains 添加，Cloudflare 自动签发证书。
+**为什么不用自定义域名**：devpath-ai 是工具产品，`workers.dev` 子域名足够。如果要绑定自定义域名（如 `devpath.ai`），在 Cloudflare Dashboard > Workers & Pages > devpath-ai > Settings > Domains & Routes 添加，Cloudflare 自动签发证书。
 
 ---
 
@@ -326,7 +325,7 @@ npx wrangler pages dev .vercel/output/static  # 本地预览
 
 ### 3. 预览部署验证
 
-push 到 `develop` 分支会自动部署到预览环境 `https://dev.devpath-ai.pages.dev/`，用真实 Cloudflare KV（preview_id）和真实 Workers AI。在预览环境跑一遍核心流程（创建计划 / 复习 / 聊天 / 番茄钟）再合并到 main。
+push 到 `develop` 分支会自动部署到预览环境（通过单独的 Workers 服务或 wrangler deploy --env preview），用真实 Cloudflare KV（preview_id）和真实 Workers AI。在预览环境跑一遍核心流程（创建计划 / 复习 / 聊天 / 番茄钟）再合并到 main。
 
 ---
 

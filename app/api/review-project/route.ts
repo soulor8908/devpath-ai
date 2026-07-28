@@ -9,6 +9,7 @@
 // 这是当前部署边界下的务实设计（真沙箱需 E2B/Modal 外部服务）。
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { getModelFromSession } from "@/lib/ai/provider";
@@ -16,6 +17,32 @@ import { reviewProject, type ProjectSubmission } from "@/lib/ai/project-review";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getNode, getRubric } from "@/lib/curriculum/server-graph";
 import { nowISO } from "@/lib/time";
+import { parseRequestBody, nonEmptyString, boundedString } from "@/lib/ai/body-validation";
+
+// 2026-07-28 P1 安全：改用 zod schema 强校验，防 prompt 注入
+// - repoUrl/deployUrl/docUrl 用 URL 协议白名单（http/https），防止 javascript: 等协议
+// - artifactText 限长 10000 字符，防超长 prompt 注入
+// - 至少提供一个材料字段（refine 保证）
+const httpUrlOrEmpty = z
+  .string()
+  .trim()
+  .regex(/^https?:\/\/[^\s]+$/i, { message: "链接必须是 http(s) URL" })
+  .or(z.literal(""));
+
+const reviewProjectBodySchema = z
+  .object({
+    nodeId: nonEmptyString,
+    title: boundedString(200),
+    repoUrl: httpUrlOrEmpty.optional(),
+    deployUrl: httpUrlOrEmpty.optional(),
+    docUrl: httpUrlOrEmpty.optional(),
+    artifactText: boundedString(10000).optional(),
+  })
+  .refine(
+    (data) =>
+      Boolean(data.repoUrl || data.deployUrl || data.docUrl || data.artifactText),
+    { message: "至少提供 repoUrl / deployUrl / docUrl / artifactText 之一" },
+  );
 
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
@@ -24,33 +51,11 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  let body: {
-    nodeId?: string;
-    title?: string;
-    repoUrl?: string;
-    deployUrl?: string;
-    docUrl?: string;
-    artifactText?: string;
-  };
-  try {
-    body = (await req.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
-
-  // 参数校验
-  if (!body.nodeId || typeof body.nodeId !== "string") {
-    return NextResponse.json({ error: "nodeId 是必填项" }, { status: 400 });
-  }
-  if (!body.title || !body.title.trim()) {
-    return NextResponse.json({ error: "title 是必填项" }, { status: 400 });
-  }
-  if (!body.repoUrl && !body.deployUrl && !body.docUrl && !body.artifactText) {
-    return NextResponse.json(
-      { error: "至少提供 repoUrl / deployUrl / docUrl / artifactText 之一" },
-      { status: 400 },
-    );
-  }
+  // 2026-07-28 P1：用 parseRequestBody 替代 as cast + 手写 if
+  // requireSession 用 req.clone().text() 算签名，不消费原 body，此处可安全 req.json()
+  const result = await parseRequestBody(req, reviewProjectBodySchema);
+  if (result instanceof NextResponse) return result;
+  const body = result.data;
 
   const node = getNode(body.nodeId);
   if (!node) {
@@ -79,11 +84,11 @@ export async function POST(req: NextRequest) {
   try {
     const model = getModelFromSession(session, "review-project");
     const submission: ProjectSubmission = {
-      title: body.title.trim(),
-      repoUrl: body.repoUrl?.trim() || undefined,
-      deployUrl: body.deployUrl?.trim() || undefined,
-      docUrl: body.docUrl?.trim() || undefined,
-      artifactText: body.artifactText?.trim() || undefined,
+      title: body.title,
+      repoUrl: body.repoUrl || undefined,
+      deployUrl: body.deployUrl || undefined,
+      docUrl: body.docUrl || undefined,
+      artifactText: body.artifactText || undefined,
     };
 
     const review = await reviewProject(rubric, submission, model);

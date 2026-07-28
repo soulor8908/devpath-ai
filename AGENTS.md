@@ -12,7 +12,7 @@
 - **技术栈**：Next.js 15 (App Router) + React 19 + TypeScript 5.5 + Tailwind CSS 3.4
 - **测试**：Vitest 1.6 + Testing Library + jsdom
 - **存储**：IndexedDB（本地）+ Cloudflare KV（云端同步，可选）
-- **生产链接**：https://devpath-ai.pages.dev/
+- **生产链接**：https://devpath-ai.ai-kits.workers.dev/
 
 ---
 

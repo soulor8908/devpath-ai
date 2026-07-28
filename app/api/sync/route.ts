@@ -7,26 +7,50 @@
 //         无 binding 时降级为内存 mock（仅本地开发）。
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
+import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
 import type { UserBackup } from "@/lib/types";
 
 const BACKUP_VERSION = 1;
 
-/** 同步请求体：以 mode 作为判别字段，区分全量 / 增量两种模式（不再含 userId） */
-type SyncRequestBody =
-  | {
-      mode?: "full"; // 省略时默认全量，向后兼容旧客户端
-      data: Record<string, unknown>;
-      updatedAt?: string;
-      version?: number;
+// 2026-07-28 P1 安全：改用 zod schema 强校验，防 changes 任意对象直传 KV 污染数据
+// - mode="incremental" 时 changes 必须是 object
+// - mode="full" 或省略时 data 必须是 object
+// - updatedAt/baseUpdatedAt 用 isoDate 校验
+// 用 object + superRefine 而非 discriminatedUnion，因为 mode 可选（省略时默认 full），
+// discriminatedUnion 要求 discriminator 必填，不兼容向后兼容场景
+const syncBodySchema = z
+  .object({
+    mode: z.enum(["full", "incremental"]).optional(),
+    data: z.record(z.string(), z.unknown()).optional(),
+    changes: z.record(z.string(), z.unknown()).optional(),
+    updatedAt: isoDate.optional(),
+    baseUpdatedAt: isoDate.optional(),
+    version: z.number().int().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode === "incremental") {
+      if (!data.changes) {
+        ctx.addIssue({
+          code: "custom",
+          message: "增量同步缺少 changes 字段",
+          path: ["changes"],
+        });
+      }
+    } else {
+      // mode 省略或 "full"：全量备份
+      if (!data.data) {
+        ctx.addIssue({
+          code: "custom",
+          message: "缺少 data 字段",
+          path: ["data"],
+        });
+      }
     }
-  | {
-      mode: "incremental";
-      changes: Record<string, unknown>;
-      baseUpdatedAt?: string;
-    };
+  });
 
 export async function GET(req: NextRequest) {
   await initCloudflareEnv();
@@ -51,38 +75,28 @@ export async function POST(req: NextRequest) {
   if (sessionResult instanceof NextResponse) return sessionResult;
   const { session } = sessionResult;
 
-  let body: SyncRequestBody;
-  try {
-    body = (await req.json()) as SyncRequestBody;
-  } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
-  }
+  // 2026-07-28 P1：用 parseRequestBody 替代 as cast + 手写 if
+  const result = await parseRequestBody(req, syncBodySchema);
+  if (result instanceof NextResponse) return result;
+  const body = result.data;
 
   const userId = session.userId;
   const store = createKVStore(getCloudflareKV());
 
   // 增量同步模式：只合并变更的 key
+  // superRefine 已校验 changes 存在，此处用 ! 断言
   if (body.mode === "incremental") {
-    if (!body.changes || typeof body.changes !== "object") {
-      return NextResponse.json(
-        { error: "增量同步缺少 changes 字段" },
-        { status: 400 },
-      );
-    }
-    const updatedAt = await store.mergeUserBackup(userId, body.changes);
+    const updatedAt = await store.mergeUserBackup(userId, body.changes!);
     return NextResponse.json({ ok: true, updatedAt });
   }
 
   // 全量备份模式（mode 省略或 "full"，向后兼容旧客户端）
-  if (!body.data || typeof body.data !== "object") {
-    return NextResponse.json({ error: "缺少 data 字段" }, { status: 400 });
-  }
-
+  // superRefine 已校验 data 存在，此处用 ! 断言
   const backup: UserBackup = {
     userId,
     updatedAt: body.updatedAt ?? new Date().toISOString(),
     version: body.version ?? BACKUP_VERSION,
-    data: body.data,
+    data: body.data!,
   };
 
   await store.setUserBackup(userId, backup);

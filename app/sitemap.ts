@@ -15,11 +15,11 @@
 //   - 修复：除根 / 外所有 URL 末尾加 /（根 / 已含 /，保持原样）
 //   - 守护测试：__tests__/seo-metadata-guard.test.ts 同步更新断言
 //
-// 访问路径：https://devpath-ai.pages.dev/sitemap.xml
+// 访问路径：https://devpath-ai.ai-kits.workers.dev/sitemap.xml
 
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://devpath-ai.pages.dev";
+const SITE_URL = "https://devpath-ai.ai-kits.workers.dev";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date().toISOString();

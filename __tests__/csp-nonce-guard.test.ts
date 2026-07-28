@@ -13,23 +13,29 @@
 //   2. layout.tsx 用 await headers() 读取 nonce，注入 <script nonce={nonce}>
 //   3. Next.js 15 自动给 RSC payload 脚本加 nonce
 //
-// 回退原因（@cloudflare/next-on-pages adapter 限制）：
+// 回退原因（@cloudflare/next-on-pages adapter 限制，2026-07-27）：
 //   - middleware 让所有路由变 dynamic
 //   - @cloudflare/next-on-pages 要求所有 dynamic 路由声明 runtime='edge'
 //   - /_not-found 是 Next.js 内置路由，无法声明 edge runtime
 //   - 部署失败：ERROR: Failed to produce a Cloudflare Pages build
-//   - wrangler.toml 注释已提示 @cloudflare/next-on-pages 被弃用，
-//     建议迁移到 OpenNext adapter（https://opennext.js.org/cloudflare）
 //
-// 后续路径：
-//   迁移到 OpenNext adapter 后，重新启用 nonce 模式（middleware + layout.tsx 注入）。
-//   迁移完成前，CSP 由 next.config.js 静态注入（含 'unsafe-inline'），
+// 2026-07-28 OpenNext 迁移完成（@opennextjs/cloudflare）：
+//   - 上述 adapter 限制已不存在（Workers + nodejs_compat，不再需要 edge runtime 声明）
+//   - nonce 模式可启用，但需线上验证 CSP 生效后再移除 unsafe-inline（避免白屏风险）
+//   - 启用步骤：
+//     1. 创建 middleware.ts（生成 nonce + 设置 CSP，移除 unsafe-inline）
+//     2. layout.tsx 改 async + await headers() + 注入 <script nonce={nonce}>
+//     3. 反转本测试文件的断言（middleware.ts 必须存在 / unsafe-inline 不再出现）
+//     4. 线上验证：curl -I https://devpath-ai.ai-kits.workers.dev/ 确认 CSP 含 nonce
+//     5. 浏览器验证：首页/学习/复习等核心页面无 CSP 违规（console 无报错）
+//
+// 当前状态：CSP 由 next.config.js 静态注入（含 'unsafe-inline'），
 //   仍能拦截外部域脚本注入，仅允许同源 + inline 脚本。
 //
 // 检测策略：源码级别扫描，防止"误删 fallback CSP"或"误加回退的 middleware"
-//   - middleware.ts 必须不存在（防止误启用导致部署失败）
+//   - middleware.ts 必须不存在（nonce 模式未启用前，防止误启用导致白屏）
 //   - next.config.js 必须保留 CSP fallback（含 'unsafe-inline'）
-//   - layout.tsx inline script 不能带 nonce 属性（nonce 来源已移除）
+//   - layout.tsx inline script 不能带 nonce 属性（nonce 来源未实现）
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -42,18 +48,19 @@ const NEXT_CONFIG_PATH = resolve(__dirname, "../next.config.js");
 const LAYOUT = readFileSync(LAYOUT_PATH, "utf-8");
 const NEXT_CONFIG = readFileSync(NEXT_CONFIG_PATH, "utf-8");
 
-describe("CSP nonce 模式现状守护（@cloudflare/next-on-pages 限制）", () => {
-  it("middleware.ts 必须不存在（误启用会导致部署失败）", () => {
-    // 误启用会触发 /_not-found 无法声明 edge runtime → 部署失败
-    // 启用 nonce 模式前须先迁移到 OpenNext adapter
+describe("CSP nonce 模式现状守护（OpenNext 迁移已完成，nonce 模式待启用）", () => {
+  it("middleware.ts 必须不存在（nonce 模式未启用前，防止误启用导致白屏）", () => {
+    // 2026-07-28 OpenNext 迁移已完成，此限制可解除
+    // 启用 nonce 模式时：创建 middleware.ts 后删除此断言
     expect(existsSync(MIDDLEWARE_PATH)).toBe(false);
   });
 
   it("next.config.js 必须保留 CSP fallback（含 'unsafe-inline'）", () => {
     // 防止误删 CSP 配置导致无任何脚本保护
+    // 2026-07-28 OpenNext 迁移后可移除 unsafe-inline（启用 nonce 模式时）
     expect(NEXT_CONFIG).toContain("Content-Security-Policy");
     expect(NEXT_CONFIG).toContain("script-src");
-    // 当前 adapter 限制下，'unsafe-inline' 是必要的（inline script 无 nonce）
+    // nonce 模式未启用前，'unsafe-inline' 是必要的（inline script 无 nonce）
     expect(NEXT_CONFIG).toContain("unsafe-inline");
   });
 
@@ -79,14 +86,14 @@ describe("CSP nonce 模式现状守护（@cloudflare/next-on-pages 限制）", (
   });
 });
 
-describe("未来启用 nonce 模式的检查清单（迁移到 OpenNext adapter 后）", () => {
-  // 这是文档型守护：提醒未来迁移完成后要恢复的配置
-  it("TODO: 迁移到 OpenNext adapter 后恢复 middleware.ts", () => {
+describe("未来启用 nonce 模式的检查清单（OpenNext 迁移已完成，可启用）", () => {
+  // 2026-07-28 OpenNext 迁移已完成，下列步骤可执行：
+  //   1. 创建 middleware.ts（生成 nonce + 设置 CSP，移除 unsafe-inline）
+  //   2. layout.tsx 改 async + await headers() + 注入 nonce
+  //   3. 反转上方断言（middleware.ts 必须存在 / unsafe-inline 不再出现）
+  //   4. 线上验证 CSP 生效 + 无白屏
+  it("TODO: 启用 nonce 模式后反转上方断言", () => {
     // 当前不强制，作为文档提醒
-    // 迁移完成后：
-    //   1. 重新创建 middleware.ts（生成 nonce + 设置 CSP）
-    //   2. layout.tsx 改回 async + await headers() + 注入 nonce
-    //   3. 更新本测试文件为断言 middleware.ts 存在
     expect(true).toBe(true);
   });
 });

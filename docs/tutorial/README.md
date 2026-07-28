@@ -2,7 +2,7 @@
 
 > 从立项到部署，一个真实 AI-Native 开发者成长 OS 的全流程决策脉络。覆盖立项 → 需求分析 → 产品设计 → 技术选型（20 个决策点深对比）→ 规范约束 → 代码实现 → 14 阶段迭代史 → 部署上线 → 复盘总结。
 
-**生产链接**：<https://devpath-ai.pages.dev/>
+**生产链接**：<https://devpath-ai.ai-kits.workers.dev/>
 **仓库**：[devpath-ai](file:///workspace/README.md)
 **关联 skill**：[build-project-tutorial](file:///workspace/.trae/skills/build-project-tutorial/SKILL.md)（把任何项目变成教程的可复用方法论）
 

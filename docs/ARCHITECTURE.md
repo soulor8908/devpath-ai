@@ -63,11 +63,13 @@ DevPath 不是单一学习工具，而是从内容到交付的完整转型系统
   ↓                                              ↓
   每次 AI 调用：                                   │
   ┌──────────────────────────────────────────────┘
-  │ Authorization: Bearer <sessionToken>:<nonce>
-  │ X-Timestamp: <unix-ms>
+  │ X-Session-Id: <sessionId>
+  │ X-Request-Timestamp: <unix-ms>
+  │ X-Request-Nonce: <nonce>
+  │ X-Request-Signature: <HMAC>
   ├─ 服务端校验：
-  │  - HMAC 签名匹配
-  │  - nonce 未消费过（KV nonce:{nonce} TTL 5min）
+  │  - HMAC 签名匹配（sessionSecret + nonce + timestamp）
+  │  - nonce 未消费过（KV nonce:{nonce} TTL 5min，一次性消费）
   │  - timestamp 在 ±60s 窗口内
   │  - session 未过期（滑动续期 7d）
   ├─ 校验通过 → 解密 apiKey → 调 AI → 返回响应
@@ -75,9 +77,10 @@ DevPath 不是单一学习工具，而是从内容到交付的完整转型系统
 ```
 
 关键文件：
-- `lib/auth/session.ts` — AES-GCM 加密 / HMAC 签名 / nonce 生成
-- `lib/auth/server.ts` — 服务端校验链
-- `app/api/auth/exchange/route.ts` — apiKey → sessionToken 交换
+- `lib/ai/crypto.ts` — AES-GCM 加密 / HMAC 签名 / nonce 生成
+- `lib/ai/session-middleware.ts` — 服务端校验链（requireSession + nonce 消费 + 滑动续期）
+- `app/api/auth/exchange/route.ts` — apiKey → sessionId + sessionSecret 交换
+- `lib/ai/cloudflare-env.ts` — Cloudflare Workers 环境变量 + KV binding 读取
 - `lib/storage/kv.ts` — session / nonce / 审计 4 个独立 KV namespace
 
 旧用户首次访问检测：有 `modelConfig.apiKey` 但无 session → 显示升级提示，引导重新 exchange。
@@ -418,4 +421,4 @@ buildProfileContext(profile) → ≤500 字符文本
 - 推送 `main` 自动触发 GitHub Actions 部署
 - Workflow 自动创建 Pages 项目（如不存在）
 - KV binding 名 `KV`，需在 Cloudflare Dashboard 创建 namespace
-- 生产 URL：https://devpath-ai.pages.dev
+- 生产 URL：https://devpath-ai.ai-kits.workers.dev
