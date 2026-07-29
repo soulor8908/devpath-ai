@@ -170,7 +170,7 @@ export default function ListClient() {
                     onClick={(e) => deletePlan(p.id, e)}
                     variant={confirmingDeleteId === p.id ? "danger" : "ghost"}
                     size="sm"
-                    aria-label="删除计划"
+                    aria-label={confirmingDeleteId === p.id ? "确认删除" : "删除计划"}
                   >
                     {confirmingDeleteId === p.id ? (
                       "确认删除"
@@ -186,7 +186,7 @@ export default function ListClient() {
         })}
       </div>
 
-      <p className="text-center text-xs text-gray-300 mt-8">
+      <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-8">
         <Icon name="lightbulb" className="w-3.5 h-3.5 inline-block align-middle" />{" "}
         点击计划卡片进入学习详情
       </p>

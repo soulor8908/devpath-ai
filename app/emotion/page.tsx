@@ -170,7 +170,7 @@ export default function EmotionPage() {
                           iconOnly
                           onClick={() => handleDelete(entry)}
                           aria-label="删除"
-                          className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Icon name="trash" className="w-4 h-4" />
                         </Button>

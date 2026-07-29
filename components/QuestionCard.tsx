@@ -198,7 +198,7 @@ export function QuestionCard({ question, planId, onFavoriteToggle, onRegenerate,
             variant="ghost"
             size="sm"
             loading={favoriting}
-            className={`text-lg ${question.favorited ? "text-yellow-500" : "text-gray-300"}`}
+            className={`text-lg ${question.favorited ? "text-yellow-500 dark:text-yellow-400" : "text-gray-400 dark:text-gray-500"}`}
             aria-label="收藏"
           >
             <Icon name="star" className="w-5 h-5" />

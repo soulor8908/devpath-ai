@@ -579,7 +579,7 @@ export function MindMap({
             aria-label="缩小"
             title="缩小"
           >
-            <span className="text-base leading-none">−</span>
+            <span aria-hidden="true" className="text-base leading-none">−</span>
           </Button>
           <span className="text-2xs text-gray-500 dark:text-gray-400 w-9 text-center font-mono tabular-nums">
             {Math.round(scale * 100)}%
@@ -593,7 +593,7 @@ export function MindMap({
             aria-label="放大"
             title="放大"
           >
-            <span className="text-base leading-none">+</span>
+            <span aria-hidden="true" className="text-base leading-none">+</span>
           </Button>
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
           <Button

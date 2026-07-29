@@ -470,7 +470,7 @@ export default function PlanEditClient() {
                   className="w-7 h-7"
                   aria-label="上移"
                 >
-                  ↑
+                  <span aria-hidden="true">↑</span>
                 </Button>
                 <Button
                   variant="secondary"
@@ -480,7 +480,7 @@ export default function PlanEditClient() {
                   className="w-7 h-7"
                   aria-label="下移"
                 >
-                  ↓
+                  <span aria-hidden="true">↓</span>
                 </Button>
               </div>
             </div>

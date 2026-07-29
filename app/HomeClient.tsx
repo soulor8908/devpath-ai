@@ -55,55 +55,64 @@ import { confirmDialog } from "@/lib/confirm-dialog";
 // useHomeData isLoading 共用同一骨架屏，避免两段式跳变（chunk 加载骨架屏 →
 // 数据加载假数据 → 真实数据）
 export function HomeSkeleton() {
+  // 2026-07-29 重构：骨架屏与 HomeClient 真实 6 区结构严格对齐，
+  // 每个区块用固定 min-h 防止 hydration 后高度跳变（CLS 归零）。
+  // 旧骨架屏有"错题区""快捷入口"等已移除区块，与真实内容不匹配导致 CLS。
   return (
     <div className="min-h-screen p-4 max-w-2xl mx-auto pb-20 dark:bg-gray-900 animate-pulse">
-      {/* 顶部 */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
-        <div className="h-7 w-20 bg-gray-100 dark:bg-gray-700 rounded-full" />
-      </div>
-      {/* AI 提醒卡片占位 */}
-      <div className="mb-4 space-y-3">
-        <div className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-        <div className="h-12 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-      </div>
-      {/* 三宫格统计占位 */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      {/* 1. Hero 行动区：问候+分享 → 路径进度卡片 → 番茄钟按钮 */}
+      <section className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-7 w-20 bg-gray-100 dark:bg-gray-700 rounded-full" />
+        </div>
+        {/* PathProgressBar 占位（固定 h-28 匹配真实卡片高度） */}
+        <div className="min-h-[112px] bg-gray-100 dark:bg-gray-800 rounded-2xl mb-2" />
+        {/* PathCoachInsight 占位 */}
+        <div className="min-h-[40px] bg-gray-100 dark:bg-gray-800 rounded-lg mb-2" />
+        {/* 番茄钟按钮占位 */}
+        <div className="min-h-[52px] bg-gray-100 dark:bg-gray-800 rounded-xl" />
+      </section>
+
+      {/* 1.5 情绪快捷选择占位 */}
+      <div className="min-h-[72px] mb-5 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+
+      {/* 2. KPI 三宫格占位（固定 h-24 匹配真实卡片高度） */}
+      <section className="mb-5 grid grid-cols-3 gap-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 border dark:border-gray-700 rounded-lg" />
+          <div key={i} className="min-h-[96px] bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl" />
         ))}
-      </div>
-      {/* 今日安排占位 */}
-      <div className="space-y-2 mb-4">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-9 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-        ))}
-      </div>
-      {/* 情绪区占位 */}
-      <div className="mb-4">
-        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-        <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-      </div>
-      {/* 错题区占位 */}
-      <div className="mb-4">
-        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-        <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-      </div>
-      {/* 热力图占位 */}
-      <div className="mb-4">
+      </section>
+
+      {/* 3. AI 教练洞察区占位（条件渲染，骨架屏保留固定高度占位防 CLS） */}
+      <section className="mb-5">
+        <div className="min-h-[80px] bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </section>
+
+      {/* 4. 能量趋势迷你图占位（条件渲染） */}
+      <section className="mb-5">
+        <div className="min-h-[60px] bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </section>
+
+      {/* 5. 7 天热力图占位 */}
+      <section className="mb-5">
         <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
         <div className="flex gap-1">
           {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex-1 h-12 bg-gray-100 dark:bg-gray-800 rounded" />
+            <div key={i} className="flex-1 min-h-[48px] bg-gray-100 dark:bg-gray-800 rounded" />
           ))}
         </div>
-      </div>
-      {/* 快捷入口占位 */}
-      <div className="grid grid-cols-3 gap-3 mt-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl" />
-        ))}
-      </div>
+      </section>
+
+      {/* 6. 今日学习队列占位 */}
+      <section>
+        <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="min-h-[56px] bg-gray-100 dark:bg-gray-800 rounded-lg" />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -376,7 +385,11 @@ export default function HomeClient() {
                   : buildSceneUrl(`/learn/${studyQueue[0].planId ?? ""}`, studyQueue[0], "home"))
               : (hasPlans ? "/learn/list" : "/learn/new")
           }
-          aria-label={`今日学习清单 ${studyQueue.length} 项，点击进入学习`}
+          aria-label={
+            studyQueue.length > 0
+              ? `今日学习清单 ${studyQueue.length} 项，点击进入学习`
+              : (hasPlans ? "查看学习列表" : "创建学习计划")
+          }
           className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/40 dark:to-gray-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all group relative"
         >
           {/* 右上角箭头图标：绝对定位，hover 时向右移动 */}
@@ -398,7 +411,7 @@ export default function HomeClient() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">已完成</p>
         </div>
         <div
-          aria-label={`连续打卡 ${streak} 天`}
+          aria-label={streak === 0 ? "今日去打卡" : `连续打卡 ${streak} 天`}
           className={`border rounded-2xl p-4 text-center ${streakMeta.color}`}
         >
           <p className="text-3xl font-bold flex items-center justify-center gap-1">
@@ -478,7 +491,6 @@ export default function HomeClient() {
           ) : (
             <Link
               href="/learn/new"
-              aria-label="新建学习计划"
               className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
             >
               <Icon name="plus" className="w-3.5 h-3.5" />

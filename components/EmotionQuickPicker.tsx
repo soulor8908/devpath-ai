@@ -101,7 +101,6 @@ export function EmotionQuickPicker({ onRecorded }: EmotionQuickPickerProps) {
         <a
           href="/emotion"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-          aria-label="进入完整情绪记录页"
         >
           完整记录 →
         </a>
