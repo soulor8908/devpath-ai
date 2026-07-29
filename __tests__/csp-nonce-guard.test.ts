@@ -1,29 +1,9 @@
 // __tests__/csp-nonce-guard.test.ts
 // CSP nonce 模式守护测试（2026-07-27 P1-4）
 //
-// 历史根因：
-//   站点体检发现 CSP 含 'unsafe-inline'，SecurityHeaders 评级被卡在 A（封顶），
-//   Mozilla Observatory 预估仅 C+。inline script 包括：
-//   - layout.tsx 主题探测脚本（避免 FOUC）
-//   - layout.tsx SW 注册脚本
-//   - Next.js RSC payload 脚本（框架固有）
-//
-// 已尝试方案（2026-07-27 回退）：
-//   1. middleware.ts 生成 per-request nonce，覆盖 next.config.js 的 CSP
-//   2. layout.tsx 用 await headers() 读取 nonce，注入 <script nonce={nonce}>
-//   3. Next.js 15 自动给 RSC payload 脚本加 nonce
-//
-// 回退原因（@cloudflare/next-on-pages adapter 限制，2026-07-27）：
-//   - middleware 让所有路由变 dynamic
-//   - @cloudflare/next-on-pages 要求所有 dynamic 路由声明 runtime='edge'
-//   - /_not-found 是 Next.js 内置路由，无法声明 edge runtime
-//   - 部署失败：ERROR: Failed to produce a Cloudflare Pages build
-//
-// 2026-07-28 回退到 @cloudflare/next-on-pages（因 workers.dev 国内无法访问）：
-//   - 上述 adapter 限制仍然存在（项目无 middleware.ts，限制不影响当前部署）
-//   - nonce 模式仍不可启用（同样会触发 dynamic routes 限制）
-//   - 当前 CSP 含 'unsafe-inline'，能拦截外部域脚本注入，仅允许同源 + inline 脚本
-//   - 未来若要启用 nonce：先迁移到 Workers（自定义域名解决国内访问），再启用 middleware.ts
+// 完整决策记录详见 docs/adr/0001-csp-nonce-next-on-pages-limitation.md
+// 摘要：nonce 模式因 @cloudflare/next-on-pages 限制（middleware 让 dynamic routes
+// 必须声明 edge runtime，/_not-found 无法声明）不可启用，当前保留 'unsafe-inline'。
 //
 // 检测策略：源码级别扫描，防止"误删 fallback CSP"或"误加回退的 middleware"
 //   - middleware.ts 必须不存在（nonce 模式未启用前，防止误启用导致白屏）

@@ -8,6 +8,7 @@
 #   - Pages 模式：pages_build_output_dir（不能用 main + [assets]）
 #   - 保留所有 KV bindings 和 AI binding（与原 Workers 配置一致）
 #   - 注：项目无 middleware.ts，next-on-pages 的 "dynamic routes 必须 edge runtime" 限制不影响
+#     （CSP nonce 模式因此限制不可启用，详见 docs/adr/0001-csp-nonce-next-on-pages-limitation.md）
 #
 # 历史轨迹：
 #   - 2026-07-16 ~ 2026-07-27：@cloudflare/next-on-pages（Pages 部署）

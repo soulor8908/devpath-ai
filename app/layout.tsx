@@ -107,12 +107,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 2026-07-27 P1-4 nonce 模式因 @cloudflare/next-on-pages 限制回退。
-  // 2026-07-28 因 workers.dev 国内无法访问，从 OpenNext 回退到 next-on-pages，
-  //   nonce 模式仍不可启用（middleware + dynamic routes 限制）。
-  //   当前 CSP 由 next.config.js 静态注入（含 'unsafe-inline'），仍能拦截
-  //   外部域脚本注入，仅允许同源 + inline 脚本。
-  // 未来若要启用 nonce：先迁移到 Workers（自定义域名解决国内访问），再启用 middleware.ts
+  // CSP nonce 模式因 @cloudflare/next-on-pages 限制不可启用。
+  // 完整决策记录详见 docs/adr/0001-csp-nonce-next-on-pages-limitation.md
+  // 当前 CSP 由 next.config.js 静态注入（含 'unsafe-inline'），仍能拦截外部域脚本注入。
 
   return (
     <html lang="zh-CN">
