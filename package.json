@@ -22,9 +22,9 @@
     "content:compile": "tsx scripts/compile-content.ts",
     "content:validate": "tsx scripts/compile-content.ts --check",
     "content:freshness": "tsx scripts/audit-source-freshness.ts",
-    "build:cloudflare": "opennextjs-cloudflare build",
-    "preview": "opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "build:cloudflare": "npx @cloudflare/next-on-pages",
+    "preview": "npx wrangler pages dev .vercel/output/static",
+    "deploy": "npx @cloudflare/next-on-pages && npx wrangler pages deploy .vercel/output/static --project-name=devpath-ai"
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.66",
@@ -46,7 +46,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@cloudflare/next-on-pages": "^1.13.0",
     "@playwright/test": "^1.61.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

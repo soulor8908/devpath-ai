@@ -34,6 +34,8 @@ import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { getPrompt } from "@/lib/ai/prompts";
 import type { KnowledgeNode, Question } from "@/lib/types";
 
+export const runtime = "edge";
+
 const PROMPT_DEF = getPrompt("answer_generate");
 
 /** 并发 worker 数量：3 个一组，平衡吞吐和 LLM 端 RPS */

@@ -11,6 +11,8 @@ import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import type { LearningPlan } from "@/lib/types";
 
+export const runtime = "edge";
+
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   // 先鉴权

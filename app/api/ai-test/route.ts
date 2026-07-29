@@ -11,6 +11,8 @@ import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { getModelFromSession } from "@/lib/ai/provider";
 
+export const runtime = "edge";
+
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
   try {

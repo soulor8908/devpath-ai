@@ -19,18 +19,11 @@
 //   - /_not-found 是 Next.js 内置路由，无法声明 edge runtime
 //   - 部署失败：ERROR: Failed to produce a Cloudflare Pages build
 //
-// 2026-07-28 OpenNext 迁移完成（@opennextjs/cloudflare）：
-//   - 上述 adapter 限制已不存在（Workers + nodejs_compat，不再需要 edge runtime 声明）
-//   - nonce 模式可启用，但需线上验证 CSP 生效后再移除 unsafe-inline（避免白屏风险）
-//   - 启用步骤：
-//     1. 创建 middleware.ts（生成 nonce + 设置 CSP，移除 unsafe-inline）
-//     2. layout.tsx 改 async + await headers() + 注入 <script nonce={nonce}>
-//     3. 反转本测试文件的断言（middleware.ts 必须存在 / unsafe-inline 不再出现）
-//     4. 线上验证：curl -I https://devpath-ai.ai-kits.workers.dev/ 确认 CSP 含 nonce
-//     5. 浏览器验证：首页/学习/复习等核心页面无 CSP 违规（console 无报错）
-//
-// 当前状态：CSP 由 next.config.js 静态注入（含 'unsafe-inline'），
-//   仍能拦截外部域脚本注入，仅允许同源 + inline 脚本。
+// 2026-07-28 回退到 @cloudflare/next-on-pages（因 workers.dev 国内无法访问）：
+//   - 上述 adapter 限制仍然存在（项目无 middleware.ts，限制不影响当前部署）
+//   - nonce 模式仍不可启用（同样会触发 dynamic routes 限制）
+//   - 当前 CSP 含 'unsafe-inline'，能拦截外部域脚本注入，仅允许同源 + inline 脚本
+//   - 未来若要启用 nonce：先迁移到 Workers（自定义域名解决国内访问），再启用 middleware.ts
 //
 // 检测策略：源码级别扫描，防止"误删 fallback CSP"或"误加回退的 middleware"
 //   - middleware.ts 必须不存在（nonce 模式未启用前，防止误启用导致白屏）

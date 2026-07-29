@@ -12,6 +12,8 @@ import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { getModelFromSession } from "@/lib/ai/provider";
 import type { KnowledgeNode } from "@/lib/types";
 
+export const runtime = "edge";
+
 // 2026-07-27 P1：用 zod 校验 node 必含 id + title（regenerateQuestion 强依赖）
 //   旧实现只 if 判 id/title 存在，缺 summary/difficulty 等下游字段会让 AI 生成低质量题
 //   用 passthrough() 保留所有字段，仅校验关键字段

@@ -14,6 +14,8 @@ import { createKVStore } from "@/lib/storage/kv";
 import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
 import type { UserBackup } from "@/lib/types";
 
+export const runtime = "edge";
+
 const BACKUP_VERSION = 1;
 
 // 2026-07-28 P1 安全：改用 zod schema 强校验，防 changes 任意对象直传 KV 污染数据

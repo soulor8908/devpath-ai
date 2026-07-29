@@ -15,6 +15,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthSessionsKV } from "@/lib/ai/cloudflare-env";
 
+export const runtime = "edge";
+
 /** csp-report 端点 IP 维度限流：每 IP 每小时最多 50 次报告 */
 const CSP_REPORT_RATE_LIMIT = 50;
 const CSP_REPORT_TTL = 3600; // 1 小时

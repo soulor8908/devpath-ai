@@ -12,6 +12,8 @@ import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nowISO } from "@/lib/time";
 import type { LearningPlan } from "@/lib/types";
 
+export const runtime = "edge";
+
 // 2026-07-27 P1：用 zod 校验范围（替代手写 if）
 const learnBodySchema = z.object({
   topic: nonEmptyString,

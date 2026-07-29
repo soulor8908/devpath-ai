@@ -1,13 +1,14 @@
 // lib/ai/cloudflare-env.ts
-// 在 Cloudflare Workers 运行时获取环境变量并注入到 provider
+// 在 Cloudflare Pages 运行时获取环境变量并注入到 provider
 //
-// 2026-07-27 OpenNext 迁移：从 raw symbol 改用官方 getCloudflareContext()
-//   - 旧实现用 globalThis[Symbol.for("__cloudflare-request-context__")]，是
-//     @cloudflare/next-on-pages 时代的内部实现细节，OpenNext 后不再保证注入
-//   - 新实现优先用 @opennextjs/cloudflare 的 getCloudflareContext()，raw symbol
-//     作为 fallback（向后兼容旧 adapter，且非 Cloudflare 环境安全降级）
-//   - getCloudflareContext() 在非 Cloudflare 环境（next dev / next build / 测试）
-//     会抛错，需 try/catch 包装
+// 2026-07-28 从 OpenNext 回退到 @cloudflare/next-on-pages：
+//   - 删除 @opennextjs/cloudflare 的 getCloudflareContext() 路径
+//   - 仅保留 raw symbol（globalThis[Symbol.for("__cloudflare-request-context__")]）
+//   - 这是 next-on-pages 注入请求上下文的官方机制
+//
+// 历史轨迹：
+//   - 2026-07-27 OpenNext 迁移：曾改用 getCloudflareContext() 优先 + raw symbol fallback
+//   - 2026-07-28 因 workers.dev 国内无法访问回退到 next-on-pages，恢复单一路径
 //
 // 开发环境（next dev）下 process.env 已可用，此函数为 no-op。
 
@@ -18,39 +19,16 @@ const CF_CTX_SYMBOL = Symbol.for("__cloudflare-request-context__");
 /**
  * 从当前请求上下文获取 Cloudflare env（bindings + vars + secrets）。
  *
- * 优先级：
- *   1. getCloudflareContext()（OpenNext 官方 API，推荐）
- *   2. raw symbol（向后兼容 @cloudflare/next-on-pages）
- *   3. undefined（非 Cloudflare 环境，调用方降级）
- *
- * 用 try/catch + 动态 import 包装，避免 next build 阶段求值失败。
+ * 通过 next-on-pages 注入的 raw symbol 读取。非 Cloudflare 环境（next dev / 测试）
+ * 返回 undefined，调用方降级到 process.env。
  */
 function getCloudflareEnv(): Record<string, unknown> | undefined {
-  // 1. 优先用 OpenNext 官方 API
-  //    用 Function('return require')() 动态调用 require，避免：
-  //    - webpack 静态分析把 @opennextjs/cloudflare 打进客户端 bundle
-  //    - eslint no-require-imports 规则报错
-  //    - next build 阶段（Node 环境）求值失败
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    const dynamicRequire = new Function("id", "return require(id)") as (id: string) => {
-      getCloudflareContext?: () => { env?: Record<string, unknown> } | undefined;
-    };
-    const mod = dynamicRequire("@opennextjs/cloudflare");
-    const ctx = mod?.getCloudflareContext?.();
-    if (ctx?.env) return ctx.env;
-  } catch {
-    // 非 Cloudflare 环境（next dev / next build / 测试），降级
-  }
-
-  // 2. Fallback: raw symbol（向后兼容 @cloudflare/next-on-pages）
   try {
     const ctx = (globalThis as Record<symbol, { env?: Record<string, unknown> } | undefined>)[CF_CTX_SYMBOL];
     if (ctx?.env) return ctx.env;
   } catch {
     // 非 Cloudflare 环境，忽略
   }
-
   return undefined;
 }
 

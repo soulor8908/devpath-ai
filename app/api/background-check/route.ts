@@ -19,6 +19,8 @@ import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
 import type { ReviewCard, LearnLog } from "@/lib/types";
 
+export const runtime = "edge";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {

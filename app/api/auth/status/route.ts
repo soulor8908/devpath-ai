@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { initCloudflareEnv } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 
+export const runtime = "edge";
+
 export async function GET(req: NextRequest) {
   await initCloudflareEnv();
 

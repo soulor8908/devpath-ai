@@ -19,6 +19,8 @@ import { getNode, getRubric } from "@/lib/curriculum/server-graph";
 import { nowISO } from "@/lib/time";
 import { parseRequestBody, nonEmptyString, boundedString } from "@/lib/ai/body-validation";
 
+export const runtime = "edge";
+
 // 2026-07-28 P1 安全：改用 zod schema 强校验，防 prompt 注入
 // - repoUrl/deployUrl/docUrl 用 URL 协议白名单（http/https），防止 javascript: 等协议
 // - artifactText 限长 10000 字符，防超长 prompt 注入

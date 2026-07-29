@@ -15,6 +15,8 @@ import { getModelFromSession } from "@/lib/ai/provider";
 import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
 import type { DailyStatus, ScheduleItem, DopamineTrigger } from "@/lib/types";
 
+export const runtime = "edge";
+
 // 2026-07-28 P1 安全：改用 zod schema 强校验，替代 as cast + 手写 if
 // - date 用 isoDate 校验（YYYY-MM-DD）
 // - energy 限定 1-5 整数

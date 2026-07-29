@@ -1,20 +1,23 @@
 # wrangler.toml
-# Cloudflare Workers 配置（OpenNext adapter）
-# 部署：npx wrangler deploy
+# Cloudflare Pages 配置（@cloudflare/next-on-pages）
+# 部署：npx wrangler pages deploy .vercel/output/static --project-name=devpath-ai
 #
-# 2026-07-27 从 @cloudflare/next-on-pages 迁移到 @opennextjs/cloudflare：
-#   - pages_build_output_dir → main + [assets]
-#   - Pages Functions → Workers（nodejs_compat 模式，不再需要 edge runtime 声明）
-#   - 保留所有 KV bindings 和 AI binding
+# 2026-07-28 从 @opennextjs/cloudflare（Workers 部署）回退到 @cloudflare/next-on-pages（Pages 部署）：
+#   - 根因：workers.dev 域名在国内无法访问，产品主要面向国内用户，必须用 pages.dev
+#   - workers.dev 在国内被 DNS 污染 + SSL 干扰；pages.dev 国内可正常访问
+#   - Pages 模式：pages_build_output_dir（不能用 main + [assets]）
+#   - 保留所有 KV bindings 和 AI binding（与原 Workers 配置一致）
+#   - 注：项目无 middleware.ts，next-on-pages 的 "dynamic routes 必须 edge runtime" 限制不影响
+#
+# 历史轨迹：
+#   - 2026-07-16 ~ 2026-07-27：@cloudflare/next-on-pages（Pages 部署）
+#   - 2026-07-27 ~ 2026-07-28：@opennextjs/cloudflare（Workers 部署，因 workers.dev 国内不可访问回退）
+#   - 2026-07-28 至今：@cloudflare/next-on-pages（Pages 部署，恢复国内访问）
 
 name = "devpath-ai"
-main = ".open-next/worker.js"
+pages_build_output_dir = ".vercel/output/static"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
-
-[assets]
-directory = ".open-next/assets"
-binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "KV"
@@ -33,16 +36,16 @@ id = "02684817b6884df4a1eb48416426cf07"
 
 [[kv_namespaces]]
 binding = "AUTH_AUDIT"
-id = "31f90bc37a644f55902e1a8b4ebce13f"
+id = "31f90bc37a644f55902e1a8b4ebce13d"
 
 # Workers AI binding（知识库向量化：/api/embed 调 bge-base-en-v1.5 嵌入查询文本）
-# OpenNext 通过 getRequestContext().env.AI 读取（与 next-on-pages 相同的 symbol 机制）
+# next-on-pages 通过 getRequestContext().env.AI 读取（raw symbol 机制）
 [ai]
 binding = "AI"
 
 [vars]
 AI_PROVIDER = "deepseek"
-# 以下密钥通过 `wrangler secret put <NAME>` 上传：
+# 以下密钥通过 `wrangler pages secret put <NAME>` 上传：
 # - MASTER_KEY        : 加密会话根密钥（32 字节 base64，必须配置，openssl rand -base64 32 生成）
 # - DEEPSEEK_API_KEY : DeepSeek API Key
 # - GLM_API_KEY       : 智谱 GLM API Key（如使用 glm provider）

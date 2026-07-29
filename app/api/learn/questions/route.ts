@@ -21,6 +21,8 @@ import { tryTrialMode, applyTrialHeaders } from "@/lib/ai/trial-mode";
 import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import type { KnowledgeNode } from "@/lib/types";
 
+export const runtime = "edge";
+
 // 2026-07-27 P1：用 zod 校验 nodes 数组元素关键字段（id/title 必填，summary/difficulty/frequency 下游使用）
 //   旧实现只校验 `Array.isArray(nodes) && length > 0`，元素内部字段不校验 →
 //   传入缺 id 的元素会让 generateQuestionStems 内部 throw

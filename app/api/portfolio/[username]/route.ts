@@ -14,6 +14,8 @@ import { createKVStore } from "@/lib/storage/kv";
 import { parseRequestBody, nonEmptyString, isoDate } from "@/lib/ai/body-validation";
 import type { PublicPortfolio, PublicPortfolioEntry } from "@/lib/types";
 
+export const runtime = "edge";
+
 interface RouteContext {
   params: Promise<{ username: string }>;
 }

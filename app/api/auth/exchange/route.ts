@@ -22,6 +22,8 @@ import { aesGcmEncrypt, sha256, randomBytes, bytesToBase64 } from "@/lib/ai/cryp
 import { chinaDateNow } from "@/lib/time";
 import type { SessionRecord } from "@/lib/storage/kv";
 
+export const runtime = "edge";
+
 /** exchange 端点 IP 维度限流：每 IP 每天最多 10 次换 session */
 const EXCHANGE_RATE_LIMIT = 10;
 const EXCHANGE_RATE_TTL = 86400; // 24 小时

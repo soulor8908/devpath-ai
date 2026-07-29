@@ -16,6 +16,8 @@ import { parseRequestBody, nonEmptyString } from "@/lib/ai/body-validation";
 import { nowISO } from "@/lib/time";
 import type { ReviewCard, ReviewLog, Rating } from "@/lib/types";
 
+export const runtime = "edge";
+
 // 2026-07-27 P1：用 zod 替代手写校验
 //   - rating 必须 1-4（FSRS 标准评级），用 z.literal 联合类型而非 number 范围
 //   - mode 限定三档枚举（默认 "standard"）

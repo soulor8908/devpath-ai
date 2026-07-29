@@ -18,6 +18,8 @@ import { createKVStore } from "@/lib/storage/kv";
 import type { PublicProfile, Achievement } from "@/lib/types";
 import type { PublicStats } from "@/lib/storage/kv";
 
+export const runtime = "edge";
+
 interface RouteContext {
   params: Promise<{ username: string }>;
 }

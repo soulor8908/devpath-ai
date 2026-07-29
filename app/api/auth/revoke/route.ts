@@ -18,6 +18,8 @@ import {
 } from "@/lib/ai/session-middleware";
 import { sha256 } from "@/lib/ai/crypto";
 
+export const runtime = "edge";
+
 export async function POST(req: NextRequest) {
   await initCloudflareEnv();
 

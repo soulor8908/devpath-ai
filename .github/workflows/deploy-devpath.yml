@@ -67,8 +67,8 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Build for Cloudflare (OpenNext)
-        run: npx opennextjs-cloudflare build
+      - name: Build for Cloudflare Pages (next-on-pages)
+        run: npx @cloudflare/next-on-pages
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
@@ -85,16 +85,16 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: pages deploy .vercel/output/static --project-name=devpath-ai --branch=main
 
       - name: Output Deployment URL
         if: always()
         run: |
           echo "✅ Deployment completed!"
-          echo "🔗 Workers: https://dash.cloudflare.com/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/services/devpath-ai"
-          echo "🌐 Production URL: https://devpath-ai.ai-kits.workers.dev"
+          echo "🔗 Pages: https://dash.cloudflare.com/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/view/devpath-ai"
+          echo "🌐 Production URL: https://devpath-ai.pages.dev"

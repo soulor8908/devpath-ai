@@ -35,10 +35,10 @@ const PRESETS: Record<string, Omit<ProviderConfig, "apiKey">> = {
   },
 };
 
-// Cloudflare Workers 运行时环境变量访问（2026-07-27 OpenNext 迁移）
-// @opennextjs/cloudflare 构建时 process.env 被内联为字面量，运行时环境变量必须通过
-// getCloudflareContext() 获取（详见 lib/ai/cloudflare-env.ts）
-// 开发环境（next dev）走 process.env，生产环境（Cloudflare Workers）走 getCloudflareContext
+// Cloudflare Pages 运行时环境变量访问
+// @cloudflare/next-on-pages 构建时 process.env 被内联为字面量，运行时环境变量必须通过
+// getRequestContext().env 获取（详见 lib/ai/cloudflare-env.ts）
+// 开发环境（next dev）走 process.env，生产环境（Cloudflare Pages）走 raw symbol
 declare global {
   // eslint-disable-next-line no-var
   var __cloudflareEnv: Record<string, string> | undefined;
