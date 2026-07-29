@@ -21,5 +21,8 @@ next-env.d.ts.bak
 /playwright-report/
 /playwright/.cache/
 
+# vitest stats 脚本临时产物（scripts/update-readme-stats.ts）
+.vitest-stats.json
+
 # WorkBuddy 本地记忆（不入库）
 .workbuddy/

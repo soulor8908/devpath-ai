@@ -22,6 +22,8 @@
     "content:compile": "tsx scripts/compile-content.ts",
     "content:validate": "tsx scripts/compile-content.ts --check",
     "content:freshness": "tsx scripts/audit-source-freshness.ts",
+    "stats:update": "tsx scripts/update-readme-stats.ts",
+    "stats:check": "tsx scripts/update-readme-stats.ts --check",
     "build:cloudflare": "npx @cloudflare/next-on-pages",
     "preview": "npx wrangler pages dev .vercel/output/static",
     "deploy": "npx @cloudflare/next-on-pages && npx wrangler pages deploy .vercel/output/static --project-name=devpath-ai"
