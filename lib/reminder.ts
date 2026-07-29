@@ -120,7 +120,7 @@ export async function checkAndTriggerReminders(): Promise<void> {
       new Notification(reminder.title, {
         body: reminder.body ?? "",
         tag: reminder.id, // 防止重复通知
-        icon: "/icon-192.png",
+        icon: "/icons/icon-192.png", // 与 manifest.json 路径一致
       });
       await markTriggered(reminder.id);
     } catch {

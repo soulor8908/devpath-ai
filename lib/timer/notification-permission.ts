@@ -50,8 +50,8 @@ export async function notify(title: string, body?: string): Promise<void> {
         body: body ?? "",
         // tag 防止重复通知堆叠
         tag: "pomodoro",
-        // icon 复用 PWA 图标
-        icon: "/icon-192.png",
+        // icon 复用 PWA 图标（路径与 manifest.json 一致：/icons/icon-192.png）
+        icon: "/icons/icon-192.png",
       });
       return;
     } catch (e) {

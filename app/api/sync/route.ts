@@ -11,7 +11,7 @@ import { z } from "zod";
 import { initCloudflareEnv, getCloudflareKV } from "@/lib/ai/cloudflare-env";
 import { requireSession } from "@/lib/ai/session-middleware";
 import { createKVStore } from "@/lib/storage/kv";
-import { parseRequestBody, isoDate } from "@/lib/ai/body-validation";
+import { parseRequestBody } from "@/lib/ai/body-validation";
 import type { UserBackup } from "@/lib/types";
 
 export const runtime = "edge";
@@ -21,7 +21,9 @@ const BACKUP_VERSION = 1;
 // 2026-07-28 P1 安全：改用 zod schema 强校验，防 changes 任意对象直传 KV 污染数据
 // - mode="incremental" 时 changes 必须是 object
 // - mode="full" 或省略时 data 必须是 object
-// - updatedAt/baseUpdatedAt 用 isoDate 校验
+// - updatedAt/baseUpdatedAt 用 z.string().datetime() 校验完整 ISO 8601（如 2026-07-28T12:34:56.789Z）
+//   注意：不能用 isoDate（YYYY-MM-DD），因为客户端发的是 new Date().toISOString() 完整时间戳，
+//   用 isoDate 会导致正则不匹配 → 400 Bad Request（2026-07-29 修复的真实线上 bug）
 // 用 object + superRefine 而非 discriminatedUnion，因为 mode 可选（省略时默认 full），
 // discriminatedUnion 要求 discriminator 必填，不兼容向后兼容场景
 const syncBodySchema = z
@@ -29,8 +31,8 @@ const syncBodySchema = z
     mode: z.enum(["full", "incremental"]).optional(),
     data: z.record(z.string(), z.unknown()).optional(),
     changes: z.record(z.string(), z.unknown()).optional(),
-    updatedAt: isoDate.optional(),
-    baseUpdatedAt: isoDate.optional(),
+    updatedAt: z.string().datetime().optional(),
+    baseUpdatedAt: z.string().datetime().optional(),
     version: z.number().int().min(1).optional(),
   })
   .superRefine((data, ctx) => {
