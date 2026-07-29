@@ -3,7 +3,7 @@
 > **视角**：卡帕西（工程视角，关注可重复、可观测、可回滚）
 > **预计阅读时间**：18 分钟
 > **前置知识**：第 4d 章部署技术选型、第 5 章规范约束
-> **学习目标**：理解 devpath-ai 如何从一行代码变成 https://devpath-ai.ai-kits.workers.dev/ 上的生产服务，包括 CI/CD 流水线、Secrets 配置、KV 命名空间、域名 HTTPS、本地验证流程。
+> **学习目标**：理解 devpath-ai 如何从一行代码变成 https://devpath-ai.pages.dev/ 上的生产服务，包括 CI/CD 流水线、Secrets 配置、KV 命名空间、域名 HTTPS、本地验证流程。
 
 ---
 
@@ -38,7 +38,7 @@ GitHub Actions 触发 deploy-devpath.yml
 └─────────────────────────────────────┘
         ↓
 Cloudflare Pages 边缘网络
-https://devpath-ai.ai-kits.workers.dev/
+https://devpath-ai.pages.dev/
         ↓
 绑定 4 个 KV namespace + Workers AI binding
         ↓
@@ -48,6 +48,11 @@ https://devpath-ai.ai-kits.workers.dev/
 **核心设计原则**：
 1. **两段而非一段**：quality-gate 失败时不浪费 deploy 的构建时间
 2. **幂等**：`wrangler pages project create` 已存在则跳过，不会因项目已存在而失败
+
+> **2026-07-28 域名决策**：使用 `pages.dev` 而非 `workers.dev`。
+> `workers.dev` 域名在国内被 DNS 污染 + SSL 干扰，无法访问；
+> `pages.dev` 国内可正常访问。产品主要面向国内用户，必须用 `pages.dev`。
+> 详见下方"域名与 HTTPS"章节和"决策 5"。
 3. **Secret 校验前置**：deploy job 第一步校验 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 存在，缺失则 fail fast 而非构建到一半才失败
 4. **路径触发**：只监听 `app/**` / `components/**` / `lib/**` / `functions/**` / `public/**` / `package.json` 等业务路径，改 README 或 docs 不触发部署
 
@@ -109,7 +114,7 @@ quality-gate:
 - `cache: "npm"`：缓存 `~/.npm`，加速 `npm ci`。`cache-dependency-path: package-lock.json` 确保 lock 文件变了才重建缓存
 - `npm ci` 而非 `npm install`：严格按 lock 文件安装，不更新依赖，保证可重复构建
 - `npm run lint` 内部是 `next lint --max-warnings 0`（Phase 8 强化），warning 当 error
-- `npm test` 跑 Vitest 986 单测，包括 16 个守护测试
+- `npm test` 跑 Vitest 1051 单测，包括 16 个守护测试
 
 ### Job 2: deploy
 
@@ -173,23 +178,17 @@ deploy:
 ### 部署到 Cloudflare Pages
 
 ```yaml
-- name: Ensure Pages Project Exists
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  run: |
-    echo "Ensuring project 'devpath-ai' exists..."
-    npx wrangler pages project create devpath-ai --production-branch=main 2>&1 || echo "Project may already exist, continuing..."
-
 - name: Deploy to Cloudflare Pages
   uses: cloudflare/wrangler-action@v3
   with:
     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    command: pages deploy .vercel/output/static --project-name=devpath-ai --commit-dirty=true
+    command: pages deploy .vercel/output/static --project-name=devpath-ai --branch=main
 ```
 
-**`--commit-dirty=true` 的作用**：允许工作区有未提交的改动时部署。CI 环境一般干净，但 `@cloudflare/next-on-pages` 会在 `.vercel/output/` 生成产物，wrangler 会检测到"工作区脏"，加这个 flag 跳过检查。
+**为什么不需要 `wrangler pages project create`**：项目已通过 Cloudflare API 预创建（direct upload 模式，不连 GitHub source）。CI 只负责上传产物。
+
+**为什么用 `--branch=main` 而非 `--commit-dirty=true`**：direct upload 模式不需要 commit dirty flag；指定 `--branch=main` 确保部署到 production 环境（Pages 项目用 `production_branch=main` 区分生产/预览）。
 
 **为什么用 `cloudflare/wrangler-action@v3` 而非裸 `npx wrangler`**：action 封装了错误处理、重试、日志格式化。裸 `npx wrangler` 失败时日志难读。
 
@@ -287,15 +286,21 @@ binding = "AI"
 
 ### 默认域名
 
-Cloudflare Workers 自动分配：
-- 生产：`https://devpath-ai.ai-kits.workers.dev/`
-- 预览：通过单独的 Workers 服务或 wrangler deploy --env preview 配置（develop 分支）
+Cloudflare Pages 自动分配：
+- 生产：`https://devpath-ai.pages.dev/`
+- 预览：通过 push 到非 `main` 分支触发 Pages preview deployment（自动生成 `<hash>.devpath-ai.pages.dev` 预览 URL）
 
 ### HTTPS 自动配置
 
 Cloudflare 自动签发 SSL 证书，无需手动配置。HTTP 自动重定向 HTTPS。
 
-**为什么不用自定义域名**：devpath-ai 是工具产品，`workers.dev` 子域名足够。如果要绑定自定义域名（如 `devpath.ai`），在 Cloudflare Dashboard > Workers & Pages > devpath-ai > Settings > Domains & Routes 添加，Cloudflare 自动签发证书。
+**为什么用 `pages.dev` 而非 `workers.dev`**：
+- `workers.dev` 域名在国内被 DNS 污染 + SSL 干扰，国内用户无法访问
+- `pages.dev` 域名国内可正常访问
+- 产品主要面向国内用户，必须用 `pages.dev`
+- 历史上曾尝试迁移到 Workers（@opennextjs/cloudflare），因 workers.dev 国内访问问题于 2026-07-28 回退到 Pages（详见决策 5）
+
+**为什么不用自定义域名**：devpath-ai 是工具产品，`pages.dev` 子域名足够。如果要绑定自定义域名（如 `devpath.ai`），在 Cloudflare Dashboard > Workers & Pages > devpath-ai > Custom domains 添加，Cloudflare 自动签发证书。
 
 ---
 
@@ -308,7 +313,7 @@ Cloudflare 自动签发 SSL 证书，无需手动配置。HTTP 自动重定向 H
 ```bash
 npm run lint       # ESLint (--max-warnings 0)
 npm run typecheck  # TypeScript 类型检查
-npm test           # Vitest 986 单测
+npm test           # Vitest 1051 单测
 ```
 
 三个都通过才考虑 push。本地失败比 CI 失败快 10 倍。
@@ -325,7 +330,7 @@ npx wrangler pages dev .vercel/output/static  # 本地预览
 
 ### 3. 预览部署验证
 
-push 到 `develop` 分支会自动部署到预览环境（通过单独的 Workers 服务或 wrangler deploy --env preview），用真实 Cloudflare KV（preview_id）和真实 Workers AI。在预览环境跑一遍核心流程（创建计划 / 复习 / 聊天 / 番茄钟）再合并到 main。
+push 到非 `main` 分支会自动触发 Pages preview deployment（生成 `<hash>.devpath-ai.pages.dev` 预览 URL），用真实 Cloudflare KV（preview_id）和真实 Workers AI。在预览环境跑一遍核心流程（创建计划 / 复习 / 聊天 / 番茄钟）再合并到 main。
 
 ---
 
@@ -354,9 +359,11 @@ push 到 `develop` 分支会自动部署到预览环境（通过单独的 Worker
 **常见原因**：
 - 用了 Edge Runtime 不支持的 Node.js API（如 `fs` / `crypto` 的某些方法）
 - 第三方依赖用了 Node.js 原生模块（如 `Buffer`）
-- `next.config.js` 配置了 `runtime: 'nodejs'` 而非 `runtime: 'edge'`
+- dynamic routes（API routes + dynamic pages）未声明 `export const runtime = 'edge'`——next-on-pages 硬性要求
 
 **排查**：看构建日志，定位是哪个文件 / 哪个 API。本地跑 `npx @cloudflare/next-on-pages --watch` 实时看错误。
+
+**Edge runtime 声明规范**：所有 `app/api/*/route.ts` 和 `app/[param]/page.tsx` 必须在文件顶部 import 后加 `export const runtime = 'edge';`。2026-07-28 回退到 next-on-pages 时一次性给 26 个 API routes + 4 个 dynamic pages 加了声明。新增路由时务必记得加。
 
 ### 常见失败 4：wrangler 部署失败
 
@@ -397,6 +404,28 @@ push 到 `develop` 分支会自动部署到预览环境（通过单独的 Worker
 **决策**：改为运行时 `fetch('/data/presets/{id}.json')`，JSON 数据放 `public/data/`，构建期由 `scripts/export-presets.ts` 从 TS 源生成。bundle 从 13MB 降到 6.5MB，通过 Cloudflare Pages 限制。
 
 **代价**：首次加载多一次 HTTP 请求（按需加载，不影响首屏）。**收益**：bundle 通过限制，preset 数据可独立缓存（HTTP 缓存 + Service Worker stale-while-revalidate）。
+
+### 决策 5：从 OpenNext（Workers）回退到 next-on-pages（Pages）
+
+**背景**：2026-07-27 项目从 `@cloudflare/next-on-pages`（Pages 部署）迁移到 `@opennextjs/cloudflare`（Workers 部署），意图用 Workers 的 nodejs_compat 模式获得更完整的 Node.js 兼容性、放弃 edge runtime 强制声明。但迁移后立即发现致命问题：**workers.dev 域名在国内无法访问**（DNS 污染 + SSL 干扰），产品主要面向国内用户，workers.dev 不可用等于服务不可用。
+
+**调研**：调研了三种方案：
+1. 方案 A（双部署：Workers + Pages）：保留 Workers 部署 + 新增 Pages 部署，CI 时间翻倍
+2. 方案 B（完全回退到 next-on-pages）：改 CI 用 next-on-pages，删除 Workers 服务
+3. 方案 C（OpenNext 产物硬塞到 Pages Advanced Mode）：调研证明不可行——OpenNext 官方不支持 Pages 部署，Pages + wrangler.toml bindings 有冲突历史，社区无可复现成功案例
+
+**决策**：方案 B。理由：
+1. next-on-pages 是项目原本的部署方式，已知可行
+2. next-on-pages 官方支持 Pages 部署，规范内用法
+3. 单一部署目标，单套 bindings，运维简单
+4. 满足核心诉求：pages.dev 国内可访问
+
+**代价**：
+- 所有 dynamic routes 必须声明 `export const runtime = 'edge'`（next-on-pages 硬性要求）——2026-07-28 一次性给 26 个 API routes + 4 个 dynamic pages 加了声明
+- CSP nonce 模式不可启用（middleware 会让 dynamic routes 强制 edge runtime 声明失效，`/_not-found` 内置路由无法声明 edge runtime，部署失败）
+- Workers 独有能力（Durable Objects / Cron / Queues）未来扩展受限——当前项目无此需求
+
+**收益**：pages.dev 国内可访问，产品可用。这是比"技术栈先进性"更重要的约束。
 
 ---
 

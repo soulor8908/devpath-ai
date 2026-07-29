@@ -6,11 +6,11 @@
 //   - 不允许 /api/、/u/（用户个人主页隐私）、/profile、/onboarding（登录后页）
 //   - 指向 sitemap.xml
 //
-// 访问路径：https://devpath-ai.ai-kits.workers.dev/robots.txt
+// 访问路径：https://devpath-ai.pages.dev/robots.txt
 
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://devpath-ai.ai-kits.workers.dev";
+const SITE_URL = "https://devpath-ai.pages.dev";
 
 export default function robots(): MetadataRoute.Robots {
   return {

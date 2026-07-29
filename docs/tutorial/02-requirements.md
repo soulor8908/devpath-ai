@@ -134,7 +134,7 @@
 
 ```
 作为小张（前端工程师想转 AI），
-我打开 https://devpath-ai.ai-kits.workers.dev/，
+我打开 https://devpath-ai.pages.dev/，
 系统自动注入 Demo 数据（前端工程师示例计划 + 3 张复习卡片 + 2 天学习日志），
 我立即看到完整功能，不用配置任何东西，
 10 秒内理解"哦，这是个学习教练"。

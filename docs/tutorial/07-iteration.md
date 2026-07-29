@@ -357,4 +357,4 @@ Phase 13 内容层重构                → Content-as-Code + L1-L4 四层架构
 
 每个 Phase 都不是"完成即结束"，而是"为下一个 Phase 铺路"。Phase 0 的 IndexedDB 单表设计 → Phase 6 的画像 prefix 扫描 → Phase 9 的 tombstone 同步 → Phase 13 的 Content-as-Code，是一条从"数据存储"到"内容护城河"的连贯演进线。
 
-下一章 [08-deployment.md](file:///workspace/docs/tutorial/08-deployment.md) 会讲部署流程——这些迭代是怎么真正上线到 https://devpath-ai.ai-kits.workers.dev/ 的。
+下一章 [08-deployment.md](file:///workspace/docs/tutorial/08-deployment.md) 会讲部署流程——这些迭代是怎么真正上线到 https://devpath-ai.pages.dev/ 的。

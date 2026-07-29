@@ -18,7 +18,7 @@ import { GlobalWidgets } from "./GlobalWidgets";
 //   - og:image 引用 manifest 已声明的 /icons/icon-512.png
 //     （用户后续补图标文件即可自动生效，无需改 metadata）
 //   - 守护测试：__tests__/seo-metadata-guard.test.ts
-const SITE_URL = "https://devpath-ai.ai-kits.workers.dev";
+const SITE_URL = "https://devpath-ai.pages.dev";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

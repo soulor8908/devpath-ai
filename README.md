@@ -4,7 +4,7 @@
 
 一个面向自学开发者的本地优先（local-first）PWA：数据存在浏览器 IndexedDB，可跨设备同步到 Cloudflare KV，AI 调用走云端（用户自带 Key 走零信任 session 加密，或用服务端 Trial 模式按场景配额免费试用）。
 
-**生产链接**：<https://devpath-ai.ai-kits.workers.dev/>
+**生产链接**：<https://devpath-ai.pages.dev/>
 
 ---
 
@@ -297,7 +297,7 @@ npm run build:knowledge-index # 构建 BGE 向量索引 → public/data/knowledg
 - `DEEPSEEK_API_KEY` / `GLM_API_KEY` — 服务端默认模型用（如启用 Trial 模式）
 
 > 详细配置说明见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 的「安全配置」章节。
-> Workflow 会自动部署到 Cloudflare Workers，首次部署后访问 <https://devpath-ai.ai-kits.workers.dev>
+> Workflow 会自动部署到 Cloudflare Pages，首次部署后访问 <https://devpath-ai.pages.dev>
 
 ---
 

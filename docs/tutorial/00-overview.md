@@ -22,7 +22,7 @@
 - 数据存在浏览器的 IndexedDB（本地数据库），不会主动上传到任何服务器
 - 可选同步到 Cloudflare KV（云端键值存储）
 - AI 调用走云端（用户自带 API Key 走零信任加密 session，或用服务端 Trial 模式按场景配额免费试用）
-- 生产链接：<https://devpath-ai.ai-kits.workers.dev/>
+- 生产链接：<https://devpath-ai.pages.dev/>
 
 **目标用户**：前端工程师 → AI 全栈 / AI Agent 工程师。旗舰路径已策展（49 节点 / 196 题 / 5 阶段 16-20 周）。
 

@@ -419,6 +419,6 @@ buildProfileContext(profile) → ≤500 字符文本
 - Cloudflare Pages（Edge Runtime）
 - `@cloudflare/next-on-pages` 转换 Next.js 输出
 - 推送 `main` 自动触发 GitHub Actions 部署
-- Workflow 自动创建 Pages 项目（如不存在）
+- Pages 项目通过 Cloudflare API 预创建（direct upload 模式，不连 GitHub source）
 - KV binding 名 `KV`，需在 Cloudflare Dashboard 创建 namespace
-- 生产 URL：https://devpath-ai.ai-kits.workers.dev
+- 生产 URL：https://devpath-ai.pages.dev（pages.dev 国内可访问，workers.dev 国内不可访问）
