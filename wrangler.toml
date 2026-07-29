@@ -36,16 +36,21 @@ id = "02684817b6884df4a1eb48416426cf07"
 
 [[kv_namespaces]]
 binding = "AUTH_AUDIT"
-id = "31f90bc37a644f55902e1a8b4ebce13d"
+id = "31f90bc37a644f55902e1a8b4ebce13f"
 
 # Workers AI binding（知识库向量化：/api/embed 调 bge-base-en-v1.5 嵌入查询文本）
 # next-on-pages 通过 getRequestContext().env.AI 读取（raw symbol 机制）
 [ai]
 binding = "AI"
 
-[vars]
-AI_PROVIDER = "deepseek"
-# 以下密钥通过 `wrangler pages secret put <NAME>` 上传：
-# - MASTER_KEY        : 加密会话根密钥（32 字节 base64，必须配置，openssl rand -base64 32 生成）
-# - DEEPSEEK_API_KEY : DeepSeek API Key
-# - GLM_API_KEY       : 智谱 GLM API Key（如使用 glm provider）
+# 环境变量通过 Cloudflare Dashboard 或 API 配置（不在此声明 [vars]，
+# 否则 Dashboard 会显示 "managed through wrangler.toml" 且无法修改）
+#
+# 当前配置（通过 API 设置，Dashboard 可修改）：
+# - AI_PROVIDER = "agnes"（plain_text，默认 provider，支持 agent/tool calling）
+#
+# 以下密钥通过 `wrangler pages secret put <NAME>` 上传（secret_text，Dashboard 不可见）：
+# - MASTER_KEY     : 加密会话根密钥（32 字节 base64，必须配置，openssl rand -base64 32 生成）
+# - AGNES_API_KEY  : Agnes API Hub 的 API Key（默认 provider）
+# - GLM_API_KEY    : 智谱 GLM API Key（如切换到 glm provider）
+# - DEEPSEEK_API_KEY : DeepSeek API Key（如切换到 deepseek provider）
