@@ -1,7 +1,12 @@
 // lib/ai/provider.ts
 // Vercel AI SDK Provider 配置
-// 支持 GLM / DeepSeek / MiMo / 自定义（均兼容 OpenAI 格式）
-// 默认 GLM 国内端点（零梯子可达）
+// 支持 Agnes / GLM / DeepSeek / MiMo / 自定义（均兼容 OpenAI 格式）
+// 默认 Agnes（agnes-2.0-flash，支持 tool calling/agent，国内可达）
+//
+// 2026-07-28 默认 provider 从 glm 切到 agnes：
+//   - 用户诉求：默认模型要支持 agent（tool calling）
+//   - Agnes API Hub 兼容 OpenAI 格式，agnes-2.0-flash 支持 function calling
+//   - 通过 Cloudflare Pages secret 配置 AGNES_API_KEY（key 不进代码）
 
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
@@ -9,7 +14,7 @@ import type { ModelConfig } from "../types";
 import { wrapModelWithObservability } from "./observability";
 import type { SessionContext } from "./session-middleware";
 
-export type AIProvider = "glm" | "deepseek" | "mimo" | "custom";
+export type AIProvider = "agnes" | "glm" | "deepseek" | "mimo" | "custom";
 
 interface ProviderConfig {
   baseURL: string;
@@ -18,6 +23,10 @@ interface ProviderConfig {
 }
 
 const PRESETS: Record<string, Omit<ProviderConfig, "apiKey">> = {
+  agnes: {
+    baseURL: "https://apihub.agnes-ai.com/v1",
+    model: "agnes-2.0-flash",
+  },
   glm: {
     baseURL: "https://open.bigmodel.cn/api/paas/v4",
     model: "glm-4-flash",
@@ -69,7 +78,7 @@ export function setCloudflareEnv(env: Record<string, unknown>): void {
 }
 
 function resolveConfig(): ProviderConfig {
-  const provider = (getEnv("AI_PROVIDER") || "glm").toLowerCase();
+  const provider = (getEnv("AI_PROVIDER") || "agnes").toLowerCase();
   const preset = PRESETS[provider];
 
   const baseURL = getEnv("AI_API_URL") || preset?.baseURL;
@@ -77,6 +86,7 @@ function resolveConfig(): ProviderConfig {
 
   const apiKey =
     getEnv("AI_API_KEY") ||
+    (provider === "agnes" && getEnv("AGNES_API_KEY")) ||
     (provider === "glm" && getEnv("GLM_API_KEY")) ||
     (provider === "deepseek" && getEnv("DEEPSEEK_API_KEY")) ||
     (provider === "mimo" && getEnv("MIMO_API_KEY")) ||
@@ -132,9 +142,10 @@ export function getModelFromSession(
 
 /** 检查是否配置了 AI Key */
 export function hasAIKey(): boolean {
-  const provider = (getEnv("AI_PROVIDER") || "glm").toLowerCase();
+  const provider = (getEnv("AI_PROVIDER") || "agnes").toLowerCase();
   return Boolean(
     getEnv("AI_API_KEY") ||
+      (provider === "agnes" && getEnv("AGNES_API_KEY")) ||
       (provider === "glm" && getEnv("GLM_API_KEY")) ||
       (provider === "deepseek" && getEnv("DEEPSEEK_API_KEY")) ||
       (provider === "mimo" && getEnv("MIMO_API_KEY"))
@@ -154,7 +165,7 @@ export function _resetModelCache(): void {
 }
 
 export function getProviderInfo(): { provider: string; model: string; baseURL: string } {
-  const provider = (getEnv("AI_PROVIDER") || "glm").toLowerCase();
+  const provider = (getEnv("AI_PROVIDER") || "agnes").toLowerCase();
   const preset = PRESETS[provider];
   return {
     provider,
@@ -209,7 +220,7 @@ function resolvePrimary(): ProviderEntry {
       "AI API Key 未配置：请设置 AI_API_KEY 或对应 provider 的 key 环境变量",
     );
   }
-  const provider = (getEnv("AI_PROVIDER") || "glm").toLowerCase();
+  const provider = (getEnv("AI_PROVIDER") || "agnes").toLowerCase();
   cachedPrimary = buildProviderEntry(provider, baseURL, model, apiKey);
   return cachedPrimary;
 }
@@ -231,6 +242,7 @@ function resolveFallback(): ProviderEntry | null {
   const model = getEnv("AI_FALLBACK_MODEL") || preset?.model;
   const apiKey =
     getEnv("AI_FALLBACK_API_KEY") ||
+    (fallbackProvider === "agnes" && getEnv("AGNES_API_KEY")) ||
     (fallbackProvider === "glm" && getEnv("GLM_API_KEY")) ||
     (fallbackProvider === "deepseek" && getEnv("DEEPSEEK_API_KEY")) ||
     (fallbackProvider === "mimo" && getEnv("MIMO_API_KEY")) ||

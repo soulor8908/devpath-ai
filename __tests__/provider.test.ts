@@ -9,6 +9,7 @@ describe("provider", () => {
     delete process.env.AI_API_KEY;
     delete process.env.AI_API_URL;
     delete process.env.AI_MODEL;
+    delete process.env.AGNES_API_KEY;
     delete process.env.GLM_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.MIMO_API_KEY;
@@ -18,7 +19,18 @@ describe("provider", () => {
     process.env = { ...originalEnv };
   });
 
-  it("默认使用 GLM provider", async () => {
+  it("默认使用 Agnes provider（支持 agent/tool calling）", async () => {
+    process.env.AGNES_API_KEY = "test-agnes-key";
+    const { getProviderInfo, _resetModelCache } = await import("../lib/ai/provider");
+    _resetModelCache();
+    const info = getProviderInfo();
+    expect(info.provider).toBe("agnes");
+    expect(info.model).toBe("agnes-2.0-flash");
+    expect(info.baseURL).toBe("https://apihub.agnes-ai.com/v1");
+  });
+
+  it("GLM provider 配置正确", async () => {
+    process.env.AI_PROVIDER = "glm";
     process.env.GLM_API_KEY = "test-glm-key";
     const { getProviderInfo } = await import("../lib/ai/provider");
     const info = getProviderInfo();
