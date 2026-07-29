@@ -78,7 +78,7 @@ export function EnergyTrendMini({ trend, todayEnergy }: Props) {
                   title={v === null ? "无数据" : `能量 ${v}/5`}
                 />
               </div>
-              <span className={`text-2xs ${isToday ? "text-blue-500 font-bold" : "text-gray-500"}`}>
+              <span className={`text-2xs ${isToday ? "text-blue-600 dark:text-blue-400 font-bold" : "text-gray-600 dark:text-gray-400"}`}>
                 {WEEKDAYS[i]}
               </span>
             </div>

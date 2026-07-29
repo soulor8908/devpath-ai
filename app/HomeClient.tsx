@@ -300,7 +300,7 @@ export default function HomeClient() {
             <div className="mt-2 text-center">
               <Link
                 href="/onboarding"
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:underline"
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
               >
                 选错方向了？重新选择岗位 →
               </Link>
@@ -355,7 +355,7 @@ export default function HomeClient() {
         {lowEnergy && (
           <Link
             href="/rest"
-            className="mt-1.5 block text-center text-xs text-green-600 dark:text-green-400 hover:underline"
+            className="mt-1.5 block text-center text-xs text-green-700 dark:text-green-400 hover:underline"
           >
             <Icon name="leaf" className="w-3 h-3 inline mr-0.5" />
             检测到今天能量偏低，去休息一下？
@@ -385,11 +385,6 @@ export default function HomeClient() {
                   : buildSceneUrl(`/learn/${studyQueue[0].planId ?? ""}`, studyQueue[0], "home"))
               : (hasPlans ? "/learn/list" : "/learn/new")
           }
-          aria-label={
-            studyQueue.length > 0
-              ? `今日学习清单 ${studyQueue.length} 项，点击进入学习`
-              : (hasPlans ? "查看学习列表" : "创建学习计划")
-          }
           className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/40 dark:to-gray-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all group relative"
         >
           {/* 右上角箭头图标：绝对定位，hover 时向右移动 */}
@@ -399,7 +394,7 @@ export default function HomeClient() {
           />
           <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{studyQueue.length}</p>
           <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">今日学习清单</p>
-          <p className="text-2xs text-blue-500 dark:text-blue-400 mt-0.5">
+          <p className="text-2xs text-blue-600 dark:text-blue-400 mt-0.5">
             {studyQueue.length > 0 ? "点击进入学习" : (hasPlans ? "查看学习列表" : "创建学习计划")}
           </p>
         </Link>
@@ -483,7 +478,7 @@ export default function HomeClient() {
             <Link
               href="/learn/list"
               aria-label="我的学习列表"
-              className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
+              className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-0.5"
             >
               <Icon name="list" className="w-3.5 h-3.5" />
               我的学习列表
@@ -491,7 +486,7 @@ export default function HomeClient() {
           ) : (
             <Link
               href="/learn/new"
-              className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-0.5"
+              className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-0.5"
             >
               <Icon name="plus" className="w-3.5 h-3.5" />
               新建计划
@@ -509,7 +504,6 @@ export default function HomeClient() {
                 <Link
                   key={task.id}
                   href={href}
-                  aria-label={`${task.type === "review" ? "复习" : "新学"}：${task.title}，优先级 ${task.priority}`}
                   className="flex items-start gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-2.5 hover:shadow-md transition-shadow"
                 >
                   <span
@@ -539,7 +533,7 @@ export default function HomeClient() {
             {studyQueue.length > 5 && (
               <Link
                 href="/review"
-                className="block text-center text-xs text-blue-500 hover:underline pt-1"
+                className="block text-center text-xs text-blue-600 hover:underline dark:text-blue-400 pt-1"
               >
                 查看全部 {studyQueue.length} 项 →
               </Link>

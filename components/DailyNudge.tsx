@@ -254,8 +254,7 @@ export function DailyNudge() {
               variant="link"
               size="sm"
               onClick={handleRefresh}
-              className="text-blue-500 hover:underline"
-              aria-label="重新生成今日建议"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
             >
               换一个 →
             </Button>
