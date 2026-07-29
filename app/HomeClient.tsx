@@ -8,7 +8,8 @@
 //   重构为 6 区结构（需求 4：学习队列移到最下面，KPI 卡片作为快速入口）：
 //     1. Hero 行动区：CurrentTaskCard + 番茄钟入口 + 低能量休息链接
 //     2. KPI 三宫格：今日学习清单 N 项（可点击进入学习）/ 已完成 X 项 / 连续打卡 N 天
-//     3. AI 教练洞察区：HomeInsightsCard（成就 + 健康提醒）+ 能力画像 + AI 质量摘要
+//     3. AI 教练洞察区：HomeInsightsCard（成就 + 健康提醒）
+//        2026-07-29：移除能力画像和AI质量卡片到 /stats 仪表盘（减少首屏负载）
 //     4. 能量趋势迷你图（新账户无数据时隐藏）
 //     5. 7 天热力图（常驻，新账户无打卡记录时隐藏）
 //     6. 今日学习队列（移到最下面作为详细视图，KPI 卡片已能快速进入学习）
@@ -18,7 +19,8 @@
 //   - 「更多」折叠按钮无存在意义 → 移除折叠逻辑，7 天热力图常驻
 //
 // 新账户隐藏空数据区块（需求 4）：
-//   - 第 3 区（AI 教练洞察）：仅在 userProfileSummary || aiQualitySummary || newAchievements.length || healthAlerts.length 时渲染
+//   - 第 3 区（AI 教练洞察）：仅在 newAchievements.length || healthAlerts.length 时渲染
+//     2026-07-29：移除能力画像和AI质量摘要（移到 /stats 仪表盘 tab）
 //   - 第 4 区能量趋势迷你图：仅在 energyTrend 有非 null 值时渲染
 //   - 第 5 区 7 天热力图：仅在 heatmapData 有非 0 分钟数据时渲染
 //   - KPI 三宫格第 2 格「已完成」：todayCompletedCount > 0 时才着色突出
@@ -116,9 +118,7 @@ export default function HomeClient() {
     username,
     newAchievements,
     healthAlerts,
-    userProfileSummary,
     energyTrend,
-    aiQualitySummary,
     studyQueue,
     todayCompletedCount,
     careerPath,
@@ -412,75 +412,13 @@ export default function HomeClient() {
       </section>
 
       {/* ============ 3. AI 教练洞察区（需求 4：新账户无数据时整区隐藏）============ */}
-      {(userProfileSummary ||
-        aiQualitySummary ||
-        newAchievements.length > 0 ||
-        healthAlerts.length > 0) && (
+      {/* 2026-07-29 性能优化：移除能力画像和AI质量卡片（移到 /stats 仪表盘 tab） */}
+      {(newAchievements.length > 0 || healthAlerts.length > 0) && (
         <section className="mb-5">
           <HomeInsightsCard
             newAchievements={newAchievements}
             healthAlerts={healthAlerts}
           />
-
-          {/* 用户画像 + AI 质量摘要（与 HomeInsights 同组） */}
-          {(userProfileSummary || aiQualitySummary) && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {userProfileSummary && (
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Icon name="user" className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">能力画像</span>
-                  </div>
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">入门</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.beginner}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">进阶</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.intermediate}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">高级</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{userProfileSummary.skillLevelCount.advanced}</span>
-                    </div>
-                    {userProfileSummary.preferredSlot && (
-                      <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-700 mt-1">
-                        <span className="text-gray-500 dark:text-gray-400">偏好时段</span>
-                        <span className="text-purple-600 dark:text-purple-400 font-medium">{userProfileSummary.preferredSlot}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {aiQualitySummary && (
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Icon name="sparkles" className="w-3.5 h-3.5 text-blue-500" />
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">AI 质量</span>
-                  </div>
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">今日调用</span>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{aiQualitySummary.todayCalls}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">采纳率</span>
-                      <span className="text-green-600 dark:text-green-400 font-medium">
-                        {Math.round(aiQualitySummary.adoptionRate * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <Link
-                    href="/stats/ai-quality"
-                    className="block text-2xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 mt-2 text-center"
-                  >
-                    详情 →
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
         </section>
       )}
 
