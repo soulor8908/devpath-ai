@@ -42,19 +42,26 @@ export default function EmotionPage() {
   const [loading, setLoading] = useState(true);
 
   const loadEntries = useCallback(async () => {
-    // 惰性迁移：首次加载时把所有旧版条目合并到新字段
-    // 已迁移过的数据再次调用无副作用（幂等）
+    // 2026-07-30 防御性修复：整个加载流程包 try/catch
+    // 旧版 listItems 抛错 → loadEntries reject → setLoading(false) 不执行
     try {
-      await migrateAllEmotionEntries();
+      // 惰性迁移：首次加载时把所有旧版条目合并到新字段
+      // 已迁移过的数据再次调用无副作用（幂等）
+      try {
+        await migrateAllEmotionEntries();
+      } catch (e) {
+        console.warn("[emotion] 迁移旧数据失败，继续展示:", e);
+      }
+      const list = await listItems<EmotionEntryWithLegacy>(KEY_PREFIXES.EMOTION);
+      list.sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return b.time.localeCompare(a.time);
+      });
+      setEntries(list);
     } catch (e) {
-      console.warn("[emotion] 迁移旧数据失败，继续展示:", e);
+      console.error("[emotion] 加载失败:", e);
+      setEntries([]);
     }
-    const list = await listItems<EmotionEntryWithLegacy>(KEY_PREFIXES.EMOTION);
-    list.sort((a, b) => {
-      if (a.date !== b.date) return b.date.localeCompare(a.date);
-      return b.time.localeCompare(a.time);
-    });
-    setEntries(list);
   }, []);
 
   useEffect(() => {

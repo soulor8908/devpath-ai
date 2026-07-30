@@ -23,6 +23,9 @@ export default function ListClient() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    // 2026-07-30 防御性修复：补 catch，异常时降级为空列表 + 控制台日志
+    // 旧版只有 finally 无 catch，migrateSummaries/listPlanSummaries 抛错时
+    // React 会打印未捕获 rejection 警告，用户看到空白页无错误提示
     try {
       await migrateSummaries();
       const summaries = await listPlanSummaries();
@@ -33,6 +36,9 @@ export default function ListClient() {
         return;
       }
       setPlans(summaries);
+    } catch (e) {
+      console.error("[ListClient] 加载计划列表失败:", e);
+      setPlans([]);
     } finally {
       setLoading(false);
     }

@@ -24,10 +24,23 @@ export default function FavoritesPage() {
   const [reviewStarting, setReviewStarting] = useState<string | null>(null);
 
   async function loadData() {
-    const [d, q] = await Promise.all([listFavoriteDecks(), listFavoritedQuestions()]);
-    setDecks(d);
-    setQuestions(q);
-    setLoading(false);
+    // 2026-07-30 防御性修复：Promise.allSettled + try/catch/finally
+    // 旧版 Promise.all 任一 reject → setLoading(false) 不执行 → 永久"加载中"
+    try {
+      const settled = await Promise.allSettled([
+        listFavoriteDecks(),
+        listFavoritedQuestions(),
+      ]);
+      const v = <T,>(r: PromiseSettledResult<T>, f: T): T =>
+        r.status === "fulfilled" ? r.value : f;
+      setDecks(v(settled[0], [] as FavoriteDeck[]));
+      setQuestions(v(settled[1], [] as FavoritedQuestionWithPlan[]));
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "加载收藏失败");
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {

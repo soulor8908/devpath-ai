@@ -73,26 +73,38 @@ function StatsInner() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      // 聚合所有计划的 KnowledgeNode + ReviewCard
-      const plans = await listItems<LearningPlan>("plan:");
-      const allNodes: KnowledgeNode[] = plans.flatMap((p) => p.knowledgeTree ?? []);
-      const cs = await listItems<ReviewCard>("card:");
-
-      // 聚合日志
-      const learnLogsArr = await listItems<LearnLog>("learn_log:");
-      const reviewLogsArr = await listItems<ReviewLog>("review_log:");
-
-      // 聚合状态
-      const statusArr = await listItems<DailyStatus>("status:");
-
-      setNodes(allNodes);
-      setCards(cs);
-      setReviewLogs(reviewLogsArr);
-      setLearnLogs(learnLogsArr);
-      setStatuses(statusArr);
-      setLoading(false);
+      // 2026-07-30 防御性修复：
+      //   1. 串行 5 IO 改 Promise.allSettled 并行（5×RTT → 1×RTT）
+      //   2. try/catch/finally 防止任一 IO reject → setLoading(false) 不执行
+      //   3. cancelled 标志防止 StrictMode 双调用竞态
+      try {
+        const settled = await Promise.allSettled([
+          listItems<LearningPlan>("plan:"),
+          listItems<ReviewCard>("card:"),
+          listItems<LearnLog>("learn_log:"),
+          listItems<ReviewLog>("review_log:"),
+          listItems<DailyStatus>("status:"),
+        ]);
+        if (cancelled) return;
+        const v = <T,>(r: PromiseSettledResult<T>, f: T): T =>
+          r.status === "fulfilled" ? r.value : f;
+        const plans = v(settled[0], [] as LearningPlan[]);
+        setNodes(plans.flatMap((p) => p.knowledgeTree ?? []));
+        setCards(v(settled[1], [] as ReviewCard[]));
+        setLearnLogs(v(settled[2], [] as LearnLog[]));
+        setReviewLogs(v(settled[3], [] as ReviewLog[]));
+        setStatuses(v(settled[4], [] as DailyStatus[]));
+      } catch (e) {
+        console.error("[stats] 加载失败:", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {

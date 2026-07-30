@@ -31,6 +31,8 @@ export default function OnboardingPage() {
   async function handleStart() {
     if (!selectedPath) return;
     setStarting(true);
+    // 2026-07-30 防御性修复：补 catch + loadPresetData 失败不创建空 plan
+    // 旧版只有 finally，异常时用户看不到错误，按钮反复点击"没反应"
     try {
       // 2026-07-27 修复（用户反馈"可以添加两个名字相同的知识库"）：
       //   以名字作为唯一键去重，遇到重名弹 confirm"是否覆盖"：
@@ -58,12 +60,18 @@ export default function OnboardingPage() {
 
       const now = new Date().toISOString();
       const preset = await loadPresetData(selectedPath.linkedPresetId);
+      // 2026-07-30：preset 加载失败时不创建空 plan（用户会看到空计划列表更困惑）
+      // loadPresetData 内部已有 8s 超时 + try/catch，返回 undefined 说明确实加载失败
+      if (!preset) {
+        alert("预设数据加载失败，请检查网络后重试");
+        return;
+      }
       const plan: LearningPlan = {
         id: nanoid(),
         topic: selectedPath.title,
-        knowledgeTree: preset?.knowledgeTree ?? [],
-        questions: preset?.questions ?? [],
-        schedule: preset?.schedule ?? [],
+        knowledgeTree: preset.knowledgeTree,
+        questions: preset.questions,
+        schedule: preset.schedule,
         dailyMinutes: selectedPath.dailyMinutesDefault,
         maxNewPerDay: selectedPath.maxNewPerDayDefault,
         fsrsMode: "standard",
@@ -83,6 +91,9 @@ export default function OnboardingPage() {
       });
       // 立即开始第一个训练会话
       router.push(`/train?planId=${plan.id}`);
+    } catch (e) {
+      console.error("[onboarding] 启动失败:", e);
+      alert(e instanceof Error ? e.message : "启动失败，请重试");
     } finally {
       setStarting(false);
     }
@@ -96,14 +107,19 @@ export default function OnboardingPage() {
       return;
     }
     let cancelled = false;
-    loadPresetData(selectedPath.linkedPresetId).then((preset) => {
-      if (cancelled) return;
-      if (!preset) {
-        setPreviewNodes([]);
-        return;
-      }
-      setPreviewNodes(getCareerPathNodes(selectedPath, preset.knowledgeTree));
-    });
+    // 2026-07-30：补 .catch() 防止未捕获 rejection
+    loadPresetData(selectedPath.linkedPresetId)
+      .then((preset) => {
+        if (cancelled) return;
+        if (!preset) {
+          setPreviewNodes([]);
+          return;
+        }
+        setPreviewNodes(getCareerPathNodes(selectedPath, preset.knowledgeTree));
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewNodes([]);
+      });
     return () => {
       cancelled = true;
     };

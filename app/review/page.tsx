@@ -102,15 +102,24 @@ function ReviewPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const loadCards = useCallback(async () => {
-    const [cards, planList, deckList] = await Promise.all([
-      listItems<ReviewCard>(KEY_PREFIXES.CARD),
-      listItems<LearningPlan>(KEY_PREFIXES.PLAN),
-      listFavoriteDecks(),
-    ]);
-    setAllCards(cards);
-    setPlans(planList);
-    setDecks(deckList);
-    setLoading(false);
+    // 2026-07-30 防御性修复：Promise.allSettled + try/catch/finally
+    // 旧版 Promise.all 任一 reject → setLoading(false) 不执行 → 永久 LoadingScreen
+    try {
+      const settled = await Promise.allSettled([
+        listItems<ReviewCard>(KEY_PREFIXES.CARD),
+        listItems<LearningPlan>(KEY_PREFIXES.PLAN),
+        listFavoriteDecks(),
+      ]);
+      const v = <T,>(r: PromiseSettledResult<T>, f: T): T =>
+        r.status === "fulfilled" ? r.value : f;
+      setAllCards(v(settled[0], [] as ReviewCard[]));
+      setPlans(v(settled[1], [] as LearningPlan[]));
+      setDecks(v(settled[2], [] as FavoriteDeck[]));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载复习卡片失败");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {

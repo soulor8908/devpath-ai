@@ -587,50 +587,82 @@ export function useHomeData(): HomeData & {
     const today = chinaDateNow();
     const todayStatusKey = KEY_PREFIXES.STATUS + today;
 
-    // 新用户首次访问：注入 demo 数据（frontend 示例计划 + 几张复习卡 + 2 天学习日志）
-    // 让新用户立刻看到"有内容"的产品状态，而非空荡荡的空白引导页
-    // 幂等：shouldInjectDemo 内部已检查 demo plan 是否存在，重复调用不会叠加
-    // 注入完成后继续走下面的并行加载，此时 listPlanSummaries 会读到 demo plan
+    // 2026-07-30 防御性修复（卡帕西视角）：
+    //   旧版 load 主体无顶层 try/catch，任何 IO 抛错 → load reject →
+    //   isLoading 永远 true → 骨架屏永远卡住（用户反馈"首屏一直骨架屏"）。
+    //   解法：整个数据加载段用 try/catch 包裹，catch 中强制 setData
+    //   isLoading=false，让用户至少看到降级空状态而非永远骨架屏。
+    //   单个 IO 失败不阻断：Promise.all 内部用 allSettled 模式降级。
     try {
-      const { shouldInjectDemo, injectDemoData } = await import("@/lib/demo/preset-data");
-      if (await shouldInjectDemo()) {
-        await injectDemoData();
+      // 新用户首次访问：注入 demo 数据（frontend 示例计划 + 几张复习卡 + 2 天学习日志）
+      // 让新用户立刻看到"有内容"的产品状态，而非空荡荡的空白引导页
+      // 幂等：shouldInjectDemo 内部已检查 demo plan 是否存在，重复调用不会叠加
+      // 注入完成后继续走下面的并行加载，此时 listPlanSummaries 会读到 demo plan
+      try {
+        const { shouldInjectDemo, injectDemoData } = await import("@/lib/demo/preset-data");
+        if (await shouldInjectDemo()) {
+          await injectDemoData();
+        }
+      } catch {
+        // demo 注入失败不影响首页加载（继续走空状态分支）
       }
-    } catch {
-      // demo 注入失败不影响首页加载（继续走空状态分支）
-    }
-    // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
-    const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
+      // 今日 0 点 ISO（用于 AI 质量统计的 since 过滤）
+      const todayStartIso = new Date(`${today}T00:00:00+08:00`).toISOString();
 
-    // 先迁移旧摘要（补齐缺失/过期 summary，含 schedule 字段），
-    // 再并行加载首页数据。迁移为 no-op 时仅扫 key，开销极小。
-    await migrateSummaries();
-    // P1 精准查询优化（替代全量加载）：
-    //   - 卡片：countDueCards(now) 走 dueAt 索引精准计数，O(due) 而非 O(n)
-    //     （首页只需要 dueCount，不需要卡片数据本身）
-    //   - 计划：listItems<LearningPlan>(PLAN) 加载完整 plan（含 questions + knowledgeTree）
-    //     2026-07-27 改动：学习队列改成题目维度，需要 questions 字段；
-    //     旧版用 listPlanSummaries() 加载轻量 summary（无 questions）已不够用
-    //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
-    // 第 2 阶段：新增 listDueCards 拉到期卡片数据（用于 studyQueue 渲染）
-    // V2：新增 onboarding 并行读取（无 IO 依赖）
-    const now = new Date();
-    const [
-      dueCount, fullPlans, summaries, logs, todayStatus, profile, emotions, mistakes, userProfile, qualityReport, dueCards, onboarding,
-    ] = await Promise.all([
-      countDueCards(now),
-      listItems<LearningPlan>(KEY_PREFIXES.PLAN),
-      listPlanSummaries(),
-      listRecentItems<LearnLog>(KEY_PREFIXES.LEARN_LOG, 7),
-      getItem<DailyStatus>(todayStatusKey),
-      getItem<PublicProfile>("my:profile"),
-      listRecentItems<EmotionEntry>(KEY_PREFIXES.EMOTION, 7),
-      getUnresolvedMistakes(),
-      getUserProfile(),
-      getQualityReport(todayStartIso),
-      listDueCards<ReviewCard>(now, 50),
-      getItem<OnboardingData>("my:onboarding"),
-    ]);
+      // 先迁移旧摘要（补齐缺失/过期 summary，含 schedule 字段），
+      // 再并行加载首页数据。迁移为 no-op 时仅扫 key，开销极小。
+      // 2026-07-30：migrateSummaries 失败不阻断首页加载（allSettled 模式已保护后续 IO）。
+      //   旧数据缺 summary 时 computeTodaySchedule 会降级为空 schedule，不影响渲染。
+      try {
+        await migrateSummaries();
+      } catch {
+        // 迁移失败静默：summary 缺失走空状态，首页仍可加载
+      }
+      // P1 精准查询优化（替代全量加载）：
+      //   - 卡片：countDueCards(now) 走 dueAt 索引精准计数，O(due) 而非 O(n)
+      //     （首页只需要 dueCount，不需要卡片数据本身）
+      //   - 计划：listItems<LearningPlan>(PLAN) 加载完整 plan（含 questions + knowledgeTree）
+      //     2026-07-27 改动：学习队列改成题目维度，需要 questions 字段；
+      //     旧版用 listPlanSummaries() 加载轻量 summary（无 questions）已不够用
+      //   - 日志/情绪：listRecentItems(prefix, 7) 只查最近 7 天，走 updatedAt 索引
+      // 第 2 阶段：新增 listDueCards 拉到期卡片数据（用于 studyQueue 渲染）
+      // V2：新增 onboarding 并行读取（无 IO 依赖）
+      // 2026-07-30：改用 Promise.allSettled 防止单个 IO reject 导致整体卡死。
+      //   任何一个 IO 失败时降级为空数组/undefined，首页仍能渲染（数据缺失 ≠ 页面不可用）。
+      const now = new Date();
+      const settled = await Promise.allSettled([
+        countDueCards(now),
+        listItems<LearningPlan>(KEY_PREFIXES.PLAN),
+        listPlanSummaries(),
+        listRecentItems<LearnLog>(KEY_PREFIXES.LEARN_LOG, 7),
+        getItem<DailyStatus>(todayStatusKey),
+        getItem<PublicProfile>("my:profile"),
+        listRecentItems<EmotionEntry>(KEY_PREFIXES.EMOTION, 7),
+        getUnresolvedMistakes(),
+        getUserProfile(),
+        getQualityReport(todayStartIso),
+        listDueCards<ReviewCard>(now, 50),
+        getItem<OnboardingData>("my:onboarding"),
+      ]);
+      // 解包 allSettled 结果：rejected 的降级为空值
+      // 类型断言安全：fulfilled.value 类型与原 Promise 一致
+      const v = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
+        r.status === "fulfilled" ? r.value : fallback;
+      const dueCount = v(settled[0], 0);
+      const fullPlans = v(settled[1], [] as LearningPlan[]);
+      const summaries = v(settled[2], [] as LearningPlanSummary[]);
+      const logs = v(settled[3], [] as LearnLog[]);
+      const todayStatus = v(settled[4], undefined as DailyStatus | undefined);
+      const profile = v(settled[5], undefined as PublicProfile | undefined);
+      const emotions = v(settled[6], [] as EmotionEntry[]);
+      const mistakes = v(settled[7], [] as MistakeRecord[]);
+      const userProfile = v(settled[8], null);
+      const qualityReport = v(
+        settled[9],
+        { totalCalls: 0, scenes: [] } as { totalCalls: number; scenes: Array<{ adoptionRate: number | null; calls: number }> },
+      );
+      const dueCards = v(settled[10], [] as ReviewCard[]);
+      const onboarding = v(settled[11], undefined as OnboardingData | undefined);
 
     // summaries 用于 computeTodaySchedule（旧 API，仍需要 summary 格式）
     // fullPlans 用于 buildStudyQueueFromData（题目维度）+ deriveCareerPath（按题目统计进度）
@@ -748,13 +780,32 @@ export function useHomeData(): HomeData & {
       .catch(() => {
         // 维护任务失败不影响首页加载
       });
+    } catch (err) {
+      // 2026-07-30 防御性兜底：
+      //   任何未预期的异常（migrateSummaries 抛错、派生计算崩溃等）
+      //   都必须让 isLoading=false，否则骨架屏永远卡住。
+      //   降级为"空状态 + 错误提示"，用户至少能看到了解发生了什么。
+      console.error("[useHomeData] load 失败，降级为空状态：", err);
+      setData((prev) => ({
+        ...prev,
+        isLoading: false,
+        hasPlans: prev.hasPlans, // 保留已读到的状态（reload 场景）
+      }));
+    }
   }, []);
 
   // mount 时首次加载
   useEffect(() => {
-    void load().finally(() => {
-      lastLoadRef.current = Date.now();
-    });
+    // 2026-07-30：load 内部已有 try/catch，不会 reject。
+    //   但保留 .catch 作为双保险，防止未来重构引入未捕获异常。
+    void load()
+      .catch((err) => {
+        console.error("[useHomeData] mount load 未捕获：", err);
+        setData((prev) => ({ ...prev, isLoading: false }));
+      })
+      .finally(() => {
+        lastLoadRef.current = Date.now();
+      });
   }, [load]);
 
   // 窗口聚焦/可见性变化时自动刷新（2026-07-27 修复）

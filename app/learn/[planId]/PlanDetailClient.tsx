@@ -129,66 +129,83 @@ export default function PlanDetailClient() {
   const [scheduleCollapsed, setScheduleCollapsed] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const p = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + planId);
-      if (!p) {
-        router.push("/learn");
-        return;
-      }
-      setPlan(p);
-      setLoading(false);
-      // 初始化重新生成表单
-      setRegenTopic(p.topic);
-      setRegenPrompt(p.prompt ?? "");
-      setRegenDailyMinutes(p.dailyMinutes);
-      setRegenMaxNew(p.maxNewPerDay);
-      // 检查是否已收藏为 deck
-      const decks = await listFavoriteDecks();
-      const found = decks.find((d) => d.planId === p.id);
-      if (found) {
-        setDeckFavorited(true);
-        setDeckId(found.id);
-      }
+      // 2026-07-30 防御性修复：包 try/catch/finally + cancelled 标志
+      // 旧版无 try/catch，getItem/listFavoriteDecks 抛错 → setLoading(false) 不执行 → 永久 LoadingScreen
+      try {
+        const p = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + planId);
+        if (!p) {
+          router.push("/learn");
+          return;
+        }
+        if (cancelled) return;
+        setPlan(p);
+        setLoading(false);
+        // 初始化重新生成表单
+        setRegenTopic(p.topic);
+        setRegenPrompt(p.prompt ?? "");
+        setRegenDailyMinutes(p.dailyMinutes);
+        setRegenMaxNew(p.maxNewPerDay);
+        // 检查是否已收藏为 deck（失败不阻断主流程）
+        try {
+          const decks = await listFavoriteDecks();
+          if (cancelled) return;
+          const found = decks.find((d) => d.planId === p.id);
+          if (found) {
+            setDeckFavorited(true);
+            setDeckId(found.id);
+          }
+        } catch {
+          // 收藏状态查询失败静默，不影响计划详情展示
+        }
 
-      // URL 参数 ?nodeId=xxx 自动筛选 + 滚动到题目区
-      // 用于从其他入口（脑图、知识树、首页今日清单、追问等）带着知识点 id 进入
-      // 2026-07-25：参数名从 ?node 统一为 ?nodeId（与 nav-params 约定一致），
-      // 保留 ?node 回退兼容老链接/书签
-      const nodeParam = searchParams?.get("nodeId") ?? searchParams?.get("node");
-      if (nodeParam && p.knowledgeTree.some((n) => n.id === nodeParam)) {
-        setFilterNodeId(nodeParam);
-        // 等 filteredQuestions 重渲染后再滚动
-        setTimeout(() => {
-          questionsSectionRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        }, 100);
-        return;
-      }
+        // URL 参数 ?nodeId=xxx 自动筛选 + 滚动到题目区
+        // 用于从其他入口（脑图、知识树、首页今日清单、追问等）带着知识点 id 进入
+        // 2026-07-25：参数名从 ?node 统一为 ?nodeId（与 nav-params 约定一致），
+        // 保留 ?node 回退兼容老链接/书签
+        const nodeParam = searchParams?.get("nodeId") ?? searchParams?.get("node");
+        if (nodeParam && p.knowledgeTree.some((n) => n.id === nodeParam)) {
+          setFilterNodeId(nodeParam);
+          // 等 filteredQuestions 重渲染后再滚动
+          setTimeout(() => {
+            questionsSectionRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }, 100);
+          return;
+        }
 
-      // 上次查看的题目缓存：用户点开过任一面试题后写入 localStorage，
-      // 下次进入该 plan 不再弹脑图，直接滚动到上次查看的题目（续学场景）
-      const lastViewedQid = getLastViewedQuestion(p.id);
-      const lastViewedQ = lastViewedQid
-        ? p.questions.find((q) => q.id === lastViewedQid)
-        : null;
-      if (lastViewedQ) {
-        // 自动筛选到该题所属知识点（让用户看到上下文），再滚动到该题
-        setFilterNodeId(lastViewedQ.nodeId);
-        setShowMindMapFloat(true); // 不弹脑图，但保留悬浮入口
-        setTimeout(() => {
-          questionRefs.current[lastViewedQ.id]?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }, 150);
-      } else {
-        // 首次进入（无 ?node= 参数 + 无上次查看记录）→ 自动弹出脑图入口弹窗
-        // 让用户鸟瞰整个知识树，主动选择今天从哪个知识点开始
-        setShowMindMapModal(true);
+        // 上次查看的题目缓存：用户点开过任一面试题后写入 localStorage，
+        // 下次进入该 plan 不再弹脑图，直接滚动到上次查看的题目（续学场景）
+        const lastViewedQid = getLastViewedQuestion(p.id);
+        const lastViewedQ = lastViewedQid
+          ? p.questions.find((q) => q.id === lastViewedQid)
+          : null;
+        if (lastViewedQ) {
+          // 自动筛选到该题所属知识点（让用户看到上下文），再滚动到该题
+          setFilterNodeId(lastViewedQ.nodeId);
+          setShowMindMapFloat(true); // 不弹脑图，但保留悬浮入口
+          setTimeout(() => {
+            questionRefs.current[lastViewedQ.id]?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }, 150);
+        } else {
+          // 首次进入（无 ?node= 参数 + 无上次查看记录）→ 自动弹出脑图入口弹窗
+          // 让用户鸟瞰整个知识树，主动选择今天从哪个知识点开始
+          setShowMindMapModal(true);
+        }
+      } catch (e) {
+        console.error("[PlanDetailClient] 加载失败:", e);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   // router/searchParams 引用稳定（App Router），不作为 effect 依赖避免重渲染
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);

@@ -124,8 +124,15 @@ export const PRESET_METAS: PresetMetaInfo[] = [
  * preset TS 源文件不再进 Worker bundle，彻底解决 Cloudflare Pages 3MB 限制。
  *
  * 缓存策略：浏览器 HTTP 缓存 + 内存常驻（同会话内重复调用零开销）。
+ *
+ * 2026-07-30：加 8s 超时（AbortController）。
+ *   旧版 fetch 无超时，若 CDN/网络 hang 住会永远 pending，
+ *   导致 injectDemoData 卡死 → useHomeData 卡死 → 首页骨架屏永远不消失。
+ *   8s 足够覆盖正常网络（frontend.json ~1MB，国内 CF 节点 < 3s），
+ *   超时后返回 undefined，injectDemoData 静默退出，首页仍能加载。
  */
 const presetDataCache = new Map<string, PresetMeta | undefined>();
+const FETCH_TIMEOUT_MS = 8000;
 
 export async function loadPresetData(id: string): Promise<PresetMeta | undefined> {
   // 内存命中（同会话内重复调用零开销）
@@ -135,22 +142,37 @@ export async function loadPresetData(id: string): Promise<PresetMeta | undefined
   if (!meta) return undefined;
 
   try {
-    const res = await fetch(`/data/presets/${id}.json`);
-    if (!res.ok) {
-      console.error(`loadPresetData(${id}): HTTP ${res.status}`);
-      return undefined;
+    // AbortController 实现 fetch 超时
+    // 超时后 fetch 抛 AbortError，被 catch 捕获返回 undefined
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(`/data/presets/${id}.json`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        console.error(`loadPresetData(${id}): HTTP ${res.status}`);
+        return undefined;
+      }
+      const data = (await res.json()) as {
+        topic: string;
+        knowledgeTree: KnowledgeNode[];
+        questions: Question[];
+        schedule: ScheduleItem[];
+      };
+      const result: PresetMeta = { ...meta, ...data };
+      presetDataCache.set(id, result);
+      return result;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    const data = (await res.json()) as {
-      topic: string;
-      knowledgeTree: KnowledgeNode[];
-      questions: Question[];
-      schedule: ScheduleItem[];
-    };
-    const result: PresetMeta = { ...meta, ...data };
-    presetDataCache.set(id, result);
-    return result;
   } catch (e) {
-    console.error(`loadPresetData(${id}) failed:`, e);
+    // AbortError 时给出明确日志，便于诊断"骨架屏卡住"问题
+    const isTimeout = e instanceof Error && e.name === "AbortError";
+    console.error(
+      `loadPresetData(${id}) ${isTimeout ? `超时（${FETCH_TIMEOUT_MS}ms）` : "failed"}:`,
+      e,
+    );
     return undefined;
   }
 }

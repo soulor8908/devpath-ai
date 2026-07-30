@@ -72,29 +72,36 @@ export default function PlanEditClient() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const p = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + planId);
-      if (!p) {
-        router.push("/learn");
-        return;
+      // 2026-07-30 防御性修复：包 try/catch/finally
+      // 旧版无 try/catch，getItem/getRoutine 抛错 → setLoading(false) 不执行 → 永久 LoadingScreen
+      try {
+        const p = await getItem<LearningPlan>(KEY_PREFIXES.PLAN + planId);
+        if (!p) {
+          router.push("/learn");
+          return;
+        }
+        if (cancelled) return;
+        setPlan(p);
+        // 节点优先级：按 customOrder 升序，未设置则按原顺序
+        const sortedNodes = [...p.knowledgeTree].sort(
+          (a, b) => (a.customOrder ?? 0) - (b.customOrder ?? 0)
+        );
+        setNodes(sortedNodes.map((n, i) => ({ ...n, customOrder: i })));
+        setIncludedIds(new Set(p.questions.map((q) => q.id)));
+        // 读取已保存的包含列表（覆盖默认全选）
+        const savedIncluded = await getItem<string[]>(includedKey(planId));
+        if (savedIncluded && !cancelled) {
+          setIncludedIds(new Set(savedIncluded));
+        }
+        const r = await getRoutine();
+        if (!cancelled) {
+          setRoutine(normalizeRoutine(r));
+        }
+      } catch (e) {
+        console.error("[PlanEditClient] 加载失败:", e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (cancelled) return;
-      setPlan(p);
-      // 节点优先级：按 customOrder 升序，未设置则按原顺序
-      const sortedNodes = [...p.knowledgeTree].sort(
-        (a, b) => (a.customOrder ?? 0) - (b.customOrder ?? 0)
-      );
-      setNodes(sortedNodes.map((n, i) => ({ ...n, customOrder: i })));
-      setIncludedIds(new Set(p.questions.map((q) => q.id)));
-      // 读取已保存的包含列表（覆盖默认全选）
-      const savedIncluded = await getItem<string[]>(includedKey(planId));
-      if (savedIncluded && !cancelled) {
-        setIncludedIds(new Set(savedIncluded));
-      }
-      const r = await getRoutine();
-      if (!cancelled) {
-        setRoutine(normalizeRoutine(r));
-      }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;

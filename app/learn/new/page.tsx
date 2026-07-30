@@ -157,15 +157,21 @@ export default function LearnNewPage() {
   // 点击预设卡片：按需异步加载完整数据后打开弹窗
   // PRESET_METAS 只含元信息（无 knowledgeTree/questions/schedule），
   // 必须先 await loadPresetData 拉取重数据 chunk，再交给 openPreset
+  // 2026-07-30 防御性修复：包 try/catch/finally，loadPresetData 抛错时不卡 loading
   async function openPresetById(p: PresetMetaInfo) {
     setLoading(true);
-    const data = await loadPresetData(p.id);
-    if (data) {
-      openPreset(data);
-    } else {
-      setError("加载预设失败，请重试");
+    try {
+      const data = await loadPresetData(p.id);
+      if (data) {
+        openPreset(data);
+      } else {
+        setError("加载预设失败，请重试");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载预设失败");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function closePreset() {
@@ -275,19 +281,26 @@ export default function LearnNewPage() {
     const matchedMeta = matchPresetByTopic(topic.trim());
     if (matchedMeta) {
       // 匹配到预设元信息 → 异步加载完整数据
+      // 2026-07-30 防御性修复：包 try/catch/finally，loadPresetData 抛错时不卡 loading
       setLoading(true);
-      const data = await loadPresetData(matchedMeta.id);
-      if (data) {
-        const customizedPreset: PresetMeta = {
-          ...data,
-          topic: topic.trim(),
-        };
-        openPreset(customizedPreset);
-        setError("");
+      try {
+        const data = await loadPresetData(matchedMeta.id);
+        if (data) {
+          const customizedPreset: PresetMeta = {
+            ...data,
+            topic: topic.trim(),
+          };
+          openPreset(customizedPreset);
+          setError("");
+          return;
+        }
+        // 加载失败 → 继续走向导流程
+      } catch (e) {
+        console.error("[learn/new] 加载预设失败，降级到向导流程:", e);
+        // 失败不阻断，继续走向导流程
+      } finally {
         setLoading(false);
-        return;
       }
-      // 加载失败 → 继续走向导流程
     }
 
     // 无匹配预设 → 进入渐进式向导（取代旧版 /api/learn 全量生成）
