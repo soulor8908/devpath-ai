@@ -19,13 +19,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Icon } from "@/components/Icon";
 import {
   Button,
   EmptyState,
   SkeletonCard,
 } from "@/components/ui";
-import { PortfolioEditorModal } from "@/components/PortfolioEditorModal";
 import {
   createPortfolioEntry,
   deletePortfolioEntry,
@@ -42,6 +42,14 @@ import { confirmDialog } from "@/lib/confirm-dialog";
 import { toast } from "@/lib/toast";
 import type { PortfolioEntry, PublicProfile } from "@/lib/types";
 import type { CurriculumGraph, SkillNode } from "@/lib/types/curriculum";
+
+// 2026-07-30 性能优化：PortfolioEditorModal 改动态加载
+// 含 FormField/Input/Textarea/Select 表单逻辑 + 节点选择器，
+// 仅在用户点击"新建/编辑"时才需要。ssr:false 因 Modal 依赖浏览器 API。
+const PortfolioEditorModal = dynamic(
+  () => import("@/components/PortfolioEditorModal").then((m) => m.PortfolioEditorModal),
+  { ssr: false, loading: () => null },
+);
 
 // 改为运行时 fetch（避免静态 import 把 568KB JSON 打进客户端 bundle，
 // 修复 Cloudflare Pages 部署失败：Worker bundle 总大小超 3MB 限制）

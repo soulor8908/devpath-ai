@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import type { PublicProfile, LearnLog, UserProfile, PersonaId, Achievement } from "@/lib/types";
 import { getItem as dbGet, setItem as dbSet, listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES } from "@/lib/types";
@@ -18,7 +19,6 @@ import { chinaDateNow, chinaDateShift } from "@/lib/time";
 import { apiFetch, aiFetch, exchangeSession, revokeSession, hasValidSession } from "@/lib/api-client";
 import { listAchievements } from "@/lib/achievements/store";
 import { confirmDialog } from "@/lib/confirm-dialog";
-import { ShareCardButton } from "@/components/ShareCardButton";
 import { SyncStatus } from "@/components/SyncStatus";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { scheduleAutoSync, getUserId } from "@/lib/sync";
@@ -37,14 +37,30 @@ import {
 import type { ModelConfig } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
 import { Button, Textarea, Checkbox, Modal } from "@/components/ui";
-import { ModelConfigModal } from "@/components/ModelConfigModal";
-import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import { mapExchangeErrorMessage } from "@/lib/model-config-form";
 import { toast } from "@/lib/toast";
 import { maybeRetrain } from "@/lib/energy-regression";
 import { getUserProfile, saveUserProfile } from "@/lib/ai/memory/user-profile";
 import { buildUserProfile } from "@/lib/ai/memory/profile-builder";
 import { PERSONA_LIST } from "@/lib/ai/persona";
+
+// 2026-07-30 性能优化：重模态/重组件改动态加载，只在用户实际触发时才下载
+// - ShareCardButton：依赖 lib/share-image.ts（动态 import html-to-image + qrcode 共 ~110KB）
+// - ModelConfigModal：含表单逻辑 + ModelIconSelector（图标选择网格）
+// - UsernameSetupModal：用户名设置弹窗，仅首次设置/编辑时需要
+// 旧版三者静态 import 让 /profile 路由 First Load JS 达 179KB，改造后预计降到 ~140KB
+const ShareCardButton = dynamic(
+  () => import("@/components/ShareCardButton").then((m) => m.ShareCardButton),
+  { ssr: false, loading: () => null },
+);
+const ModelConfigModal = dynamic(
+  () => import("@/components/ModelConfigModal").then((m) => m.ModelConfigModal),
+  { ssr: false, loading: () => null },
+);
+const UsernameSetupModal = dynamic(
+  () => import("@/components/UsernameSetupModal").then((m) => m.UsernameSetupModal),
+  { ssr: false, loading: () => null },
+);
 
 const STORAGE_KEY = "my:profile";
 

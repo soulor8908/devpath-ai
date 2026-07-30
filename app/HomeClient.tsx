@@ -34,6 +34,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useHomeData, getStreakMeta } from "@/lib/home";
 import { buildSceneUrl } from "@/lib/study-queue/nav-params";
 import { CurrentTaskCard } from "@/components/CurrentTaskCard";
@@ -45,10 +46,16 @@ import { Button, LinkButton } from "@/components/ui";
 import { HomeInsightsCard } from "@/components/HomeInsightsCard";
 import { EnergyTrendMini } from "@/components/EnergyTrendMini";
 import { POMODORO_OPEN_EVENT } from "@/lib/timer/pomodoro";
-import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import type { PublicProfile } from "@/lib/types";
 import { getLastSyncedAt, uploadIncremental } from "@/lib/sync";
 import { confirmDialog } from "@/lib/confirm-dialog";
+
+// 2026-07-30 性能优化：UsernameSetupModal 改动态加载
+// 仅在用户点击分享且未设置用户名时才需要，避免首屏加载弹窗组件 chunk。
+const UsernameSetupModal = dynamic(
+  () => import("@/components/UsernameSetupModal").then((m) => m.UsernameSetupModal),
+  { ssr: false, loading: () => null },
+);
 
 // 首屏骨架屏：与 HomeClient 布局对齐，提供"结构感"而非白屏
 // 2026-07-27：从 app/page.tsx 移到此处 export，让 Suspense fallback 和

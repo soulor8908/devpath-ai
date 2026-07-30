@@ -22,7 +22,11 @@ import { setItem as dbSet, getItem as dbGet } from "@/lib/storage/db";
 import { maskUsername } from "@/lib/username-mask";
 import { topoSort, allocateDaily } from "@/lib/schedule";
 import { nanoid } from "nanoid";
-import QRCode from "qrcode";
+
+// 2026-07-30 性能优化：qrcode（~60KB）改动态 import，只在生成二维码时才加载。
+// 旧版静态 import 让 qrcode 进 /u/[username] 路由首屏 chunk，但二维码只在
+// 页面渲染后 useEffect 内生成一次，无需首屏就下载整个库。
+type QRCodeModule = typeof import("qrcode");
 
 interface PublicResponse {
   profile: PublicProfile;
@@ -65,17 +69,28 @@ export default function UserPageClient() {
   }, [username]);
 
   // 生成当前页面二维码（供扫码访问）
+  // 2026-07-30：qrcode 改动态 import，避免 60KB 库进首屏 chunk
   useEffect(() => {
     if (!username) return;
+    let cancelled = false;
     const url = `${window.location.origin}/u/${encodeURIComponent(username)}`;
-    QRCode.toDataURL(url, {
-      width: 240,
-      margin: 1,
-      color: { dark: "#0f172a", light: "#ffffff" },
-      errorCorrectionLevel: "M",
-    })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(""));
+    (async () => {
+      try {
+        const QRCode: QRCodeModule = await import("qrcode");
+        const dataUrl = await QRCode.toDataURL(url, {
+          width: 240,
+          margin: 1,
+          color: { dark: "#0f172a", light: "#ffffff" },
+          errorCorrectionLevel: "M",
+        });
+        if (!cancelled) setQrDataUrl(dataUrl);
+      } catch {
+        if (!cancelled) setQrDataUrl("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [username]);
 
   async function copyPlan() {

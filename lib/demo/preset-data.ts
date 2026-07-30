@@ -17,6 +17,16 @@ import { createCard } from "@/lib/fsrs";
 import { KEY_PREFIXES } from "@/lib/types";
 import type { LearningPlan, ReviewCard, LearnLog } from "@/lib/types";
 import { chinaDateNow, chinaDateShift } from "@/lib/time";
+// 2026-07-30 性能优化（卡帕西视角）：
+//   旧版用 `await import("@/lib/presets/frontend")` 把 13k 行 TS 源码（FRONTEND_PRESET）
+//   打进客户端 chunk（933KB unminified），导致 /learn/new、/onboarding、LearnWizard
+//   等页面额外下载这个巨型 chunk。即使 dynamic import，webpack 仍会把它作为这些页面
+//   的 prefetch 目标，严重拖慢首屏。
+//   改用 loadPresetData 走 fetch('/data/presets/frontend.json')：
+//   - lib/presets/index.ts 是轻量入口（PRESET_METAS + fetch 函数），可安全静态 import
+//   - preset TS 源码不再进客户端 bundle（只用于脚本/测试）
+//   - 与 v3 设计同构（lib/presets/index.ts 已用此模式）
+import { loadPresetData } from "@/lib/presets";
 
 /** Demo 计划固定 ID（幂等：重复注入只覆盖不叠加） */
 const DEMO_PLAN_ID = "demo-frontend-plan";
@@ -57,11 +67,15 @@ export async function shouldInjectDemo(): Promise<boolean> {
 export async function injectDemoData(): Promise<void> {
   if (typeof window === "undefined") return;
 
-  // 动态 import：避免静态 import FRONTEND_PRESET（13k 行）打进 Worker bundle
-  // 导致 Cloudflare Pages 部署失败（Worker bundle > 3MB 限制）。
-  // hasDemoData / clearDemoData / shouldInjectDemo 不需要 preset 数据，
-  // 只有本函数实际注入时才加载。
-  const { FRONTEND_PRESET: preset } = await import("@/lib/presets/frontend");
+  // 2026-07-30 改造：用 loadPresetData 走 fetch JSON，不再 dynamic import TS 源码。
+  // 旧版 `await import("@/lib/presets/frontend")` 让 webpack 把 933KB preset chunk
+  // 作为本模块依赖方的 prefetch 目标，严重拖慢首屏。
+  // 失败兜底：fetch 失败时静默退出，首页仍可正常渲染（无 demo 数据不影响主流程）。
+  const preset = await loadPresetData("frontend");
+  if (!preset) {
+    console.warn("[injectDemoData] loadPresetData(frontend) 返回空，跳过注入");
+    return;
+  }
 
   const now = new Date().toISOString();
   const today = chinaDateNow();

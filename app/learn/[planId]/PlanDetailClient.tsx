@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { getItem, setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES } from "@/lib/types";
@@ -10,7 +11,6 @@ import type { LearningPlan, Question, ScheduleItem, KnowledgeNode } from "@/lib/
 import { KnowledgeTree } from "@/components/KnowledgeTree";
 import { MindMap } from "@/components/MindMap";
 import { QuestionCard } from "@/components/QuestionCard";
-import { RelatedKnowledge } from "@/components/RelatedKnowledge";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Select, Modal, LoadingScreen } from "@/components/ui";
 import { toggleQuestionInPlan, createFavoriteDeck, listFavoriteDecks, deleteFavoriteDeck } from "@/lib/favorite";
@@ -62,6 +62,19 @@ import {
   completeAITask,
   errorAITask,
 } from "@/lib/ai-task-queue";
+
+// 2026-07-30 性能优化：RelatedKnowledge 改动态加载
+// 该组件依赖向量检索（lib/knowledge/search）+ KnowledgeDetailModal，
+// 仅在用户查看某个知识点的相关知识时才需要。
+const RelatedKnowledge = dynamic(
+  () => import("@/components/RelatedKnowledge").then((m) => m.RelatedKnowledge),
+  {
+    loading: () => (
+      <div className="text-xs text-gray-400 dark:text-gray-500 py-2">加载相关知识...</div>
+    ),
+    ssr: false,
+  },
+);
 
 export default function PlanDetailClient() {
   const params = useParams<{ planId: string }>();

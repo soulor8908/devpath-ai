@@ -13,6 +13,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { setItem } from "@/lib/storage/db";
 import { aiFetch } from "@/lib/api-client";
 import { KEY_PREFIXES, type LearningPlan, type KnowledgeNode, type Question, type ScheduleItem, type PromptLibraryItem } from "@/lib/types";
@@ -29,12 +30,28 @@ import { savePlanSummary, checkOverwriteOrCreate } from "@/lib/plan-summary";
 import { nanoid } from "nanoid";
 import { Icon } from "@/components/Icon";
 import { hasDemoData, clearDemoData } from "@/lib/demo/preset-data";
-import { LearnWizard } from "@/components/LearnWizard";
 import { getRecommendedQuickInputs, getDefaultQuickInputs } from "@/lib/recommend-quick-inputs";
 import { toast } from "@/lib/toast";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { startAITask, setAITaskContent, completeAITask, errorAITask } from "@/lib/ai-task-queue";
 import { Button, Input, Textarea } from "@/components/ui";
+
+// 2026-07-30 性能优化：LearnWizard 改动态加载
+// 该组件仅在用户提交非预设主题后（view === "wizard"）才渲染，
+// 包含 4 步 AI 生成状态机 + NDJSON 流式解析逻辑，体积较大。
+// 配合 wizard 视图切换时的 loading 态，用户感知"立即响应"。
+const LearnWizard = dynamic(
+  () => import("@/components/LearnWizard").then((m) => m.LearnWizard),
+  {
+    loading: () => (
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+        <Icon name="loader" className="w-5 h-5 mr-2 animate-spin" />
+        准备学习向导...
+      </div>
+    ),
+    ssr: false,
+  },
+);
 
 interface PresetPlanData {
   topic: string;

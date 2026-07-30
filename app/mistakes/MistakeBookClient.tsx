@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { listItems } from "@/lib/storage/db";
 import { KEY_PREFIXES, type LearningPlan, type MistakeRecord, type KnowledgeNode } from "@/lib/types";
 import {
@@ -13,7 +14,19 @@ import {
 } from "@/lib/mistake-book";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
-import { RelatedKnowledge } from "@/components/RelatedKnowledge";
+
+// 2026-07-30 性能优化：RelatedKnowledge 改动态加载
+// 该组件依赖 lib/knowledge/search（向量检索）+ KnowledgeCard + KnowledgeDetailModal，
+// 仅在用户展开某条错题时才需要。ssr:false 因向量检索依赖浏览器 IndexedDB/Worker。
+const RelatedKnowledge = dynamic(
+  () => import("@/components/RelatedKnowledge").then((m) => m.RelatedKnowledge),
+  {
+    loading: () => (
+      <div className="text-xs text-gray-400 dark:text-gray-500 py-2">加载相关知识...</div>
+    ),
+    ssr: false,
+  },
+);
 
 /** 相对时间（"2小时前"） */
 function relativeTime(iso: string): string {

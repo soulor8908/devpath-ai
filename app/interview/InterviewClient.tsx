@@ -21,6 +21,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   type InterviewDifficulty,
   type InterviewConfig,
@@ -31,10 +32,25 @@ import {
 } from "@/lib/ai/interview-coach";
 import { Icon } from "@/components/Icon";
 import { Button, Textarea } from "@/components/ui";
-import { InterviewReportView } from "@/components/InterviewReport";
 import { aiFetch } from "@/lib/api-client";
 import { getDefaultModelConfig } from "@/lib/model-config";
 import { toast } from "@/lib/toast";
+
+// 2026-07-30 性能优化：InterviewReportView 改动态加载
+// 该组件只在面试结束（phase === "reporting"）时才渲染，
+// 配置/面试阶段不需要。延迟到用户进入报告阶段才下载 chunk。
+const InterviewReportView = dynamic(
+  () => import("@/components/InterviewReport").then((m) => m.InterviewReportView),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[60vh] text-sm text-gray-500 dark:text-gray-400">
+        <Icon name="loader" className="w-5 h-5 mr-2 animate-spin" />
+        生成面试报告...
+      </div>
+    ),
+    ssr: false,
+  },
+);
 
 type Phase = "config" | "interviewing" | "reporting";
 
