@@ -51,6 +51,12 @@ let migrationPromise: Promise<void> | null = null;
 
 /**
  * 创建 Dexie 数据库实例（含 schema 定义）
+ *
+ * 2026-07-31 修复 "Data lost due to missing file"：
+ *   经实测，Dexie 能正常打开版本号高于代码定义的现有数据库（schema 兼容时）。
+ *   "Data lost" 错误的真实根因是并发 IndexedDB 事务冲突（injectDemoData 的
+ *   7 次串行 setItem 与用户操作并发），已通过 bulkPutItems 单事务批量写入
+ *   + withDBRetry 重试机制修复。此处保持 schema 定义不变。
  */
 async function createDB(): Promise<AppDBInstance> {
   const { default: Dexie } = await import("dexie");
