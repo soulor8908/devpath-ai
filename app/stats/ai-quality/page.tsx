@@ -101,6 +101,10 @@ export default function AIQualityPage() {
       setPruned(deleted);
       const r = await getQualityReport(rangeToSince(range));
       setReport(r);
+    } catch (e) {
+      // 2026-07-31 修复（审计 MEDIUM risk）：缺 catch 导致 report 永远 null → 空白页
+      console.error("[ai-quality] 加载失败:", e);
+      setReport(null);
     } finally {
       setLoading(false);
     }

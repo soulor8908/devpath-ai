@@ -36,7 +36,15 @@ export default function DailyPage() {
         setHasData(false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
+      // 2026-07-31 修复（审计 HIGH risk）：
+      //   旧版 catch 只 setError 不 setLog，导致 log 永远 null，
+      //   下面的 `if (!log) return 加载中...` 永远不退出 → 页面卡死。
+      //   修复：catch 中创建空 log 让页面降级为编辑器（错误信息在编辑器内可见）。
+      const empty = createEmptyLog(d);
+      setLog(empty);
+      setRawContent(formatDailyLog(empty));
+      setHasData(false);
+      setError(e instanceof Error ? e.message : "加载失败，已创建空白日志");
     }
   }, []);
 

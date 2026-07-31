@@ -88,14 +88,38 @@ async function createDB(): Promise<AppDBInstance> {
  * 获取 Dexie 实例（浏览器环境单例）
  * 服务端/Edge 返回 null（动态导入 Dexie 避免打包到 Edge runtime）
  *
- * 注意：此函数是异步的（因为动态 import）
+ * 2026-07-31 修复（微信清理缓存后首页骨架屏卡住根因）：
+ *   微信 WKWebView 清理缓存后，IndexedDB open 请求可能永远不触发
+ *   onsuccess/onerror/onupgradeneeded（WKWebView IndexedDB 实现 bug）。
+ *   Dexie 的 open promise 永远不 resolve → getDB() 永远不返回 →
+ *   ensureDBReady() 永远不完成 → getItem/listItems 永远不返回 →
+ *   首页 Promise.allSettled 永远不完成 → 骨架屏永远卡住。
+ *
+ *   修复：给 createDB 加 10 秒超时。超时后返回 null，上层降级为空数据。
+ *   用户至少能看到空状态页面而非永远骨架屏。
  */
 export async function getDB(): Promise<AppDBInstance | null> {
   if (typeof window === "undefined" || typeof indexedDB === "undefined") {
     return null;
   }
   if (!dbInstance) {
-    dbInstance = await createDB();
+    // 10 秒超时：防止微信 WKWebView IndexedDB open 永久挂起
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    dbInstance = await Promise.race([
+      createDB(),
+      new Promise<AppDBInstance | null>((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.error("[dexie] getDB 超时（10s），IndexedDB open 可能已挂起");
+          resolve(null);
+        }, 10000);
+      }),
+    ]);
+    // 清除超时定时器（createDB 先完成时防止误报超时）
+    if (timeoutId) clearTimeout(timeoutId);
+    // 如果超时返回 null，不缓存 null，下次 getDB() 会重新尝试
+    if (!dbInstance) {
+      return null;
+    }
   }
   return dbInstance;
 }

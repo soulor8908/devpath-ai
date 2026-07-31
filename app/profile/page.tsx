@@ -165,12 +165,21 @@ export default function ProfilePage() {
   const [personaSaved, setPersonaSaved] = useState(false);
 
   useEffect(() => {
+    // 2026-07-31 修复（审计 MEDIUM risk）：
+    //   旧版 8+ 个串行 await 无 try/catch，任一抛错（如 IndexedDB "Data lost"）
+    //   后续状态更新全被跳过 → 页面半渲染且无错误提示。
+    //   修复：整体包 try/catch，每个独立操作单独 try/catch 互不影响。
+    let cancelled = false;
     (async () => {
-      const stored = await dbGet<PublicProfile>(STORAGE_KEY);
-      if (stored) setProfile(stored);
+      try {
+        const stored = await dbGet<PublicProfile>(STORAGE_KEY);
+        if (!cancelled && stored) setProfile(stored);
+      } catch { /* IndexedDB 失败用默认 profile */ }
 
-      const r = await loadRoutineMarkdown();
-      setRoutine(r);
+      try {
+        const r = await loadRoutineMarkdown();
+        if (!cancelled) setRoutine(r);
+      } catch { /* routine 加载失败用默认值 */ }
 
       // 检查 PWA 通知支持
       if (typeof window !== "undefined" && "Notification" in window) {
@@ -178,58 +187,63 @@ export default function ProfilePage() {
         setNotifPermission(Notification.permission);
       }
 
-      // 加载收藏统计
-      const [decks, questions] = await Promise.all([
-        listFavoriteDecks(),
-        listFavoritedQuestions(),
-      ]);
-      setDeckCount(decks.length);
-      setQuestionCount(questions.length);
+      // 加载收藏统计（用 allSettled 防止单个失败跳过后续）
+      try {
+        const settled = await Promise.allSettled([
+          listFavoriteDecks(),
+          listFavoritedQuestions(),
+          listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG),
+          listModelConfigs(),
+        ]);
+        if (cancelled) return;
+        const v = <T,>(r: PromiseSettledResult<T>, f: T): T =>
+          r.status === "fulfilled" ? r.value : f;
+        const decks = v(settled[0], []);
+        const questions = v(settled[1], []);
+        const logs = v(settled[2], [] as LearnLog[]);
+        const configs = v(settled[3], []);
+        setDeckCount(decks.length);
+        setQuestionCount(questions.length);
+        setModelConfigs(configs);
 
-      // P2.5 加载学习统计概览：连续打卡 + 总时长 + 本周时长
-      const logs = await listItems<LearnLog>(KEY_PREFIXES.LEARN_LOG);
-      const total = logs.reduce((sum, l) => sum + (l.duration ?? 0), 0);
-      setTotalMinutes(total);
-      // 本周（最近 7 天）时长
-      let week = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = chinaDateShift(chinaDateNow(), -i);
-        week += logs
-          .filter((l) => l.date === d)
-          .reduce((s, l) => s + (l.duration ?? 0), 0);
-      }
-      setWeekMinutes(week);
-      // 连续打卡
-      const logDates = new Set(logs.map((l) => l.date));
-      let streakCount = 0;
-      let checkDate = chinaDateNow();
-      while (logDates.has(checkDate)) {
-        streakCount++;
-        checkDate = chinaDateShift(checkDate, -1);
-      }
-      setStreak(streakCount);
-
-      // 加载 AI 模型配置
-      const configs = await listModelConfigs();
-      setModelConfigs(configs);
-
-      // 安全升级检测：旧数据可能仍含 apiKey（2026-07-27 P0 加固前的持久化遗留）
-      // 检测到 apiKey 残留且无有效 session → 提示用户重新保存以清除明文 apiKey
-      const hasSession = await hasValidSession();
-      if (!hasSession) {
-        const hasApiKey = configs.some((c) => typeof c.apiKey === "string" && c.apiKey.trim().length > 0);
-        if (hasApiKey) {
-          setShowUpgradeModal(true);
+        // 学习统计概览
+        const total = logs.reduce((sum, l) => sum + (l.duration ?? 0), 0);
+        setTotalMinutes(total);
+        let week = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = chinaDateShift(chinaDateNow(), -i);
+          week += logs.filter((l) => l.date === d).reduce((s, l) => s + (l.duration ?? 0), 0);
         }
-      }
+        setWeekMinutes(week);
+        const logDates = new Set(logs.map((l) => l.date));
+        let streakCount = 0;
+        let checkDate = chinaDateNow();
+        while (logDates.has(checkDate)) {
+          streakCount++;
+          checkDate = chinaDateShift(checkDate, -1);
+        }
+        setStreak(streakCount);
 
-      // 加载用户画像（用于 persona 设置）
-      const profile = await getUserProfile();
-      setUserProfile(profile);
+        // 安全升级检测
+        try {
+          const hasSession = await hasValidSession();
+          if (cancelled) return;
+          if (!hasSession) {
+            const hasApiKey = configs.some((c) => typeof c.apiKey === "string" && c.apiKey.trim().length > 0);
+            if (hasApiKey) setShowUpgradeModal(true);
+          }
+        } catch { /* session 检查失败不阻塞 */ }
+      } catch { /* 统计加载失败不阻塞 */ }
 
-      // P3.4：页面加载时静默检查能量模型是否需要重训练（不阻塞 UI，失败仅 console.warn）
+      try {
+        const profile = await getUserProfile();
+        if (!cancelled) setUserProfile(profile);
+      } catch { /* 画像加载失败用默认值 */ }
+
+      // P3.4：静默检查能量模型重训练（不阻塞 UI）
       void maybeRetrain();
     })();
+    return () => { cancelled = true; };
   }, []);
 
   function toggleVisibility(key: keyof PublicProfile["visibility"]) {
