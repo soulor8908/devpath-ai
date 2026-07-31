@@ -253,23 +253,37 @@ export default function LearnNewPage() {
       createdAt: now,
       updatedAt: now,
     };
-    await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
-    await savePlanSummary(plan);
-    // 创建真实计划后，若存在 Demo 数据则提示清除
-    const hasDemo = await hasDemoData();
-    if (hasDemo) {
-      const ok = await confirmDialog({
-        title: "清除示例数据？",
-        message: "检测到首次访问注入的示例数据。已创建真实学习计划，是否清除示例数据？",
-        confirmText: "清除",
-        cancelText: "保留",
-        danger: true,
-      });
-      if (ok) await clearDemoData();
+    // 2026-07-31：补 try/catch/finally，setItem 失败时给用户友好提示而非静默卡死
+    // setItem 内部已有 withDBRetry 重试机制，到这一步说明重试也失败了
+    setLoading(true);
+    try {
+      await setItem(KEY_PREFIXES.PLAN + plan.id, plan);
+      await savePlanSummary(plan);
+      // 创建真实计划后，若存在 Demo 数据则提示清除
+      const hasDemo = await hasDemoData();
+      if (hasDemo) {
+        const ok = await confirmDialog({
+          title: "清除示例数据？",
+          message: "检测到首次访问注入的示例数据。已创建真实学习计划，是否清除示例数据？",
+          confirmText: "清除",
+          cancelText: "保留",
+          danger: true,
+        });
+        if (ok) await clearDemoData();
+      }
+      // 如果点击了具体节点，通过 query 选中该节点
+      const query = node ? `?node=${encodeURIComponent(node.id)}` : "";
+      router.push(`/learn/${plan.id}${query}`);
+    } catch (e) {
+      console.error("[learn/new] 创建计划失败:", e);
+      toast.error(
+        e instanceof Error && e.message.includes("Data lost")
+          ? "浏览器存储异常，请刷新页面后重试"
+          : "创建学习计划失败，请重试",
+      );
+    } finally {
+      setLoading(false);
     }
-    // 如果点击了具体节点，通过 query 选中该节点
-    const query = node ? `?node=${encodeURIComponent(node.id)}` : "";
-    router.push(`/learn/${plan.id}${query}`);
   }
 
   async function handleSubmit(e: React.FormEvent) {

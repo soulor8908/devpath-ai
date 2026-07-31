@@ -93,7 +93,14 @@ export default function OnboardingPage() {
       router.push(`/train?planId=${plan.id}`);
     } catch (e) {
       console.error("[onboarding] 启动失败:", e);
-      alert(e instanceof Error ? e.message : "启动失败，请重试");
+      // 2026-07-31：IndexedDB "Data lost" 错误给出友好提示而非原始错误信息
+      const msg =
+        e instanceof Error && e.message.includes("Data lost")
+          ? "浏览器存储异常，请刷新页面后重试"
+          : e instanceof Error
+            ? e.message
+            : "启动失败，请重试";
+      alert(msg);
     } finally {
       setStarting(false);
     }

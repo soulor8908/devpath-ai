@@ -59,6 +59,12 @@ export interface LearningPlanSummary {
    * - 解决用户反馈"我答对了进度还是 0"：列表卡片直接展示进度，让用户看到点击有效
    */
   understoodCount?: number;
+  /**
+   * 是否为 Demo 预置数据（2026-07-31 新增）。
+   * - 用于 findExistingPlanByTopic 排除 demo 计划，避免用户导入 preset 时误判重复
+   * - 旧 summary 缺此字段时视为非 demo（向后兼容）
+   */
+  isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
 }

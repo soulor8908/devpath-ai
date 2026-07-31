@@ -79,6 +79,8 @@ export function toSummary(plan: LearningPlan): LearningPlanSummary {
     nodeStates: deriveNodeStates(knowledgeTree, questions),
     // 2026-07-26 派生 understoodCount：列表卡片展示"已看懂 X/Y 题"
     understoodCount,
+    // 2026-07-31 传递 isDemo：findExistingPlanByTopic 据此排除 demo 计划
+    isDemo: plan.isDemo === true ? true : undefined,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
@@ -233,7 +235,13 @@ export async function findExistingPlanByTopic(
   const trimmed = topic.trim().toLowerCase();
   if (!trimmed) return undefined;
   const summaries = await listPlanSummaries();
-  return summaries.find((s) => s.topic.trim().toLowerCase() === trimmed);
+  // 2026-07-31 修复（用户反馈"导入内置知识库提示重复，实际没有重复"）：
+  //   injectDemoData 注入的 demo plan topic 与 preset topic 完全相同，
+  //   导致用户导入 preset 时被误判为重复。排除 isDemo=true 的计划，
+  //   demo 计划不算"用户已创建的真实计划"，不阻断导入流程。
+  return summaries.find(
+    (s) => !s.isDemo && s.topic.trim().toLowerCase() === trimmed,
+  );
 }
 
 /**

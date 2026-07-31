@@ -19,12 +19,55 @@
 import {
   getDB,
   ensureDBReady,
+  resetDBConnection,
   extractPrefix,
   extractDueAtFromValue,
   extractUpdatedAtFromValue,
   type KVRecord,
 } from "@/lib/storage/dexie-db";
 import { invalidateCache, setCached } from "@/lib/storage/cache";
+
+/**
+ * 判断是否为可重试的 IndexedDB 事务错误（2026-07-31 新增）。
+ *
+ * "Data lost due to missing file" 等 Dexie 错误通常是因为数据库连接
+ * 处于异常状态（dev 热重载 / 浏览器存储临时不可用）。
+ * 重置连接后重试一次通常能恢复。
+ */
+function isRetryableDBError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const msg = e.message.toLowerCase();
+  // Dexie 事务中止 / 连接断开类错误
+  return (
+    msg.includes("data lost") ||
+    msg.includes("missing file") ||
+    msg.includes("irrecoverable") ||
+    msg.includes("database is closed") ||
+    msg.includes("connection closed") ||
+    e.name === "UnknownError"
+  );
+}
+
+/**
+ * 执行 DB 操作，遇可重试错误时重置连接并重试一次。
+ * 避免单次事务失败导致整个流程中断（如 onboarding 创建计划失败）。
+ */
+async function withDBRetry<T>(fn: (db: NonNullable<Awaited<ReturnType<typeof getDB>>>) => Promise<T>): Promise<T> {
+  const db = await getDB();
+  if (!db) throw new Error("Database unavailable");
+  try {
+    return await fn(db);
+  } catch (e) {
+    if (!isRetryableDBError(e)) throw e;
+    // 可重试错误：重置连接后重试一次
+    console.warn("[db] 事务失败，重置连接后重试:", e);
+    await resetDBConnection();
+    await ensureDBReady();
+    const newDb = await getDB();
+    if (!newDb) throw new Error("Database unavailable after reset");
+    return await fn(newDb);
+  }
+}
 
 // ============ 向后兼容 API ============
 
@@ -49,8 +92,6 @@ export async function getItem<T>(key: string): Promise<T | undefined> {
 export async function setItem<T>(key: string, value: T): Promise<void> {
   if (typeof window === "undefined") return;
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return;
 
   const record: KVRecord = {
     key,
@@ -59,7 +100,11 @@ export async function setItem<T>(key: string, value: T): Promise<void> {
     updatedAt: extractUpdatedAtFromValue(value),
     dueAt: extractDueAtFromValue(value),
   };
-  await db.kv.put(record);
+  // 2026-07-31：用 withDBRetry 包裹，遇 "Data lost due to missing file" 等事务错误时
+  // 重置连接并重试一次，避免 onboarding/learn-new 创建计划时因临时 DB 故障永久失败
+  await withDBRetry(async (db) => {
+    await db.kv.put(record);
+  });
 
   // 写穿缓存：更新内存缓存（如果有）
   setCached(key, value);
@@ -76,10 +121,6 @@ export async function setItem<T>(key: string, value: T): Promise<void> {
 export async function delItem(key: string): Promise<void> {
   if (typeof window === "undefined") return;
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return;
-  await db.kv.delete(key);
-  // 写 tombstone（与原 key 同表，通过 prefix="tombstone:" 区分）
   const nowIso = new Date().toISOString();
   const tombstoneKey = `tombstone:${key}`;
   const tombstone: KVRecord = {
@@ -88,7 +129,11 @@ export async function delItem(key: string): Promise<void> {
     prefix: "tombstone:",
     updatedAt: nowIso,
   };
-  await db.kv.put(tombstone);
+  // 2026-07-31：删除 + 写 tombstone 用同一重试逻辑
+  await withDBRetry(async (db) => {
+    await db.kv.delete(key);
+    await db.kv.put(tombstone);
+  });
   invalidateCache(key);
 }
 

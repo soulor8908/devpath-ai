@@ -50,6 +50,41 @@ let dbInstance: AppDBInstance | null = null;
 let migrationPromise: Promise<void> | null = null;
 
 /**
+ * 创建 Dexie 数据库实例（含 schema 定义）
+ */
+async function createDB(): Promise<AppDBInstance> {
+  const { default: Dexie } = await import("dexie");
+
+  class AppDB extends Dexie {
+    kv!: Table<KVRecord, string>;
+    constructor() {
+      super("devpath");
+      this.version(1).stores({
+        kv: "&key, prefix, updatedAt",
+      });
+      this.version(2).stores({
+        kv: "&key, prefix, updatedAt, dueAt",
+      }).upgrade(async (tx) => {
+        await tx.table("kv").toCollection().modify((rec: KVRecord) => {
+          if (
+            rec.value &&
+            typeof rec.value === "object" &&
+            "due" in rec.value
+          ) {
+            const due = (rec.value as { due?: unknown }).due;
+            if (typeof due === "string") {
+              rec.dueAt = due;
+            }
+          }
+        });
+      });
+    }
+  }
+
+  return new AppDB();
+}
+
+/**
  * 获取 Dexie 实例（浏览器环境单例）
  * 服务端/Edge 返回 null（动态导入 Dexie 避免打包到 Edge runtime）
  *
@@ -60,46 +95,34 @@ export async function getDB(): Promise<AppDBInstance | null> {
     return null;
   }
   if (!dbInstance) {
-    // 动态导入 Dexie：避免静态 import 导致 Dexie 被打包到 Edge runtime
-    // （Dexie 内部使用 BroadcastChannel，Edge runtime 不支持）
-    const { default: Dexie } = await import("dexie");
-
-    class AppDB extends Dexie {
-      kv!: Table<KVRecord, string>;
-      constructor() {
-        super("devpath");
-        // v1: 单表 kv，主键 key + 两个索引（prefix、updatedAt）
-        //   - prefix 索引：listKeys(prefix) 走索引而非全表扫描
-        //   - updatedAt 索引：增量同步 getChangesSince(ts) 直接索引范围查询
-        this.version(1).stores({
-          kv: "&key, prefix, updatedAt",
-        });
-        // v2: 新增 dueAt 索引（从 ReviewCard.due 提取）
-        //   - countDueCards(now) 走索引查询，避免全量加载 cards
-        //   - Dexie 自动处理 schema 升级；upgrade 回填旧记录的 dueAt
-        this.version(2).stores({
-          kv: "&key, prefix, updatedAt, dueAt",
-        }).upgrade(async (tx) => {
-          // 回填现有 ReviewCard 记录的 dueAt 字段
-          await tx.table("kv").toCollection().modify((rec: KVRecord) => {
-            if (
-              rec.value &&
-              typeof rec.value === "object" &&
-              "due" in rec.value
-            ) {
-              const due = (rec.value as { due?: unknown }).due;
-              if (typeof due === "string") {
-                rec.dueAt = due;
-              }
-            }
-          });
-        });
-      }
-    }
-
-    dbInstance = new AppDB();
+    dbInstance = await createDB();
   }
   return dbInstance;
+}
+
+/**
+ * 重置数据库连接（2026-07-31 新增）。
+ *
+ * 触发场景：IndexedDB 事务中止（如 "Data lost due to missing file"）后，
+ * 旧连接可能处于不可用状态。关闭旧连接并重置单例，下次 getDB() 会创建新实例。
+ *
+ * 使用模式（db.ts 的 setItem/delItem 等在捕获事务错误后调用）：
+ *   ```ts
+ *   try { await db.kv.put(record); }
+ *   catch (e) { await resetDBConnection(); throw e; }
+ *   ```
+ */
+export async function resetDBConnection(): Promise<void> {
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {
+      // 关闭失败忽略
+    }
+    dbInstance = null;
+    // 重置迁移标志，下次 ensureDBReady 会重新检查（但不重新迁移，因为迁移标志在 IndexedDB 内）
+    migrationPromise = null;
+  }
 }
 
 // ============ 前缀提取 ============
