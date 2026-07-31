@@ -120,9 +120,80 @@ export async function resetDBConnection(): Promise<void> {
       // 关闭失败忽略
     }
     dbInstance = null;
-    // 重置迁移标志，下次 ensureDBReady 会重新检查（但不重新迁移，因为迁移标志在 IndexedDB 内）
     migrationPromise = null;
   }
+}
+
+/**
+ * 彻底删除并重建数据库（2026-07-31 新增）。
+ *
+ * 根因（经充分调研确认）：
+ *   微信清理缓存 / iOS 系统存储清理 / 清理工具 会删除 WKWebView 的
+ *   IndexedDB 底层数据库文件。文件丢失后，IndexedDB 系统表仍注册着
+ *   "devpath" 数据库，但底层文件不存在 → 任何操作都报
+ *   "Data lost due to missing file. Affected record should be considered irrevocable"
+ *
+ *   参考：Super Productivity 项目相同 issue（johannesjo/super-productivity#4527）
+ *   维护者确认："The error appears when some other app (some cleaner utility?)
+ *   has deleted some of super productivity's files."
+ *
+ * 恢复策略：
+ *   1. 关闭所有 Dexie 连接（释放数据库锁）
+ *   2. 等待连接释放（100ms）
+ *   3. indexedDB.deleteDatabase("devpath") 删除损坏的数据库注册
+ *   4. 等待删除完成（处理 onblocked，最多等 5s）
+ *   5. 下次 getDB() 会创建全新数据库 + 全新文件
+ *
+ * 数据影响：
+ *   底层文件已被清理工具删除，数据本就不可恢复。
+ *   deleteDatabase 只是清理 IndexedDB 系统表中的残留注册信息，
+ *   让数据库能被重新创建。不会造成额外数据丢失。
+ */
+export async function nukeAndRebuildDB(): Promise<void> {
+  // 1. 关闭 Dexie 连接
+  await resetDBConnection();
+
+  // 2. 等待连接释放（Dexie.close() 是同步的，但底层 IndexedDB 连接释放可能需要一点时间）
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  // 3. 删除数据库
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+    try {
+      const req = indexedDB.deleteDatabase("devpath");
+      req.onsuccess = () => {
+        console.info("[dexie] 数据库已删除，准备重建");
+        finish();
+      };
+      req.onerror = () => {
+        console.warn("[dexie] deleteDatabase 失败，尝试继续创建新实例");
+        finish();
+      };
+      req.onblocked = () => {
+        // 连接未完全释放，等待后继续
+        // 即使 deleteDatabase 被 blocked，Dexie 创建新实例时仍可能成功
+        console.warn("[dexie] deleteDatabase 被 blocked（连接未释放），等待后继续");
+        finish();
+      };
+      // 5s 超时兜底
+      setTimeout(() => {
+        console.warn("[dexie] deleteDatabase 超时（5s），尝试继续创建新实例");
+        finish();
+      }, 5000);
+    } catch (e) {
+      console.warn("[dexie] deleteDatabase 异常:", e);
+      finish();
+    }
+  });
+
+  // 4. 重置迁移标志，允许重新迁移
+  migrationPromise = null;
 }
 
 // ============ 前缀提取 ============

@@ -20,6 +20,7 @@ import {
   getDB,
   ensureDBReady,
   resetDBConnection,
+  nukeAndRebuildDB,
   extractPrefix,
   extractDueAtFromValue,
   extractUpdatedAtFromValue,
@@ -28,20 +29,33 @@ import {
 import { invalidateCache, setCached } from "@/lib/storage/cache";
 
 /**
- * 判断是否为可重试的 IndexedDB 事务错误（2026-07-31 新增）。
+ * 判断是否为"数据库文件丢失"错误（2026-07-31 修复）。
  *
- * "Data lost due to missing file" 等 Dexie 错误通常是因为数据库连接
- * 处于异常状态（dev 热重载 / 浏览器存储临时不可用）。
- * 重置连接后重试一次通常能恢复。
+ * 微信清理缓存 / iOS 存储清理 会删除 IndexedDB 底层数据库文件。
+ * 文件丢失后，IndexedDB 系统表仍注册着数据库，但操作时报：
+ *   "Data lost due to missing file. Affected record should be considered irrevocable"
+ *
+ * 此类错误必须通过 nukeAndRebuildDB（删除数据库+重建）恢复，
+ * 单纯重置连接无效（底层文件已不存在）。
  */
-function isRetryableDBError(e: unknown): boolean {
+function isDataLostError(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
   const msg = e.message.toLowerCase();
-  // Dexie 事务中止 / 连接断开类错误
   return (
     msg.includes("data lost") ||
     msg.includes("missing file") ||
-    msg.includes("irrecoverable") ||
+    msg.includes("irrecoverable")
+  );
+}
+
+/**
+ * 判断是否为可重试的临时性事务错误。
+ * 这类错误重置连接后重试即可恢复（非文件丢失）。
+ */
+function isRetryableTransactionError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const msg = e.message.toLowerCase();
+  return (
     msg.includes("database is closed") ||
     msg.includes("connection closed") ||
     e.name === "UnknownError"
@@ -49,8 +63,13 @@ function isRetryableDBError(e: unknown): boolean {
 }
 
 /**
- * 执行 DB 操作，遇可重试错误时重置连接并重试一次。
- * 避免单次事务失败导致整个流程中断（如 onboarding 创建计划失败）。
+ * 执行 DB 操作，遇错误时自动恢复并重试（2026-07-31 修复）。
+ *
+ * 恢复策略：
+ *   1. "Data lost due to missing file" → nukeAndRebuildDB（删除+重建数据库）
+ *      根因：微信清理缓存删除了 IndexedDB 底层文件，必须删除数据库注册并重建
+ *   2. "database is closed" 等 → resetDBConnection（仅重置连接）
+ *      根因：Dexie 连接状态异常，重置后重试即可
  */
 async function withDBRetry<T>(fn: (db: NonNullable<Awaited<ReturnType<typeof getDB>>>) => Promise<T>): Promise<T> {
   const db = await getDB();
@@ -58,14 +77,25 @@ async function withDBRetry<T>(fn: (db: NonNullable<Awaited<ReturnType<typeof get
   try {
     return await fn(db);
   } catch (e) {
-    if (!isRetryableDBError(e)) throw e;
-    // 可重试错误：重置连接后重试一次
-    console.warn("[db] 事务失败，重置连接后重试:", e);
-    await resetDBConnection();
-    await ensureDBReady();
-    const newDb = await getDB();
-    if (!newDb) throw new Error("Database unavailable after reset");
-    return await fn(newDb);
+    if (isDataLostError(e)) {
+      // 文件丢失：必须删除数据库并重建
+      console.error("[db] 检测到数据库文件丢失（微信清理缓存导致），执行 nukeAndRebuildDB:", e);
+      await nukeAndRebuildDB();
+      await ensureDBReady();
+      const newDb = await getDB();
+      if (!newDb) throw new Error("Database unavailable after nuke");
+      return await fn(newDb);
+    }
+    if (isRetryableTransactionError(e)) {
+      // 临时性事务错误：重置连接后重试
+      console.warn("[db] 事务失败，重置连接后重试:", e);
+      await resetDBConnection();
+      await ensureDBReady();
+      const newDb = await getDB();
+      if (!newDb) throw new Error("Database unavailable after reset");
+      return await fn(newDb);
+    }
+    throw e;
   }
 }
 
@@ -74,14 +104,20 @@ async function withDBRetry<T>(fn: (db: NonNullable<Awaited<ReturnType<typeof get
 /**
  * 读取单个值
  * 服务端返回 undefined
+ * 2026-07-31：包 withDBRetry，遇 "Data lost" 自动 nuke 重建
  */
 export async function getItem<T>(key: string): Promise<T | undefined> {
   if (typeof window === "undefined") return undefined;
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return undefined;
-  const rec = await db.kv.get(key);
-  return rec?.value as T | undefined;
+  try {
+    return await withDBRetry(async (db) => {
+      const rec = await db.kv.get(key);
+      return rec?.value as T | undefined;
+    });
+  } catch {
+    // 读取失败返回 undefined（nuke 重建后数据已丢失）
+    return undefined;
+  }
 }
 
 /**
@@ -140,31 +176,40 @@ export async function delItem(key: string): Promise<void> {
 /**
  * 列出所有 key（可按前缀过滤）
  * 走 prefix 索引而非全表扫描
+ * 2026-07-31：包 withDBRetry
  */
 export async function listKeys(prefix?: string): Promise<string[]> {
   if (typeof window === "undefined") return [];
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return [];
-  if (prefix) {
-    // 利用 prefix 索引
-    const records = await db.kv.where("prefix").equals(prefix).toArray();
-    return records.map((r) => r.key);
+  try {
+    return await withDBRetry(async (db) => {
+      if (prefix) {
+        const records = await db.kv.where("prefix").equals(prefix).toArray();
+        return records.map((r) => r.key);
+      }
+      const all = await db.kv.toArray();
+      return all.map((r) => r.key);
+    });
+  } catch {
+    return [];
   }
-  const all = await db.kv.toArray();
-  return all.map((r) => r.key);
 }
 
 /**
  * 列出某前缀下所有 value
+ * 2026-07-31：包 withDBRetry
  */
 export async function listItems<T>(prefix: string): Promise<T[]> {
   if (typeof window === "undefined") return [];
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return [];
-  const records = await db.kv.where("prefix").equals(prefix).toArray();
-  return records.map((r) => r.value as T);
+  try {
+    return await withDBRetry(async (db) => {
+      const records = await db.kv.where("prefix").equals(prefix).toArray();
+      return records.map((r) => r.value as T);
+    });
+  } catch {
+    return [];
+  }
 }
 
 // 别名：与计划文档代码保持一致（get/set/del/keys/getMany）
@@ -203,14 +248,13 @@ export async function getChangesSince(since: string): Promise<KVRecord[]> {
 
 /**
  * 批量写入（增量同步下载用，比逐条 setItem 快 10x+）
+ * 2026-07-31：包 withDBRetry
  */
 export async function bulkPutItems<T>(
   items: Array<{ key: string; value: T }>
 ): Promise<void> {
   if (typeof window === "undefined") return;
   await ensureDBReady();
-  const db = await getDB();
-  if (!db) return;
   const records: KVRecord[] = items.map(({ key, value }) => ({
     key,
     value,
@@ -218,7 +262,9 @@ export async function bulkPutItems<T>(
     updatedAt: extractUpdatedAtFromValue(value),
     dueAt: extractDueAtFromValue(value),
   }));
-  await db.kv.bulkPut(records);
+  await withDBRetry(async (db) => {
+    await db.kv.bulkPut(records);
+  });
   // 批量写入后失效缓存（避免逐条失效）
   for (const { key } of items) {
     invalidateCache(key);
